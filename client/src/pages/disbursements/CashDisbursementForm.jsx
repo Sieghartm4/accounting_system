@@ -525,11 +525,11 @@ function SidebarInput({ label, placeholder, type = "text", required, dark }) {
 }
 
 {/* --- UPDATED SUMMARYROW COMPONENT --- */ }
-function SummaryRow({ label, value, color = "text-black" }) {
+function SummaryRow({ label, value, color = "text-green-600" }) {
   return (
     <div className="flex justify-between items-center hover:bg-gray-50/50 rounded-md transition-colors group">
       {/* Label remains at 10px */}
-      <span className="text-[12px] font-black uppercase tracking-widest text-gray-500">
+      <span className="text-[12px] font-black uppercase tracking-widest text-gray-600">
         {label}
       </span>
 

@@ -54,7 +54,7 @@ module.exports = {
         allowNull: true
       },
       cd_state: {
-        type: Sequelize.ENUM('PREPARED BY', 'CHECKED BY', 'APPROVED BY', 'REJECTED BY'),
+        type: Sequelize.ENUM('PREPARED','CHECKED','APPROVED','REJECTED','CANCELLED'),
         allowNull: true
       },
       cd_created_date: {

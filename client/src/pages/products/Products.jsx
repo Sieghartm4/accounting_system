@@ -1,15 +1,83 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Package, PlusSquare, ShieldCheck, Layers, ArrowRight, Download } from 'lucide-react';
+import { Package, PlusSquare, ShieldCheck, Layers, ArrowRight, Download, Plus } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
+import RightSideModal from '../../components/RightSideModal';
+import DynamicToast from '../../components/DynamicToast';
 import useProductService from './useProductService';
 
 export default function ProductService() {
-  const { productService, loading, error } = useProductService();
+  const { productService, loading, error, createProductService } = useProductService();
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    code: '',
+    name: '',
+    type: '',
+    category: '',
+    sales_price: '',
+    purchase_price: '',
+    unit: ''
+  });
+  const [toast, setToast] = useState(null);
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+  };
+
+  const handleAddProductClick = () => {
+    setFormData({ 
+      code: '', 
+      name: '', 
+      type: '', 
+      category: '', 
+      sales_price: '', 
+      purchase_price: '', 
+      unit: '' 
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleToastClose = () => {
+    setToast(null);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const result = await createProductService(
+        formData.code,
+        formData.name,
+        formData.type,
+        formData.category,
+        formData.sales_price,
+        formData.purchase_price,
+        formData.unit
+      );
+      
+      if (result.success) {
+        setToast({
+          type: 'success',
+          message: `Product/Service "${formData.name}" created successfully!`
+        });
+        setIsModalOpen(false);
+      } else {
+        setToast({
+          type: 'error',
+          message: result.message || 'Failed to create product/service'
+        });
+      }
+    } catch (error) {
+      setToast({
+        type: 'error',
+        message: 'Network error occurred while creating product/service'
+      });
+    }
   };
 
   if (loading) {
@@ -68,7 +136,7 @@ export default function ProductService() {
               <Download size={14} />
               EXPORT CATALOG
             </button>
-            <button className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+            <button onClick={handleAddProductClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
               <PlusSquare size={14} />
               Add New
             </button>
@@ -111,6 +179,156 @@ export default function ProductService() {
           enableAddButton={false}
         />
       </motion.div>
+      
+      {/* Add Product/Service Modal */}
+      <RightSideModal 
+        isOpen={isModalOpen} 
+        onClose={handleCloseModal} 
+        title="Create New Product/Service"
+      >
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Product/Service Code <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.code}
+                onChange={(e) => setFormData({...formData, code: e.target.value})}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter product/service code..."
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Product/Service Name <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter product/service name..."
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Type <span className="text-red-600">*</span>
+              </label>
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData({...formData, type: e.target.value})}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                required
+              >
+                <option value="">Select type...</option>
+                <option value="product">Product</option>
+                <option value="service">Service</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Category <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.category}
+                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter category..."
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                  Sales Price <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.sales_price}
+                  onChange={(e) => setFormData({...formData, sales_price: e.target.value})}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                  Purchase Price <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.purchase_price}
+                  onChange={(e) => setFormData({...formData, purchase_price: e.target.value})}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Unit <span className="text-red-600">*</span>
+              </label>
+              <select
+                value={formData.unit}
+                onChange={(e) => setFormData({...formData, unit: e.target.value})}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                required
+              >
+                <option value="">Select unit...</option>
+                <option value="pcs">Pieces</option>
+                <option value="kg">Kilograms</option>
+                <option value="l">Liters</option>
+                <option value="m">Meters</option>
+                <option value="box">Box</option>
+                <option value="hour">Hour</option>
+                <option value="day">Day</option>
+                <option value="service">Service</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={handleCloseModal}
+              className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 text-xs font-black rounded-xl hover:bg-gray-200 transition-all uppercase tracking-widest"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-3 bg-black text-white text-xs font-black rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+            >
+              <Plus size={14} />
+              Create Product/Service
+            </button>
+          </div>
+        </form>
+      </RightSideModal>
+      
+      {/* Toast Notification */}
+      {toast && (
+        <DynamicToast
+          type={toast.type}
+          message={toast.message}
+          onClose={handleToastClose}
+          duration={4000}
+        />
+      )}
     </div>
   );
 }
