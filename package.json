@@ -1,0 +1,27 @@
+{
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev:server": "dotenv -e .env -- npm run dev -w server",
+    "dev:client": "dotenv -e .env -- npm run dev -w client",
+    "bump:patch": "npm version patch && npm run sync-versions",
+    "bump:minor": "npm version minor && npm run sync-versions",
+    "bump:major": "npm version major && npm run sync-versions",
+    "sync-versions": "v=$(node -p \"require('./package.json').version\") && cd client && npm version $v --no-git-tag-version && cd ../server && npm version $v --no-git-tag-version",
+    "migrate": "dotenv -e .env -- npm run db:migrate -w server",
+    "migrate:undo": "dotenv -e .env -- npm run db:migrate:undo -w server",
+    "migrate:prod": "dotenv -e .env -- npm run db:migrate:prod -w server",
+    "seed": "dotenv -e .env -- npm run db:seed -w server",
+    "db:status": "dotenv -e .env -- npm run db:status -w server",
+    "db:reset": "dotenv -e .env -- npm run db:reset -w server",
+    "db:create": "dotenv -e .env -- npm run db:create -w server",
+    "db:setup": "dotenv -e .env -- npm run db:setup -w server",
+    "migration:create": "npm run db:generate:migration -w server --",
+    "seeder:create": "npm run db:generate:seeder -w server --"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^11.0.0"
+  }
+}
