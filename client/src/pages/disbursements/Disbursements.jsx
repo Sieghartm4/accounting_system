@@ -2,19 +2,29 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Wallet, Banknote, ShieldCheck, History, ArrowRight, Download } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
+import DynamicToast from '../../components/DynamicToast';
 import useDisbursements from './useDisbursements';
 import CashDisbursementForm from './CashDisbursementForm';
 
 export default function Disbursements() {
-  const { disbursements, loading, error } = useDisbursements();
+  const { disbursements, loading, error, refetchDisbursements } = useDisbursements();
   const [isAdding, setIsAdding] = useState(false);
+  const [toast, setToast] = useState(null);
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
   };
 
-  if (isAdding) return <CashDisbursementForm onBack={() => setIsAdding(false)} />;
+  if (isAdding) return (
+    <CashDisbursementForm
+      onBack={() => setIsAdding(false)}
+      onSuccess={async (nextToast) => {
+        if (nextToast) setToast(nextToast);
+        await refetchDisbursements();
+      }}
+    />
+  );
 
   if (loading) {
     return (
@@ -38,6 +48,14 @@ export default function Disbursements() {
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
+
+      {toast && (
+        <DynamicToast
+          type={toast.type}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
       
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">

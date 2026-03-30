@@ -11,23 +11,23 @@ module.exports = {
       },
       v_code: {
         type: Sequelize.STRING(20),
-        allowNull: true
+        allowNull: false
       },
       v_name: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       v_category: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: false
       },
       v_type: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: false
       },
       v_status: {
         type: Sequelize.ENUM("ACTIVE","INACTIVE"),
-        allowNull: true
+        allowNull: false
       }
     });
   },

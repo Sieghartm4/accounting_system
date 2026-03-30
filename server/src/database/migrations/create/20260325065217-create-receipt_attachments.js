@@ -11,7 +11,7 @@ module.exports = {
       },
       ra_receipt_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'receipts',
           key: 'r_id'
@@ -19,23 +19,23 @@ module.exports = {
       },
       ra_file: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       ra_name: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       ra_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       ra_uploaded_by: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       ra_uploaded_date: {
         type: Sequelize.STRING(30),
-        allowNull: true
+        allowNull: false
       }
     });
   },

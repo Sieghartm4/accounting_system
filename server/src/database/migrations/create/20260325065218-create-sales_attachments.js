@@ -11,7 +11,7 @@ module.exports = {
       },
       sa_sales_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'sales',
           key: 's_id'
@@ -19,23 +19,23 @@ module.exports = {
       },
       sa_file: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       sa_name: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       sa_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       sa_uploaded_by: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       sa_uploaded_date: {
         type: Sequelize.STRING(30),
-        allowNull: true
+        allowNull: false
       }
     });
   },

@@ -11,7 +11,7 @@ module.exports = {
       },
       cdi_cash_disbursement_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'cash_disbursements',
           key: 'cd_id'
@@ -23,7 +23,7 @@ module.exports = {
       },
       cdi_charts_of_accounts: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'charts_of_accounts',
           key: 'coa_id'
@@ -31,7 +31,7 @@ module.exports = {
       },
       cdi_description: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       cdi_unit: {
         type: Sequelize.STRING(300),
@@ -43,23 +43,23 @@ module.exports = {
       },
       cdi_purchase_price: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       },
       cdi_discount: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       },
       cdi_vat: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       },
       cdi_witholding_tax: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       },
       cdi_responsibility_center: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       }
     });
   },

@@ -1,53 +1,106 @@
 const os = require('os')
-const { checkConnection, SelectAll } = require('../database/util/queries.util')
+const { checkConnection, SelectAll, Transaction, Query, Insert } = require('../database/util/queries.util')
 const { formatMemoryUsage, formatTime, DataModeling } = require('../util/helper.util')
 const { Accounting } = require('../database/model/Accounting')
+const { Master } = require('../database/model/Master')
+const { SQLQueryBuilder } = require('../util/helper.util')
+const sql = new SQLQueryBuilder()
+const mysql = require('mysql2/promise')
+const CONFIG = require('../database/config/config')
 
+const pool = mysql.createPool({
+  host: CONFIG[process.env.NODE_ENV].host,
+  user: CONFIG[process.env.NODE_ENV].username,
+  password: CONFIG[process.env.NODE_ENV].password,
+  database: CONFIG[process.env.NODE_ENV].database,
+  multipleStatements: CONFIG[process.env.NODE_ENV].dialectOptions.multipleStatements,
+})
 require('dotenv').config()
 
 const getCashDisbursements = async (req, res, next) => {
-  try {
-    const cashDisbursements = await SelectAll(Accounting.cash_disbursements.tablename, Accounting.cash_disbursements.prefix_)
-    
-    res.status(200).json({
-      success: true,
-      message: 'Cash disbursements retrieved successfully',
-      data: cashDisbursements,
-      count: cashDisbursements.length,
-      timestamp: new Date().toISOString()
-    })
+    try {
+        const query = sql.select([
+                    { col: Accounting.cash_disbursements.selectOptionColumns.id, as: 'id' },
+                    { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
+                    { col: Accounting.cash_disbursements.selectOptionColumns.document_reference, as: 'doc_ref' },
+                    { col: Accounting.cash_disbursements.selectOptionColumns.payment_date, as: 'payment_date' },
+                    { col: Accounting.cash_disbursements.selectOptionColumns.mode_of_payment, as: 'mode' },
+                    { col: Accounting.cash_disbursements.selectOptionColumns.bank_name, as: 'bank_name' },
+                    { col: Accounting.cash_disbursements.selectOptionColumns.check_number, as: 'check_number' },
+                    { col: Accounting.cash_disbursements.selectOptionColumns.category, as: 'category' },
+                    { col: Accounting.cash_disbursements.selectOptionColumns.remarks, as: 'remarks' },
+                    { col: Accounting.cash_disbursements.selectOptionColumns.total_amount_due, as: 'amount_due' },
+                    { col: Accounting.cash_disbursements.selectOptionColumns.status, as: 'status' },
+                    { col: Accounting.cash_disbursements.selectOptionColumns.state, as: 'state' }
+                ])
+                .from(Accounting.cash_disbursements.tablename)
+                .innerJoin(Master.vendors.tablename, Accounting.cash_disbursements.selectOptionColumns.vendor_id, Master.vendors.selectOptionColumns.id)
+                .build();
 
-  } catch (error) {
-    console.error('Error fetching cash disbursements:', error)
-    return res.status(500).json({ 
-      success: false,
-      message: 'Server error while fetching cash disbursements',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    })
-  }
+        let result = await Query(query, [Accounting.cash_disbursements.prefix_, Master.vendors.prefix_]);
+        res.status(200).json({
+            success: true,
+            message: 'Cash disbursements retrieved successfully',
+            data: result,
+            count: result.length,
+            timestamp: new Date().toISOString()
+        })
+
+    } catch (error) {
+        console.error('Error fetching cash disbursements:', error)
+        return res.status(500).json({
+            success: false,
+            message: 'Server error while fetching cash disbursements',
+            error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        })
+    }
 }
 
 const createCashDisbursement = async (req, res, next) => {
     try {
-        const { vendor_id, document_reference, payment_date, mode_of_payment, bank_name, check_number, category, remarks, total_amount_due, created_by } = req.body;
-
-        if (!vendor_id || !document_reference || !payment_date || !mode_of_payment || !bank_name || !check_number || !category || !remarks || !total_amount_due || !created_by) {
+        const { 
+            vendor_id, 
+            document_reference, 
+            payment_date, 
+            mode_of_payment, 
+            bank_name, 
+            check_number, 
+            category, 
+            remarks, 
+            total_amount_due, 
+            created_by, 
+            disbursement_items, 
+            journal_entries, 
+            attachments 
+        } = req.body;
+        console.log(req.body)
+        
+        if (!vendor_id || !document_reference || !payment_date || !mode_of_payment || !category || !remarks || !total_amount_due || !created_by) {
             return res.status(400).json({
                 success: false,
                 message: 'All fields are required'
             });
         }
         
-        let queries = []
+        if ((mode_of_payment === 'CHECK' || mode_of_payment === 'BANK_TRANSFER') && (!bank_name || !check_number)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Bank name and check number are required for CHECK or BANK_TRANSFER payments'
+            });
+        }
         
-        queries.push({
-            sql: sql.insert(Accounting.cash_disbursements.tablename, {
+        let connection;
+        try {
+            connection = await pool.getConnection();
+            await connection.beginTransaction();
+            
+            const mainQuery = sql.insert(Accounting.cash_disbursements.tablename, {
                 columns: Accounting.cash_disbursements.insertColumns,
                 prefix: Accounting.cash_disbursements.prefix,
                 isTransaction: true
-            })
-                .build(),
-            values: [
+            }).build();
+            
+            const mainValues = [
                 vendor_id || null,
                 document_reference || null,
                 payment_date || null,
@@ -57,38 +110,109 @@ const createCashDisbursement = async (req, res, next) => {
                 category || null,
                 remarks || null,
                 total_amount_due || null,
+                'UNPAID',
+                'PREPARED',
+                new Date().toISOString().split('T')[0],
                 created_by || null
-            ]
-        });
+            ];
+            
+            const [mainResult] = await connection.execute(mainQuery, mainValues);
+            const cashDisbursementId = mainResult.insertId;
+            
+            if (disbursement_items && disbursement_items.length > 0) {
+                for (const item of disbursement_items) {
+                    const itemQuery = sql.insert(Accounting.cash_disbursement_items.tablename, {
+                        columns: Accounting.cash_disbursement_items.insertColumns,
+                        prefix: Accounting.cash_disbursement_items.prefix,
+                        isTransaction: true
+                    }).build();
+                    
+                    const itemValues = [
+                        cashDisbursementId,
+                        item.product_id || null,
+                        item.account_id || null,
+                        item.description || null,
+                        item.unit || '',
+                        item.qty || 0,
+                        item.price || 0,
+                        item.discount || 0,
+                        item.vat || 0,
+                        item.wtax || 0,
+                        item.responsibility_center || ''
+                    ];
+                    
+                    await connection.execute(itemQuery, itemValues);
+                }
+            }
 
-        let result = await Transaction(queries);
+            if (journal_entries && journal_entries.length > 0) {
+                for (const entry of journal_entries) {
+                    const entryQuery = sql.insert(Accounting.journal_entries.tablename, {
+                        columns: Accounting.journal_entries.insertColumns,
+                        prefix: Accounting.journal_entries.prefix,
+                        isTransaction: true
+                    }).build();
+                    
+                    const type = entry.debit > 0 ? 'debit' : 'credit';
+                    const amount = entry.debit > 0 ? entry.debit : entry.credit;
+                    
+                    const entryValues = [
+                        "cash_disbursements",
+                        cashDisbursementId,
+                        entry.account_id || null,
+                        entry.responsibility_center || '',
+                        type,
+                        amount,
+                        new Date().toISOString().split('T')[0]
+                    ];
+                    
+                    await connection.execute(entryQuery, entryValues);
+                }
+            }
 
-        const getIdQuery = `SELECT LAST_INSERT_ID() as insertId`;
-        const idResult = await Query(getIdQuery);
-        const newCashDisbursementId = idResult[0]?.insertId;
-
-        if (!newCashDisbursementId) {
-            throw new Error('Failed to get cash disbursement ID from insertion');
+            if (attachments && attachments.length > 0) {
+                for (const attachment of attachments) {
+                    const attachmentQuery = sql.insert(Accounting.cash_disbursement_attachments.tablename, {
+                        columns: Accounting.cash_disbursement_attachments.insertColumns,
+                        prefix: Accounting.cash_disbursement_attachments.prefix,
+                        isTransaction: true
+                    }).build();
+                    
+                    const attachmentValues = [
+                        cashDisbursementId,
+                        attachment.fileName || null,
+                        attachment.file || null,
+                        attachment.remarks || null,
+                        attachment.uploadedBy || null,
+                        attachment.date || new Date().toLocaleDateString()
+                    ];
+                    
+                    await connection.execute(attachmentQuery, attachmentValues);
+                }
+            }
+            
+            // Commit transaction
+            await connection.commit();
+            
+            res.status(201).json({
+                success: true,
+                message: 'Cash disbursement created successfully',
+                data: { id: cashDisbursementId },
+                timestamp: new Date().toISOString()
+            });
+            
+        } catch (error) {
+            // Rollback transaction if error occurs
+            if (connection) {
+                await connection.rollback();
+            }
+            throw error;
+        } finally {
+            // Release connection
+            if (connection) {
+                connection.release();
+            }
         }
-
-        res.status(201).json({
-            success: true,
-            message: 'Cash disbursement created successfully',
-            data: {
-                id: newCashDisbursementId,
-                vendor_id: vendor_id,
-                document_reference: document_reference,
-                payment_date: payment_date,
-                mode_of_payment: mode_of_payment,
-                bank_name: bank_name,
-                check_number: check_number,
-                category: category,
-                remarks: remarks,
-                total_amount_due: total_amount_due,
-                created_by: created_by
-            },
-            timestamp: new Date().toISOString()
-        });
 
     } catch (error) {
         console.error('Error creating cash disbursement:', error);
@@ -101,6 +225,6 @@ const createCashDisbursement = async (req, res, next) => {
 }
 
 module.exports = {
-  getCashDisbursements,
-  createCashDisbursement
+    getCashDisbursements,
+    createCashDisbursement
 }

@@ -11,15 +11,15 @@ module.exports = {
       },
       pe_module: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: false
       },
       pe_name: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       pe_coa_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'charts_of_accounts',
           key: 'coa_id'
@@ -27,7 +27,7 @@ module.exports = {
       },
       pe_t_account: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       }
     });
   },

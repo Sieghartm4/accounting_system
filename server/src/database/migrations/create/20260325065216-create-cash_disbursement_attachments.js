@@ -11,7 +11,7 @@ module.exports = {
       },
       a_cash_disburssement_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'cash_disbursements',
           key: 'cd_id'
@@ -19,23 +19,23 @@ module.exports = {
       },
       a_file: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       a_name: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       a_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       a_uploaded_by: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       a_uploaded_date: {
         type: Sequelize.STRING(30),
-        allowNull: true
+        allowNull: false
       }
     });
   },

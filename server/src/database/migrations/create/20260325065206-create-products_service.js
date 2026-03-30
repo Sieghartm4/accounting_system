@@ -11,31 +11,31 @@ module.exports = {
       },
       ps_code: {
         type: Sequelize.STRING(20),
-        allowNull: true
+        allowNull: false
       },
       ps_name: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       ps_type: {
         type: Sequelize.ENUM("PRODUCT","SERVICE"),
-        allowNull: true
+        allowNull: false
       },
       ps_category: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: false
       },
       ps_sales_price: {
         type: Sequelize.INTEGER,
-        allowNull: true
+        allowNull: false
       },
       ps_purchase_price: {
         type: Sequelize.INTEGER,
-        allowNull: true
+        allowNull: false
       },
       ps_unit: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: false
       }
     });
   },

@@ -224,7 +224,7 @@ const DynamicTable = ({
                   className="px-6 py-4 text-left group cursor-pointer hover:bg-gray-100/50 transition-all select-none"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-black uppercase tracking-[2px] transition-colors">
+                    <span className="text-[12px] font-black text-black uppercase tracking-[2px] transition-colors">
                       {header}
                     </span>
                     {sortColumn === header && (

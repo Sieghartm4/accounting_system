@@ -25,7 +25,7 @@ const initRoutes = (app) => {
   app.use('/route_access', routeAccessRouter)
   app.use('/company', companyRouter)
   app.use('/cash_disbursements', cashDisbursementRouter)
-  app.use('/receipts', receiptRouter)
+  app.use('/receipt', receiptRouter)
   app.use('/sales', salesRouter)
   app.use('/collections', collectionRouter)
   app.use('/journal_entries', journalEntriesRouter)

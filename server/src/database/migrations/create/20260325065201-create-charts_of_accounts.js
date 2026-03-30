@@ -11,23 +11,23 @@ module.exports = {
       },
       coa_code: {
         type: Sequelize.STRING(20),
-        allowNull: true
+        allowNull: false
       },
       coa_name: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       coa_type: {
         type: Sequelize.ENUM('ASSETS', 'LIABILITIES', 'EQUITY', 'REVENUE', 'EXPENSES'),
-        allowNull: true
+        allowNull: false
       },
       coa_description: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       coa_status: {
         type: Sequelize.ENUM("ACTIVE","INACTIVE"),
-        allowNull: true
+        allowNull: false
       }
     });
   },

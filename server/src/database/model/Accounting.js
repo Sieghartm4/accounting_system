@@ -1,9 +1,9 @@
 const Accounting = {
-	cash_disbursements: {
-  tablename: "cash_disbursements",
-  prefix: "cd",
-  prefix_: "cd_",
-  insertColumns: [
+  cash_disbursements: {
+    tablename: "cash_disbursements",
+    prefix: "cd",
+    prefix_: "cd_",
+    insertColumns: [
       "vendor_id",
       "document_reference",
       "payment_date",
@@ -18,7 +18,7 @@ const Accounting = {
       "created_date",
       "created_by"
     ],
-  selectColumns: [
+    selectColumns: [
       "cd_id",
       "cd_vendor_id",
       "cd_document_reference",
@@ -34,40 +34,42 @@ const Accounting = {
       "cd_created_date",
       "cd_created_by"
     ],
-  selectOptionColumns: {
-    id: "cd_id",
-    vendor_id: "cd_vendor_id",
-    document_reference: "cd_document_reference",
-    payment_date: "cd_payment_date",
-    mode_of_payment: "cd_mode_of_payment",
-    bank_name: "cd_bank_name",
-    check_number: "cd_check_number",
-    category: "cd_category",
-    remarks: "cd_remarks",
-    total_amount_due: "cd_total_amount_due",
-    status: "cd_status",
-    state: "cd_state",
-    created_date: "cd_created_date",
-    created_by: "cd_created_by"
-  },
-  updateOptionColumns: {
-    id: "id",
-    vendor_id: "vendor_id",
-    document_reference: "document_reference",
-    payment_date: "payment_date",
-    mode_of_payment: "mode_of_payment",
-    bank_name: "bank_name",
-    check_number: "check_number",
-    category: "category",
-    remarks: "remarks",
-    total_amount_due: "total_amount_due",
-    status: "status",
-    state: "state",
-    created_date: "created_date",
-    created_by: "created_by"
-  },
-  selectDateFormatColumns: {
+    selectOptionColumns: {
+      id: "cd_id",
+      vendor_id: "cd_vendor_id",
+      document_reference: "cd_document_reference",
+      payment_date: "cd_payment_date",
+      mode_of_payment: "cd_mode_of_payment",
+      bank_name: "cd_bank_name",
+      check_number: "cd_check_number",
+      category: "cd_category",
+      remarks: "cd_remarks",
+      total_amount_due: "cd_total_amount_due",
+      status: "cd_status",
+      state: "cd_state",
+      created_date: "cd_created_date",
+      created_by: "cd_created_by"
+    },
+    updateOptionColumns: {
+      id: "id",
+      vendor_id: "vendor_id",
+      document_reference: "document_reference",
+      payment_date: "payment_date",
+      mode_of_payment: "mode_of_payment",
+      bank_name: "bank_name",
+      check_number: "check_number",
+      category: "category",
+      remarks: "remarks",
+      total_amount_due: "total_amount_due",
+      status: "status",
+      state: "state",
+      created_date: "created_date",
+      created_by: "created_by"
+    },
+    selectDateFormatColumns: {
 
+    },
+    selectMiscColumns: {
   },
   selectMiscColumns: {
 

@@ -11,7 +11,7 @@ module.exports = {
       },
       ri_receipts_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'receipts',
           key: 'r_id'
@@ -19,11 +19,11 @@ module.exports = {
       },
       ri_product_service: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       ri_charts_of_accounts: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'charts_of_accounts',
           key: 'coa_id'
@@ -31,35 +31,35 @@ module.exports = {
       },
       ri_description: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       ri_unit: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       ri_quantity: {
         type: Sequelize.INTEGER,
-        allowNull: true
+        allowNull: false
       },
       ri_sales_price: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       },
       ri_discount: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       },
       ri_vat: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       },
       ri_witholding_tax: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       },
       ri_responsibility_center: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       }
     });
   },

@@ -168,15 +168,20 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CashDisbursementForm({ onBack, onSuccess }) {
-
-  const [disbursementItems, setDisbursementItems] = useState([
+export default function ReceiptsForm({ onBack, onSuccess }) {
+  const [receiptItems, setReceiptItems] = useState([
     { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
   ]);
 
   const [journalEntries, setJournalEntries] = useState([
     { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 }
   ]);
+
+  const [customers, setCustomers] = useState([]);
+  const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerError, setCustomerError] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
 
   const [vendors, setVendors] = useState([]);
   const [vendorLoading, setVendorLoading] = useState(false);
@@ -213,6 +218,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
 
   const coaOptions = chartsOfAccounts.map(a => ({ label: a.name || a.account_name, sublabel: a.code || a.account_code, value: a.id }));
   const vendorOptions = vendors.map(v => ({ label: v.name || v.code, sublabel: v.code, value: v.id }));
+  const customerOptions = customers.map(c => ({ label: c.name || c.customer_name, sublabel: c.code, value: c.id }));
   const productOptions = products.map(p => ({ label: p.name || p.product_name, sublabel: p.code || p.product_code, value: p.id }));
 
   const fetchVendors = async () => {
@@ -225,6 +231,18 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
       const result = await res.json();
       if (result.success) setVendors(result.data); else setVendorError(result.message || 'Failed to fetch vendors');
     } catch (err) { setVendorError(err.message); } finally { setVendorLoading(false); }
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      setCustomerLoading(true);
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No authorization token found");
+      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, { method: "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const result = await res.json();
+      if (result.success) setCustomers(result.data); else setCustomerError(result.message || 'Failed to fetch customers');
+    } catch (err) { setCustomerError(err.message); } finally { setCustomerLoading(false); }
   };
 
   const fetchChartsOfAccounts = async () => {
@@ -257,18 +275,18 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
     } catch (err) { setProductError(err.message); } finally { setProductLoading(false); }
   };
 
-  useEffect(() => { fetchVendors(); fetchChartsOfAccounts(); fetchProducts(); }, []);
+  useEffect(() => { fetchCustomers(); fetchChartsOfAccounts(); fetchProducts(); }, []);
 
-  const addDisbursementItem = (isOther = false) => setDisbursementItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
+  const addReceiptItem = (isOther = false) => setReceiptItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0 }]);
-  const removeDisbursementItem = (id) => setDisbursementItems(prev => prev.filter(i => i.id !== id));
+  const removeReceiptItem = (id) => setReceiptItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
-  const updateDisbursementItem = (id, field, value) => setDisbursementItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+  const updateReceiptItem = (id, field, value) => setReceiptItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   const updateJournalEntry = (id, field, value) => setJournalEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
   const addAttachment = () => setAttachments(prev => [...prev, { id: Date.now(), fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }]);
   const removeAttachment = (id) => setAttachments(prev => prev.filter(a => a.id !== id));
 
-  const summary = computeSummary(disbursementItems);
+  const summary = computeSummary(receiptItems);
 
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
@@ -308,7 +326,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
       }
     }
 
-    disbursementItems.forEach((item) => {
+    receiptItems.forEach((item) => {
       const qty = parseFloat(item.qty) || 0;
       const price = parseFloat(item.price) || 0;
       const discountPct = parseFloat(item.discount) || 0;
@@ -408,8 +426,8 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       const createdBy = userData.mu_username || userData.username || 'Unknown User';
 
-      if (!selectedVendor) {
-        setToast({ type: 'warning', message: 'Please select a vendor' });
+      if (!selectedCustomer) {
+        setToast({ type: 'warning', message: 'Please select a customer' });
         return;
       }
 
@@ -423,8 +441,8 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
         return;
       }
 
-      if (disbursementItems.length === 0 || (disbursementItems.length === 1 && disbursementItems[0].isOther)) {
-        setToast({ type: 'warning', message: 'Please add at least one disbursement item' });
+      if (receiptItems.length === 0 || (receiptItems.length === 1 && receiptItems[0].isOther)) {
+        setToast({ type: 'warning', message: 'Please add at least one receipt item' });
         return;
       }
 
@@ -434,7 +452,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
         return;
       }
 
-      const preparedDisbursementItems = disbursementItems
+      const preparedReceiptItems = receiptItems
         .filter(item => !item.isOther)
         .map(item => ({
           product_id: item.productId || null,
@@ -468,29 +486,29 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
         }))
       );
 
-      const disbursementData = {
-        vendor_id: selectedVendor,
+      const receiptData = {
+        customer_id: selectedCustomer,
         document_reference: documentReference,
-        payment_date: new Date().toISOString().split('T')[0],
+        payment_date: new Date().toISOString().split("T")[0],
         mode_of_payment: modeOfPayment,
-        bank_name: bankName || '',
-        check_number: checkNumber || '',
+        bank_name: bankName || "",
+        check_number: checkNumber || "",
         category: category,
         remarks: remarks,
         total_amount_due: summary.totalAmountDue,
         created_by: createdBy,
-        disbursement_items: preparedDisbursementItems,
+        receipt_items: preparedReceiptItems,
         journal_entries: preparedJournalEntries,
         attachments: preparedAttachments
       };
-
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/cash_disbursements`, {
+      
+      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/receipt`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(disbursementData)
+        body: JSON.stringify(receiptData)
       });
 
       if (!response.ok) {
@@ -502,23 +520,23 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
       const result = await response.json();
 
       if (result.success) {
-        const nextToast = { type: 'success', message: 'Cash disbursement created successfully!' };
+        const nextToast = { type: 'success', message: 'Receipt created successfully!' };
         setToast(nextToast);
         if (onSuccess) await onSuccess(nextToast);
         onBack();
       } else {
-        setToast({ type: 'error', message: result.message || 'Failed to create cash disbursement' });
+        setToast({ type: 'error', message: result.message || 'Failed to create receipt' });
       }
 
     } catch (error) {
-      console.error('Error posting cash disbursement:', error);
+      console.error('Error posting receipt:', error);
       setToast({ type: 'error', message: 'Error: ' + error.message });
     }
   };
 
   useEffect(() => {
     generateJournalEntries();
-  }, [disbursementItems, modeOfPayment, bankName, chartsOfAccounts]);
+  }, [receiptItems, modeOfPayment, bankName, chartsOfAccounts]);
   return (
     <div className="h-full flex flex-col overflow-x-hidden bg-[#F3F4F6]">
       <style dangerouslySetInnerHTML={{
@@ -545,7 +563,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
       {/* TOP NAV */}
       <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <nav className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors" onClick={onBack}>
-          <ArrowLeft size={17} /><span className="text-black">Back to Cash Disbursements</span>
+          <ArrowLeft size={17} /><span className="text-black">Back to Receipts</span>
         </nav>
         <div className="flex gap-2">
           <button className="px-4 py-2 bg-white border border-gray-200 text-[12px] font-black text-gray-400 rounded-lg hover:bg-gray-50 transition-all uppercase">Save Draft</button>
@@ -568,10 +586,10 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
             </h3>
             <div className="grid grid-cols-1 gap-2.5">
               <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Vendor / Payee <span className="text-red-600">*</span></label>
-                {vendorLoading
-                  ? <div className={inputBase + " text-gray-400 py-1.5"}>Loading vendors…</div>
-                  : <SearchableDropdown placeholder="Search vendor..." value={vendorSearch} onChange={v => { setVendorSearch(v); setSelectedVendor(''); }} onSelect={opt => { setSelectedVendor(opt.value); setVendorSearch(opt.label); }} options={vendorOptions} inputClassName={inputBase} emptyText={vendorError || 'No vendors found'} />
+                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Customer <span className="text-red-600">*</span></label>
+                {customerLoading
+                  ? <div className={inputBase + " text-gray-400 py-1.5"}>Loading customers…</div>
+                  : <SearchableDropdown placeholder="Search customer..." value={customerSearch} onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); }} onSelect={opt => { setSelectedCustomer(opt.value); setCustomerSearch(opt.label); }} options={customerOptions} inputClassName={inputBase} emptyText={customerError || 'No customers found'} />
                 }
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -726,7 +744,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
           <motion.div initial="hidden" animate="visible" variants={fadeInUp} className="space-y-4">
 
             {/* 1. DISBURSEMENT ITEMS */}
-            <TableSection title="Disbursement Items" icon={<Wallet size={14} />}>
+            <TableSection title="Receipt Items" icon={<Wallet size={14} />}>
               <div className="w-full flex flex-col gap-[2px] mb-3">
                 <div className="h-[2px] w-full bg-red-600 rounded-full" />
                 <div className="h-[1px] w-full bg-black/10" />
@@ -751,66 +769,63 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
                   <thead>
                     <tr className="border-b border-gray-100">
                       {['Product/Service', 'Charts of Accounts', 'Description', 'Unit', 'Qty', 'Price', 'Disc %', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
-                        <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center whitespace-nowrap px-1">{h}</th>
+                        <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {disbursementItems.map((item) => (
+                    {receiptItems.map((item) => (
                       <tr key={item.id} className={item.isOther ? 'bg-gray-50/30' : ''}>
                         <td className="py-1 px-1">
-                          <SearchableDropdown 
+                          <SearchableDropdown
                             disabled={item.isOther}
-                            placeholder="Search product..." 
-                            value={item.productSearch} 
-                            onChange={v => updateDisbursementItem(item.id, 'productSearch', v)} 
-                            onSelect={opt => { updateDisbursementItem(item.id, 'productId', opt.value); updateDisbursementItem(item.id, 'productSearch', opt.label); }} 
-                            options={productOptions} 
+                            placeholder="Search product..."
+                            value={item.productSearch}
+                            onChange={v => updateReceiptItem(item.id, 'productSearch', v)}
+                            onSelect={opt => { updateReceiptItem(item.id, 'productId', opt.value); updateReceiptItem(item.id, 'productSearch', opt.label); }}
+                            options={productOptions}
                             inputClassName={`${tableInput} ${item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
-                            emptyText={productError || 'No products found'} 
+                            emptyText={productError || 'No products found'}
                           />
                         </td>
                         <td className="py-1 px-1">
-                          <SearchableDropdown placeholder="Search account..." value={item.coaSearch} onChange={v => updateDisbursementItem(item.id, 'coaSearch', v)} onSelect={opt => { updateDisbursementItem(item.id, 'coa', opt.value); updateDisbursementItem(item.id, 'coaSearch', opt.label); }} options={coaOptions} inputClassName={tableInput} emptyText="No accounts found" />
+                          <SearchableDropdown placeholder="Search account..." value={item.coaSearch} onChange={v => updateReceiptItem(item.id, 'coaSearch', v)} onSelect={opt => { updateReceiptItem(item.id, 'coa', opt.value); updateReceiptItem(item.id, 'coaSearch', opt.label); }} options={coaOptions} inputClassName={tableInput} emptyText="No accounts found" />
                         </td>
                         <td className="py-1 px-1">
-                          <input className={tableInput} placeholder="Details..." value={item.description} onChange={e => updateDisbursementItem(item.id, 'description', e.target.value)} />
+                          <input className={tableInput} placeholder="Details..." value={item.description} onChange={e => updateReceiptItem(item.id, 'description', e.target.value)} />
                         </td>
                         <td className="py-1 px-1">
-                          <input disabled={item.isOther} className={`${tableInput} ${item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : 'pc'} value={item.isOther ? '' : item.unit} onChange={e => updateDisbursementItem(item.id, 'unit', e.target.value)} />
+                          <input disabled={item.isOther} className={`${tableInput} ${item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : 'pc'} value={item.isOther ? '' : item.unit} onChange={e => updateReceiptItem(item.id, 'unit', e.target.value)} />
                         </td>
                         <td className="py-1 px-1">
-                          <input disabled={item.isOther} type="number" min="0" className={`${tableInput} ${item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : '1'} value={item.isOther ? '' : item.qty} onChange={e => updateDisbursementItem(item.id, 'qty', parseFloat(e.target.value) || 0)} />
+                          <input disabled={item.isOther} type="number" min="0" className={`${tableInput} ${item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : '1'} value={item.isOther ? '' : item.qty} onChange={e => updateReceiptItem(item.id, 'qty', parseFloat(e.target.value) || 0)} />
                         </td>
                         <td className="py-1 px-1">
-                          <input className={tableInput + ' font-black'} type="number" min="0" step="0.01" placeholder="0.00" value={item.price} onChange={e => updateDisbursementItem(item.id, 'price', parseFloat(e.target.value) || 0)} />
+                          <input className={tableInput + ' font-black'} type="number" min="0" step="0.01" placeholder="0.00" value={item.price} onChange={e => updateReceiptItem(item.id, 'price', parseFloat(e.target.value) || 0)} />
                         </td>
-                        {/* DISCOUNT % */}
                         <td className="py-1 px-1">
                           <div className="relative">
-                            <input className={pctInput + ' font-black'} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.discount || 0} onChange={e => updateDisbursementItem(item.id, 'discount', parseFloat(e.target.value) || 0)} />
+                            <input className={pctInput + ' font-black'} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.discount || 0} onChange={e => updateReceiptItem(item.id, 'discount', parseFloat(e.target.value) || 0)} />
                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">%</span>
                           </div>
                         </td>
-                        {/* VAT % */}
                         <td className="py-1 px-1">
                           <div className="relative">
-                            <input className={pctInput + ' font-black text-red-600'} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.vat} onChange={e => updateDisbursementItem(item.id, 'vat', parseFloat(e.target.value) || 0)} />
+                            <input className={pctInput + ' font-black text-red-600'} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.vat} onChange={e => updateReceiptItem(item.id, 'vat', parseFloat(e.target.value) || 0)} />
                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-red-400 font-black pointer-events-none">%</span>
                           </div>
                         </td>
-                        {/* WHT % */}
                         <td className="py-1 px-1">
                           <div className="relative">
-                            <input className={pctInput + ' font-black text-blue-600'} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.wht} onChange={e => updateDisbursementItem(item.id, 'wht', parseFloat(e.target.value) || 0)} />
+                            <input className={pctInput + ' font-black text-blue-600'} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.wht} onChange={e => updateReceiptItem(item.id, 'wht', parseFloat(e.target.value) || 0)} />
                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-blue-400 font-black pointer-events-none">%</span>
                           </div>
                         </td>
                         <td className="py-1 px-1">
-                          <input className={tableInput} placeholder="Select" value={item.responsibilityCenter} onChange={e => updateDisbursementItem(item.id, 'responsibilityCenter', e.target.value)} />
+                          <input className={tableInput} placeholder="Select" value={item.responsibilityCenter} onChange={e => updateReceiptItem(item.id, 'responsibilityCenter', e.target.value)} />
                         </td>
                         <td className="py-1 px-1 text-center">
-                          <button onClick={() => removeDisbursementItem(item.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors">
+                          <button onClick={() => removeReceiptItem(item.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors">
                             <Trash2 size={15} />
                           </button>
                         </td>
@@ -819,12 +834,11 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
                   </tbody>
                 </table>
               </div>
-
-              <div className="flex gap-3 mt-3">
-                <button onClick={() => addDisbursementItem(false)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-2">
+              <div className="flex gap-2 mt-3">
+                <button onClick={() => addReceiptItem(false)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-2">
                   <Plus size={14} /> ADD Product/Service
                 </button>
-                <button onClick={() => addDisbursementItem(true)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2">
+                <button onClick={() => addReceiptItem(true)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2">
                   <Plus size={14} /> ADD Others
                 </button>
               </div>

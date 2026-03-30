@@ -11,7 +11,7 @@ module.exports = {
       },
       r_customer_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'customers',
           key: 'c_id'
@@ -19,15 +19,15 @@ module.exports = {
       },
       r_document_reference: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: false
       },
       r_collection_date: {
         type: Sequelize.STRING(20),
-        allowNull: true
+        allowNull: false
       },
       r_mode_of_payment: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       r_bank_name: {
         type: Sequelize.STRING(300),
@@ -39,31 +39,31 @@ module.exports = {
       },
       r_category: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: false
       },
       r_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       r_total_amount_due: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       },
       r_status: {
         type: Sequelize.ENUM('COLLECTED', 'NOT COLLECTED', 'PARTIALLY COLLECTED'),
-        allowNull: true
+        allowNull: false
       },
       r_state: {
-        type: Sequelize.ENUM('PREPARED BY', 'CHECKED BY', 'APPROVED BY', 'REJECTED BY'),
-        allowNull: true
+        type: Sequelize.ENUM('PREPARED','CHECKED','APPROVED','REJECTED','CANCELLED'),
+        allowNull: false
       },
       r_created_date: {
         type: Sequelize.STRING(30),
-        allowNull: true
+        allowNull: false
       },
       r_created_by: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       }
     });
   },

@@ -11,7 +11,7 @@ module.exports = {
       },
       c_customer_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'customers',
           key: 'c_id'
@@ -19,11 +19,11 @@ module.exports = {
       },
       c_document_reference: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: false
       },
       c_mode_of_payment: {
         type: Sequelize.ENUM('CASH', 'CHECK', 'BANK_TRANSFER', 'CARD', 'E-WALLET', 'OTHERS'),
-        allowNull: true
+        allowNull: false
       },
       c_bank_name: {
         type: Sequelize.STRING(300),
@@ -35,27 +35,27 @@ module.exports = {
       },
       c_collection_date: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       c_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       c_status: {
         type: Sequelize.ENUM('COLLECTED', 'NOT COLLECTED', 'PARTIALLY COLLECTED'),
-        allowNull: true
+        allowNull: false
       },
       c_state: {
-        type: Sequelize.ENUM('PREPARED BY', 'CHECKED BY', 'APPROVED BY', 'REJECTED BY'),
-        allowNull: true
+        type: Sequelize.ENUM('PREPARED','CHECKED','APPROVED','REJECTED','CANCELLED'),
+        allowNull: false
       },
       c_created_date: {
         type: Sequelize.STRING(30),
-        allowNull: true
+        allowNull: false
       },
       c_created_by: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       }
     });
   },

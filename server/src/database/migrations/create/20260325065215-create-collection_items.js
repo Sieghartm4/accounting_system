@@ -11,19 +11,19 @@ module.exports = {
       },
       ci_collection_id: {
         type: Sequelize.INTEGER,
-        allowNull: true
+        allowNull: false
       },
       ci_sales_id: {
         type: Sequelize.INTEGER,
-        allowNull: true
+        allowNull: false
       },
       ci_amount: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       },
       ci_witholding_tax: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       }
     });
   },

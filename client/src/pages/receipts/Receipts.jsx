@@ -1,16 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Receipt, FilePlus, ShieldCheck, CreditCard, ArrowRight, Download } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
+import DynamicToast from '../../components/DynamicToast';
 import useReceipts from './useReceipts';
+import ReceiptsForm from './ReceiptsForm';
 
 export default function Receipts() {
-  const { receipts, loading, error } = useReceipts();
+  const { receipts, loading, error, refetchReceipts } = useReceipts();
+  const [isAdding, setIsAdding] = useState(false);
+  const [toast, setToast] = useState(null);
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
   };
+  if (isAdding) return (
+    <ReceiptsForm
+      onBack={() => setIsAdding(false)}
+      onSuccess={async (nextToast) => {
+        if (nextToast) setToast(nextToast);
+        await refetchReceipts();
+      }}
+    />
+  );
 
   if (loading) {
     return (
@@ -34,6 +47,14 @@ export default function Receipts() {
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
+
+      {toast && (
+        <DynamicToast
+          type={toast.type}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
       
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
@@ -68,7 +89,7 @@ export default function Receipts() {
               <Download size={14} />
               EXPORT DATA
             </button>
-            <button className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+            <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
               <FilePlus size={14} />
               New Receipt
             </button>

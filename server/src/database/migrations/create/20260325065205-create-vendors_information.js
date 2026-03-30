@@ -11,27 +11,27 @@ module.exports = {
       },
       vi_vendor_code: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: false
       },
       vi_vendor_name: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       vi_address: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       vi_tin: {
         type: Sequelize.STRING(15),
-        allowNull: true
+        allowNull: false
       },
       vi_details: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       vi_contact: {
         type: Sequelize.STRING(15),
-        allowNull: true
+        allowNull: false
       }
     });
   },

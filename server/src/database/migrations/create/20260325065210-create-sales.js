@@ -11,7 +11,7 @@ module.exports = {
       },
       s_customer_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+        allowNull: false,
         references: {
           model: 'customers',
           key: 'c_id'
@@ -19,47 +19,47 @@ module.exports = {
       },
       s_document_reference: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: false
       },
       s_terms: {
         type: Sequelize.ENUM('DAYS', 'MONTHS', 'DURATION OF TIME'),
-        allowNull: true
+        allowNull: false
       },
       s_date_delivered: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       s_date_due: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       },
       s_category: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: false
       },
       s_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: false
       },
       s_total_amount_due: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true
+        allowNull: false
       },
       s_status: {
         type: Sequelize.ENUM('COLLECTED', 'NOT COLLECTED', 'PARTIALLY COLLECTED'),
-        allowNull: true
+        allowNull: false
       },
       s_state: {
-        type: Sequelize.ENUM('PREPARED BY', 'CHECKED BY', 'APPROVED BY', 'REJECTED BY'),
-        allowNull: true
+        type: Sequelize.ENUM('PREPARED','CHECKED','APPROVED','REJECTED','CANCELLED'),
+        allowNull: false
       },
       s_created_date: {
         type: Sequelize.STRING(30),
-        allowNull: true
+        allowNull: false
       },
       s_created_by: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: false
       }
     });
   },
