@@ -27,7 +27,6 @@ const getCashDisbursements = async (req, res, next) => {
                     { col: Accounting.cash_disbursements.selectOptionColumns.mode_of_payment, as: 'mode' },
                     { col: Accounting.cash_disbursements.selectOptionColumns.bank_name, as: 'bank_name' },
                     { col: Accounting.cash_disbursements.selectOptionColumns.check_number, as: 'check_number' },
-                    { col: Accounting.cash_disbursements.selectOptionColumns.category, as: 'category' },
                     { col: Accounting.cash_disbursements.selectOptionColumns.remarks, as: 'remarks' },
                     { col: Accounting.cash_disbursements.selectOptionColumns.total_amount_due, as: 'amount_due' },
                     { col: Accounting.cash_disbursements.selectOptionColumns.status, as: 'status' },
@@ -65,7 +64,6 @@ const createCashDisbursement = async (req, res, next) => {
             mode_of_payment, 
             bank_name, 
             check_number, 
-            category, 
             remarks, 
             total_amount_due, 
             created_by, 
@@ -75,7 +73,7 @@ const createCashDisbursement = async (req, res, next) => {
         } = req.body;
         console.log(req.body)
         
-        if (!vendor_id || !document_reference || !payment_date || !mode_of_payment || !category || !remarks || !total_amount_due || !created_by) {
+        if (!vendor_id || !document_reference || !payment_date || !mode_of_payment || !remarks || !total_amount_due || !created_by) {
             return res.status(400).json({
                 success: false,
                 message: 'All fields are required'
@@ -107,7 +105,6 @@ const createCashDisbursement = async (req, res, next) => {
                 mode_of_payment || null,
                 bank_name || null,
                 check_number || null,
-                category || null,
                 remarks || null,
                 total_amount_due || null,
                 'UNPAID',

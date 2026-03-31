@@ -105,13 +105,13 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
 //  totalAmountDue   = totalDiscounted + totalVAT − totalWHT
 //
 function computeSummary(items) {
-  let totalPurchasePrice = 0;
+  let totalSalesPrice = 0;
   let totalDiscount = 0;
   let totalDiscounted = 0;
   let totalVAT = 0;
-  let vatablePurchases = 0;
-  let vatExemptPurchases = 0;
-  let zeroRatedPurchases = 0;
+  let vatableSales = 0;
+  let vatExemptSales = 0;
+  let zeroRatedSales = 0;
   let totalNoVatDiscount = 0;
   let totalNetOfVat = 0;
   let totalWHT = 0;
@@ -131,7 +131,7 @@ function computeSummary(items) {
 
     const netBase = vatPct > 0 ? discounted / (1 + vatPct / 100) : discounted;
 
-    totalPurchasePrice += gross;
+    totalSalesPrice += gross;
     totalDiscount += discAmt;
     totalDiscounted += discounted;
     totalVAT += vatAmt;
@@ -139,23 +139,23 @@ function computeSummary(items) {
     totalNetOfVat += netBase;
 
     if (vatPct > 0) {
-      vatablePurchases += netBase;
+      vatableSales += netBase;
       totalNoVatDiscount += discAmt;
     } else if (whtPct > 0) {
-      zeroRatedPurchases += discounted;
+      zeroRatedSales += discounted;
     } else {
-      vatExemptPurchases += discounted;
+      vatExemptSales += discounted;
     }
   });
 
   return {
-    totalPurchasePrice,
+    totalSalesPrice,
     totalDiscount,
     totalDiscounted,
     totalVAT,
-    vatablePurchases,
-    vatExemptPurchases,
-    zeroRatedPurchases,
+    vatableSales,
+    vatExemptSales,
+    zeroRatedSales,
     totalNoVatDiscount,
     totalNetOfVat,
     totalWHT,
@@ -174,7 +174,7 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
   ]);
 
   const [journalEntries, setJournalEntries] = useState([
-    { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 }
+    { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: false }
   ]);
 
   const [customers, setCustomers] = useState([]);
@@ -202,8 +202,6 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
   const [modeSearch, setModeSearch] = useState('');
   const [bankName, setBankName] = useState('');
   const [checkNumber, setCheckNumber] = useState('');
-  const [category, setCategory] = useState('');
-  const [categorySearch, setCategorySearch] = useState('');
   const [documentReference, setDocumentReference] = useState('');
   const [remarks, setRemarks] = useState('');
 
@@ -214,7 +212,6 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
   const [toast, setToast] = useState(null);
 
   const modeOfPaymentOptions = ['CASH', 'CHECK', 'BANK_TRANSFER', 'CARD', 'E-WALLET', 'OTHERS'];
-  const categoryOptions = ['OPERATIONAL EXPENSES', 'ADMINISTRATIVE EXPENSES', 'MARKETING EXPENSES', 'MAINTENANCE EXPENSES', 'UTILITIES EXPENSES', 'RENT EXPENSES', 'SUPPLIES EXPENSES', 'PROFESSIONAL FEES', 'INSURANCE EXPENSES', 'OTHER EXPENSES'];
 
   const coaOptions = chartsOfAccounts.map(a => ({ label: a.name || a.account_name, sublabel: a.code || a.account_code, value: a.id }));
   const vendorOptions = vendors.map(v => ({ label: v.name || v.code, sublabel: v.code, value: v.id }));
@@ -278,7 +275,7 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
   useEffect(() => { fetchCustomers(); fetchChartsOfAccounts(); fetchProducts(); }, []);
 
   const addReceiptItem = (isOther = false) => setReceiptItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
-  const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0 }]);
+  const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removeReceiptItem = (id) => setReceiptItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
   const updateReceiptItem = (id, field, value) => setReceiptItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
@@ -352,6 +349,7 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
           center: item.responsibilityCenter || '',
           debit: parseFloat(discountedAmount.toFixed(2)),
           credit: 0,
+          isManual: false,
         });
       }
 
@@ -368,6 +366,7 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
             center: item.responsibilityCenter || '',
             debit: parseFloat(vatAmount.toFixed(2)),
             credit: 0,
+            isManual: false,
           });
         }
       }
@@ -385,13 +384,14 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
             center: item.responsibilityCenter || '',
             debit: 0,
             credit: parseFloat(whtAmount.toFixed(2)),
+            isManual: false,
           });
         }
       }
 
       if (discountAmount > 0) {
         const discountAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('purchase discounts')
+          (a.name || '').toLowerCase().includes('sales discounts')
         );
 
         if (discountAccount) {
@@ -402,6 +402,7 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
             center: item.responsibilityCenter || '',
             debit: 0,
             credit: parseFloat(discountAmount.toFixed(2)),
+            isManual: false,
           });
         }
       }
@@ -415,6 +416,7 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
         center: '',
         debit: 0,
         credit: parseFloat(totalCreditAmount.toFixed(2)),
+        isManual: false,
       });
     }
 
@@ -493,7 +495,6 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
         mode_of_payment: modeOfPayment,
         bank_name: bankName || "",
         check_number: checkNumber || "",
-        category: category,
         remarks: remarks,
         total_amount_due: summary.totalAmountDue,
         created_by: createdBy,
@@ -601,10 +602,6 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
                   <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Mode of Payment</label>
                   <SearchableDropdown placeholder="Select mode..." value={modeSearch} onChange={v => { setModeSearch(v); setModeOfPayment(''); }} onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }} options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))} inputClassName={inputBase} emptyText="No modes found" />
                 </div>
-                <div>
-                  <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Category</label>
-                  <SearchableDropdown placeholder="Select category..." value={categorySearch} onChange={v => { setCategorySearch(v); setCategory(''); }} onSelect={opt => { setCategory(opt.value); setCategorySearch(opt.label); }} options={categoryOptions.map(c => ({ label: c, value: c }))} inputClassName={inputBase} emptyText="No categories found" />
-                </div>
               </div>
               {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
                 <div className="grid grid-cols-2 gap-2">
@@ -632,10 +629,10 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
             <div className="overflow-y-auto min-h-0 flex-1">
               <div className="space-y-0">
 
-                {/* 1. Total Purchase Price = Σ(qty × price) */}
+                {/* 1. Total Sales Price = Σ(qty × price) */}
                 <SummaryRow
-                  label="Total Purchase Price"
-                  value={fmt(summary.totalPurchasePrice)}
+                  label="Total Sales Price"
+                  value={fmt(summary.totalSalesPrice)}
                   formula="Σ (Qty × Price)"
                 />
                 <SDivider />
@@ -666,26 +663,26 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
                 />
                 <SDivider />
 
-                {/* 5. VATable Purchases = Σ net-of-VAT base for vat>0 items */}
+                {/* 5. VATable Sales = Σ net-of-VAT base for vat>0 items */}
                 <SummaryRow
-                  label="VATable Purchases"
-                  value={fmt(summary.vatablePurchases)}
+                  label="VATable Sales"
+                  value={fmt(summary.vatableSales)}
                   formula="Discounted ÷ (1 + VAT%) where VAT > 0"
                 />
                 <SDivider />
 
                 {/* 6. VAT-Exempt = Σ discounted where vat=0 and wht=0 */}
                 <SummaryRow
-                  label="VAT-Exempt Purchases"
-                  value={fmt(summary.vatExemptPurchases)}
+                  label="VAT-Exempt Sales"
+                  value={fmt(summary.vatExemptSales)}
                   formula="Items with 0% VAT & 0% WHT"
                 />
                 <SDivider />
 
                 {/* 7. Zero-Rated = Σ discounted where vat=0 but wht>0 */}
                 <SummaryRow
-                  label="Zero Rated Purchases"
-                  value={fmt(summary.zeroRatedPurchases)}
+                  label="Zero Rated Sales"
+                  value={fmt(summary.zeroRatedSales)}
                   formula="Items with 0% VAT but WHT > 0"
                 />
                 <SDivider />
@@ -873,12 +870,16 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
                           <SearchableDropdown placeholder="Search account..." value={entry.accountSearch} onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)} onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }} options={coaOptions} inputClassName={tableInput} emptyText="No accounts found" />
                         </td>
                         <td className="py-1.5 px-1"><input className={tableInput} placeholder="Center..." value={entry.center} onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} /></td>
-                        <td className="py-1.5 px-1"><input className={tableInput + ' font-black'} placeholder="0.00" type="number" value={entry.debit} onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} /></td>
-                        <td className="py-1.5 px-1"><input className={tableInput + ' font-black text-red-600'} placeholder="0.00" type="number" value={entry.credit} onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} /></td>
+                        <td className="py-1.5 px-1"><input className={tableInput + ' font-black'} placeholder="0.00" type="number" value={entry.debit} onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} disabled={!entry.isManual} readOnly={!entry.isManual} /></td>
+                        <td className="py-1.5 px-1"><input className={tableInput + ' font-black text-red-600'} placeholder="0.00" type="number" value={entry.credit} onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} disabled={!entry.isManual} readOnly={!entry.isManual} /></td>
                         <td className="py-1.5 text-center">
-                          <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
-                            <Trash2 size={15} className="mx-auto" />
-                          </button>
+                          {entry.isManual ? (
+                            <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
+                              <Trash2 size={15} className="mx-auto" />
+                            </button>
+                          ) : (
+                            <span className="text-gray-300 text-[11px] italic">Auto</span>
+                          )}
                         </td>
                       </tr>
                     ))}

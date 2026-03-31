@@ -37,10 +37,6 @@ module.exports = {
         type: Sequelize.STRING(120),
         allowNull: true
       },
-      r_category: {
-        type: Sequelize.STRING(120),
-        allowNull: false
-      },
       r_remarks: {
         type: Sequelize.TEXT('long'),
         allowNull: false

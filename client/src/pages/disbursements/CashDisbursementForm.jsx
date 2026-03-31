@@ -175,7 +175,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
   ]);
 
   const [journalEntries, setJournalEntries] = useState([
-    { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 }
+    { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: false }
   ]);
 
   const [vendors, setVendors] = useState([]);
@@ -197,8 +197,6 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
   const [modeSearch, setModeSearch] = useState('');
   const [bankName, setBankName] = useState('');
   const [checkNumber, setCheckNumber] = useState('');
-  const [category, setCategory] = useState('');
-  const [categorySearch, setCategorySearch] = useState('');
   const [documentReference, setDocumentReference] = useState('');
   const [remarks, setRemarks] = useState('');
 
@@ -209,7 +207,6 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
   const [toast, setToast] = useState(null);
 
   const modeOfPaymentOptions = ['CASH', 'CHECK', 'BANK_TRANSFER', 'CARD', 'E-WALLET', 'OTHERS'];
-  const categoryOptions = ['OPERATIONAL EXPENSES', 'ADMINISTRATIVE EXPENSES', 'MARKETING EXPENSES', 'MAINTENANCE EXPENSES', 'UTILITIES EXPENSES', 'RENT EXPENSES', 'SUPPLIES EXPENSES', 'PROFESSIONAL FEES', 'INSURANCE EXPENSES', 'OTHER EXPENSES'];
 
   const coaOptions = chartsOfAccounts.map(a => ({ label: a.name || a.account_name, sublabel: a.code || a.account_code, value: a.id }));
   const vendorOptions = vendors.map(v => ({ label: v.name || v.code, sublabel: v.code, value: v.id }));
@@ -260,7 +257,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
   useEffect(() => { fetchVendors(); fetchChartsOfAccounts(); fetchProducts(); }, []);
 
   const addDisbursementItem = (isOther = false) => setDisbursementItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
-  const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0 }]);
+  const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removeDisbursementItem = (id) => setDisbursementItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
   const updateDisbursementItem = (id, field, value) => setDisbursementItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
@@ -334,6 +331,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
           center: item.responsibilityCenter || '',
           debit: parseFloat(discountedAmount.toFixed(2)),
           credit: 0,
+          isManual: false,
         });
       }
 
@@ -350,6 +348,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
             center: item.responsibilityCenter || '',
             debit: parseFloat(vatAmount.toFixed(2)),
             credit: 0,
+            isManual: false,
           });
         }
       }
@@ -367,6 +366,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
             center: item.responsibilityCenter || '',
             debit: 0,
             credit: parseFloat(whtAmount.toFixed(2)),
+            isManual: false,
           });
         }
       }
@@ -382,8 +382,9 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
             account: discountAccount.id,
             accountSearch: discountAccount.name,
             center: item.responsibilityCenter || '',
-            debit: 0,
-            credit: parseFloat(discountAmount.toFixed(2)),
+            debit: parseFloat(discountAmount.toFixed(2)),
+            credit: 0,
+            isManual: false,
           });
         }
       }
@@ -397,6 +398,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
         center: '',
         debit: 0,
         credit: parseFloat(totalCreditAmount.toFixed(2)),
+        isManual: false,
       });
     }
 
@@ -475,7 +477,6 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
         mode_of_payment: modeOfPayment,
         bank_name: bankName || '',
         check_number: checkNumber || '',
-        category: category,
         remarks: remarks,
         total_amount_due: summary.totalAmountDue,
         created_by: createdBy,
@@ -582,10 +583,6 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
                 <div>
                   <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Mode of Payment</label>
                   <SearchableDropdown placeholder="Select mode..." value={modeSearch} onChange={v => { setModeSearch(v); setModeOfPayment(''); }} onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }} options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))} inputClassName={inputBase} emptyText="No modes found" />
-                </div>
-                <div>
-                  <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Category</label>
-                  <SearchableDropdown placeholder="Select category..." value={categorySearch} onChange={v => { setCategorySearch(v); setCategory(''); }} onSelect={opt => { setCategory(opt.value); setCategorySearch(opt.label); }} options={categoryOptions.map(c => ({ label: c, value: c }))} inputClassName={inputBase} emptyText="No categories found" />
                 </div>
               </div>
               {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
@@ -859,12 +856,16 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
                           <SearchableDropdown placeholder="Search account..." value={entry.accountSearch} onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)} onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }} options={coaOptions} inputClassName={tableInput} emptyText="No accounts found" />
                         </td>
                         <td className="py-1.5 px-1"><input className={tableInput} placeholder="Center..." value={entry.center} onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} /></td>
-                        <td className="py-1.5 px-1"><input className={tableInput + ' font-black'} placeholder="0.00" type="number" value={entry.debit} onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} /></td>
-                        <td className="py-1.5 px-1"><input className={tableInput + ' font-black text-red-600'} placeholder="0.00" type="number" value={entry.credit} onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} /></td>
+                        <td className="py-1.5 px-1"><input className={tableInput + ' font-black'} placeholder="0.00" type="number" value={entry.debit} onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} disabled={!entry.isManual} readOnly={!entry.isManual} /></td>
+                        <td className="py-1.5 px-1"><input className={tableInput + ' font-black text-red-600'} placeholder="0.00" type="number" value={entry.credit} onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} disabled={!entry.isManual} readOnly={!entry.isManual} /></td>
                         <td className="py-1.5 text-center">
-                          <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
-                            <Trash2 size={15} className="mx-auto" />
-                          </button>
+                          {entry.isManual ? (
+                            <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
+                              <Trash2 size={15} className="mx-auto" />
+                            </button>
+                          ) : (
+                            <span className="text-gray-300 text-[11px] italic">Auto</span>
+                          )}
                         </td>
                       </tr>
                     ))}

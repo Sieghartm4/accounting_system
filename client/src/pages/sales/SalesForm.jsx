@@ -105,13 +105,13 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
 //  totalAmountDue   = totalDiscounted + totalVAT − totalWHT
 //
 function computeSummary(items) {
-  let totalPurchasePrice = 0;
+  let totalSalesPrice = 0;
   let totalDiscount = 0;
   let totalDiscounted = 0;
   let totalVAT = 0;
-  let vatablePurchases = 0;
-  let vatExemptPurchases = 0;
-  let zeroRatedPurchases = 0;
+  let vatableSales = 0;
+  let vatExemptSales = 0;
+  let zeroRatedSales = 0;
   let totalNoVatDiscount = 0;
   let totalNetOfVat = 0;
   let totalWHT = 0;
@@ -131,7 +131,7 @@ function computeSummary(items) {
 
     const netBase = vatPct > 0 ? discounted / (1 + vatPct / 100) : discounted;
 
-    totalPurchasePrice += gross;
+    totalSalesPrice += gross;
     totalDiscount += discAmt;
     totalDiscounted += discounted;
     totalVAT += vatAmt;
@@ -139,23 +139,23 @@ function computeSummary(items) {
     totalNetOfVat += netBase;
 
     if (vatPct > 0) {
-      vatablePurchases += netBase;
+      vatableSales += netBase;
       totalNoVatDiscount += discAmt;
     } else if (whtPct > 0) {
-      zeroRatedPurchases += discounted;
+      zeroRatedSales += discounted;
     } else {
-      vatExemptPurchases += discounted;
+      vatExemptSales += discounted;
     }
   });
 
   return {
-    totalPurchasePrice,
+    totalSalesPrice,
     totalDiscount,
     totalDiscounted,
     totalVAT,
-    vatablePurchases,
-    vatExemptPurchases,
-    zeroRatedPurchases,
+    vatableSales,
+    vatExemptSales,
+    zeroRatedSales,
     totalNoVatDiscount,
     totalNetOfVat,
     totalWHT,
@@ -391,7 +391,7 @@ export default function SalesForm({ onBack, onSuccess }) {
 
       if (discountAmount > 0) {
         const discountAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('purchase discounts')
+          (a.name || '').toLowerCase().includes('sales discounts')
         );
 
         if (discountAccount) {
@@ -632,10 +632,10 @@ export default function SalesForm({ onBack, onSuccess }) {
             <div className="overflow-y-auto min-h-0 flex-1">
               <div className="space-y-0">
 
-                {/* 1. Total Purchase Price = Σ(qty × price) */}
+                {/* 1. Total Sales Price = Σ(qty × price) */}
                 <SummaryRow
-                  label="Total Purchase Price"
-                  value={fmt(summary.totalPurchasePrice)}
+                  label="Total Sales Price"
+                  value={fmt(summary.totalSalesPrice)}
                   formula="Σ (Qty × Price)"
                 />
                 <SDivider />
@@ -666,26 +666,26 @@ export default function SalesForm({ onBack, onSuccess }) {
                 />
                 <SDivider />
 
-                {/* 5. VATable Purchases = Σ net-of-VAT base for vat>0 items */}
+                {/* 5. VATable Sales = Σ net-of-VAT base for vat>0 items */}
                 <SummaryRow
-                  label="VATable Purchases"
-                  value={fmt(summary.vatablePurchases)}
+                  label="VATable Sales"
+                  value={fmt(summary.vatableSales)}
                   formula="Discounted ÷ (1 + VAT%) where VAT > 0"
                 />
                 <SDivider />
 
                 {/* 6. VAT-Exempt = Σ discounted where vat=0 and wht=0 */}
                 <SummaryRow
-                  label="VAT-Exempt Purchases"
-                  value={fmt(summary.vatExemptPurchases)}
+                  label="VAT-Exempt Sales"
+                  value={fmt(summary.vatExemptSales)}
                   formula="Items with 0% VAT & 0% WHT"
                 />
                 <SDivider />
 
                 {/* 7. Zero-Rated = Σ discounted where vat=0 but wht>0 */}
                 <SummaryRow
-                  label="Zero Rated Purchases"
-                  value={fmt(summary.zeroRatedPurchases)}
+                  label="Zero Rated Sales"
+                  value={fmt(summary.zeroRatedSales)}
                   formula="Items with 0% VAT but WHT > 0"
                 />
                 <SDivider />

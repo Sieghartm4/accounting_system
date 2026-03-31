@@ -20,7 +20,6 @@ require('dotenv').config()
 
 const getReceipts = async (req, res, next) => {
   try {
-    // const receipts = await SelectAll(Accounting.receipts.tablename, Accounting.receipts.prefix_)
     const query = sql.select([
       { col: Accounting.receipts.selectOptionColumns.id, as: 'id' },
       { col: Master.customers.selectOptionColumns.name, as: 'customer' },
@@ -29,7 +28,6 @@ const getReceipts = async (req, res, next) => {
       { col: Accounting.receipts.selectOptionColumns.mode_of_payment, as: 'mode' },
       { col: Accounting.receipts.selectOptionColumns.bank_name, as: 'bank_name' },
       { col: Accounting.receipts.selectOptionColumns.check_number, as: 'check_number' },
-      { col: Accounting.receipts.selectOptionColumns.category, as: 'category' },
       { col: Accounting.receipts.selectOptionColumns.remarks, as: 'remarks' },
       { col: Accounting.receipts.selectOptionColumns.total_amount_due, as: 'amount_due' },
       { col: Accounting.receipts.selectOptionColumns.status, as: 'status' },
@@ -67,7 +65,6 @@ const createReceipts = async (req, res, next) => {
       mode_of_payment,
       bank_name,
       check_number,
-      category,
       remarks,
       total_amount_due,
       created_by,
@@ -76,7 +73,7 @@ const createReceipts = async (req, res, next) => {
       attachments
     } = req.body;
     console.log(req.body)
-    if (!customer_id || !document_reference || !payment_date || !mode_of_payment || !category || !remarks || !total_amount_due || !created_by) {
+    if (!customer_id || !document_reference || !payment_date || !mode_of_payment || !remarks || !total_amount_due || !created_by) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
@@ -108,7 +105,6 @@ const createReceipts = async (req, res, next) => {
         mode_of_payment || null,
         bank_name || null,
         check_number || null,
-        category || null,
         remarks || null,
         total_amount_due || null,
         'COLLECTED',
