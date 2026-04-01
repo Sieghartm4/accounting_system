@@ -347,25 +347,25 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
           account: selectedCoa.id,
           accountSearch: selectedCoa.name,
           center: item.responsibilityCenter || '',
-          debit: parseFloat(discountedAmount.toFixed(2)),
-          credit: 0,
+          debit: 0,
+          credit: parseFloat(discountedAmount.toFixed(2)),
           isManual: false,
         });
       }
 
       if (vatAmount > 0) {
-        const inputVatAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('input vat')
+        const outputVatAccount = chartsOfAccounts.find(a =>
+          (a.name || '').toLowerCase().includes('output vat')
         );
 
-        if (inputVatAccount) {
+        if (outputVatAccount) {
           entries.push({
             id: Date.now() + Math.random(),
-            account: inputVatAccount.id,
-            accountSearch: inputVatAccount.name,
+            account: outputVatAccount.id,
+            accountSearch: outputVatAccount.name,
             center: item.responsibilityCenter || '',
-            debit: parseFloat(vatAmount.toFixed(2)),
-            credit: 0,
+            debit: 0,
+            credit: parseFloat(vatAmount.toFixed(2)),
             isManual: false,
           });
         }
@@ -373,7 +373,7 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
 
       if (whtAmount > 0) {
         const whtAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('withholding tax - expanded')
+          (a.name || '').toLowerCase().includes('creditable withholding tax')
         );
 
         if (whtAccount) {
@@ -382,8 +382,8 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
             account: whtAccount.id,
             accountSearch: whtAccount.name,
             center: item.responsibilityCenter || '',
-            debit: 0,
-            credit: parseFloat(whtAmount.toFixed(2)),
+            debit: parseFloat(whtAmount.toFixed(2)),
+            credit: 0,
             isManual: false,
           });
         }
@@ -400,8 +400,8 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
             account: discountAccount.id,
             accountSearch: discountAccount.name,
             center: item.responsibilityCenter || '',
-            debit: 0,
-            credit: parseFloat(discountAmount.toFixed(2)),
+            debit: parseFloat(discountAmount.toFixed(2)),
+            credit: 0,
             isManual: false,
           });
         }
@@ -414,8 +414,8 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
         account: paymentAccount.id,
         accountSearch: paymentAccount.name,
         center: '',
-        debit: 0,
-        credit: parseFloat(totalCreditAmount.toFixed(2)),
+        debit: parseFloat(totalCreditAmount.toFixed(2)),
+        credit: 0,
         isManual: false,
       });
     }

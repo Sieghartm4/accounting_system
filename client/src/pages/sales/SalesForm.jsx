@@ -205,6 +205,9 @@ export default function SalesForm({ onBack, onSuccess }) {
   const [category, setCategory] = useState('');
   const [categorySearch, setCategorySearch] = useState('');
   const [documentReference, setDocumentReference] = useState('');
+  const [terms, setTerms] = useState('');
+  const [dateDelivered, setDateDelivered] = useState('');
+  const [dateDue, setDateDue] = useState('');
   const [remarks, setRemarks] = useState('');
 
   const [attachments, setAttachments] = useState([
@@ -350,8 +353,8 @@ export default function SalesForm({ onBack, onSuccess }) {
           account: selectedCoa.id,
           accountSearch: selectedCoa.name,
           center: item.responsibilityCenter || '',
-          debit: parseFloat(discountedAmount.toFixed(2)),
-          credit: 0,
+          debit: 0,
+          credit: parseFloat(discountedAmount.toFixed(2)),
         });
       }
 
@@ -366,15 +369,15 @@ export default function SalesForm({ onBack, onSuccess }) {
             account: inputVatAccount.id,
             accountSearch: inputVatAccount.name,
             center: item.responsibilityCenter || '',
-            debit: parseFloat(vatAmount.toFixed(2)),
-            credit: 0,
+            debit: 0,
+            credit: parseFloat(vatAmount.toFixed(2)),
           });
         }
       }
 
       if (whtAmount > 0) {
         const whtAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('withholding tax - expanded')
+          (a.name || '').toLowerCase().includes('creditable witholding tax')
         );
 
         if (whtAccount) {
@@ -383,8 +386,8 @@ export default function SalesForm({ onBack, onSuccess }) {
             account: whtAccount.id,
             accountSearch: whtAccount.name,
             center: item.responsibilityCenter || '',
-            debit: 0,
-            credit: parseFloat(whtAmount.toFixed(2)),
+            debit: parseFloat(whtAmount.toFixed(2)),
+            credit: 0,
           });
         }
       }
@@ -400,22 +403,30 @@ export default function SalesForm({ onBack, onSuccess }) {
             account: discountAccount.id,
             accountSearch: discountAccount.name,
             center: item.responsibilityCenter || '',
-            debit: 0,
-            credit: parseFloat(discountAmount.toFixed(2)),
+            debit: parseFloat(discountAmount.toFixed(2)),
+            credit: 0,
           });
         }
       }
     });
 
     if (paymentAccount && totalCreditAmount > 0) {
-      entries.push({
-        id: Date.now() + Math.random(),
-        account: paymentAccount.id,
-        accountSearch: paymentAccount.name,
-        center: '',
-        debit: 0,
-        credit: parseFloat(totalCreditAmount.toFixed(2)),
-      });
+      // Find accounts receivable account
+      const arAccount = chartsOfAccounts.find(a =>
+        (a.name || '').toLowerCase().includes('accounts receivable')
+      );
+
+      if (arAccount) {
+        entries.push({
+          id: Date.now() + Math.random(),
+          account: arAccount.id,
+          accountSearch: arAccount.name,
+          center: '',
+          debit: parseFloat(totalCreditAmount.toFixed(2)),
+          credit: 0,
+          isManual: false,
+        });
+      }
     }
 
     setJournalEntries(entries);
@@ -431,13 +442,18 @@ export default function SalesForm({ onBack, onSuccess }) {
         return;
       }
 
-      if (!modeOfPayment) {
-        setToast({ type: 'warning', message: 'Please select mode of payment' });
+      if (!terms) {
+        setToast({ type: 'warning', message: 'Please enter terms' });
         return;
       }
 
-      if ((modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && !bankName) {
-        setToast({ type: 'warning', message: 'Please enter bank name' });
+      if (!dateDelivered) {
+        setToast({ type: 'warning', message: 'Please enter date delivered' });
+        return;
+      }
+
+      if (!dateDue) {
+        setToast({ type: 'warning', message: 'Please enter date due' });
         return;
       }
 
@@ -489,14 +505,10 @@ export default function SalesForm({ onBack, onSuccess }) {
       const salesData = {
         customer_id: selectedCustomer,
         document_reference: documentReference,
-        payment_date: new Date().toISOString().split("T")[0],
-        mode_of_payment: modeOfPayment,
-        bank_name: bankName || "",
-        check_number: checkNumber || "",
-        category: category,
+        terms: terms,
+        date_delivered: dateDelivered,
+        date_due: dateDue,
         remarks: remarks,
-        total_amount_due: summary.totalAmountDue,
-        created_by: createdBy,
         sales_items: preparedSalesItems,
         journal_entries: preparedJournalEntries,
         attachments: preparedAttachments
@@ -592,26 +604,24 @@ export default function SalesForm({ onBack, onSuccess }) {
                   : <SearchableDropdown placeholder="Search customer..." value={customerSearch} onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); }} onSelect={opt => { setSelectedCustomer(opt.value); setCustomerSearch(opt.label); }} options={customerOptions} inputClassName={inputBase} emptyText={customerError || 'No customers found'} />
                 }
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <SidebarInput label="Reference" placeholder="INV-000" value={documentReference} onChange={e => setDocumentReference(e.target.value)} />
-                <SidebarInput label="Date" type="date" />
+              <div>
+                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Document Reference</label>
+                <input type="text" placeholder="INV-000" value={documentReference} onChange={e => setDocumentReference(e.target.value)} className={inputBase} />
+              </div>
+              <div>
+                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Terms <span className="text-red-600">*</span></label>
+                <input type="text" placeholder="Enter terms" value={terms} onChange={e => setTerms(e.target.value)} className={inputBase} />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Mode of Payment</label>
-                  <SearchableDropdown placeholder="Select mode..." value={modeSearch} onChange={v => { setModeSearch(v); setModeOfPayment(''); }} onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }} options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))} inputClassName={inputBase} emptyText="No modes found" />
+                  <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Date Delivered <span className="text-red-600">*</span></label>
+                  <input type="date" value={dateDelivered} onChange={e => setDateDelivered(e.target.value)} className={inputBase} />
                 </div>
                 <div>
-                  <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Category</label>
-                  <SearchableDropdown placeholder="Select category..." value={categorySearch} onChange={v => { setCategorySearch(v); setCategory(''); }} onSelect={opt => { setCategory(opt.value); setCategorySearch(opt.label); }} options={categoryOptions.map(c => ({ label: c, value: c }))} inputClassName={inputBase} emptyText="No categories found" />
+                  <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Date Due <span className="text-red-600">*</span></label>
+                  <input type="date" value={dateDue} onChange={e => setDateDue(e.target.value)} className={inputBase} />
                 </div>
               </div>
-              {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
-                <div className="grid grid-cols-2 gap-2">
-                  <SidebarInput label="Bank Name" placeholder="Enter bank name" value={bankName} onChange={e => setBankName(e.target.value)} />
-                  <SidebarInput label="Check #" placeholder="Enter check number" value={checkNumber} onChange={e => setCheckNumber(e.target.value)} />
-                </div>
-              )}
             </div>
           </section>
 
