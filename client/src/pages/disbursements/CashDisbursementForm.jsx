@@ -98,9 +98,7 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
 //  VAT-Exempt item  → vat === 0 AND wht === 0
 //    vatExemptPurchases += discountedAmount
 //
-//  totalNetOfVat    = Σ (net-of-VAT base per item)
-//                   = Σ discountedAmount / (1 + vat/100)  for vatable
-//                   + Σ discountedAmount                   for non-vatable
+//  totalNetOfVat    = Σ discountedAmount
 //
 //  totalAmountDue   = totalDiscounted + totalVAT − totalWHT
 //
@@ -129,7 +127,7 @@ function computeSummary(items) {
     const vatAmt = discounted * (vatPct / 100);
     const whtAmt = discounted * (whtPct / 100);
 
-    const netBase = vatPct > 0 ? discounted / (1 + vatPct / 100) : discounted;
+    const netBase = discounted;
 
     totalPurchasePrice += gross;
     totalDiscount += discAmt;
@@ -139,7 +137,7 @@ function computeSummary(items) {
     totalNetOfVat += netBase;
 
     if (vatPct > 0) {
-      vatablePurchases += netBase;
+      vatablePurchases += discounted;
       totalNoVatDiscount += discAmt;
     } else if (whtPct > 0) {
       zeroRatedPurchases += discounted;
@@ -290,8 +288,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
 
     if (modeOfPayment === 'CASH') {
       paymentAccount = chartsOfAccounts.find(a =>
-        (a.name || '').toLowerCase().includes('cash on hand') ||
-        (a.name || '').toLowerCase().includes('petty cash')
+        (a.name || '').toLowerCase().includes('cash on hand')
       );
     } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
       paymentAccount = chartsOfAccounts.find(a =>
@@ -323,13 +320,13 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
 
       const selectedCoa = chartsOfAccounts.find(a => a.id === item.coa);
 
-      if (selectedCoa && discountedAmount > 0) {
+      if (selectedCoa && gross > 0) {
         entries.push({
           id: Date.now() + Math.random(),
           account: selectedCoa.id,
           accountSearch: selectedCoa.name,
           center: item.responsibilityCenter || '',
-          debit: parseFloat(discountedAmount.toFixed(2)),
+          debit: parseFloat(gross.toFixed(2)),
           credit: 0,
           isManual: false,
         });
@@ -382,22 +379,38 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
             account: discountAccount.id,
             accountSearch: discountAccount.name,
             center: item.responsibilityCenter || '',
-            debit: parseFloat(discountAmount.toFixed(2)),
-            credit: 0,
+            debit: 0,
+            credit: parseFloat(discountAmount.toFixed(2)),
             isManual: false,
           });
         }
       }
     });
 
-    if (paymentAccount && totalCreditAmount > 0) {
+    const totalCashPaid = disbursementItems.reduce((sum, item) => {
+      const qty = parseFloat(item.qty) || 0;
+      const price = parseFloat(item.price) || 0;
+      const discountPct = parseFloat(item.discount) || 0;
+      const vatPct = parseFloat(item.vat) || 0;
+      const whtPct = parseFloat(item.wht) || 0;
+
+      const gross = qty * price;
+      const discountAmount = gross * (discountPct / 100);
+      const discountedAmount = gross - discountAmount;
+      const vatAmount = discountedAmount * (vatPct / 100);
+      const whtAmount = discountedAmount * (whtPct / 100);
+
+      return sum + (discountedAmount + vatAmount - whtAmount);
+    }, 0);
+
+    if (paymentAccount && totalCashPaid > 0) {
       entries.push({
         id: Date.now() + Math.random(),
         account: paymentAccount.id,
         accountSearch: paymentAccount.name,
         center: '',
         debit: 0,
-        credit: parseFloat(totalCreditAmount.toFixed(2)),
+        credit: parseFloat(totalCashPaid.toFixed(2)),
         isManual: false,
       });
     }
@@ -649,7 +662,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
                 <SummaryRow
                   label="VATable Purchases"
                   value={fmt(summary.vatablePurchases)}
-                  formula="Discounted ÷ (1 + VAT%) where VAT > 0"
+                  formula="Discounted Amount where VAT > 0"
                 />
                 <SDivider />
 
@@ -681,7 +694,7 @@ export default function CashDisbursementForm({ onBack, onSuccess }) {
                 <SummaryRow
                   label="Total Net of VAT"
                   value={fmt(summary.totalNetOfVat)}
-                  formula="VATable: Disc÷(1+VAT%); Others: Discounted"
+                  formula="Discounted Amount (VAT-exclusive pricing)"
                 />
                 <SDivider />
 

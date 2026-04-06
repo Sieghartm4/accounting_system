@@ -22,7 +22,7 @@ module.exports = {
         allowNull: false
       },
       s_terms: {
-        type: Sequelize.ENUM('DAYS', 'MONTHS', 'DURATION OF TIME'),
+        type: Sequelize.STRING(120),
         allowNull: false
       },
       s_date_delivered: {

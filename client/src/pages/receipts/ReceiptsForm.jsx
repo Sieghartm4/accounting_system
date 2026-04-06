@@ -129,7 +129,9 @@ function computeSummary(items) {
     const vatAmt = discounted * (vatPct / 100);
     const whtAmt = discounted * (whtPct / 100);
 
-    const netBase = vatPct > 0 ? discounted / (1 + vatPct / 100) : discounted;
+    // For VATable items: VATable Sales = Discounted Amount (VAT-exclusive pricing)
+    // For non-VATable items: use discounted amount directly
+    const netBase = vatPct > 0 ? discounted : discounted;
 
     totalSalesPrice += gross;
     totalDiscount += discAmt;
@@ -139,7 +141,7 @@ function computeSummary(items) {
     totalNetOfVat += netBase;
 
     if (vatPct > 0) {
-      vatableSales += netBase;
+      vatableSales += discounted; // VATable Sales = Discounted Amount
       totalNoVatDiscount += discAmt;
     } else if (whtPct > 0) {
       zeroRatedSales += discounted;
@@ -308,9 +310,15 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
 
     if (modeOfPayment === 'CASH') {
       paymentAccount = chartsOfAccounts.find(a =>
-        (a.name || '').toLowerCase().includes('cash on hand') ||
-        (a.name || '').toLowerCase().includes('petty cash')
+        (a.name || '').toLowerCase().includes('cash on hand')
       );
+
+      // Fallback: try 'petty cash' if 'cash on hand' not found
+      if (!paymentAccount) {
+        paymentAccount = chartsOfAccounts.find(a =>
+          (a.name || '').toLowerCase().includes('petty cash')
+        );
+      }
     } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
       paymentAccount = chartsOfAccounts.find(a =>
         (a.name || '').toLowerCase().includes(bankName.toLowerCase())
@@ -341,14 +349,15 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
 
       const selectedCoa = chartsOfAccounts.find(a => a.id === item.coa);
 
-      if (selectedCoa && discountedAmount > 0) {
+      // Income account credited at GROSS amount (before discount) - Gross Method
+      if (selectedCoa && gross > 0) {
         entries.push({
           id: Date.now() + Math.random(),
           account: selectedCoa.id,
           accountSearch: selectedCoa.name,
           center: item.responsibilityCenter || '',
           debit: 0,
-          credit: parseFloat(discountedAmount.toFixed(2)),
+          credit: parseFloat(gross.toFixed(2)),
           isManual: false,
         });
       }
@@ -408,13 +417,30 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
       }
     });
 
-    if (paymentAccount && totalCreditAmount > 0) {
+    // Calculate total cash amount: Discounted Amount + VAT - WHT
+    const totalCashAmount = receiptItems.reduce((sum, item) => {
+      const qty = parseFloat(item.qty) || 0;
+      const price = parseFloat(item.price) || 0;
+      const discountPct = parseFloat(item.discount) || 0;
+      const vatPct = parseFloat(item.vat) || 0;
+      const whtPct = parseFloat(item.wht) || 0;
+
+      const gross = qty * price;
+      const discountAmount = gross * (discountPct / 100);
+      const discountedAmount = gross - discountAmount;
+      const vatAmount = discountedAmount * (vatPct / 100);
+      const whtAmount = discountedAmount * (whtPct / 100);
+
+      return sum + (discountedAmount + vatAmount - whtAmount);
+    }, 0);
+
+    if (paymentAccount && totalCashAmount > 0) {
       entries.push({
         id: Date.now() + Math.random(),
         account: paymentAccount.id,
         accountSearch: paymentAccount.name,
         center: '',
-        debit: parseFloat(totalCreditAmount.toFixed(2)),
+        debit: parseFloat(totalCashAmount.toFixed(2)),
         credit: 0,
         isManual: false,
       });
@@ -667,7 +693,7 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
                 <SummaryRow
                   label="VATable Sales"
                   value={fmt(summary.vatableSales)}
-                  formula="Discounted ÷ (1 + VAT%) where VAT > 0"
+                  formula="Discounted Amount where VAT > 0"
                 />
                 <SDivider />
 
@@ -699,7 +725,7 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
                 <SummaryRow
                   label="Total Net of VAT"
                   value={fmt(summary.totalNetOfVat)}
-                  formula="VATable: Disc÷(1+VAT%); Others: Discounted"
+                  formula="Discounted Amount (VAT-exclusive pricing)"
                 />
                 <SDivider />
 

@@ -1,7 +1,20 @@
 import React from 'react';
 
-const RightSideModal = ({ isOpen, onClose, title, children }) => {
+const RightSideModal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   if (!isOpen) return null;
+
+  const sizeClasses = {
+    xs: 'max-w-xs',
+    sm: 'max-w-sm',
+    md: 'max-w-md', 
+    lg: 'max-w-lg',
+    xl: 'max-w-xl',
+    '2xl': 'max-w-2xl',
+    '3xl': 'max-w-3xl',
+    '4xl': 'max-w-4xl',
+    '5xl': 'max-w-5xl',
+    '6xl': 'max-w-6xl',
+  };
 
   return (
     <>
@@ -12,7 +25,7 @@ const RightSideModal = ({ isOpen, onClose, title, children }) => {
       />
       
       {/* Modal - Pure White with Black/Red accents */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.2)] z-[90] transform transition-transform duration-300 ease-in-out animate-in slide-in-from-right">
+      <div className={`fixed right-0 top-0 h-full w-full ${sizeClasses[size]} bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.2)] z-[90] transform transition-transform duration-300 ease-in-out animate-in slide-in-from-right`}>
         
         {/* Header - Now Black with a Red indicator */}
         <div className="bg-black px-6 py-5 flex items-center justify-between relative">
@@ -35,7 +48,7 @@ const RightSideModal = ({ isOpen, onClose, title, children }) => {
         </div>
         
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 bg-white">
+        <div className="flex-1 overflow-y-auto p-4 bg-white">
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
             {children}
           </div>

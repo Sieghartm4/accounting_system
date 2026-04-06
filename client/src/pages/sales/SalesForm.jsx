@@ -129,7 +129,8 @@ function computeSummary(items) {
     const vatAmt = discounted * (vatPct / 100);
     const whtAmt = discounted * (whtPct / 100);
 
-    const netBase = vatPct > 0 ? discounted / (1 + vatPct / 100) : discounted;
+    // For VAT-exclusive pricing, VATable sales is the discounted amount (before VAT is added)
+    const netBase = discounted;
 
     totalSalesPrice += gross;
     totalDiscount += discAmt;
@@ -139,7 +140,7 @@ function computeSummary(items) {
     totalNetOfVat += netBase;
 
     if (vatPct > 0) {
-      vatableSales += netBase;
+      vatableSales += netBase; // This is now the discounted amount for VATable items
       totalNoVatDiscount += discAmt;
     } else if (whtPct > 0) {
       zeroRatedSales += discounted;
@@ -206,6 +207,8 @@ export default function SalesForm({ onBack, onSuccess }) {
   const [categorySearch, setCategorySearch] = useState('');
   const [documentReference, setDocumentReference] = useState('');
   const [terms, setTerms] = useState('');
+  const [termsOption, setTermsOption] = useState('DAYS');
+  const [termsNumber, setTermsNumber] = useState('');
   const [dateDelivered, setDateDelivered] = useState('');
   const [dateDue, setDateDue] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -218,6 +221,7 @@ export default function SalesForm({ onBack, onSuccess }) {
 
   const modeOfPaymentOptions = ['CASH', 'CHECK', 'BANK_TRANSFER', 'CARD', 'E-WALLET', 'OTHERS'];
   const categoryOptions = ['OPERATIONAL EXPENSES', 'ADMINISTRATIVE EXPENSES', 'MARKETING EXPENSES', 'MAINTENANCE EXPENSES', 'UTILITIES EXPENSES', 'RENT EXPENSES', 'SUPPLIES EXPENSES', 'PROFESSIONAL FEES', 'INSURANCE EXPENSES', 'OTHER EXPENSES'];
+  const termsOptions = ['DAYS', 'MONTHS', 'DURATION OF TIME'];
 
   const coaOptions = chartsOfAccounts.map(a => ({ label: a.name || a.account_name, sublabel: a.code || a.account_code, value: a.id }));
   const vendorOptions = vendors.map(v => ({ label: v.name || v.code, sublabel: v.code, value: v.id }));
@@ -308,27 +312,15 @@ export default function SalesForm({ onBack, onSuccess }) {
 
   const generateJournalEntries = () => {
     const entries = [];
+    let totalDebitAmount = 0;
     let totalCreditAmount = 0;
+    let totalGrossAmount = 0;
+    let totalDiscountedAmount = 0;
+    let totalVatAmount = 0;
+    let totalWhtAmount = 0;
+    let totalDiscountAmount = 0;
 
-    let paymentAccount = '';
-
-    if (modeOfPayment === 'CASH') {
-      paymentAccount = chartsOfAccounts.find(a =>
-        (a.name || '').toLowerCase().includes('cash on hand') ||
-        (a.name || '').toLowerCase().includes('petty cash')
-      );
-    } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
-      paymentAccount = chartsOfAccounts.find(a =>
-        (a.name || '').toLowerCase().includes(bankName.toLowerCase())
-      );
-
-      if (!paymentAccount) {
-        paymentAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('cash in bank')
-        );
-      }
-    }
-
+    // First pass: calculate totals
     salesItems.forEach((item) => {
       const qty = parseFloat(item.qty) || 0;
       const price = parseFloat(item.price) || 0;
@@ -341,91 +333,115 @@ export default function SalesForm({ onBack, onSuccess }) {
       const discountedAmount = gross - discountAmount;
       const vatAmount = discountedAmount * (vatPct / 100);
       const whtAmount = discountedAmount * (whtPct / 100);
-      const totalAmount = discountedAmount + vatAmount - whtAmount;
 
-      totalCreditAmount += totalAmount;
+      totalGrossAmount += gross;
+      totalDiscountAmount += discountAmount;
+      totalDiscountedAmount += discountedAmount;
+      totalVatAmount += vatAmount;
+      totalWhtAmount += whtAmount;
+    });
 
-      const selectedCoa = chartsOfAccounts.find(a => a.id === item.coa);
+    // Find accounts receivable account
+    const arAccount = chartsOfAccounts.find(a =>
+      (a.name || '').toLowerCase().includes('accounts receivable')
+    );
 
-      if (selectedCoa && discountedAmount > 0) {
+    // 1. Accounts Receivable (DEBIT) - what customer owes: discounted + VAT - WHT
+    if (arAccount && totalDiscountedAmount > 0) {
+      const arAmount = totalDiscountedAmount + totalVatAmount - totalWhtAmount;
+      entries.push({
+        id: Date.now() + Math.random(),
+        account: arAccount.id,
+        accountSearch: arAccount.name,
+        center: salesItems[0]?.responsibilityCenter || '',
+        debit: parseFloat(arAmount.toFixed(2)),
+        credit: 0,
+        isManual: false,
+      });
+      totalDebitAmount += arAmount;
+    }
+
+    // 2. Sales Discounts (DEBIT)
+    if (totalDiscountAmount > 0) {
+      const discountAccount = chartsOfAccounts.find(a =>
+        (a.name || '').toLowerCase().includes('sales discounts')
+      );
+
+      if (discountAccount) {
         entries.push({
           id: Date.now() + Math.random(),
-          account: selectedCoa.id,
-          accountSearch: selectedCoa.name,
-          center: item.responsibilityCenter || '',
-          debit: 0,
-          credit: parseFloat(discountedAmount.toFixed(2)),
+          account: discountAccount.id,
+          accountSearch: discountAccount.name,
+          center: salesItems[0]?.responsibilityCenter || '',
+          debit: parseFloat(totalDiscountAmount.toFixed(2)),
+          credit: 0,
+          isManual: false,
         });
+        totalDebitAmount += totalDiscountAmount;
       }
+    }
 
-      if (vatAmount > 0) {
-        const inputVatAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('input vat')
-        );
+    // 3. Creditable Withholding Tax (DEBIT)
+    if (totalWhtAmount > 0) {
+      const whtAccount = chartsOfAccounts.find(a => {
+        const name = (a.name || '').toLowerCase();
+        return name.includes('creditable withholding tax') || name.includes('creditable witholding tax');
+      });
 
-        if (inputVatAccount) {
+      if (whtAccount) {
+        entries.push({
+          id: Date.now() + Math.random(),
+          account: whtAccount.id,
+          accountSearch: whtAccount.name,
+          center: salesItems[0]?.responsibilityCenter || '',
+          debit: parseFloat(totalWhtAmount.toFixed(2)),
+          credit: 0,
+          isManual: false,
+        });
+        totalDebitAmount += totalWhtAmount;
+      }
+    }
+
+    // 4. Income from Trading (CREDIT) - using the original COA from sales items for proper balance
+    salesItems.forEach((item) => {
+      if (item.coa) {
+        const selectedCoa = chartsOfAccounts.find(a => a.id === item.coa);
+        const qty = parseFloat(item.qty) || 0;
+        const price = parseFloat(item.price) || 0;
+        const gross = qty * price;
+
+        if (selectedCoa && gross > 0) {
           entries.push({
             id: Date.now() + Math.random(),
-            account: inputVatAccount.id,
-            accountSearch: inputVatAccount.name,
+            account: selectedCoa.id,
+            accountSearch: selectedCoa.name,
             center: item.responsibilityCenter || '',
             debit: 0,
-            credit: parseFloat(vatAmount.toFixed(2)),
+            credit: parseFloat(gross.toFixed(2)),
+            isManual: false,
           });
-        }
-      }
-
-      if (whtAmount > 0) {
-        const whtAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('creditable witholding tax')
-        );
-
-        if (whtAccount) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: whtAccount.id,
-            accountSearch: whtAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: parseFloat(whtAmount.toFixed(2)),
-            credit: 0,
-          });
-        }
-      }
-
-      if (discountAmount > 0) {
-        const discountAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('sales discounts')
-        );
-
-        if (discountAccount) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: discountAccount.id,
-            accountSearch: discountAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: parseFloat(discountAmount.toFixed(2)),
-            credit: 0,
-          });
+          totalCreditAmount += gross;
         }
       }
     });
 
-    if (paymentAccount && totalCreditAmount > 0) {
-      // Find accounts receivable account
-      const arAccount = chartsOfAccounts.find(a =>
-        (a.name || '').toLowerCase().includes('accounts receivable')
+    // 5. Output VAT (CREDIT) - keep this for proper VAT accounting
+    if (totalVatAmount > 0) {
+      const outputVatAccount = chartsOfAccounts.find(a =>
+        (a.name || '').toLowerCase().includes('output vat')
       );
 
-      if (arAccount) {
+      if (outputVatAccount) {
         entries.push({
           id: Date.now() + Math.random(),
-          account: arAccount.id,
-          accountSearch: arAccount.name,
-          center: '',
-          debit: parseFloat(totalCreditAmount.toFixed(2)),
-          credit: 0,
+          account: outputVatAccount.id,
+          accountSearch: outputVatAccount.name,
+          center: salesItems[0]?.responsibilityCenter || '',
+          debit: 0,
+          credit: parseFloat(totalVatAmount.toFixed(2)),
           isManual: false,
         });
+        totalCreditAmount += totalVatAmount;
       }
     }
 
@@ -442,8 +458,8 @@ export default function SalesForm({ onBack, onSuccess }) {
         return;
       }
 
-      if (!terms) {
-        setToast({ type: 'warning', message: 'Please enter terms' });
+      if (!termsOption || !termsNumber) {
+        setToast({ type: 'warning', message: 'Please enter terms option and number' });
         return;
       }
 
@@ -505,10 +521,12 @@ export default function SalesForm({ onBack, onSuccess }) {
       const salesData = {
         customer_id: selectedCustomer,
         document_reference: documentReference,
-        terms: terms,
+        terms: `${termsNumber} ${termsOption}`,
         date_delivered: dateDelivered,
         date_due: dateDue,
         remarks: remarks,
+        total_amount_due: summary.totalAmountDue,
+        created_by: createdBy,
         sales_items: preparedSalesItems,
         journal_entries: preparedJournalEntries,
         attachments: preparedAttachments
@@ -610,7 +628,25 @@ export default function SalesForm({ onBack, onSuccess }) {
               </div>
               <div>
                 <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Terms <span className="text-red-600">*</span></label>
-                <input type="text" placeholder="Enter terms" value={terms} onChange={e => setTerms(e.target.value)} className={inputBase} />
+                <div className="grid grid-cols-2 gap-2">
+                  <select 
+                    value={termsOption} 
+                    onChange={e => setTermsOption(e.target.value)} 
+                    className={`${inputBase} text-black bg-gray-50 border-gray-200`}
+                  >
+                    {termsOptions.map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                  <input 
+                    type="number" 
+                    placeholder="Number" 
+                    value={termsNumber} 
+                    onChange={e => setTermsNumber(e.target.value)} 
+                    className={`${inputBase} text-black bg-gray-50 border-gray-200`}
+                    min="1"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
