@@ -9,12 +9,12 @@ module.exports = {
         primaryKey: true,
         autoIncrement: true
       },
-      ca_sales_id: {
+      ca_collection_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'receipts',
-          key: 'r_id'
+          model: 'collections',
+          key: 'c_id'
         }
       },
       ca_file: {

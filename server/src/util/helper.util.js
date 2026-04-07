@@ -254,6 +254,11 @@ class SQLQueryBuilder {
     return this
   }
 
+  whereIn(column, values) {
+    this.query.where.push({ column, values, operator: 'IN' })
+    return this
+  }
+
   andWhere(condition) {
     this.query.where.push(condition)
     return this
@@ -327,12 +332,28 @@ class SQLQueryBuilder {
 
   // Helper to DRY up condition formatting
   _formatCondition(cond, isNot = false) {
+    // Handle object conditions (from whereIn, whereNot, etc.)
+    if (typeof cond === 'object' && cond !== null) {
+      const { column, values, operator } = cond;
+      
+      if (operator === 'IN') {
+        const placeholders = values.map(() => '?').join(', ');
+        return `${column} IN (${placeholders})`;
+      }
+      
+      // Handle other operators for objects
+      const operators = ['=', '!=', '<>', '<', '>', ' LIKE ', ' IS '];
+      const op = operator || (isNot ? '!=' : '=');
+      return `${column} ${op} ?`;
+    }
+    
+    // Handle string conditions (legacy)
     const operators = ['=', '!=', '<>', '<', '>', ' LIKE ', ' IN ', ' IS ']
     const hasOperator = operators.some((op) => cond.includes(op))
 
     if (hasOperator) return cond
 
-    // Default behavior
+    // Default behavior for strings
     return isNot ? `${cond} != ?` : `${cond} = ?`
   }
 

@@ -791,7 +791,7 @@ const Accounting = {
   prefix: "ca",
   prefix_: "ca_",
   insertColumns: [
-      "sales_id",
+      "collection_id",
       "file",
       "name",
       "remarks",
@@ -800,7 +800,7 @@ const Accounting = {
     ],
   selectColumns: [
       "ca_id",
-      "ca_sales_id",
+      "ca_collection_id",
       "ca_file",
       "ca_name",
       "ca_remarks",
@@ -809,7 +809,7 @@ const Accounting = {
     ],
   selectOptionColumns: {
     id: "ca_id",
-    sales_id: "ca_sales_id",
+    collection_id: "ca_collection_id",
     file: "ca_file",
     name: "ca_name",
     remarks: "ca_remarks",
@@ -818,7 +818,7 @@ const Accounting = {
   },
   updateOptionColumns: {
     id: "id",
-    sales_id: "sales_id",
+    collection_id: "collection_id",
     file: "file",
     name: "name",
     remarks: "remarks",
@@ -833,7 +833,7 @@ const Accounting = {
   },
   columnDataTypes: {
     id: "INTEGER",
-    sales_id: "INTEGER",
+    collection_id: "INTEGER",
     file: "TEXT",
     name: "STRING",
     remarks: "TEXT",

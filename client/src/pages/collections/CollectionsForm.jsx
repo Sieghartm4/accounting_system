@@ -108,167 +108,131 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SUMMARY COMPUTATION — Collections
+// HELPERS — amount computation per line item
 //
-//  A Collection is a payment received against a previously issued Sales Invoice.
-//  Output VAT was already recorded on the Sales Invoice, so it is NOT re-recorded here.
+//  Collection items store only 3 things in the DB (collection_items table):
+//    ci_sales_id       → which sales invoice line  (salesItemId)
+//    ci_amount         → discounted + VAT − WHT     (amount)
+//    ci_witholding_tax → WHT amount                 (whtAmount)
 //
-//  Per item:
-//    gross            = qty × price          (the original invoice amount)
-//    discountAmount   = gross × (disc / 100)
-//    discountedAmount = gross − discountAmount
-//    whtAmount        = discountedAmount × (wht / 100)
-//    cashCollected    = discountedAmount − whtAmount  ← actual cash received
-//
-//  Journal entry per item:
-//    DR  Sales Discounts              discountAmount
-//    DR  Creditable Withholding Tax   whtAmount
-//    DR  Cash in Bank                 cashCollected
-//    CR  Accounts Receivable          gross          ← closes the AR balance
-//
-//  Balance: DR = discAmt + whtAmt + (discounted − whtAmt)
-//               = discAmt + discounted
-//               = discAmt + (gross − discAmt)
-//               = gross  ✅
+//  All other fields (gross, discAmt, vatAmt) are DERIVED for display only.
 // ─────────────────────────────────────────────────────────────────────────────
-function computeSummary(items) {
-  let totalInvoiceAmount  = 0;
-  let totalDiscount       = 0;
-  let totalDiscounted     = 0;
-  let totalWHT            = 0;
-  let totalCashCollected  = 0;
-
-  items.forEach(item => {
-    const qty     = parseFloat(item.qty)      || 0;
-    const price   = parseFloat(item.price)    || 0;
-    const discPct = parseFloat(item.discount) || 0;
-    const whtPct  = parseFloat(item.wht)      || 0;
-
-    const gross      = qty * price;
-    const discAmt    = gross * (discPct / 100);
-    const discounted = gross - discAmt;
-    const whtAmt     = discounted * (whtPct / 100);
-    const cash       = discounted - whtAmt;
-
-    totalInvoiceAmount += gross;
-    totalDiscount      += discAmt;
-    totalDiscounted    += discounted;
-    totalWHT           += whtAmt;
-    totalCashCollected += cash;
-  });
-
+function computeItemAmounts(qty, price, discPct, vatPct, whtPct) {
+  const gross      = qty * price;
+  const discAmt    = gross * (discPct / 100);
+  const discounted = gross - discAmt;
+  const vatAmt     = discounted * (vatPct / 100);
+  const whtAmt     = discounted * (whtPct / 100);
+  const amount     = discounted + vatAmt - whtAmt;  // → ci_amount
   return {
-    totalInvoiceAmount,
-    totalDiscount,
-    totalDiscounted,
-    totalWHT,
-    totalCashCollected,
-    // "Total Amount Due" on a collection = cash actually received
-    totalAmountDue: totalCashCollected,
+    gross:     parseFloat(gross.toFixed(2)),
+    discAmt:   parseFloat(discAmt.toFixed(2)),
+    vatAmt:    parseFloat(vatAmt.toFixed(2)),
+    whtAmount: parseFloat(whtAmt.toFixed(2)),        // → ci_witholding_tax
+    amount:    parseFloat(amount.toFixed(2)),         // → ci_amount
   };
 }
 
-const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// ─────────────────────────────────────────────────────────────────────────────
+// SUMMARY — derived entirely from pre-computed item fields
+// ─────────────────────────────────────────────────────────────────────────────
+function computeSummary(items) {
+  return items.reduce(
+    (acc, item) => ({
+      totalGross:         acc.totalGross         + (item.gross      || 0),
+      totalDiscount:      acc.totalDiscount      + (item.discAmt    || 0),
+      totalVAT:           acc.totalVAT           + (item.vatAmt     || 0),
+      totalWHT:           acc.totalWHT           + (item.whtAmount  || 0),
+      totalCashCollected: acc.totalCashCollected + (item.amount     || 0),
+    }),
+    { totalGross: 0, totalDiscount: 0, totalVAT: 0, totalWHT: 0, totalCashCollected: 0 }
+  );
+}
+
+const fmt = (n = 0) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CollectionsForm({ onBack, onSuccess }) {
 
-  const [collectionItems, setCollectionItems] = useState([
-    {
-      id: 1,
-      productId: '', productSearch: '',
-      coa: '', coaSearch: '',          // AR account (e.g. Accounts Receivable)
-      invoiceRef: '',                  // linked sales invoice / OR number
-      description: '',
-      unit: '', qty: 1, price: 0,
-      discount: 0, wht: 0,
-      responsibilityCenter: '',
-      isOther: false
-    }
-  ]);
-
-  const [journalEntries, setJournalEntries] = useState([
-    { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: false }
-  ]);
+  // ── Collection items ──────────────────────────────────────────────────────
+  // Each item shape (what lives in state):
+  // {
+  //   id                 : React key (frontend only)
+  //   salesItemId        : si_id from sales_items  → ci_sales_id (STORED)
+  //   invoiceRef         : document_reference       (display only)
+  //   description        : product name             (display only)
+  //   responsibilityCenter                           (display only)
+  //   gross              : qty × price              (display only)
+  //   discAmt            : gross × disc%            (display only)
+  //   vatAmt             : discounted × vat%        (display only)
+  //   whtAmount          : discounted × wht%        → ci_witholding_tax (STORED)
+  //   amount             : discounted + vat − wht   → ci_amount (STORED)
+  //   isOther            : false for invoice items
+  // }
+  const [collectionItems, setCollectionItems] = useState([]);
+  const [journalEntries,  setJournalEntries]  = useState([]);
 
   // ── Remote data ──────────────────────────────────────────────────────────
-  const [customers,       setCustomers]       = useState([]);
-  const [customerLoading, setCustomerLoading] = useState(false);
-  const [customerError,   setCustomerError]   = useState('');
+  const [customers,        setCustomers]        = useState([]);
+  const [customerLoading,  setCustomerLoading]  = useState(false);
+  const [customerError,    setCustomerError]    = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState('');
-  const [customerSearch,  setCustomerSearch]  = useState('');
+  const [customerSearch,   setCustomerSearch]   = useState('');
 
   const [chartsOfAccounts, setChartsOfAccounts] = useState([]);
-  const [coaLoading,        setCoaLoading]       = useState(false);
-  const [coaError,          setCoaError]         = useState('');
 
-  const [products,       setProducts]       = useState([]);
-  const [productLoading, setProductLoading] = useState(false);
-  const [productError,   setProductError]   = useState('');
-
-  // ── Payment fields ────────────────────────────────────────────────────────
-  const [modeOfPayment,      setModeOfPayment]      = useState('');
-  const [modeSearch,         setModeSearch]         = useState('');
-  const [bankName,           setBankName]           = useState('');
-  const [checkNumber,        setCheckNumber]        = useState('');
-  const [documentReference,  setDocumentReference]  = useState('');
-  const [remarks,            setRemarks]            = useState('');
+  // ── Payment / header fields ───────────────────────────────────────────────
+  const [modeOfPayment,     setModeOfPayment]     = useState('');
+  const [modeSearch,        setModeSearch]        = useState('');
+  const [bankName,          setBankName]          = useState('');
+  const [checkNumber,       setCheckNumber]       = useState('');
+  const [documentReference, setDocumentReference] = useState('');
+  const [remarks,           setRemarks]           = useState('');
 
   const [attachments, setAttachments] = useState([
     { id: 1, fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }
   ]);
 
   const [toast, setToast] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [salesData, setSalesData] = useState([]);
+  // ── Sales invoice modal ───────────────────────────────────────────────────
+  const [isModalOpen,      setIsModalOpen]      = useState(false);
+  const [salesData,        setSalesData]        = useState([]);
   const [salesDataLoading, setSalesDataLoading] = useState(false);
-  const [salesDataError, setSalesDataError] = useState('');
-  const [selectedSales, setSelectedSales] = useState([]);
+  const [salesDataError,   setSalesDataError]   = useState('');
+  const [selectedSales,    setSelectedSales]    = useState([]);
 
   const modeOfPaymentOptions = ['CASH', 'CHECK', 'BANK_TRANSFER', 'CARD', 'E-WALLET', 'OTHERS'];
 
   const coaOptions      = chartsOfAccounts.map(a => ({ label: a.name || a.account_name, sublabel: a.code || a.account_code, value: a.id }));
   const customerOptions = customers.map(c => ({ label: c.name || c.customer_name, sublabel: c.code, value: c.id }));
-  const productOptions  = products.map(p => ({ label: p.name || p.product_name, sublabel: p.code || p.product_code, value: p.id }));
 
-  // ── Fetchers ─────────────────────────────────────────────────────────────
+  // ── Fetchers ──────────────────────────────────────────────────────────────
   const fetchCustomers = async () => {
     try {
       setCustomerLoading(true);
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authorization token found');
-      const res    = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, { method: 'GET', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } });
+      const res    = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const result = await res.json();
-      if (result.success) setCustomers(result.data); else setCustomerError(result.message || 'Failed to fetch customers');
-    } catch (err) { setCustomerError(err.message); } finally { setCustomerLoading(false); }
+      if (result.success) setCustomers(result.data);
+      else setCustomerError(result.message || 'Failed to fetch customers');
+    } catch (err) { setCustomerError(err.message); }
+    finally { setCustomerLoading(false); }
   };
 
   const fetchChartsOfAccounts = async () => {
     try {
-      setCoaLoading(true);
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authorization token found');
-      const res    = await fetch(`${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`, { method: 'GET', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } });
+      const res    = await fetch(`${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const result = await res.json();
-      if (result.success) setChartsOfAccounts(result.data); else setCoaError(result.message || 'Failed to fetch charts of accounts');
-    } catch (err) { setCoaError(err.message); } finally { setCoaLoading(false); }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      setProductLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No authorization token found');
-      const res    = await fetch(`${import.meta.env.VITE_SERVER_LINK}/product_service`, { method: 'GET', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const result = await res.json();
-      if (result.success) setProducts(result.data); else setProductError(result.message || 'Failed to fetch products');
-    } catch (err) { setProductError(err.message); } finally { setProductLoading(false); }
+      if (result.success) setChartsOfAccounts(result.data);
+    } catch (err) { console.error('COA fetch error:', err.message); }
   };
 
   const fetchSalesData = async () => {
@@ -277,224 +241,204 @@ export default function CollectionsForm({ onBack, onSuccess }) {
       setSalesDataError('');
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authorization token found');
-      
-      const response = await fetch(
+      const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/collections/sales-collection/`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } }
       );
-      
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const result = await res.json();
+      if (result.success) setSalesData(result.data || []);
+      else setSalesDataError(result.message || 'Failed to fetch sales data');
+    } catch (err) { setSalesDataError(err.message); }
+    finally { setSalesDataLoading(false); }
+  };
+
+  useEffect(() => { fetchCustomers(); fetchChartsOfAccounts(); }, []);
+  useEffect(() => {
+    if (isModalOpen) { fetchSalesData(); setSelectedSales([]); }
+  }, [isModalOpen]);
+
+  // ── Item helpers ──────────────────────────────────────────────────────────
+  const removeCollectionItem = (id) => setCollectionItems(prev => prev.filter(i => i.id !== id));
+  const toggleSalesSelection = (saleId) =>
+    setSelectedSales(prev => prev.includes(saleId) ? prev.filter(id => id !== saleId) : [...prev, saleId]);
+
+  // ── Add selected invoices → fetch their line items → map to collection items ──
+  const handleAddSelectedSales = async () => {
+    try {
+      if (selectedSales.length === 0) {
+        setToast({ type: 'warning', message: 'Please select at least one sales invoice' });
+        return;
+      }
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authorization token found');
+
+      const queryParams = new URLSearchParams();
+      selectedSales.forEach(id => queryParams.append('sales_id', id));
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/collections/sales-items-collection?${queryParams.toString()}`,
+        { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } }
+      );
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const result = await response.json();
-      
-      if (result.success) {
-        setSalesData(result.data || []);
-      } else {
-        setSalesDataError(result.message || 'Failed to fetch sales data');
-      }
-    } catch (err) {
-      setSalesDataError(err.message);
-    } finally {
-      setSalesDataLoading(false);
+      if (!result.success) throw new Error(result.message || 'Failed to fetch sales items');
+
+      // ── Map sales_items → collection items ──────────────────────────────
+      //  We compute amounts here so the accountant sees the full breakdown.
+      //  vat IS included — it is part of ci_amount (Discounted + VAT − WHT).
+      const newItems = result.data.map(s => {
+        const qty     = parseFloat(s.quantity)       || 0;
+        const price   = parseFloat(s.purchase_price) || 0;
+        const discPct = parseFloat(s.discount)       || 0;
+        const vatPct  = parseFloat(s.vat)            || 0; // ← MUST include VAT
+        const whtPct  = parseFloat(s.witholding_tax) || 0;
+
+        const computed = computeItemAmounts(qty, price, discPct, vatPct, whtPct);
+
+        return {
+          id:                  Date.now() + Math.random(),
+          salesItemId:         s.id,                        // → ci_sales_id
+          invoiceRef:          s.document_reference || '',  // display only
+          description:         s.product_service_name || s.description || '', // display only
+          responsibilityCenter: s.responsibility_center || '', // display only
+          gross:      computed.gross,     // display only
+          discAmt:    computed.discAmt,   // display only
+          vatAmt:     computed.vatAmt,    // display only
+          whtAmount:  computed.whtAmount, // → ci_witholding_tax
+          amount:     computed.amount,    // → ci_amount
+          isOther:    false,
+        };
+      });
+
+      // Clear existing collection items
+      setCollectionItems([]);
+      // Add new items to collection
+      setCollectionItems([...newItems]);
+      setIsModalOpen(false);
+      setSelectedSales([]);
+      setToast({ type: 'success', message: `${newItems.length} item(s) added from sales invoice` });
+
+    } catch (error) {
+      console.error('Error adding selected sales:', error);
+      setToast({ type: 'error', message: 'Error: ' + error.message });
     }
   };
 
-  useEffect(() => { fetchCustomers(); fetchChartsOfAccounts(); fetchProducts(); }, []);
-
-  useEffect(() => {
-    if (isModalOpen) {
-      fetchSalesData();
-      setSelectedSales([]);
-    }
-  }, [isModalOpen]);
-
-  // ── Item / entry helpers ──────────────────────────────────────────────────
-  const addCollectionItem  = (isOther = false) => setCollectionItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', invoiceRef: '', description: '', unit: '', qty: 1, price: 0, discount: 0, wht: 0, responsibilityCenter: '', isOther }]);
-  const removeCollectionItem = (id) => setCollectionItems(prev => prev.filter(i => i.id !== id));
-  const updateCollectionItem = (id, field, value) => setCollectionItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
-
+  // ── Journal entry helpers ─────────────────────────────────────────────────
   const addJournalEntry    = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
   const updateJournalEntry = (id, field, value) => setJournalEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
 
+  // ── Attachment helpers ────────────────────────────────────────────────────
   const addAttachment    = () => setAttachments(prev => [...prev, { id: Date.now(), fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }]);
   const removeAttachment = (id) => setAttachments(prev => prev.filter(a => a.id !== id));
 
-  // ── Sales selection helpers ───────────────────────────────────────────────────
-  const toggleSalesSelection = (saleId) => {
-    setSelectedSales(prev => 
-      prev.includes(saleId) 
-        ? prev.filter(id => id !== saleId)
-        : [...prev, saleId]
-    );
-  };
-
-  const handleAddSelectedSales = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      
-      if (!token) {
-        throw new Error("No authorization token found");
-      }
-      console.log("Selected sales:", selectedSales);
-      // Send selected IDs to the testing API
-      const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/collections/testing`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            selectedIds: selectedSales
-          }),
-
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        // Close modal and reset selection
-        setIsModalOpen(false);
-        setSelectedSales([]);
-        console.log('Selected items sent successfully:', result);
-      } else {
-        throw new Error(result.message || 'Failed to add selected items');
-      }
-    } catch (error) {
-      console.error('Error adding selected sales:', error);
-      // You might want to show an error message to the user here
-    }
-  };
-
   const summary = computeSummary(collectionItems);
 
-  // ── Journal-entry auto-generation ─────────────────────────────────────────
+  // ── Auto-generate journal entries ─────────────────────────────────────────
   //
-  //  Collection Journal (per item):
-  //    DR  Accounts Receivable  0          gross          ← closing the AR
+  //  Per item:
+  //    CR  Accounts Receivable   gross      ← closes the full AR (asset decreases)
+  //    DR  Sales Discounts       discAmt    ← discount expense
+  //    DR  Creditable WHT        whtAmount  ← asset: BIR owes us later
   //
-  //  Wait — AR is being CREDITED (we're collecting it / reducing it).
-  //  AR is an asset: increases with DR, decreases with CR.
-  //    CR  Accounts Receivable             gross
-  //    DR  Sales Discounts      discAmt    0
-  //    DR  CWT                  whtAmt     0
-  //    DR  Cash in Bank         cashAmt    0
+  //  One combined:
+  //    DR  Cash / Bank           totalCash  ← actual money received
+  //
+  //  Balance proof per item:
+  //    DR side = discAmt + whtAmount + (amount)
+  //            = discAmt + whtAmt + (discounted + vatAmt − whtAmt)
+  //            = discAmt + discounted + vatAmt
+  //            = discAmt + (gross − discAmt) + vatAmt
+  //            = gross + vatAmt   ← note: AR was originally booked at gross + vatAmt in the Sales JE
+  //    CR side = gross + vatAmt  ✅
   // ─────────────────────────────────────────────────────────────────────────
   const generateJournalEntries = () => {
+    if (collectionItems.length === 0) { setJournalEntries([]); return; }
+
     const entries = [];
 
-    // Resolve the payment/cash account
+    // Resolve cash/payment account
     let paymentAccount = null;
     if (modeOfPayment === 'CASH') {
-      paymentAccount = chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('cash on hand'))
-        ?? chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('petty cash'));
+      paymentAccount =
+        chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('cash on hand')) ??
+        chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('petty cash'));
     } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
-      paymentAccount = bankName
-        ? chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes(bankName.toLowerCase()))
-        : null;
+      if (bankName) {
+        paymentAccount = chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes(bankName.toLowerCase()));
+      }
       paymentAccount ??= chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('cash in bank'));
     }
 
+    const arAccount   = chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('accounts receivable'));
+    const discAccount = chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('sales discounts'));
+    const whtAccount  = chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('creditable withholding tax'));
+
     let totalCash = 0;
 
-    collectionItems.forEach(item => {
-      const qty     = parseFloat(item.qty)      || 0;
-      const price   = parseFloat(item.price)    || 0;
-      const discPct = parseFloat(item.discount) || 0;
-      const whtPct  = parseFloat(item.wht)      || 0;
+    collectionItems.filter(i => !i.isOther).forEach(item => {
+      totalCash += item.amount || 0;
 
-      const gross      = qty * price;
-      const discAmt    = gross * (discPct / 100);
-      const discounted = gross - discAmt;
-      const whtAmt     = discounted * (whtPct / 100);
-      const cashAmt    = discounted - whtAmt;
-
-      totalCash += cashAmt;
-
-      // ── CR  Accounts Receivable (or whatever AR account is chosen per item) ──
-      const selectedCoa = chartsOfAccounts.find(a => a.id === item.coa)
-        ?? chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('accounts receivable'));
-
-      if (selectedCoa && gross > 0) {
+      // CR  Accounts Receivable — gross + vatAmt (mirrors what was DR'd on the Sales JE)
+      const arCredit = parseFloat(((item.gross || 0) + (item.vatAmt || 0)).toFixed(2));
+      if (arAccount && arCredit > 0) {
         entries.push({
-          id: Date.now() + Math.random(),
-          account: selectedCoa.id,
-          accountSearch: selectedCoa.name,
-          center: item.responsibilityCenter || '',
-          debit: 0,
-          credit: parseFloat(gross.toFixed(2)),
-          isManual: false,
+          id:            Date.now() + Math.random(),
+          account:       arAccount.id,
+          accountSearch: arAccount.name,
+          center:        item.responsibilityCenter || '',
+          debit:         0,
+          credit:        arCredit,
+          isManual:      false,
         });
       }
 
-      // ── DR  Sales Discounts ──
-      if (discAmt > 0) {
-        const discAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('sales discounts')
-        );
-        if (discAccount) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: discAccount.id,
-            accountSearch: discAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: parseFloat(discAmt.toFixed(2)),
-            credit: 0,
-            isManual: false,
-          });
-        }
+      // DR  Sales Discounts
+      if (discAccount && (item.discAmt || 0) > 0) {
+        entries.push({
+          id:            Date.now() + Math.random(),
+          account:       discAccount.id,
+          accountSearch: discAccount.name,
+          center:        item.responsibilityCenter || '',
+          debit:         parseFloat((item.discAmt || 0).toFixed(2)),
+          credit:        0,
+          isManual:      false,
+        });
       }
 
-      // ── DR  Creditable Withholding Tax ──
-      if (whtAmt > 0) {
-        const whtAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('creditable withholding tax')
-        );
-        if (whtAccount) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: whtAccount.id,
-            accountSearch: whtAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: parseFloat(whtAmt.toFixed(2)),
-            credit: 0,
-            isManual: false,
-          });
-        }
+      // DR  Creditable Withholding Tax
+      if (whtAccount && (item.whtAmount || 0) > 0) {
+        entries.push({
+          id:            Date.now() + Math.random(),
+          account:       whtAccount.id,
+          accountSearch: whtAccount.name,
+          center:        item.responsibilityCenter || '',
+          debit:         parseFloat((item.whtAmount || 0).toFixed(2)),
+          credit:        0,
+          isManual:      false,
+        });
       }
     });
 
-    // ── DR  Cash in Bank (one combined entry for all items) ──
+    // DR  Cash / Bank — one combined entry
     if (paymentAccount && totalCash > 0) {
       entries.push({
-        id: Date.now() + Math.random(),
-        account: paymentAccount.id,
+        id:            Date.now() + Math.random(),
+        account:       paymentAccount.id,
         accountSearch: paymentAccount.name,
-        center: '',
-        debit: parseFloat(totalCash.toFixed(2)),
-        credit: 0,
-        isManual: false,
+        center:        '',
+        debit:         parseFloat(totalCash.toFixed(2)),
+        credit:        0,
+        isManual:      false,
       });
     }
 
     setJournalEntries(entries);
   };
 
-  useEffect(() => {
-    generateJournalEntries();
-  }, [collectionItems, modeOfPayment, bankName, chartsOfAccounts]);
+  useEffect(() => { generateJournalEntries(); }, [collectionItems, modeOfPayment, bankName, chartsOfAccounts]);
 
   // ── Post Transaction ──────────────────────────────────────────────────────
   const fileToBase64 = (file) =>
@@ -507,44 +451,39 @@ export default function CollectionsForm({ onBack, onSuccess }) {
 
   const handlePostTransaction = async () => {
     try {
-      const userData  = JSON.parse(localStorage.getItem('user') || '{}');
-      const createdBy = userData.mu_username || userData.username || 'Unknown User';
-
       if (!selectedCustomer) { setToast({ type: 'warning', message: 'Please select a customer' }); return; }
       if (!modeOfPayment)    { setToast({ type: 'warning', message: 'Please select mode of payment' }); return; }
       if ((modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && !bankName) {
         setToast({ type: 'warning', message: 'Please enter bank name' }); return;
       }
-      if (collectionItems.length === 0 || (collectionItems.length === 1 && collectionItems[0].isOther)) {
-        setToast({ type: 'warning', message: 'Please add at least one collection item' }); return;
+      if (collectionItems.filter(i => !i.isOther).length === 0) {
+        setToast({ type: 'warning', message: 'Please add at least one collection item from a sales invoice' }); return;
       }
 
       const token = localStorage.getItem('token');
       if (!token) { setToast({ type: 'error', message: 'No authorization token found. Please login again.' }); return; }
 
+      const userData  = JSON.parse(localStorage.getItem('user') || '{}');
+      const createdBy = userData.mu_username || userData.username || 'Unknown User';
+
+      // ── collection_items payload — ONLY what the DB schema stores ──
+      //   ci_sales_id       → salesItemId
+      //   ci_amount         → amount       (discounted + VAT − WHT)
+      //   ci_witholding_tax → whtAmount
       const preparedItems = collectionItems
         .filter(item => !item.isOther)
         .map(item => ({
-          product_id:            item.productId || null,
-          account_id:            item.coa || item.accountId,
-          invoice_ref:           item.invoiceRef || '',
-          description:           item.description,
-          unit:                  item.unit || '',
-          qty:                   parseFloat(item.qty)      || 0,
-          price:                 parseFloat(item.price)    || 0,
-          discount:              parseFloat(item.discount) || 0,
-          wtax:                  parseFloat(item.wht)      || 0,
-          responsibility_center: item.responsibilityCenter || '',
+          sales_id:       item.salesItemId,
+          amount:         item.amount,
+          witholding_tax: item.whtAmount,
         }));
 
-      const preparedJournalEntries = journalEntries
-        .filter(entry => !entry.isOther)
-        .map(entry => ({
-          account_id:            entry.account || entry.accountId,
-          responsibility_center: entry.center  || '',
-          debit:                 parseFloat(entry.debit)  || 0,
-          credit:                parseFloat(entry.credit) || 0,
-        }));
+      const preparedJournalEntries = journalEntries.map(entry => ({
+        account_id:            entry.account || '',
+        responsibility_center: entry.center  || '',
+        debit:                 parseFloat(entry.debit)  || 0,
+        credit:                parseFloat(entry.credit) || 0,
+      }));
 
       const preparedAttachments = await Promise.all(
         attachments.map(async att => ({
@@ -556,35 +495,36 @@ export default function CollectionsForm({ onBack, onSuccess }) {
         }))
       );
 
+      // ── collections header payload — matches DB columns exactly ──
+      // c_customer_id, c_document_reference, c_mode_of_payment,
+      // c_bank_name, c_check_number, c_collection_date, c_remarks, c_created_by
       const collectionData = {
         customer_id:        selectedCustomer,
         document_reference: documentReference,
-        collection_date:    new Date().toISOString().split('T')[0],
         mode_of_payment:    modeOfPayment,
-        bank_name:          bankName     || '',
-        check_number:       checkNumber  || '',
+        bank_name:          bankName    || '',
+        check_number:       checkNumber || '',
+        collection_date:    new Date().toISOString().split('T')[0],
         remarks,
-        total_amount_due:   summary.totalAmountDue,
+        total_amount_due:   summary.totalCashCollected,
         created_by:         createdBy,
         collection_items:   preparedItems,
         journal_entries:    preparedJournalEntries,
         attachments:        preparedAttachments,
       };
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/collection`, {
-        method: 'POST',
+      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/collections`, {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(collectionData),
+        body:    JSON.stringify(collectionData),
       });
 
       if (!response.ok) {
-        const errorData    = await response.json().catch(() => ({}));
-        const errorMessage = errorData.message || `HTTP error! status: ${response.status}`;
-        throw new Error(errorMessage);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-
       if (result.success) {
         const nextToast = { type: 'success', message: 'Collection posted successfully!' };
         setToast(nextToast);
@@ -593,6 +533,7 @@ export default function CollectionsForm({ onBack, onSuccess }) {
       } else {
         setToast({ type: 'error', message: result.message || 'Failed to post collection' });
       }
+
     } catch (error) {
       console.error('Error posting collection:', error);
       setToast({ type: 'error', message: 'Error: ' + error.message });
@@ -602,12 +543,11 @@ export default function CollectionsForm({ onBack, onSuccess }) {
   // ── Styles ────────────────────────────────────────────────────────────────
   const inputBase  = 'w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500 text-center';
   const tableInput = 'w-full bg-gray-50/50 rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none focus:ring-1 focus:ring-red-400';
-  const pctInput   = tableInput + ' pr-4';
   const fadeInUp   = { hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
-  // ── Derived totals for Balance Check ─────────────────────────────────────
   const totalDebit  = journalEntries.reduce((s, e) => s + (parseFloat(e.debit)  || 0), 0);
   const totalCredit = journalEntries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0);
+  const isBalanced  = Math.abs(totalDebit - totalCredit) < 0.01;
 
   return (
     <div className="h-full flex flex-col overflow-x-hidden bg-[#F3F4F6]">
@@ -629,10 +569,7 @@ export default function CollectionsForm({ onBack, onSuccess }) {
 
       {/* TOP NAV */}
       <div className="flex items-center justify-between mb-3 flex-shrink-0">
-        <nav
-          className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors"
-          onClick={onBack}
-        >
+        <nav className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors" onClick={onBack}>
           <ArrowLeft size={17} /><span className="text-black">Back to Collections</span>
         </nav>
         <div className="flex gap-2">
@@ -651,7 +588,7 @@ export default function CollectionsForm({ onBack, onSuccess }) {
       {/* BODY */}
       <div className="flex-1 flex gap-4 min-h-0">
 
-        {/* LEFT SIDEBAR */}
+        {/* ── LEFT SIDEBAR ── */}
         <aside className="w-72 flex-shrink-0 flex flex-col gap-3 h-full overflow-y-auto sidebar-scroll pb-2">
 
           {/* Basic Details */}
@@ -660,11 +597,8 @@ export default function CollectionsForm({ onBack, onSuccess }) {
               <Landmark size={12} /> Basic Details
             </h3>
             <div className="grid grid-cols-1 gap-2.5">
-              {/* Customer */}
               <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">
-                  Customer <span className="text-red-600">*</span>
-                </label>
+                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Customer <span className="text-red-600">*</span></label>
                 {customerLoading
                   ? <div className={inputBase + ' text-gray-400 py-1.5'}>Loading customers…</div>
                   : <SearchableDropdown
@@ -678,121 +612,67 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                     />
                 }
               </div>
-
-              {/* Reference + Date */}
               <div className="grid grid-cols-2 gap-2">
-                <SidebarInput
-                  label="OR / Reference"
-                  placeholder="OR-000"
-                  value={documentReference}
-                  onChange={e => setDocumentReference(e.target.value)}
-                />
+                <SidebarInput label="OR / Reference" placeholder="OR-000" value={documentReference} onChange={e => setDocumentReference(e.target.value)} />
                 <SidebarInput label="Date" type="date" />
               </div>
-
-              {/* Mode of Payment */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Mode of Payment</label>
-                  <SearchableDropdown
-                    placeholder="Select mode..."
-                    value={modeSearch}
-                    onChange={v => { setModeSearch(v); setModeOfPayment(''); }}
-                    onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }}
-                    options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))}
-                    inputClassName={inputBase}
-                    emptyText="No modes found"
-                  />
-                </div>
+              <div>
+                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Mode of Payment</label>
+                <SearchableDropdown
+                  placeholder="Select mode..."
+                  value={modeSearch}
+                  onChange={v => { setModeSearch(v); setModeOfPayment(''); }}
+                  onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }}
+                  options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))}
+                  inputClassName={inputBase}
+                  emptyText="No modes found"
+                />
               </div>
-
-              {/* Bank / Check — shown only when relevant */}
               {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
                 <div className="grid grid-cols-2 gap-2">
                   <SidebarInput label="Bank Name" placeholder="Enter bank name" value={bankName} onChange={e => setBankName(e.target.value)} />
-                  <SidebarInput label="Check #"   placeholder="Enter check number" value={checkNumber} onChange={e => setCheckNumber(e.target.value)} />
+                  <SidebarInput label="Check #" placeholder="Check number" value={checkNumber} onChange={e => setCheckNumber(e.target.value)} />
                 </div>
               )}
             </div>
           </section>
 
-          {/* ── SUMMARY ── */}
+          {/* SUMMARY */}
           <section className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex-1 flex flex-col min-h-0">
             <h3 className="text-[12px] font-black uppercase tracking-[3px] text-gray-900 mb-2 flex items-center gap-2 flex-shrink-0">
               <Calculator size={12} /> Summary
             </h3>
-
-            <div className="overflow-y-auto min-h-0 flex-1">
-              <div className="space-y-0">
-
-                {/* 1. Total Invoice Amount = Σ (qty × price) */}
-                <SummaryRow
-                  label="Total Invoice Amount"
-                  value={fmt(summary.totalInvoiceAmount)}
-                  formula="Σ (Qty × Price)"
-                />
-                <SDivider />
-
-                {/* 2. Total Discount */}
-                <SummaryRow
-                  label="Total Discount"
-                  value={fmt(summary.totalDiscount)}
-                  color="text-orange-500"
-                  formula="Σ (Invoice Amount × Disc%)"
-                />
-                <SDivider />
-
-                {/* 3. Total Discounted Amount */}
-                <SummaryRow
-                  label="Total Discounted Amount"
-                  value={fmt(summary.totalDiscounted)}
-                  formula="Invoice Amount − Discount"
-                />
-                <SDivider />
-
-                {/* 4. Total WHT */}
-                <SummaryRow
-                  label="Total Withholding Tax"
-                  value={fmt(summary.totalWHT)}
-                  color="text-blue-600"
-                  formula="Σ (Discounted × WHT%)"
-                />
-                <SDivider />
-
-                {/* 5. Total Cash Collected */}
-                <SummaryRow
-                  label="Total Cash Collected"
-                  value={fmt(summary.totalCashCollected)}
-                  color="text-green-600"
-                  formula="Discounted Amount − WHT"
-                />
-
-              </div>
+            <div className="overflow-y-auto min-h-0 flex-1 space-y-0">
+              <SummaryRow label="Total Invoice Amount" value={fmt(summary.totalGross)}         formula="Σ (Qty × Price)" />
+              <SDivider />
+              <SummaryRow label="Total Discount"       value={fmt(summary.totalDiscount)}      formula="Σ (Gross × Disc%)"        color="text-orange-500" />
+              <SDivider />
+              <SummaryRow label="Total VAT"            value={fmt(summary.totalVAT)}           formula="Σ (Discounted × VAT%)"    color="text-red-600" />
+              <SDivider />
+              <SummaryRow label="Total WHT"            value={fmt(summary.totalWHT)}           formula="Σ (Discounted × WHT%)"    color="text-blue-600" />
+              <SDivider />
+              <SummaryRow label="Total Amount Due" value={fmt(summary.totalCashCollected)} formula="Discounted + VAT - WHT"   color="text-green-600" />
             </div>
-
-            {/* Total Amount Due footer */}
             <div className="mt-3 flex-shrink-0">
               <div className="flex flex-col gap-[2px] mb-2">
                 <div className="h-[2px] w-full bg-red-600 rounded-full" />
                 <div className="h-[1px] w-full bg-black/10" />
               </div>
               <div className="mb-2 px-2 py-1 bg-red-50 rounded-lg border border-red-100 text-center">
-                <p className="text-[9px] font-black uppercase tracking-wide text-red-400">
-                  Discounted Amount − WHT
-                </p>
+                <p className="text-[9px] font-black uppercase tracking-wide text-red-400">Discounted + VAT − WHT</p>
               </div>
               <div className="text-center">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[3px] mb-1">Total Cash Received</p>
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[3px] mb-1">Total Amount Due</p>
                 <p className="text-2xl font-black text-black tracking-tighter leading-none flex items-baseline justify-center gap-1">
                   <span className="text-[13px] text-red-600">PHP</span>
-                  {fmt(summary.totalAmountDue)}
+                  {fmt(summary.totalCashCollected)}
                 </p>
               </div>
             </div>
           </section>
         </aside>
 
-        {/* MAIN CONTENT */}
+        {/* ── MAIN CONTENT ── */}
         <main className="flex-1 overflow-y-auto custom-table-scroller space-y-4 pr-1 min-h-0">
           <motion.div initial="hidden" animate="visible" variants={fadeInUp} className="space-y-4">
 
@@ -803,190 +683,100 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                 <div className="h-[1px] w-full bg-black/10" />
               </div>
 
-              {/* Info badge — explains VAT absence */}
-              <div className="mb-3 px-3 py-2 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-2">
-                <span className="text-blue-500 text-[11px] font-black uppercase tracking-wide leading-snug">
-                  ℹ️ Collection against Sales Invoice — Output VAT was already recorded on the Sales Invoice and is not re-recorded here.
+              {/* <div className="mb-3 px-3 py-2 bg-blue-50 rounded-xl border border-blue-100">
+                <span className="text-blue-600 text-[11px] font-black uppercase tracking-wide">
+                  ℹ️ Collected against Sales Invoice — amounts are auto-computed from original invoice items (Discounted + VAT − WHT). Only Sales ID, Amount, and WHT are stored.
                 </span>
-              </div>
+              </div> */}
 
-              <div className="overflow-x-auto custom-table-scroller">
-                <table className="w-full text-center min-w-[1050px]" style={{ tableLayout: 'fixed' }}>
-                  <colgroup>
-                    <col style={{ width: '13%' }} />  {/* Product/Service */}
-                    <col style={{ width: '14%' }} />  {/* Charts of Accounts (AR) */}
-                    <col style={{ width: '12%' }} />  {/* Invoice Ref */}
-                    <col style={{ width: '14%' }} />  {/* Description */}
-                    <col style={{ width: '6%'  }} />  {/* Unit */}
-                    <col style={{ width: '6%'  }} />  {/* Qty */}
-                    <col style={{ width: '10%' }} />  {/* Price (Invoice Amt) */}
-                    <col style={{ width: '8%'  }} />  {/* Disc % */}
-                    <col style={{ width: '8%'  }} />  {/* WHT % */}
-                    <col style={{ width: '12%' }} />  {/* Resp. Center */}
-                    <col style={{ width: '5%'  }} />  {/* Delete */}
-                  </colgroup>
-                  <thead>
-                    <tr className="border-b border-gray-100">
-                      {[
-                        'Product/Service',
-                        'AR Account',
-                        'Invoice Ref',
-                        'Description',
-                        'Unit', 'Qty',
-                        'Invoice Amt',
-                        'Disc %',
-                        'WHT %',
-                        'Resp. Center',
-                        ''
-                      ].map((h, i) => (
-                        <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {collectionItems.map((item) => (
-                      <tr key={item.id} className={item.isOther ? 'bg-gray-50/30' : ''}>
-
-                        {/* Product/Service */}
-                        <td className="py-1 px-1">
-                          <SearchableDropdown
-                            disabled={item.isOther}
-                            placeholder="Search product..."
-                            value={item.productSearch}
-                            onChange={v => updateCollectionItem(item.id, 'productSearch', v)}
-                            onSelect={opt => { updateCollectionItem(item.id, 'productId', opt.value); updateCollectionItem(item.id, 'productSearch', opt.label); }}
-                            options={productOptions}
-                            inputClassName={`${tableInput} ${item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
-                            emptyText={productError || 'No products found'}
-                          />
-                        </td>
-
-                        {/* AR Account */}
-                        <td className="py-1 px-1">
-                          <SearchableDropdown
-                            placeholder="Accounts Receivable..."
-                            value={item.coaSearch}
-                            onChange={v => updateCollectionItem(item.id, 'coaSearch', v)}
-                            onSelect={opt => { updateCollectionItem(item.id, 'coa', opt.value); updateCollectionItem(item.id, 'coaSearch', opt.label); }}
-                            options={coaOptions}
-                            inputClassName={tableInput}
-                            emptyText="No accounts found"
-                          />
-                        </td>
-
-                        {/* Invoice Reference */}
-                        <td className="py-1 px-1">
-                          <input
-                            className={tableInput}
-                            placeholder="INV-000"
-                            value={item.invoiceRef}
-                            onChange={e => updateCollectionItem(item.id, 'invoiceRef', e.target.value)}
-                          />
-                        </td>
-
-                        {/* Description */}
-                        <td className="py-1 px-1">
-                          <input
-                            className={tableInput}
-                            placeholder="Details..."
-                            value={item.description}
-                            onChange={e => updateCollectionItem(item.id, 'description', e.target.value)}
-                          />
-                        </td>
-
-                        {/* Unit */}
-                        <td className="py-1 px-1">
-                          <input
-                            disabled={item.isOther}
-                            className={`${tableInput} ${item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
-                            placeholder={item.isOther ? '' : 'pc'}
-                            value={item.isOther ? '' : item.unit}
-                            onChange={e => updateCollectionItem(item.id, 'unit', e.target.value)}
-                          />
-                        </td>
-
-                        {/* Qty */}
-                        <td className="py-1 px-1">
-                          <input
-                            disabled={item.isOther}
-                            type="number" min="0"
-                            className={`${tableInput} ${item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
-                            placeholder={item.isOther ? '' : '1'}
-                            value={item.isOther ? '' : item.qty}
-                            onChange={e => updateCollectionItem(item.id, 'qty', parseFloat(e.target.value) || 0)}
-                          />
-                        </td>
-
-                        {/* Price / Invoice Amount */}
-                        <td className="py-1 px-1">
-                          <input
-                            className={tableInput + ' font-black'}
-                            type="number" min="0" step="0.01"
-                            placeholder="0.00"
-                            value={item.price}
-                            onChange={e => updateCollectionItem(item.id, 'price', parseFloat(e.target.value) || 0)}
-                          />
-                        </td>
-
-                        {/* Disc % */}
-                        <td className="py-1 px-1">
-                          <div className="relative">
-                            <input
-                              className={pctInput + ' font-black'}
-                              type="number" min="0" max="100" step="0.01"
-                              placeholder="0"
-                              value={item.discount || 0}
-                              onChange={e => updateCollectionItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
-                            />
-                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">%</span>
-                          </div>
-                        </td>
-
-                        {/* WHT % */}
-                        <td className="py-1 px-1">
-                          <div className="relative">
-                            <input
-                              className={pctInput + ' font-black text-blue-600'}
-                              type="number" min="0" max="100" step="0.01"
-                              placeholder="0"
-                              value={item.wht}
-                              onChange={e => updateCollectionItem(item.id, 'wht', parseFloat(e.target.value) || 0)}
-                            />
-                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-blue-400 font-black pointer-events-none">%</span>
-                          </div>
-                        </td>
-
-                        {/* Resp. Center */}
-                        <td className="py-1 px-1">
-                          <input
-                            className={tableInput}
-                            placeholder="Center"
-                            value={item.responsibilityCenter}
-                            onChange={e => updateCollectionItem(item.id, 'responsibilityCenter', e.target.value)}
-                          />
-                        </td>
-
-                        {/* Delete */}
-                        <td className="py-1 px-1 text-center">
-                          <button
-                            onClick={() => removeCollectionItem(item.id)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </td>
+              {collectionItems.length === 0 ? (
+                <div className="py-10 text-center text-gray-400 text-[13px] font-bold border-2 border-dashed border-gray-100 rounded-xl">
+                  No items yet. Click "Add Sales Items" to select outstanding invoices.
+                </div>
+              ) : (
+                <div className="overflow-x-auto custom-table-scroller">
+                  {/*
+                    READ-ONLY display table.
+                    All columns are for accountant review.
+                    Only whtAmount (→ ci_witholding_tax) and amount (→ ci_amount) go to the DB.
+                  */}
+                  <table className="w-full text-center min-w-[860px]" style={{ tableLayout: 'fixed' }}>
+                    <colgroup>
+                      <col style={{ width: '16%' }} /> {/* Invoice Ref */}
+                      <col style={{ width: '20%' }} /> {/* Product/Service */}
+                      <col style={{ width: '12%' }} /> {/* Gross Amt */}
+                      <col style={{ width: '10%' }} /> {/* Discount */}
+                      <col style={{ width: '10%' }} /> {/* VAT */}
+                      <col style={{ width: '12%' }} /> {/* WHT → ci_witholding_tax */}
+                      <col style={{ width: '14%' }} /> {/* Amount Due → ci_amount */}
+                      <col style={{ width: '10%' }} /> {/* Responsibility Center */}
+                      <col style={{ width: '6%'  }} /> {/* Delete */}
+                    </colgroup>
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        {['Invoice Ref', 'Product/Service', 'Gross Amt', 'Discount', 'VAT', 'WHT', 'Amount Due', 'Responsibility Center', ''].map((h, i) => (
+                          <th key={i} className="pb-2 text-[11px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {collectionItems.map(item => (
+                        <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="py-2 px-2 text-center">
+                            <span className="font-mono text-[11px] bg-gray-100 px-2 py-0.5 rounded text-gray-700">
+                              {item.invoiceRef || '—'}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 truncate" title={item.product_service_name || item.description}>
+                            {item.product_service_name || item.description || '—'}
+                          </td>
+                          <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-800 tabular-nums">
+                            {fmt(item.gross || 0)}
+                          </td>
+                          <td className="py-2 px-2 text-[12px] font-bold text-center text-orange-500 tabular-nums">
+                            ({fmt(item.discAmt || 0)})
+                          </td>
+                          <td className="py-2 px-2 text-[12px] font-bold text-center text-red-500 tabular-nums">
+                            +{fmt(item.vatAmt || 0)}
+                          </td>
+                          <td className="py-2 px-2 text-[12px] font-bold text-center text-blue-600 tabular-nums">
+                            ({fmt(item.whtAmount || 0)})
+                          </td>
+                          <td className="py-2 px-2 text-[13px] font-black text-center text-green-700 tabular-nums">
+                            {fmt(item.amount || 0)}
+                          </td>
+                          <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 tabular-nums">
+                            {item.responsibilityCenter || '---'}
+                          </td>
+                          <td className="py-2 px-1 text-center">
+                            <button onClick={() => removeCollectionItem(item.id)} className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors">
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-gray-200 bg-gray-50/80">
+                        <td colSpan={2} className="py-2 px-2 text-[13px] font-black uppercase text-gray-900 text-left">Totals</td>
+                        <td className="py-2 px-2 text-[12px] font-black text-center tabular-nums">{fmt(summary.totalGross)}</td>
+                        <td className="py-2 px-2 text-[12px] font-black text-orange-500 text-center tabular-nums">({fmt(summary.totalDiscount)})</td>
+                        <td className="py-2 px-2 text-[12px] font-black text-red-500 text-center tabular-nums">+{fmt(summary.totalVAT)}</td>
+                        <td className="py-2 px-2 text-[12px] font-black text-blue-600 text-center tabular-nums">({fmt(summary.totalWHT)})</td>
+                        <td className="py-2 px-2 text-[13px] font-black text-green-700 text-center tabular-nums">{fmt(summary.totalCashCollected)}</td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
 
-              <div className="flex gap-2 mt-3">
+              <div className="mt-3">
                 <button
                   onClick={() => setIsModalOpen(true)}
                   className="w-full py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-2"
                 >
-                  <Plus size={14} /> ADD SALES ITEMS
+                  <Plus size={14} /> Add Sales Items
                 </button>
               </div>
             </TableSection>
@@ -998,6 +788,19 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                 <div className="h-[1px] w-full bg-black/10" />
               </div>
 
+              {/* <div className="mb-3 grid grid-cols-2 gap-2">
+                {[
+                  { label: 'CR  Accounts Receivable', sub: 'Gross + VAT — closes the AR',      color: 'bg-red-50 border-red-100 text-red-600'       },
+                  { label: 'DR  Sales Discounts',      sub: 'Discount given on collection',     color: 'bg-orange-50 border-orange-100 text-orange-600' },
+                  { label: 'DR  Creditable WHT',       sub: 'Tax withheld by customer (asset)', color: 'bg-blue-50 border-blue-100 text-blue-600'      },
+                  { label: 'DR  Cash / Bank',          sub: 'Actual cash received',             color: 'bg-green-50 border-green-100 text-green-600'   },
+                ].map((leg, i) => (
+                  <div key={i} className={`px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase ${leg.color}`}>
+                    {leg.label}<br />
+                    <span className="opacity-70 normal-case font-semibold">{leg.sub}</span>
+                  </div>
+                ))}
+              </div> */}
 
               <div className="overflow-x-auto custom-table-scroller">
                 <table className="w-full text-center" style={{ tableLayout: 'fixed', minWidth: 600 }}>
@@ -1016,7 +819,13 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {journalEntries.map((entry) => (
+                    {journalEntries.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-[12px] text-gray-400 text-center">
+                          Journal entries auto-generate once items are added and mode of payment is selected.
+                        </td>
+                      </tr>
+                    ) : journalEntries.map(entry => (
                       <tr key={entry.id}>
                         <td className="py-1.5 px-1">
                           <SearchableDropdown
@@ -1034,8 +843,7 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                         </td>
                         <td className="py-1.5 px-1">
                           <input
-                            className={tableInput + ' font-black'}
-                            placeholder="0.00" type="number"
+                            className={tableInput + ' font-black'} placeholder="0.00" type="number"
                             value={entry.debit}
                             onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)}
                             disabled={!entry.isManual} readOnly={!entry.isManual}
@@ -1043,8 +851,7 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                         </td>
                         <td className="py-1.5 px-1">
                           <input
-                            className={tableInput + ' font-black text-red-600'}
-                            placeholder="0.00" type="number"
+                            className={tableInput + ' font-black text-red-600'} placeholder="0.00" type="number"
                             value={entry.credit}
                             onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)}
                             disabled={!entry.isManual} readOnly={!entry.isManual}
@@ -1052,11 +859,11 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                         </td>
                         <td className="py-1.5 text-center">
                           {entry.isManual ? (
-                            <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
-                              <Trash2 size={15} className="mx-auto" />
+                            <button className="p-1 text-red-600 hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
+                              <Trash2 size={14} className="mx-auto" />
                             </button>
                           ) : (
-                            <span className="text-gray-300 text-[11px] italic">Auto</span>
+                            <span className="text-gray-300 text-[10px] italic">Auto</span>
                           )}
                         </td>
                       </tr>
@@ -1064,18 +871,10 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                   </tbody>
                   <tfoot>
                     <tr className="bg-gray-50/50">
-                      <td colSpan={2} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">
-                        Balance Check
-                      </td>
-                      <td className="py-2 px-1 text-center text-[13px] font-black">
-                        {fmt(totalDebit)}
-                      </td>
-                      <td className={`py-2 px-1 text-center text-[13px] font-black ${Math.abs(totalDebit - totalCredit) < 0.01 ? 'text-green-600' : 'text-red-600'}`}>
-                        {fmt(totalCredit)}
-                        {Math.abs(totalDebit - totalCredit) < 0.01
-                          ? <span className="ml-1 text-[10px]">✅</span>
-                          : <span className="ml-1 text-[10px]">❌</span>
-                        }
+                      <td colSpan={2} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
+                      <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(totalDebit)}</td>
+                      <td className={`py-2 px-1 text-center text-[13px] font-black ${isBalanced ? 'text-green-600' : 'text-red-600'}`}>
+                        {fmt(totalCredit)} <span className="text-[11px]">{isBalanced ? '✅' : '❌'}</span>
                       </td>
                       <td />
                     </tr>
@@ -1113,7 +912,7 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {attachments.map((file) => (
+                      {attachments.map(file => (
                         <tr key={file.id}>
                           <td className="py-2 px-1"><input className={tableInput} placeholder="e.g. OR_Scan" /></td>
                           <td className="py-2 px-1">
@@ -1123,8 +922,8 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                           <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">{file.uploadedBy}</td>
                           <td className="py-2 px-1 text-[12px] font-bold text-gray-600 tabular-nums">{file.date}</td>
                           <td className="py-2 text-center">
-                            <button onClick={() => removeAttachment(file.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors">
-                              <Trash2 size={15} />
+                            <button onClick={() => removeAttachment(file.id)} className="p-1 text-red-600 hover:bg-red-50 rounded">
+                              <Trash2 size={14} />
                             </button>
                           </td>
                         </tr>
@@ -1132,10 +931,7 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                     </tbody>
                   </table>
                 </div>
-                <button
-                  onClick={addAttachment}
-                  className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1"
-                >
+                <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
                   <Plus size={15} /> Add File
                 </button>
               </TableSection>
@@ -1154,134 +950,118 @@ export default function CollectionsForm({ onBack, onSuccess }) {
         </main>
       </div>
 
-      {/* Right Side Modal for Sales Items */}
-      <RightSideModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Select Sales Items"
-        size="2xl"
-      >
+      {/* ── SALES INVOICE MODAL ── */}
+      <RightSideModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Select Sales Invoices" size="2xl">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600 mb-4">
-            Select sales invoices to add to this collection. This will populate the collection items with the selected invoice details.
+          <p className="text-[12px] text-gray-500 font-semibold">
+            Select outstanding sales invoices to collect. Their line items will be fetched and amounts auto-computed (Discounted + VAT − WHT).
           </p>
-          
-          {/* Sales Data Table */}
-          <div className="space-y-3">
-            {salesDataLoading ? (
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-xs text-gray-500 text-center">Loading sales data...</p>
-              </div>
-            ) : salesDataError ? (
-              <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                <p className="text-xs text-red-600 text-center">{salesDataError}</p>
-              </div>
-            ) : salesData.length === 0 ? (
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-xs text-gray-500 text-center">No sales invoices found</p>
-              </div>
-            ) : (
-              <div className="overflow-hidden border border-gray-200 rounded-lg">
-                <div className="max-h-96 overflow-y-auto">
-                  <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
-                    <colgroup>
-                      <col style={{ width: '60px' }} />  {/* Select */}
-                      <col style={{ width: '20%' }} /> {/* Customer */}
-                      <col style={{ width: '20%' }} /> {/* Doc Ref */}
-                      <col style={{ width: '15%' }} /> {/* Terms */}
-                      <col style={{ width: '15%' }} /> {/* Date Due */}
-                      <col style={{ width: '15%' }} /> {/* Amount Due */}
-                      <col style={{ width: '130px' }} /> {/* Status */}
-                    </colgroup>
-                    <thead className="bg-black border-b border-red-600 sticky top-0 z-10">
-                      <tr>
-                        <th className="p-4 text-center font-bold uppercase text-white text-xs tracking-wider">Select</th>
-                        <th className="p-4 text-center font-bold uppercase text-white text-xs tracking-wider">Customer</th>
-                        <th className="p-4 text-center font-bold uppercase text-white text-xs tracking-wider">Doc Ref</th>
-                        <th className="p-4 text-center font-bold uppercase text-white text-xs tracking-wider">Terms</th>
-                        <th className="p-4 text-center font-bold uppercase text-white text-xs tracking-wider">Date Due</th>
-                        <th className="p-4 text-center font-bold uppercase text-white text-xs tracking-wider">Amount Due</th>
-                        <th className="p-4 text-center font-bold uppercase text-white text-xs tracking-wider">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                      {salesData.map((sale, index) => (
-                        <tr 
-                          key={sale.id} 
-                          className={`hover:bg-gray-50 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}
+
+          {salesDataLoading ? (
+            <div className="p-8 bg-gray-50 rounded-xl border border-gray-200 text-center">
+              <p className="text-[12px] text-gray-400 font-bold animate-pulse">Loading sales invoices…</p>
+            </div>
+          ) : salesDataError ? (
+            <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-center">
+              <p className="text-[12px] text-red-600 font-bold">{salesDataError}</p>
+            </div>
+          ) : salesData.length === 0 ? (
+            <div className="p-8 bg-gray-50 rounded-xl border border-gray-200 text-center">
+              <p className="text-[12px] text-gray-400 font-bold">No outstanding sales invoices found.</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden border border-gray-200 rounded-xl">
+              <div className="max-h-[440px] overflow-y-auto custom-table-scroller">
+                <table className="w-full" style={{ tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '5%' }} />
+                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '18%' }} />
+                    <col style={{ width: '13%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '14%' }} />
+                  </colgroup>
+                  <thead className="bg-black sticky top-0 z-10">
+                    <tr>
+                      {['', 'Customer', 'Doc Ref', 'Terms', 'Date Due', 'Amount Due', 'Status'].map((h, i) => (
+                        <th key={i} className="px-4 py-3 text-center text-[11px] font-black uppercase text-white tracking-wider border-b-2 border-red-600">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {salesData.map((sale, idx) => {
+                      const isChecked = selectedSales.includes(sale.id);
+                      return (
+                        <tr
+                          key={sale.id}
                           onClick={() => toggleSalesSelection(sale.id)}
+                          className={`cursor-pointer transition-colors ${isChecked ? 'bg-red-50' : idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50/40 hover:bg-gray-100'}`}
                         >
-                          <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-center">
+                          <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-center">
                               <input
                                 type="checkbox"
-                                checked={selectedSales.includes(sale.id)}
+                                checked={isChecked}
                                 onChange={() => toggleSalesSelection(sale.id)}
-                                className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 focus:ring-2"
+                                className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                               />
                             </div>
                           </td>
-                          <td className="p-3">
-                            <div className="font-medium text-gray-900 truncate text-center" title={sale.customer}>
-                              {sale.customer || '-'}
-                            </div>
+                          <td className="px-4 py-3 text-center text-[12px] font-bold text-gray-900 truncate" title={sale.customer}>{sale.customer || '—'}</td>
+                          <td className="px-4 py-3 text-center text-[11px] font-mono font-bold text-gray-700">{sale.doc_ref || '—'}</td>
+                          <td className="px-4 py-3 text-center text-[11px] font-bold text-gray-500 uppercase">{sale.terms || '—'}</td>
+                          <td className="px-4 py-3 text-center text-[11px] font-mono text-gray-600">{sale.date_due || '—'}</td>
+                          <td className="px-4 py-3 text-center text-[12px] font-black tabular-nums text-gray-900">
+                            {parseFloat(sale.amount_due || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                           </td>
-                          <td className="p-3">
-                            <div className="font-medium text-gray-900 font-mono text-xs text-center" title={sale.doc_ref}>
-                              {sale.doc_ref || '-'}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="text-gray-600 text-xs font-medium uppercase text-center">
-                              {sale.terms || '-'}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="text-gray-600 text-xs font-mono text-center">
-                              {sale.date_due || '-'}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="font-bold text-gray-900 text-right tabular-nums">
-                              {parseFloat(sale.amount_due || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="flex items-center">
-                              <span className={`inline-flex items-center px-2.5 py-1 text-xs font-bold text-center rounded-full border ${
-                                sale.status === 'COLLECTED' 
-                                  ? 'bg-green-50 text-green-700 border-green-200' 
-                                  : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                              }`}>
-                                {sale.status || 'UNKNOWN'}
-                              </span>
-                            </div>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 text-[10px] font-black rounded-full border ${
+                              sale.status === 'COLLECTED'
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : sale.status === 'PARTIALLY COLLECTED'
+                                ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                : sale.status === 'NOT COLLECTED'
+                                ? 'bg-red-50 text-red-700 border-red-200'
+                                : 'bg-gray-50 text-gray-600 border-gray-200'
+                            }`}>
+                              {sale.status || 'UNKNOWN'}
+                            </span>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
-          <div className="flex justify-end gap-3 mt-6">
+            </div>
+          )}
+
+          {selectedSales.length > 0 && (
+            <div className="px-3 py-2 bg-red-50 border border-red-100 rounded-lg text-center">
+              <p className="text-[11px] font-black text-red-600 uppercase tracking-wide">
+                {selectedSales.length} invoice{selectedSales.length > 1 ? 's' : ''} selected
+              </p>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
             <button
-              onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 bg-gray-200 text-gray-600 text-sm font-bold rounded-lg hover:bg-gray-300 transition-colors"
+              onClick={() => { setIsModalOpen(false); setSelectedSales([]); }}
+              className="px-4 py-2 bg-gray-100 text-gray-600 text-[12px] font-black rounded-lg hover:bg-gray-200 transition-colors uppercase"
             >
               Cancel
             </button>
             <button
               onClick={handleAddSelectedSales}
               disabled={selectedSales.length === 0}
-              className={`px-6 py-2 text-sm font-bold rounded-lg transition-colors ${
+              className={`px-6 py-2 text-[12px] font-black rounded-lg uppercase tracking-wider transition-colors ${
                 selectedSales.length === 0
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-red-600 text-white hover:bg-red-700'
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-200'
               }`}
             >
-              Add Selected Items ({selectedSales.length})
+              Add {selectedSales.length > 0 ? `(${selectedSales.length})` : ''} Selected
             </button>
           </div>
         </div>
@@ -1305,17 +1085,13 @@ function TableSection({ title, icon, children }) {
   );
 }
 
-function SDivider() {
-  return <div className="h-[1px] w-full bg-gray-100" />;
-}
+function SDivider() { return <div className="h-[1px] w-full bg-gray-100" />; }
 
 function SummaryRow({ label, value, color = 'text-gray-800', formula }) {
   return (
     <div className="summary-row relative flex justify-between items-center hover:bg-gray-50 rounded-md transition-colors py-1 px-1 cursor-default">
       <span className="text-[10.5px] font-black uppercase text-gray-500 leading-tight pr-1 flex-1">{label}</span>
-      <span className={`${color} text-[12px] font-black tabular-nums tracking-tight whitespace-nowrap text-right flex-shrink-0`}>
-        {value}
-      </span>
+      <span className={`${color} text-[12px] font-black tabular-nums tracking-tight whitespace-nowrap text-right flex-shrink-0`}>{value}</span>
       {formula && (
         <div className="summary-tooltip absolute left-0 bottom-full mb-1 z-50 bg-gray-900 text-white text-[10px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none">
           <span className="text-gray-300 font-medium">{formula}</span>
@@ -1330,12 +1106,11 @@ function SidebarInput({ label, placeholder, type = 'text', required, value, onCh
   return (
     <div className="space-y-1">
       <label className="text-[11px] font-black uppercase text-gray-400 block">
-        {label} {required && <span className="text-red-600">*</span>}
+        {label}{required && <span className="text-red-600 ml-1">*</span>}
       </label>
       <input
-        type={type} placeholder={placeholder}
-        value={value} onChange={onChange}
-        className="w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all bg-gray-50 border border-gray-200 text-black focus:ring-red-500 border-gray-200 focus:ring-1"
+        type={type} placeholder={placeholder} value={value} onChange={onChange}
+        className="w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500"
       />
     </div>
   );

@@ -211,6 +211,22 @@ const DynamicTable = ({
 
       {/* --- DATA TABLE --- */}
       <div className="flex-1 overflow-auto bg-white custom-scrollbar">
+        <style dangerouslySetInnerHTML={{
+          __html: `
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 5px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #dc2626; /* red-600 */
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: #b91c1c; /* red-700 */
+                }
+            `}} />
         <table className="w-full border-collapse">
           <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
             <tr>

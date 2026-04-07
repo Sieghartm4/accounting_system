@@ -11,11 +11,19 @@ module.exports = {
       },
       ci_collection_id: {
         type: Sequelize.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+          model: 'collections',
+          key: 'c_id'
+        }
       },
       ci_sales_id: {
         type: Sequelize.INTEGER,
-        allowNull: false
+        allowNull: false,
+        references: {
+          model: 'sales',
+          key: 's_id'
+        }
       },
       ci_amount: {
         type: Sequelize.DECIMAL(18, 2),
