@@ -9,9 +9,9 @@ const CollectionAttachmentsSchema = Joi.object({
         'any.required': 'id is required.',
         'number.base': 'id must be a valid integer.',
       }),
- 	salesId: Joi.number().integer().required().messages({
-        'any.required': 'salesId is required.',
-        'number.base': 'salesId must be a valid integer.',
+ 	collectionId: Joi.number().integer().required().messages({
+        'any.required': 'collectionId is required.',
+        'number.base': 'collectionId must be a valid integer.',
       }),
  	file: Joi.string().trim().required().messages({
         'any.required': 'file is required.',
@@ -39,13 +39,13 @@ const CollectionAttachmentsSchema = Joi.object({
 /** Field references for clean, type-safe access */
 const CollectionAttachmentsField = {
     Id: 'id',
-    SalesId: 'sales_id',
+    CollectionId: 'collection_id',
     File: 'file',
     Name: 'name',
     Remarks: 'remarks',
     UploadedBy: 'uploaded_by',
     UploadedDate: 'uploaded_date',
-    All: ['id', 'sales_id', 'file', 'name', 'remarks', 'uploaded_by', 'uploaded_date'],
+    All: ['id', 'collection_id', 'file', 'name', 'remarks', 'uploaded_by', 'uploaded_date'],
 };
 
 

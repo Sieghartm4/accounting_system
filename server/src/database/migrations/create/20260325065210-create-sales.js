@@ -46,7 +46,7 @@ module.exports = {
         allowNull: false
       },
       s_status: {
-        type: Sequelize.ENUM('COLLECTED', 'NOT COLLECTED', 'PARTIALLY COLLECTED'),
+        type: Sequelize.ENUM('PAID','UNPAID','REJECTED'),
         allowNull: false
       },
       s_state: {

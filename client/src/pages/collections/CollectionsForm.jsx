@@ -333,6 +333,13 @@ export default function CollectionsForm({ onBack, onSuccess }) {
   // ── Attachment helpers ────────────────────────────────────────────────────
   const addAttachment    = () => setAttachments(prev => [...prev, { id: Date.now(), fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }]);
   const removeAttachment = (id) => setAttachments(prev => prev.filter(a => a.id !== id));
+  const updateAttachment = (id, field, value) => setAttachments(prev => prev.map(att => att.id === id ? { ...att, [field]: value } : att));
+  const handleFileChange = (id, file) => {
+    if (file) {
+      updateAttachment(id, 'fileName', file.name);
+      updateAttachment(id, 'file', file);
+    }
+  };
 
   const summary = computeSummary(collectionItems);
 
@@ -372,51 +379,22 @@ export default function CollectionsForm({ onBack, onSuccess }) {
       paymentAccount ??= chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('cash in bank'));
     }
 
-    const arAccount   = chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('accounts receivable'));
-    const discAccount = chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('sales discounts'));
-    const whtAccount  = chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('creditable withholding tax'));
+    const arAccount = chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('accounts receivable'));
 
     let totalCash = 0;
 
     collectionItems.filter(i => !i.isOther).forEach(item => {
       totalCash += item.amount || 0;
 
-      // CR  Accounts Receivable — gross + vatAmt (mirrors what was DR'd on the Sales JE)
-      const arCredit = parseFloat(((item.gross || 0) + (item.vatAmt || 0)).toFixed(2));
-      if (arAccount && arCredit > 0) {
+      // CR  Accounts Receivable — amount collected
+      if (arAccount && item.amount > 0) {
         entries.push({
           id:            Date.now() + Math.random(),
           account:       arAccount.id,
           accountSearch: arAccount.name,
           center:        item.responsibilityCenter || '',
           debit:         0,
-          credit:        arCredit,
-          isManual:      false,
-        });
-      }
-
-      // DR  Sales Discounts
-      if (discAccount && (item.discAmt || 0) > 0) {
-        entries.push({
-          id:            Date.now() + Math.random(),
-          account:       discAccount.id,
-          accountSearch: discAccount.name,
-          center:        item.responsibilityCenter || '',
-          debit:         parseFloat((item.discAmt || 0).toFixed(2)),
-          credit:        0,
-          isManual:      false,
-        });
-      }
-
-      // DR  Creditable Withholding Tax
-      if (whtAccount && (item.whtAmount || 0) > 0) {
-        entries.push({
-          id:            Date.now() + Math.random(),
-          account:       whtAccount.id,
-          accountSearch: whtAccount.name,
-          center:        item.responsibilityCenter || '',
-          debit:         parseFloat((item.whtAmount || 0).toFixed(2)),
-          credit:        0,
+          credit:        parseFloat(item.amount.toFixed(2)),
           isManual:      false,
         });
       }
@@ -541,7 +519,7 @@ export default function CollectionsForm({ onBack, onSuccess }) {
   };
 
   // ── Styles ────────────────────────────────────────────────────────────────
-  const inputBase  = 'w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500 text-center';
+  const inputBase  = 'w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500';
   const tableInput = 'w-full bg-gray-50/50 rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none focus:ring-1 focus:ring-red-400';
   const fadeInUp   = { hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
@@ -914,11 +892,29 @@ export default function CollectionsForm({ onBack, onSuccess }) {
                     <tbody className="divide-y divide-gray-50">
                       {attachments.map(file => (
                         <tr key={file.id}>
-                          <td className="py-2 px-1"><input className={tableInput} placeholder="e.g. OR_Scan" /></td>
                           <td className="py-2 px-1">
-                            <input type="file" className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full" />
+                            <input 
+                              className={tableInput} 
+                              placeholder="e.g. OR_Scan" 
+                              value={file.fileName}
+                              onChange={(e) => updateAttachment(file.id, 'fileName', e.target.value)}
+                            />
                           </td>
-                          <td className="py-2 px-1"><input className={tableInput} placeholder="Add note..." /></td>
+                          <td className="py-2 px-1">
+                            <input 
+                              type="file" 
+                              className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full" 
+                              onChange={(e) => handleFileChange(file.id, e.target.files[0])}
+                            />
+                          </td>
+                          <td className="py-2 px-1">
+                            <input 
+                              className={tableInput} 
+                              placeholder="Add note..." 
+                              value={file.remarks}
+                              onChange={(e) => updateAttachment(file.id, 'remarks', e.target.value)}
+                            />
+                          </td>
                           <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">{file.uploadedBy}</td>
                           <td className="py-2 px-1 text-[12px] font-bold text-gray-600 tabular-nums">{file.date}</td>
                           <td className="py-2 text-center">

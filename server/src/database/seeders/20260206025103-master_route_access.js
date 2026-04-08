@@ -12,23 +12,27 @@ module.exports = {
      *   isBetaMember: false
      * }], {});
     */
-       await queryInterface.bulkInsert('master_route_access', [
-      {
+       const routes = [
+      'dashboard', 'access', 'users', 'customers', 'vendors', 'charts',
+      'proforma_entries', 'product_service', 'company', 'receipts',
+      'disbursement', 'sales', 'collections', 'purchase', 'payments'
+    ];
+
+    const seedData = [];
+    routes.forEach(route => {
+      seedData.push({
         mra_access_id: 1,
-        mra_name: 'dashboard',
+        mra_name: route,
         mra_status: 'Full Access'
-      },
-      {
-        mra_access_id: 1,
-        mra_name: 'access',
+      });
+      seedData.push({
+        mra_access_id: 2,
+        mra_name: route,
         mra_status: 'Full Access'
-      },
-      {
-        mra_access_id: 1,
-        mra_name: 'users',
-        mra_status: 'Full Access'
-      }
-    ]);
+      });
+    });
+
+    await queryInterface.bulkInsert('master_route_access', seedData);
   },
 
   async down (queryInterface, Sequelize) {

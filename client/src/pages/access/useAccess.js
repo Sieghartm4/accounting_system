@@ -100,6 +100,86 @@ const useAccess = () => {
         }
     };
 
+    const updateRouteAccess = async (route_access_Data) => {
+        try {
+            const token = localStorage.getItem("token");
+
+            if (!token) {
+                throw new Error("No authorization token found");
+            }
+
+            const response = await fetch(
+                `${import.meta.env.VITE_SERVER_LINK}/route_access`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify(route_access_Data)
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                return { success: true, data: result.data };
+            } else {
+                return { success: false, message: result.message || "Failed to update route access" };
+            }
+        } catch (err) {
+            console.error('Error updating route access:', err.message);
+            return { success: false, message: err.message };
+        }
+    };
+
+    const updateSingleRouteAccess = async (route_id, status, access_id) => {
+        try {
+            const token = localStorage.getItem("token");
+
+            if (!token) {
+                throw new Error("No authorization token found");
+            }
+
+            const response = await fetch(
+                `${import.meta.env.VITE_SERVER_LINK}/route_access`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ 
+                        route_access_Data: {
+                            route_id,
+                            status,
+                            access_id
+                        }
+                    })
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                return { success: true, data: result.data };
+            } else {
+                return { success: false, message: result.message || "Failed to update single route access" };
+            }
+        } catch (err) {
+            console.error('Error updating single route access:', err.message);
+            return { success: false, message: err.message };
+        }
+    };
+
     const fetchAccess = async () => {
         try {
             setLoading(true);
@@ -151,7 +231,9 @@ const useAccess = () => {
         selectedAccessId, 
         routeAccessData, 
         routeAccessLoading,
-        createAccess
+        createAccess,
+        updateRouteAccess,
+        updateSingleRouteAccess
     };
 };
 

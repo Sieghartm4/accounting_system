@@ -22,7 +22,7 @@ module.exports = {
         allowNull: false
       },
       ra_name: {
-        type: Sequelize.STRING(300),
+        type: Sequelize.TEXT('medium'),
         allowNull: false
       },
       ra_remarks: {

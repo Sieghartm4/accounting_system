@@ -107,7 +107,7 @@ const createReceipts = async (req, res, next) => {
         check_number || null,
         remarks || null,
         total_amount_due || null,
-        'COLLECTED',
+        'NOT COLLECTED',
         'PREPARED',
         new Date().toISOString().split('T')[0],
         created_by || null

@@ -100,14 +100,14 @@ const createSales = async (req, res, next) => {
         'SALES',
         remarks || null,
         total_amount_due || null,
-        'NOT COLLECTED',
+        'UNPAID',
         'PREPARED',
         new Date().toISOString().split('T')[0],
         created_by || null
       ];
 
       const [mainResult] = await connection.execute(mainQuery, mainValues);
-      const receiptId = mainResult.insertId;
+      const salesId = mainResult.insertId;
 
       if (sales_items && sales_items.length > 0) {
         for (const item of sales_items) {
@@ -118,7 +118,7 @@ const createSales = async (req, res, next) => {
           }).build();
 
           const itemValues = [
-            receiptId,
+            salesId,
             item.product_id || null,
             item.account_id || null,
             item.description || null,
@@ -147,8 +147,8 @@ const createSales = async (req, res, next) => {
           const amount = entry.debit > 0 ? entry.debit : entry.credit;
 
           const entryValues = [
-            "receipts",
-            receiptId,
+            "sales",
+            salesId,
             entry.account_id || null,
             entry.responsibility_center || '',
             type,
@@ -169,7 +169,7 @@ const createSales = async (req, res, next) => {
           }).build();
 
           const attachmentValues = [
-            receiptId,
+            salesId,
             attachment.fileName || null,
             attachment.file || null,
             attachment.remarks || null,
@@ -185,8 +185,8 @@ const createSales = async (req, res, next) => {
 
       res.status(201).json({
         success: true,
-        message: 'Receipt created successfully',
-        data: { id: receiptId },
+        message: 'Sales created successfully',
+        data: { id: salesId },
         timestamp: new Date().toISOString()
       });
 
@@ -202,10 +202,10 @@ const createSales = async (req, res, next) => {
     }
 
   } catch (error) {
-    console.error('Error creating receipt:', error);
+    console.error('Error creating sales:', error);
     return res.status(500).json({
       success: false,
-      message: 'Server error while creating receipt',
+      message: 'Server error while creating sales',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }

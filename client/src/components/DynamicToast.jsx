@@ -39,7 +39,10 @@ const DynamicToast = ({ type = 'success', message, onClose, duration = 4000 }) =
   }, [onClose, duration]);
 
   return (
-    <div className="fixed top-6 right-6 z-[200] animate-in slide-in-from-right-8 fade-in duration-300">
+    <div 
+      className="fixed top-6 right-6 z-[200] animate-in slide-in-from-right-8 fade-in duration-300 cursor-pointer"
+      onClick={onClose}
+    >
       <div className={`
         relative w-80 bg-white shadow-[0_15px_50px_-12px_rgba(0,0,0,0.25)] 
         rounded-xl border-l-4 ${config.borderColor} overflow-hidden

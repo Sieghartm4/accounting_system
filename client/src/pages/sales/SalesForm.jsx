@@ -292,6 +292,13 @@ export default function SalesForm({ onBack, onSuccess }) {
   const updateJournalEntry = (id, field, value) => setJournalEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
   const addAttachment = () => setAttachments(prev => [...prev, { id: Date.now(), fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }]);
   const removeAttachment = (id) => setAttachments(prev => prev.filter(a => a.id !== id));
+  const updateAttachment = (id, field, value) => setAttachments(prev => prev.map(att => att.id === id ? { ...att, [field]: value } : att));
+  const handleFileChange = (id, file) => {
+    if (file) {
+      updateAttachment(id, 'fileName', file.name);
+      updateAttachment(id, 'file', file);
+    }
+  };
 
   const summary = computeSummary(salesItems);
 
@@ -966,9 +973,29 @@ export default function SalesForm({ onBack, onSuccess }) {
                     <tbody className="divide-y divide-gray-50">
                       {attachments.map((file) => (
                         <tr key={file.id}>
-                          <td className="py-2 px-1"><input className={tableInput} placeholder="e.g. Invoice_Scan" /></td>
-                          <td className="py-2 px-1"><input type="file" className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full" /></td>
-                          <td className="py-2 px-1"><input className={tableInput} placeholder="Add note..." /></td>
+                          <td className="py-2 px-1">
+                            <input 
+                              className={tableInput} 
+                              placeholder="e.g. Invoice_Scan" 
+                              value={file.fileName}
+                              onChange={(e) => updateAttachment(file.id, 'fileName', e.target.value)}
+                            />
+                          </td>
+                          <td className="py-2 px-1">
+                            <input 
+                              type="file" 
+                              className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full" 
+                              onChange={(e) => handleFileChange(file.id, e.target.files[0])}
+                            />
+                          </td>
+                          <td className="py-2 px-1">
+                            <input 
+                              className={tableInput} 
+                              placeholder="Add note..." 
+                              value={file.remarks}
+                              onChange={(e) => updateAttachment(file.id, 'remarks', e.target.value)}
+                            />
+                          </td>
                           <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">{file.uploadedBy}</td>
                           <td className="py-2 px-1 text-[12px] font-bold text-gray-600 tabular-nums">{file.date}</td>
                           <td className="py-2 text-center">

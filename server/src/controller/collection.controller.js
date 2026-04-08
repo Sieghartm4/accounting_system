@@ -20,8 +20,22 @@ require('dotenv').config()
 
 const getCollections = async (req, res, next) => {
   try {
-    const collections = await SelectAll(Accounting.collections.tablename, Accounting.collections.prefix_)
-    
+    const query = sql.select([
+      { col: `${Accounting.collections.tablename}.c_id`, as: 'id' },
+      { col: `${Master.customers.tablename}.c_name`, as: 'customer' },
+      { col: `${Accounting.collections.tablename}.c_document_reference`, as: 'doc_ref' },
+      { col: `${Accounting.collections.tablename}.c_mode_of_payment`, as: 'mode_of_payment' },
+      { col: `${Accounting.collections.tablename}.c_bank_name`, as: 'bank_name' },
+      { col: `${Accounting.collections.tablename}.c_check_number`, as: 'check_number' },
+      { col: `${Accounting.collections.tablename}.c_collection_date`, as: 'collection_date' },
+      { col: `${Accounting.collections.tablename}.c_status`, as: 'status' },
+      { col: `${Accounting.collections.tablename}.c_state`, as: 'state' }
+    ])
+      .from(Accounting.collections.tablename)
+      .innerJoin(Master.customers.tablename, `${Accounting.collections.tablename}.c_customer_id`, `${Master.customers.tablename}.c_id`)
+      .build();
+    let collections = await Query(query, [], [Accounting.collections.prefix_, Master.customers.prefix_]);
+
     res.status(200).json({
       success: true,
       message: 'Collections retrieved successfully',
@@ -32,7 +46,7 @@ const getCollections = async (req, res, next) => {
 
   } catch (error) {
     console.error('Error fetching collections:', error)
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
       message: 'Server error while fetching collections',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -49,14 +63,15 @@ const getSalesCollection = async (req, res, next) => {
       { col: Accounting.sales.selectOptionColumns.terms, as: 'terms' },
       { col: Accounting.sales.selectOptionColumns.date_due, as: 'date_due' },
       { col: Accounting.sales.selectOptionColumns.total_amount_due, as: 'amount_due' },
-      { col: Accounting.sales.selectOptionColumns.status, as: 'status' }
+      { col: Accounting.sales.selectOptionColumns.status, as: 'status' },
     ])
       .from(Accounting.sales.tablename)
       .innerJoin(Master.customers.tablename, Accounting.sales.selectOptionColumns.customer_id, Master.customers.selectOptionColumns.id)
-      .whereNot(Accounting.sales.selectOptionColumns.status, 'COLLECTED')
+      .whereNot(Accounting.sales.selectOptionColumns.status)
+      .where(Accounting.sales.selectOptionColumns.state)
       .build();
-    let sales = await Query(query, ['COLLECTED'], [Accounting.sales.prefix_, Master.customers.prefix_]);
-
+    let sales = await Query(query, ['APPROVED', 'COLLECTED'], [Accounting.sales.prefix_, Master.customers.prefix_]);
+    console.log(query);
     res.status(200).json({
       success: true,
       message: 'Sales retrieved successfully',
@@ -85,38 +100,38 @@ const getSalesItemsCollection = async (req, res, next) => {
 
     if (salesIds.length === 0) {
       return res.status(400).json({
-        success:   false,
-        message:   'No sales IDs provided',
+        success: false,
+        message: 'No sales IDs provided',
         timestamp: new Date().toISOString(),
       });
     }
 
     const query = sql.select([
       // Sales item identity
-      { col: Accounting.sales_items.selectOptionColumns.id,                  as: 'id' },
-      { col: Accounting.sales_items.selectOptionColumns.sales_id,            as: 'sales_id' },
+      { col: Accounting.sales_items.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.sales_items.selectOptionColumns.sales_id, as: 'sales_id' },
 
       // Product info (display only)
-      { col: Accounting.sales_items.selectOptionColumns.product_service,     as: 'product_service' },
-      { col: Master.products_service.selectOptionColumns.name,               as: 'product_service_name' },
+      { col: Accounting.sales_items.selectOptionColumns.product_service, as: 'product_service' },
+      { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
 
       // COA / AR account
-      { col: Accounting.sales_items.selectOptionColumns.charts_of_accounts,  as: 'charts_of_accounts' },
-      { col: Master.charts_of_accounts.selectOptionColumns.name,             as: 'coa_name' },
+      { col: Accounting.sales_items.selectOptionColumns.charts_of_accounts, as: 'charts_of_accounts' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'coa_name' },
 
       // Invoice reference (from parent sales header)
-      { col: Accounting.sales.selectOptionColumns.document_reference,        as: 'document_reference' },
+      { col: Accounting.sales.selectOptionColumns.document_reference, as: 'document_reference' },
 
       // Line item detail
-      { col: Accounting.sales_items.selectOptionColumns.description,         as: 'description' },
-      { col: Accounting.sales_items.selectOptionColumns.unit,                as: 'unit' },
-      { col: Accounting.sales_items.selectOptionColumns.quantity,            as: 'quantity' },
-      { col: Accounting.sales_items.selectOptionColumns.purchase_price,      as: 'purchase_price' },
+      { col: Accounting.sales_items.selectOptionColumns.description, as: 'description' },
+      { col: Accounting.sales_items.selectOptionColumns.unit, as: 'unit' },
+      { col: Accounting.sales_items.selectOptionColumns.quantity, as: 'quantity' },
+      { col: Accounting.sales_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
 
       // Rate fields — all needed to compute ci_amount correctly
-      { col: Accounting.sales_items.selectOptionColumns.discount,            as: 'discount' },
-      { col: Accounting.sales_items.selectOptionColumns.vat,                 as: 'vat' },           // ← CRITICAL: must be returned
-      { col: Accounting.sales_items.selectOptionColumns.witholding_tax,      as: 'witholding_tax' },
+      { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
+      { col: Accounting.sales_items.selectOptionColumns.vat, as: 'vat' },           // ← CRITICAL: must be returned
+      { col: Accounting.sales_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
 
       { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
     ])
@@ -156,18 +171,18 @@ const getSalesItemsCollection = async (req, res, next) => {
     console.log('Sales items fetched:', salesItems, 'rows');
 
     res.status(200).json({
-      success:   true,
-      message:   'Sales items retrieved successfully',
-      data:      salesItems,
-      count:     salesItems.length,
+      success: true,
+      message: 'Sales items retrieved successfully',
+      data: salesItems,
+      count: salesItems.length,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error('Error fetching sales items for collection:', error);
     res.status(500).json({
-      success:   false,
-      message:   'Failed to fetch sales items data',
-      error:     error.message,
+      success: false,
+      message: 'Failed to fetch sales items data',
+      error: error.message,
       timestamp: new Date().toISOString(),
     });
   }
@@ -190,7 +205,6 @@ const createCollection = async (req, res, next) => {
       attachments
     } = req.body;
     console.log(req.body)
-    // Required fields validation
     if (!customer_id || !document_reference || !mode_of_payment || !collection_date || !created_by) {
       return res.status(400).json({
         success: false,
@@ -198,7 +212,6 @@ const createCollection = async (req, res, next) => {
       });
     }
 
-    // Mode-specific validation
     if ((mode_of_payment === 'CHECK' || mode_of_payment === 'BANK_TRANSFER') && !bank_name) {
       return res.status(400).json({
         success: false,
@@ -234,7 +247,7 @@ const createCollection = async (req, res, next) => {
         check_number || null,
         collection_date || null,
         remarks || null,
-        'NOT COLLECTED',
+        'COLLECTED',
         'PREPARED',
         new Date().toISOString().split('T')[0],
         created_by || null

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Lock, Key, ArrowRight, ShieldAlert, Fingerprint, X, Plus } from 'lucide-react';
+import { ShieldCheck, Lock, Key, ArrowRight, ShieldAlert, Fingerprint, X, Plus, Trash2, ShieldOff } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import RightSideModal from '../../components/RightSideModal';
 import DynamicToast from '../../components/DynamicToast';
@@ -15,13 +15,15 @@ export default function Access() {
     selectedAccessId, 
     routeAccessData, 
     routeAccessLoading,
-    createAccess
+    createAccess,
+    updateRouteAccess,
+    updateSingleRouteAccess
   } = useAccess();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     access_name: '',
-    status: 'active'
+    status: 'Full Access'
   });
   const [toast, setToast] = useState(null);
 
@@ -43,6 +45,49 @@ export default function Access() {
     setToast(null);
   };
 
+  // Define select options for route access
+  const routeAccessOptions = [
+    { value: 'Full Access', label: 'Full Access' },
+    { value: 'No Access', label: 'No Access' },
+    { value: 'Check Access', label: 'Check Access' },
+    { value: 'Approve Access', label: 'Approve Access' }
+  ];
+
+  // Handle individual row status change
+  const handleRouteStatusChange = async (routeId, newStatus, row) => {
+    try {
+      // Prepare single update data
+      const route_access_Data = {
+        updates: [{
+          id: routeId,
+          access_id: selectedAccessId,
+          status: newStatus
+        }]
+      };
+
+      // Call the API with single update
+      const result = await updateRouteAccess(route_access_Data);
+      
+      if (result.success) {
+        setToast({
+          type: 'success',
+          message: `Route access updated to "${newStatus}"`
+        });
+      } else {
+        setToast({
+          type: 'error',
+          message: result.message || 'Failed to update route access'
+        });
+      }
+    } catch (error) {
+      console.error('Error updating single route access:', error);
+      setToast({
+        type: 'error',
+        message: 'Network error occurred while updating route access'
+      });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -54,7 +99,6 @@ export default function Access() {
           message: `Access role "${formData.access_name}" created successfully!`
         });
         setIsModalOpen(false);
-        // Data is automatically refreshed by the hook
       } else {
         setToast({
           type: 'error',
@@ -68,6 +112,62 @@ export default function Access() {
       });
     }
   };
+
+  // --- CHECKBOX ACTIONS for Route Privileges table ---
+  // Each action receives the array of selected full row objects.
+  const routeCheckboxActions = [
+    {
+      label: 'Set Access',
+      icon: <ShieldOff size={12} />,
+      type: 'dropdown',
+      options: [
+        { value: 'Full Access', label: 'Full Access' },
+        { value: 'No Access', label: 'No Access' },
+        { value: 'Check Access', label: 'Check Access' },
+        { value: 'Approve Access', label: 'Approve Access' }
+      ],
+      onChange: async (selectedRows, selectedValue) => {
+        console.log(`Setting access to "${selectedValue}" for:`, selectedRows);
+        
+        try {
+          // Prepare data for bulk update - updates array at root level
+          const route_access_Data = {
+            updates: selectedRows.map(row => ({
+              id: row.id, // Use correct id field
+              access_id: selectedAccessId,
+              status: selectedValue
+            }))
+          };
+
+          // Call the API once with all updates
+          const result = await updateRouteAccess(route_access_Data);
+          
+          if (result.success) {
+            // Update the status for each selected row locally
+            selectedRows.forEach(row => {
+              row.status = selectedValue;
+            });
+            
+            setToast({
+              type: 'success',
+              message: `Access set to "${selectedValue}" for ${selectedRows.length} route(s).`
+            });
+          } else {
+            setToast({
+              type: 'error',
+              message: result.message || 'Failed to update route access'
+            });
+          }
+        } catch (error) {
+          console.error('Error updating route access:', error);
+          setToast({
+            type: 'error',
+            message: 'Network error occurred while updating route access'
+          });
+        }
+      }
+    }
+  ];
 
   if (loading) {
     return (
@@ -94,12 +194,6 @@ export default function Access() {
       
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
-        {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          <span>Security</span>
-          <ArrowRight size={10} />
-          <span className="text-black">Access Control List</span>
-        </nav> */}
-
         <motion.div 
           initial="hidden"
           animate="visible"
@@ -189,6 +283,13 @@ export default function Access() {
                   title="Route Privileges"
                   enableRowClick={false}
                   enableAddButton={false}
+                  optionColumns={new Set(['status'])}
+                  onOptionChange={handleRouteStatusChange}
+                  selectOptions={routeAccessOptions}
+                  // --- CHECKBOX ENABLED ---
+                  enableCheckbox={true}
+                  checkboxColumn="route_id"        // use your actual unique column name here
+                  checkboxActions={routeCheckboxActions}
                 />
               </div>
             )
@@ -238,8 +339,10 @@ export default function Access() {
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="Full Access">Full Access</option>
+                <option value="No Access">No Access</option>
+                <option value="Check Access">Check Access</option>
+                <option value="Approve Access">Approve Access</option>
               </select>
             </div>
           </div>

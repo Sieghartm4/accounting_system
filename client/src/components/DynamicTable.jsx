@@ -8,7 +8,15 @@ const DynamicTable = ({
   returnColumn = null,
   onRowClick = null,
   enableAddButton = true,
-  onAddClick = null
+  onAddClick = null,
+  optionColumns = new Set(),
+  onOptionChange = null,
+  // --- OPTION SELECT PROPS ---
+  selectOptions = [],         // array of { value, label } for select dropdowns
+  // --- CHECKBOX PROPS ---
+  enableCheckbox = false,
+  checkboxColumn = null,        // which column value to use as unique key (e.g. 'id', 'name')
+  checkboxActions = [],         // array of { label, onClick(selectedRows) } buttons shown when rows are selected
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterColumn, setFilterColumn] = useState('');
@@ -18,7 +26,20 @@ const DynamicTable = ({
   const [visibleColumns, setVisibleColumns] = useState(new Set());
   const [showColumnDropdown, setShowColumnDropdown] = useState(false);
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' });
+  // --- CHECKBOX STATE: a Set of unique keys (values from checkboxColumn) ---
+  const [selectedKeys, setSelectedKeys] = useState(new Set());
+  // --- OPTION COLUMNS STATE: track changes to dropdown values ---
+  const [optionData, setOptionData] = useState(new Map());
   const dropdownRef = useRef(null);
+
+  // --- CHECKBOX HELPERS ---
+  // Derive the unique key for a row. Falls back to index if checkboxColumn not set.
+  const getRowKey = (row, idx) => {
+    if (checkboxColumn && row[checkboxColumn] !== undefined) {
+      return String(row[checkboxColumn]);
+    }
+    return String(idx);
+  };
 
   const handleRowClick = (row) => {
     if (enableRowClick && onRowClick && returnColumn && row[returnColumn] !== undefined) {
@@ -26,7 +47,7 @@ const DynamicTable = ({
     }
   };
 
-  const renderCellValue = (value) => {
+  const renderCellValue = (value, header, row) => {
     if (typeof value === 'string' && value.startsWith('data:image/')) {
       return (
         <div className="relative group w-8 h-8">
@@ -42,6 +63,40 @@ const DynamicTable = ({
         </div>
       );
     }
+
+    if (optionColumns.has(header) && row) {
+      // Get the row key for tracking option changes
+      const rowKey = getRowKey(row, filteredAndSortedData.indexOf(row));
+      const optionKey = `${rowKey}-${header}`;
+      const currentValue = optionData.get(optionKey) || value || '';
+      
+      return (
+        <select
+          value={currentValue}
+          onChange={(e) => {
+            setOptionData(prev => new Map(prev).set(optionKey, e.target.value));
+            
+            if (onOptionChange) {
+              const rowId = row[checkboxColumn] || row[returnColumn] || row.id;
+              onOptionChange(rowId, e.target.value, row);
+            }
+            
+            if (onRowClick && returnColumn) {
+              const updatedRow = { ...row, [header]: e.target.value };
+              onRowClick(updatedRow[returnColumn], updatedRow);
+            }
+          }}
+          className="w-full px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs font-bold focus:outline-none focus:ring-1 focus:ring-red-500"
+        >
+          {selectOptions.map((option, idx) => (
+            <option key={idx} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
     return value !== null && value !== undefined ? String(value) : (
       <span className="text-gray-300 italic">-</span>
     );
@@ -64,6 +119,12 @@ const DynamicTable = ({
       setVisibleColumns(new Set(headers));
     }
   }, [headers]);
+
+  // Clear selections and option data when data changes
+  useEffect(() => {
+    setSelectedKeys(new Set());
+    setOptionData(new Map());
+  }, [data]);
 
   const filteredAndSortedData = useMemo(() => {
     let filtered = data || [];
@@ -97,10 +158,51 @@ const DynamicTable = ({
     return values.sort();
   }, [data, filterColumn]);
 
+  const allVisibleKeys = filteredAndSortedData.map((row, idx) => getRowKey(row, idx));
+  const allChecked = allVisibleKeys.length > 0 && allVisibleKeys.every(k => selectedKeys.has(k));
+  const someChecked = allVisibleKeys.some(k => selectedKeys.has(k));
+
+  const handleHeaderCheckbox = () => {
+    if (allChecked) {
+      // Uncheck all visible rows
+      setSelectedKeys(prev => {
+        const next = new Set(prev);
+        allVisibleKeys.forEach(k => next.delete(k));
+        return next;
+      });
+    } else {
+      // Check all visible rows
+      setSelectedKeys(prev => {
+        const next = new Set(prev);
+        allVisibleKeys.forEach(k => next.add(k));
+        return next;
+      });
+    }
+  };
+
+  const handleRowCheckbox = (key, e) => {
+    // Stop propagation so it doesn't also trigger handleRowClick
+    e.stopPropagation();
+    setSelectedKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  // Build the array of selected full row objects for action callbacks
+  const selectedRows = useMemo(() => {
+    return filteredAndSortedData.filter((row, idx) => selectedKeys.has(getRowKey(row, idx)));
+  }, [filteredAndSortedData, selectedKeys]);
+
   return (
     <div className="h-full flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
 
-{/* --- INTEGRATED CONTROL BAR --- */}
+      {/* --- INTEGRATED CONTROL BAR --- */}
       <div className="bg-black p-4 flex-shrink-0">
         <div className="flex items-center justify-between gap-4">
 
@@ -114,7 +216,7 @@ const DynamicTable = ({
               </h2>
             </div>
 
-            {/* Section 2: Search - Now grows to fill left side */}
+            {/* Section 2: Search */}
             <div className="flex-1 relative group max-w-md">
               <Search
                 size={14}
@@ -130,9 +232,9 @@ const DynamicTable = ({
             </div>
           </div>
 
-          {/* RIGHT SIDE: Filters & Actions - Always at the end */}
+          {/* RIGHT SIDE: Filters & Actions */}
           <div className="flex items-center gap-3">
-            
+
             {/* Column Filter */}
             <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
               <Filter size={14} className="text-gray-600" />
@@ -209,27 +311,84 @@ const DynamicTable = ({
         </div>
       </div>
 
+      {/* --- CHECKBOX ACTION BAR (shown when rows are selected) --- */}
+      {enableCheckbox && selectedKeys.size > 0 && checkboxActions.length > 0 && (
+        <div className="flex-shrink-0 bg-red-50 border-b border-red-100 px-6 py-2 flex items-center gap-3 animate-in slide-in-from-top-1">
+          <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">
+            {selectedKeys.size} Selected
+          </span>
+          <div className="w-px h-4 bg-red-200" />
+          {checkboxActions.map((action, i) => (
+            action.type === 'dropdown' ? (
+              <div key={i} className="flex items-center gap-1.5">
+                {action.icon && <span className="w-3 h-3">{action.icon}</span>}
+                <select
+                  onChange={(e) => {
+                    if (e.target.value && action.onChange) {
+                      action.onChange(selectedRows, e.target.value);
+                      // Reset dropdown to default state after selection
+                      e.target.value = '';
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-white border border-red-200 text-red-700 text-[10px] font-black rounded-lg hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-red-500 uppercase tracking-widest cursor-pointer"
+                  defaultValue=""
+                >
+                  <option value="" disabled>{action.label}</option>
+                  {action.options.map((option, idx) => (
+                    <option key={idx} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <button
+                key={i}
+                onClick={() => action.onClick(selectedRows)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-700 text-[10px] font-black rounded-lg hover:bg-red-600 hover:text-white hover:border-red-600 transition-all uppercase tracking-widest"
+              >
+                {action.icon && <span className="w-3 h-3">{action.icon}</span>}
+                {action.label}
+              </button>
+            )
+          ))}
+          <button
+            onClick={() => setSelectedKeys(new Set())}
+            className="ml-auto text-[9px] font-black text-gray-400 hover:text-red-600 uppercase tracking-widest transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* --- DATA TABLE --- */}
       <div className="flex-1 overflow-auto bg-white custom-scrollbar">
         <style dangerouslySetInnerHTML={{
           __html: `
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 5px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: #dc2626; /* red-600 */
-                    border-radius: 10px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: #b91c1c; /* red-700 */
-                }
-            `}} />
+            .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+            .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+            .custom-scrollbar::-webkit-scrollbar-thumb { background: #dc2626; border-radius: 10px; }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #b91c1c; }
+            .row-checkbox { width: 15px; height: 15px; accent-color: #dc2626; cursor: pointer; }
+          `}} />
         <table className="w-full border-collapse">
           <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
             <tr>
+              {/* CHECKBOX HEADER COLUMN */}
+              {enableCheckbox && (
+                <th className="px-4 py-4 w-10">
+                  <input
+                    type="checkbox"
+                    className="row-checkbox"
+                    checked={allChecked}
+                    ref={el => {
+                      if (el) el.indeterminate = someChecked && !allChecked;
+                    }}
+                    onChange={handleHeaderCheckbox}
+                    title={allChecked ? 'Uncheck all' : 'Check all'}
+                  />
+                </th>
+              )}
               {headers.map((header) => visibleColumns.has(header) && (
                 <th
                   key={header}
@@ -252,24 +411,39 @@ const DynamicTable = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredAndSortedData.map((row, idx) => (
-              <tr
-                key={idx}
-                onClick={() => handleRowClick(row)}
-                className={`group ${enableRowClick ? 'cursor-pointer' : ''} hover:bg-red-50/30 transition-colors`}
-              >
-                {headers.map((header) => visibleColumns.has(header) && (
-                  <td key={header} className="px-6 py-4 text-xs font-bold text-gray-700 tracking-tight">
-                    {renderCellValue(row[header])}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {filteredAndSortedData.map((row, idx) => {
+              const rowKey = getRowKey(row, idx);
+              const isChecked = selectedKeys.has(rowKey);
+              return (
+                <tr
+                  key={idx}
+                  onClick={() => handleRowClick(row)}
+                  className={`group ${enableRowClick ? 'cursor-pointer' : ''} ${isChecked ? 'bg-red-50/60' : 'hover:bg-red-50/30'} transition-colors`}
+                >
+                  {/* CHECKBOX ROW CELL */}
+                  {enableCheckbox && (
+                    <td className="px-4 py-4 w-10" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="row-checkbox"
+                        checked={isChecked}
+                        onChange={(e) => handleRowCheckbox(rowKey, e)}
+                      />
+                    </td>
+                  )}
+                  {headers.map((header) => visibleColumns.has(header) && (
+                    <td key={header} className="px-6 py-4 text-xs font-bold text-gray-700 tracking-tight">
+                      {renderCellValue(row[header], header, row)}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-{/* --- REFINED DATA METRICS FOOTER --- */}
+      {/* --- REFINED DATA METRICS FOOTER --- */}
       <div className="bg-white border-t border-gray-100 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-6">
           {/* Row Metrics */}
@@ -300,6 +474,17 @@ const DynamicTable = ({
               {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
             </span>
           </div>
+
+          {/* Selected count in footer */}
+          {enableCheckbox && selectedKeys.size > 0 && (
+            <>
+              <div className="w-1 h-1 bg-gray-200 rounded-full" />
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-black text-gray-400 uppercase tracking-[1.5px]">Selected:</span>
+                <span className="text-[10px] font-black text-red-600">{selectedKeys.size}</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right Side Details */}

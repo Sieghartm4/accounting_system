@@ -33,10 +33,6 @@ const ReceiptsSchema = Joi.object({
         'any.required': 'checkNumber is required.',
         'string.empty': 'checkNumber must be a valid string.',
       }),
- 	category: Joi.string().trim().required().messages({
-        'any.required': 'category is required.',
-        'string.empty': 'category must be a valid string.',
-      }),
  	remarks: Joi.string().trim().required().messages({
         'any.required': 'remarks is required.',
         'string.empty': 'remarks must be a valid text.',
@@ -73,14 +69,13 @@ const ReceiptsField = {
     ModeOfPayment: 'mode_of_payment',
     BankName: 'bank_name',
     CheckNumber: 'check_number',
-    Category: 'category',
     Remarks: 'remarks',
     TotalAmountDue: 'total_amount_due',
     Status: 'status',
     State: 'state',
     CreatedDate: 'created_date',
     CreatedBy: 'created_by',
-    All: ['id', 'customer_id', 'document_reference', 'collection_date', 'mode_of_payment', 'bank_name', 'check_number', 'category', 'remarks', 'total_amount_due', 'status', 'state', 'created_date', 'created_by'],
+    All: ['id', 'customer_id', 'document_reference', 'collection_date', 'mode_of_payment', 'bank_name', 'check_number', 'remarks', 'total_amount_due', 'status', 'state', 'created_date', 'created_by'],
 };
 
 
