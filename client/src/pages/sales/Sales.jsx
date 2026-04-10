@@ -3,13 +3,34 @@ import { motion } from 'framer-motion';
 import { TrendingUp, ShoppingBag, ShieldCheck, Zap, ArrowRight, Download } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import DynamicToast from '../../components/DynamicToast';
+import RouteProtection from '../../components/RouteProtection';
+import ProtectedAction from '../../components/ProtectedAction';
 import useSales from './useSales';
 import SalesForm from './SalesForm';
+import { getAccessLevel } from '../../utils/routeProtection';
 
 export default function Sales() {
+  return (
+    <RouteProtection routeName="sales">
+      <SalesContent />
+    </RouteProtection>
+  );
+}
+
+function SalesContent() {
   const { sales, loading, error, refetchSales } = useSales();
   const [isAdding, setIsAdding] = useState(false);
   const [toast, setToast] = useState(null);
+
+  // Check if user has access to enable checkboxes
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const accessLevel = getAccessLevel('sales', user);
+  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access';
+
+  // Determine checkbox condition based on access level
+  const checkboxCondition = enableCheckboxes 
+    ? { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
+    : null;
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -17,13 +38,15 @@ export default function Sales() {
   };
 
   if (isAdding) return (
-    <SalesForm
-      onBack={() => setIsAdding(false)}
-      onSuccess={async (nextToast) => {
-        if (nextToast) setToast(nextToast);
-        await refetchSales();
-      }}
-    />
+    <RouteProtection routeName="sales">
+      <SalesForm
+        onBack={() => setIsAdding(false)}
+        onSuccess={async (nextToast) => {
+          if (nextToast) setToast(nextToast);
+          await refetchSales();
+        }}
+      />
+    </RouteProtection>
   );
 
   if (loading) {
@@ -90,10 +113,12 @@ export default function Sales() {
               <Download size={14} />
               EXPORT REPORT
             </button>
-            <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
-              <ShoppingBag size={14} />
-              New Sale
-            </button>
+            <ProtectedAction routeName="sales">
+              <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+                <ShoppingBag size={14} />
+                New Sale
+              </button>
+            </ProtectedAction>
           </div>
         </motion.div>
 
@@ -131,6 +156,62 @@ export default function Sales() {
           data={sales}
           title="Sales Ledger"
           enableAddButton={false}
+          enableCheckbox={enableCheckboxes}
+          checkboxColumn="id"
+          checkboxCondition={checkboxCondition}
+          checkboxActions={[
+            {
+              label: 'Approve Selected',
+              onClick: async (selectedRows) => {
+                try {
+                  console.log('Approving sales:', selectedRows);
+                  
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const updates = selectedRows.map(row => ({
+                    id: row.id,
+                    currentState: row.state
+                  }));
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/sales/sales-state`,
+                    {
+                      method: "PUT",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({ updates })
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to approve sales');
+                  }
+
+                  // Refresh sales data
+                  await refetchSales();
+
+                  setToast({
+                    type: 'success',
+                    message: result.message || `${selectedRows.length} sale(s) approved successfully`
+                  });
+
+                } catch (error) {
+                  console.error('Error approving sales:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to approve sales'
+                  });
+                }
+              }
+            }
+          ]}
         />
       </motion.div>
     </div>

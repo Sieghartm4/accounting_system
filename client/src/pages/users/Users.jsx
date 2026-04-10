@@ -2,9 +2,19 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { UserCheck, UserPlus, Shield, ArrowRight, UserCog, Activity, Mail } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
+import RouteProtection from '../../components/RouteProtection';
+import ProtectedAction from '../../components/ProtectedAction';
 import useUsers from './useUsers';
 
 export default function Users() {
+  return (
+    <RouteProtection routeName="users">
+      <UsersContent />
+    </RouteProtection>
+  );
+}
+
+function UsersContent() {
   const { users, loading, error, handleUserRowClick } = useUsers();
 
   const fadeInUp = {
@@ -69,10 +79,12 @@ export default function Users() {
               <Mail size={16} className="text-red-600" />
               SEND INVITE
             </button>
-            <button className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-xl tracking-widest uppercase">
-              <UserPlus size={16} />
-              Register User
-            </button>
+            <ProtectedAction routeName="users">
+              <button className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-xl tracking-widest uppercase">
+                <UserPlus size={16} />
+                Register User
+              </button>
+            </ProtectedAction>
           </div>
         </motion.div>
 

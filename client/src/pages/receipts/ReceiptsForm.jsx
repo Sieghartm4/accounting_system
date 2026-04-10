@@ -54,14 +54,30 @@ function PortalDropdown({ anchorRef, open, children }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Reusable SearchableDropdown
 // ─────────────────────────────────────────────────────────────────────────────
-function SearchableDropdown({ placeholder, value, onChange, onSelect, options, inputClassName, emptyText = 'No results found' }) {
+function SearchableDropdown({ placeholder, value, onChange, onSelect, options, inputClassName, emptyText = 'No results found', disabled = false }) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef(null);
   const closeTimer = useRef(null);
   const filtered = options.filter(o => !value || o.label.toLowerCase().includes(value.toLowerCase()) || (o.sublabel || '').toLowerCase().includes(value.toLowerCase()));
   const handleBlur = () => { closeTimer.current = setTimeout(() => setOpen(false), 180); };
-  const handleFocus = () => { clearTimeout(closeTimer.current); setOpen(true); };
-  const handleSelect = (opt) => { clearTimeout(closeTimer.current); onSelect(opt); setOpen(false); };
+  const handleFocus = () => { if (!disabled) { clearTimeout(closeTimer.current); setOpen(true); } };
+  const handleSelect = (opt) => { if (!disabled) { clearTimeout(closeTimer.current); onSelect(opt); setOpen(false); } };
+  
+  if (disabled) {
+    return (
+      <div className="relative w-full">
+        <input 
+          type="text" 
+          placeholder={placeholder} 
+          value={value} 
+          readOnly
+          className={`${inputClassName} cursor-not-allowed text-black`} 
+          autoComplete="off" 
+        />
+      </div>
+    );
+  }
+  
   return (
     <div ref={anchorRef} className="relative w-full">
       <input type="text" placeholder={placeholder} value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={handleFocus} onBlur={handleBlur} className={inputClassName} autoComplete="off" />
@@ -170,7 +186,7 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ReceiptsForm({ onBack, onSuccess }) {
+export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, receiptData = null }) {
   const [receiptItems, setReceiptItems] = useState([
     { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
   ]);
@@ -276,6 +292,79 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
 
   useEffect(() => { fetchCustomers(); fetchChartsOfAccounts(); fetchProducts(); }, []);
 
+  // Populate form with receipt data when in view mode
+  useEffect(() => {
+    if (isViewMode && receiptData) {
+      console.log('Populating form with receipt data:', receiptData);
+      
+      // Populate basic receipt info
+      if (receiptData.data && receiptData.data.length > 0) {
+        const receipt = receiptData.data[0];
+        setSelectedCustomer(receipt.customer);
+        setCustomerSearch(receipt.customer);
+        setDocumentReference(receipt.doc_ref || '');
+        setModeOfPayment(receipt.mode || '');
+        setModeSearch(receipt.mode || '');
+        setBankName(receipt.bank_name || '');
+        setCheckNumber(receipt.check_number || '');
+        setRemarks(receipt.remarks || '');
+      }
+
+      // Populate receipt items
+      if (receiptData.items && receiptData.items.length > 0) {
+        const items = receiptData.items.map(item => ({
+          id: item.id,
+          productId: item.product_service_name,
+          productSearch: item.product_service_name,
+          coa: item.charts_of_accounts_name,
+          coaSearch: item.charts_of_accounts_name,
+          description: item.description || '',
+          unit: item.unit || '',
+          qty: item.quantity || 1,
+          price: parseFloat(item.sales_price) || 0,
+          discount: parseFloat(item.discount) || 0,
+          vat: parseFloat(item.vat) || 0,
+          wht: parseFloat(item.witholding_tax) || 0,
+          responsibilityCenter: item.responsibility_center || '',
+          isOther: false
+        }));
+        setReceiptItems(items);
+      }
+
+      // Populate journal entries
+      if (receiptData.journal && receiptData.journal.length > 0) {
+        const journal = receiptData.journal.map(entry => ({
+          id: entry.id,
+          account: entry.charts_of_accounts_name,
+          accountSearch: entry.charts_of_accounts_name,
+          center: entry.responsibility_center || '',
+          debit: entry.type === 'DEBIT' ? parseFloat(entry.amount) || 0 : 0,
+          credit: entry.type === 'CREDIT' ? parseFloat(entry.amount) || 0 : 0,
+          isManual: false
+        }));
+        setJournalEntries(journal);
+      }
+
+      // Populate attachments
+      if (receiptData.attachments && receiptData.attachments.length > 0) {
+        console.log('Processing attachments:', receiptData.attachments);
+        const attachments = receiptData.attachments.map(att => {
+          console.log('Processing attachment:', att.id, att.name, 'File data type:', typeof att.file, 'File data length:', att.file ? att.file.length : 'null');
+          return {
+            id: att.id,
+            fileName: att.name || '',
+            file: att.file || null, // Preserve base64 data from server for view mode
+            remarks: att.remarks || '',
+            uploadedBy: att.uploaded_by || 'Current User',
+            date: att.uploaded_date || new Date().toLocaleDateString()
+          };
+        });
+        console.log('Final attachments array:', attachments);
+        setAttachments(attachments);
+      }
+    }
+  }, [isViewMode, receiptData]);
+
   const addReceiptItem = (isOther = false) => setReceiptItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removeReceiptItem = (id) => setReceiptItems(prev => prev.filter(i => i.id !== id));
@@ -303,8 +392,10 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
     });
   };
 
-  const inputBase = "w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500 text-center";
-  const tableInput = "w-full bg-gray-50/50 rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none focus:ring-1 focus:ring-red-400";
+  const inputBase = "w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all " + 
+    (isViewMode ? "bg-gray-100 border border-gray-300 text-black cursor-not-allowed" : "bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500 text-center");
+  const tableInput = "w-full rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none " + 
+    (isViewMode ? "bg-gray-100 border border-gray-300 text-black! cursor-not-allowed" : "bg-gray-50/50 focus:ring-1 focus:ring-red-400");
   const pctInput = tableInput + " pr-4";
 
   const fadeInUp = { hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
@@ -597,14 +688,16 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
       {/* TOP NAV */}
       <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <nav className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors" onClick={onBack}>
-          <ArrowLeft size={17} /><span className="text-black">Back to Receipts</span>
+          <ArrowLeft size={17} /><span className="text-black">{isViewMode ? 'Back to Receipts' : 'Back to Receipts'}</span>
         </nav>
-        <div className="flex gap-2">
-          <button className="px-4 py-2 bg-white border border-gray-200 text-[12px] font-black text-gray-400 rounded-lg hover:bg-gray-50 transition-all uppercase">Save Draft</button>
-          <button onClick={handlePostTransaction} className="px-6 py-2 bg-red-600 text-white text-[12px] font-black rounded-lg hover:bg-red-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-red-200">
-            <Save size={14} /> Post Transaction
-          </button>
-        </div>
+        {!isViewMode && (
+          <div className="flex gap-2">
+            <button className="px-4 py-2 bg-white border border-gray-200 text-[12px] font-black text-gray-400 rounded-lg hover:bg-gray-50 transition-all uppercase">Save Draft</button>
+            <button onClick={handlePostTransaction} className="px-6 py-2 bg-red-600 text-white text-[12px] font-black rounded-lg hover:bg-red-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-red-200">
+              <Save size={14} /> Post Transaction
+            </button>
+          </div>
+        )}
       </div>
 
       {/* BODY */}
@@ -621,25 +714,32 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
             <div className="grid grid-cols-1 gap-2.5">
               <div>
                 <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Customer <span className="text-red-600">*</span></label>
-                {customerLoading
-                  ? <div className={inputBase + " text-gray-400 py-1.5"}>Loading customers…</div>
-                  : <SearchableDropdown placeholder="Search customer..." value={customerSearch} onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); }} onSelect={opt => { setSelectedCustomer(opt.value); setCustomerSearch(opt.label); }} options={customerOptions} inputClassName={inputBase} emptyText={customerError || 'No customers found'} />
-                }
+                {isViewMode ? (
+                  <div className={inputBase + " text-gray-400 py-1.5"}>{customerSearch || 'No customer selected'}</div>
+                ) : customerLoading ? (
+                  <div className={inputBase + " text-gray-400 py-1.5"}>Loading customers...</div>
+                ) : (
+                  <SearchableDropdown placeholder="Search customer..." value={customerSearch} onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); }} onSelect={opt => { setSelectedCustomer(opt.value); setCustomerSearch(opt.label); }} options={customerOptions} inputClassName={inputBase} emptyText={customerError || 'No customers found'} />
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <SidebarInput label="Reference" placeholder="INV-000" value={documentReference} onChange={e => setDocumentReference(e.target.value)} />
-                <SidebarInput label="Date" type="date" />
+                <SidebarInput label="Reference" placeholder="INV-000" value={documentReference} onChange={e => setDocumentReference(e.target.value)} disabled={isViewMode} />
+                <SidebarInput label="Date" type="date" disabled={isViewMode} />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Mode of Payment</label>
-                  <SearchableDropdown placeholder="Select mode..." value={modeSearch} onChange={v => { setModeSearch(v); setModeOfPayment(''); }} onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }} options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))} inputClassName={inputBase} emptyText="No modes found" />
+                  {isViewMode ? (
+                    <div className={inputBase + " text-gray-400 py-1.5"}>{modeSearch || 'No mode selected'}</div>
+                  ) : (
+                    <SearchableDropdown placeholder="Select mode..." value={modeSearch} onChange={v => { setModeSearch(v); setModeOfPayment(''); }} onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }} options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))} inputClassName={inputBase} emptyText="No modes found" />
+                  )}
                 </div>
               </div>
               {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
                 <div className="grid grid-cols-2 gap-2">
-                  <SidebarInput label="Bank Name" placeholder="Enter bank name" value={bankName} onChange={e => setBankName(e.target.value)} />
-                  <SidebarInput label="Check #" placeholder="Enter check number" value={checkNumber} onChange={e => setCheckNumber(e.target.value)} />
+                  <SidebarInput label="Bank Name" placeholder="Enter bank name" value={bankName} onChange={e => setBankName(e.target.value)} disabled={isViewMode} />
+                  <SidebarInput label="Check #" placeholder="Enter check number" value={checkNumber} onChange={e => setCheckNumber(e.target.value)} disabled={isViewMode} />
                 </div>
               )}
             </div>
@@ -808,70 +908,148 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
                       <tr key={item.id} className={item.isOther ? 'bg-gray-50/30' : ''}>
                         <td className="py-1 px-1">
                           <SearchableDropdown
-                            disabled={item.isOther}
+                            disabled={isViewMode || item.isOther}
                             placeholder="Search product..."
                             value={item.productSearch}
                             onChange={v => updateReceiptItem(item.id, 'productSearch', v)}
                             onSelect={opt => { updateReceiptItem(item.id, 'productId', opt.value); updateReceiptItem(item.id, 'productSearch', opt.label); }}
                             options={productOptions}
-                            inputClassName={`${tableInput} ${item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                            inputClassName={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                             emptyText={productError || 'No products found'}
                           />
                         </td>
                         <td className="py-1 px-1">
-                          <SearchableDropdown placeholder="Search account..." value={item.coaSearch} onChange={v => updateReceiptItem(item.id, 'coaSearch', v)} onSelect={opt => { updateReceiptItem(item.id, 'coa', opt.value); updateReceiptItem(item.id, 'coaSearch', opt.label); }} options={coaOptions} inputClassName={tableInput} emptyText="No accounts found" />
+                          <SearchableDropdown 
+                            disabled={isViewMode}
+                            placeholder="Search account..." 
+                            value={item.coaSearch} 
+                            onChange={v => updateReceiptItem(item.id, 'coaSearch', v)} 
+                            onSelect={opt => { updateReceiptItem(item.id, 'coa', opt.value); updateReceiptItem(item.id, 'coaSearch', opt.label); }} 
+                            options={coaOptions} 
+                            inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            emptyText="No accounts found" 
+                          />
                         </td>
                         <td className="py-1 px-1">
-                          <input className={tableInput} placeholder="Details..." value={item.description} onChange={e => updateReceiptItem(item.id, 'description', e.target.value)} />
+                          <input 
+                            disabled={isViewMode}
+                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            placeholder="Details..." 
+                            value={item.description} 
+                            onChange={e => updateReceiptItem(item.id, 'description', e.target.value)} 
+                          />
                         </td>
                         <td className="py-1 px-1">
-                          <input disabled={item.isOther} className={`${tableInput} ${item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : 'pc'} value={item.isOther ? '' : item.unit} onChange={e => updateReceiptItem(item.id, 'unit', e.target.value)} />
+                          <input 
+                            disabled={isViewMode || item.isOther} 
+                            className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
+                            placeholder={item.isOther ? '' : 'pc'} 
+                            value={item.isOther ? '' : item.unit} 
+                            onChange={e => updateReceiptItem(item.id, 'unit', e.target.value)} 
+                          />
                         </td>
                         <td className="py-1 px-1">
-                          <input disabled={item.isOther} type="number" min="0" className={`${tableInput} ${item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : '1'} value={item.isOther ? '' : item.qty} onChange={e => updateReceiptItem(item.id, 'qty', parseFloat(e.target.value) || 0)} />
+                          <input 
+                            disabled={isViewMode || item.isOther} 
+                            type="number" 
+                            min="0" 
+                            className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
+                            placeholder={item.isOther ? '' : '1'} 
+                            value={item.isOther ? '' : item.qty} 
+                            onChange={e => updateReceiptItem(item.id, 'qty', parseFloat(e.target.value) || 0)} 
+                          />
                         </td>
                         <td className="py-1 px-1">
-                          <input className={tableInput + ' font-black'} type="number" min="0" step="0.01" placeholder="0.00" value={item.price} onChange={e => updateReceiptItem(item.id, 'price', parseFloat(e.target.value) || 0)} />
+                          <input 
+                            disabled={isViewMode}
+                            className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
+                            type="number" 
+                            min="0" 
+                            step="0.01" 
+                            placeholder="0.00" 
+                            value={item.price} 
+                            onChange={e => updateReceiptItem(item.id, 'price', parseFloat(e.target.value) || 0)} 
+                          />
                         </td>
                         <td className="py-1 px-1">
                           <div className="relative">
-                            <input className={pctInput + ' font-black'} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.discount || 0} onChange={e => updateReceiptItem(item.id, 'discount', parseFloat(e.target.value) || 0)} />
+                            <input 
+                              disabled={isViewMode}
+                              className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                              type="number" 
+                              min="0" 
+                              max="100" 
+                              step="0.01" 
+                              placeholder="0" 
+                              value={item.discount || 0} 
+                              onChange={e => updateReceiptItem(item.id, 'discount', parseFloat(e.target.value) || 0)} 
+                            />
                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">%</span>
                           </div>
                         </td>
                         <td className="py-1 px-1">
                           <div className="relative">
-                            <input className={pctInput + ' font-black text-red-600'} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.vat} onChange={e => updateReceiptItem(item.id, 'vat', parseFloat(e.target.value) || 0)} />
+                            <input 
+                              disabled={isViewMode}
+                              className={`${pctInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
+                              type="number" 
+                              min="0" 
+                              max="100" 
+                              step="0.01" 
+                              placeholder="0" 
+                              value={item.vat} 
+                              onChange={e => updateReceiptItem(item.id, 'vat', parseFloat(e.target.value) || 0)} 
+                            />
                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-red-400 font-black pointer-events-none">%</span>
                           </div>
                         </td>
                         <td className="py-1 px-1">
                           <div className="relative">
-                            <input className={pctInput + ' font-black text-blue-600'} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.wht} onChange={e => updateReceiptItem(item.id, 'wht', parseFloat(e.target.value) || 0)} />
+                            <input 
+                              disabled={isViewMode}
+                              className={`${pctInput + ' font-black text-blue-600'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
+                              type="number" 
+                              min="0" 
+                              max="100" 
+                              step="0.01" 
+                              placeholder="0" 
+                              value={item.wht} 
+                              onChange={e => updateReceiptItem(item.id, 'wht', parseFloat(e.target.value) || 0)} 
+                            />
                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-blue-400 font-black pointer-events-none">%</span>
                           </div>
                         </td>
                         <td className="py-1 px-1">
-                          <input className={tableInput} placeholder="Select" value={item.responsibilityCenter} onChange={e => updateReceiptItem(item.id, 'responsibilityCenter', e.target.value)} />
+                          <input 
+                            disabled={isViewMode}
+                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            placeholder="Select" 
+                            value={item.responsibilityCenter} 
+                            onChange={e => updateReceiptItem(item.id, 'responsibilityCenter', e.target.value)} 
+                          />
                         </td>
                         <td className="py-1 px-1 text-center">
-                          <button onClick={() => removeReceiptItem(item.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors">
-                            <Trash2 size={15} />
-                          </button>
+                          {!isViewMode && (
+                            <button onClick={() => removeReceiptItem(item.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors">
+                              <Trash2 size={15} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <div className="flex gap-2 mt-3">
-                <button onClick={() => addReceiptItem(false)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-2">
-                  <Plus size={14} /> ADD Product/Service
-                </button>
-                <button onClick={() => addReceiptItem(true)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2">
-                  <Plus size={14} /> ADD Others
-                </button>
-              </div>
+              {!isViewMode && (
+                <div className="flex gap-2 mt-3">
+                  <button onClick={() => addReceiptItem(false)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-2">
+                    <Plus size={14} /> ADD Product/Service
+                  </button>
+                  <button onClick={() => addReceiptItem(true)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2">
+                    <Plus size={14} /> ADD Others
+                  </button>
+                </div>
+              )}
             </TableSection>
 
             {/* 2. JOURNAL ENTRIES */}
@@ -900,18 +1078,55 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
                     {journalEntries.map((entry) => (
                       <tr key={entry.id}>
                         <td className="py-1.5 px-1">
-                          <SearchableDropdown placeholder="Search account..." value={entry.accountSearch} onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)} onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }} options={coaOptions} inputClassName={tableInput} emptyText="No accounts found" />
+                          <SearchableDropdown 
+                            disabled={isViewMode}
+                            placeholder="Search account..." 
+                            value={entry.accountSearch} 
+                            onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)} 
+                            onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }} 
+                            options={coaOptions} 
+                            inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            emptyText="No accounts found" 
+                          />
                         </td>
-                        <td className="py-1.5 px-1"><input className={tableInput} placeholder="Center..." value={entry.center} onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} /></td>
-                        <td className="py-1.5 px-1"><input className={tableInput + ' font-black'} placeholder="0.00" type="number" value={entry.debit} onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} disabled={!entry.isManual} readOnly={!entry.isManual} /></td>
-                        <td className="py-1.5 px-1"><input className={tableInput + ' font-black text-red-600'} placeholder="0.00" type="number" value={entry.credit} onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} disabled={!entry.isManual} readOnly={!entry.isManual} /></td>
+                        <td className="py-1.5 px-1">
+                          <input 
+                            disabled={isViewMode}
+                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            placeholder="Center..." 
+                            value={entry.center} 
+                            onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} 
+                          />
+                        </td>
+                        <td className="py-1.5 px-1">
+                          <input 
+                            disabled={isViewMode || !entry.isManual} 
+                            className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
+                            placeholder="0.00" 
+                            type="number" 
+                            value={entry.debit} 
+                            onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} 
+                            readOnly={!entry.isManual} 
+                          />
+                        </td>
+                        <td className="py-1.5 px-1">
+                          <input 
+                            disabled={isViewMode || !entry.isManual} 
+                            className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
+                            placeholder="0.00" 
+                            type="number" 
+                            value={entry.credit} 
+                            onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} 
+                            readOnly={!entry.isManual} 
+                          />
+                        </td>
                         <td className="py-1.5 text-center">
-                          {entry.isManual ? (
+                          {!isViewMode && entry.isManual ? (
                             <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
                               <Trash2 size={15} className="mx-auto" />
                             </button>
                           ) : (
-                            <span className="text-gray-300 text-[11px] italic">Auto</span>
+                            <span className="text-gray-300 text-[11px] italic">{isViewMode ? '' : 'Auto'}</span>
                           )}
                         </td>
                       </tr>
@@ -927,9 +1142,11 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
                   </tfoot>
                 </table>
               </div>
-              <button onClick={addJournalEntry} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
-                <Plus size={15} /> Add Ledger Row
-              </button>
+              {!isViewMode && (
+                <button onClick={addJournalEntry} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
+                  <Plus size={15} /> Add Ledger Row
+                </button>
+              )}
             </TableSection>
 
             {/* 3. ATTACHMENTS & REMARKS */}
@@ -956,22 +1173,53 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
                         <tr key={file.id}>
                           <td className="py-2 px-1">
                             <input 
-                              className={tableInput} 
+                              disabled={isViewMode}
+                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
                               placeholder="e.g. Invoice_Scan" 
                               value={file.fileName}
                               onChange={(e) => updateAttachment(file.id, 'fileName', e.target.value)}
                             />
                           </td>
                           <td className="py-2 px-1">
-                            <input 
-                              type="file" 
-                              className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full" 
-                              onChange={(e) => handleFileChange(file.id, e.target.files[0])}
-                            />
+                            {isViewMode ? (
+                              <div className={`${tableInput} text-black cursor-not-allowed flex items-center justify-center`}>
+                                {file.file && typeof file.file === 'string' && file.file.startsWith('data:image/') ? (
+                                  <img 
+                                    src={file.file} 
+                                    alt={file.fileName || 'Attachment'} 
+                                    className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
+                                    onClick={() => window.open(file.file, '_blank')}
+                                    title="Click to view full size"
+                                    onLoad={() => console.log('Image loaded successfully:', file.fileName)}
+                                    onError={(e) => {
+                                      console.error('Image failed to load:', file.fileName, e);
+                                      e.target.style.display = 'none';
+                                      const fallback = document.createElement('span');
+                                      fallback.className = 'text-red-600 text-[10px] font-bold';
+                                      fallback.textContent = 'Image error';
+                                      e.target.parentNode.appendChild(fallback);
+                                    }}
+                                  />
+                                ) : file.file && typeof file.file === 'string' ? (
+                                  <span className="text-blue-600 text-[11px] font-bold" title={file.file.substring(0, 50) + '...'}>Non-image file</span>
+                                ) : file.file ? (
+                                  <span className="text-orange-600 text-[11px] font-bold">Invalid file data</span>
+                                ) : (
+                                  <span className="text-gray-400 text-[11px] italic">No file</span>
+                                )}
+                              </div>
+                            ) : (
+                              <input 
+                                type="file" 
+                                className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full" 
+                                onChange={(e) => handleFileChange(file.id, e.target.files[0])}
+                              />
+                            )}
                           </td>
                           <td className="py-2 px-1">
                             <input 
-                              className={tableInput} 
+                              disabled={isViewMode}
+                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
                               placeholder="Add note..." 
                               value={file.remarks}
                               onChange={(e) => updateAttachment(file.id, 'remarks', e.target.value)}
@@ -980,20 +1228,34 @@ export default function ReceiptsForm({ onBack, onSuccess }) {
                           <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">{file.uploadedBy}</td>
                           <td className="py-2 px-1 text-[12px] font-bold text-gray-600 tabular-nums">{file.date}</td>
                           <td className="py-2 text-center">
-                            <button onClick={() => removeAttachment(file.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"><Trash2 size={15} /></button>
+                            {!isViewMode && (
+                              <button onClick={() => removeAttachment(file.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"><Trash2 size={15} /></button>
+                            )}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
-                  <Plus size={15} /> Add File
-                </button>
+                {!isViewMode && (
+                  <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
+                    <Plus size={15} /> Add File
+                  </button>
+                )}
               </TableSection>
 
               <TableSection title="Remarks" icon={<FileText size={14} />}>
-                <textarea className="w-full min-h-[100px] mt-4 p-4 bg-gray-50 border-none rounded-xl text-[14px] font-bold focus:ring-1 focus:ring-red-500 outline-none" placeholder="Enter justification or internal notes here..." value={remarks} onChange={e => setRemarks(e.target.value)} />
+                <textarea 
+                  disabled={isViewMode}
+                  className={`w-full min-h-[100px] mt-4 p-4 rounded-xl text-[14px] font-bold outline-none ${
+                    isViewMode 
+                      ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed resize-none' 
+                      : 'bg-gray-50 border-none focus:ring-1 focus:ring-red-500'
+                  }`} 
+                  placeholder="Enter justification or internal notes here..." 
+                  value={remarks} 
+                  onChange={e => setRemarks(e.target.value)} 
+                />
               </TableSection>
             </div>
           </motion.div>
@@ -1043,13 +1305,24 @@ function SummaryRow({ label, value, color = 'text-gray-800', formula }) {
   );
 }
 
-function SidebarInput({ label, placeholder, type = 'text', required, dark, value, onChange }) {
+function SidebarInput({ label, placeholder, type = 'text', required, dark, value, onChange, disabled = false }) {
   return (
     <div className="space-y-1">
       <label className={`text-[11px] font-black uppercase ${dark ? 'text-gray-500' : 'text-gray-400'} block`}>
         {label} {required && <span className="text-red-600">*</span>}
       </label>
-      <input type={type} placeholder={placeholder} value={value} onChange={onChange} className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${dark ? 'bg-gray-900 border-gray-800 text-white focus:ring-red-600' : 'bg-gray-50 border-gray-200 text-black focus:ring-red-500'} border focus:ring-1`} />
+      <input 
+        type={type} 
+        placeholder={placeholder} 
+        value={value} 
+        onChange={onChange}
+        disabled={disabled}
+        className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${
+          disabled 
+            ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed' 
+            : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+        }`}
+      />
     </div>
   );
 }

@@ -4,9 +4,11 @@ import { BookOpen, FilePlus, ShieldCheck, PieChart, ArrowRight, Download, Plus }
 import DynamicTable from '../../components/DynamicTable';
 import RightSideModal from '../../components/RightSideModal';
 import DynamicToast from '../../components/DynamicToast';
+import RouteProtection from '../../components/RouteProtection';
+import ProtectedAction from '../../components/ProtectedAction';
 import useChartsOfAccounts from './useChartsOfAccounts';
 
-export default function ChartsOfAccounts() {
+function ChartsOfAccountsContent() {
   const { chartsOfAccounts, loading, error, createChartsOfAccount } = useChartsOfAccounts();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -124,10 +126,12 @@ export default function ChartsOfAccounts() {
               <Download size={14} />
               EXPORT COA
             </button>
-            <button onClick={handleAddAccountClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
-              <FilePlus size={14} />
-              New Account
-            </button>
+            <ProtectedAction routeName="charts">
+              <button onClick={handleAddAccountClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+                <FilePlus size={14} />
+                New Account
+              </button>
+            </ProtectedAction>
           </div>
         </motion.div>
 
@@ -297,5 +301,13 @@ function SummaryCard({ icon, label, value, subText }) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChartsOfAccounts() {
+  return (
+    <RouteProtection routeName="charts">
+      <ChartsOfAccountsContent />
+    </RouteProtection>
   );
 }

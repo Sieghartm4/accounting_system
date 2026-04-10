@@ -4,9 +4,19 @@ import { ShieldCheck, Lock, Key, ArrowRight, ShieldAlert, Fingerprint, X, Plus, 
 import DynamicTable from '../../components/DynamicTable';
 import RightSideModal from '../../components/RightSideModal';
 import DynamicToast from '../../components/DynamicToast';
+import RouteProtection from '../../components/RouteProtection';
+import ProtectedAction from '../../components/ProtectedAction';
 import useAccess from './useAccess';
 
 export default function Access() {
+  return (
+    <RouteProtection routeName="access">
+      <AccessContent />
+    </RouteProtection>
+  );
+}
+
+function AccessContent() {
   const { 
     access, 
     loading, 
@@ -215,10 +225,12 @@ export default function Access() {
           </div>
 
           <div className="flex gap-3">
-            <button onClick={handleNewRoleClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
-              <Lock size={14} />
-              New Role
-            </button>
+            <ProtectedAction routeName="access">
+              <button onClick={handleNewRoleClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+                <Lock size={14} />
+                New Role
+              </button>
+            </ProtectedAction>
           </div>
         </motion.div>
 

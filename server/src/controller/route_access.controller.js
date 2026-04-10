@@ -71,12 +71,10 @@ const updateRouteAccess = async (req, res, next) => {
         .set([Master.master_route_access.selectOptionColumns.status])
         .where(Master.master_route_access.selectOptionColumns.id)
         .build();
-console.log("updateQuery", updateQuery);
         const updateValues = [status, id];
         return connection.execute(updateQuery, updateValues);
       });
 
-      // Execute all updates
       const results = await Promise.all(updatePromises);
       
       await connection.commit();

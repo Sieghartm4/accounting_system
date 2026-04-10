@@ -10,8 +10,17 @@ import {
   Clock, 
   CheckCircle2 
 } from 'lucide-react';
+import RouteProtection from '../../components/RouteProtection';
 
 export default function Dashboard() {
+  return (
+    <RouteProtection routeName="dashboard">
+      <DashboardContent />
+    </RouteProtection>
+  );
+}
+
+function DashboardContent() {
   // Container animation for staggered children
   const container = {
     hidden: { opacity: 0 },

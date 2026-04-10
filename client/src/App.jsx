@@ -2,6 +2,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Login from './pages/login/Login'
 import Layout from './components/layout/Layout'
+import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/dashboard/Dashboard'
 import Users from './pages/users/Users'
 import Vendors from './pages/vendors/Vendors'
@@ -24,22 +25,81 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/" element={<Layout />}>
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="company" element={<Company />} />
-          <Route path="charts" element={<ChartsOfAccounts />} />
-          <Route path="vendors" element={<Vendors />} />
-          <Route path="proforma" element={<Proforma />} />
-          <Route path="products" element={<ProductService />} />
-          <Route path="receipts" element={<Receipts />} />
-          <Route path="disbursements" element={<Disbursements />} />
-          <Route path="sales" element={<Sales />} />
-          <Route path="collections" element={<Collections />} />
-          <Route path="purchase" element={<Purchase />} />
-          <Route path="payments" element={<Payments />} />
-          <Route path="customer" element={<Customer />} />
-          <Route path="access" element={<Access />} />
-          <Route path="users" element={<Users />} />
-          
+          <Route path="dashboard" element={
+            <ProtectedRoute routeName="dashboard">
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="company" element={
+            <ProtectedRoute routeName="company">
+              <Company />
+            </ProtectedRoute>
+          } />
+          <Route path="charts" element={
+            <ProtectedRoute routeName="charts">
+              <ChartsOfAccounts />
+            </ProtectedRoute>
+          } />
+          <Route path="vendors" element={
+            <ProtectedRoute routeName="vendors">
+              <Vendors />
+            </ProtectedRoute>
+          } />
+          <Route path="proforma_entries" element={
+            <ProtectedRoute routeName="proforma_entries">
+              <Proforma />
+            </ProtectedRoute>
+          } />
+          <Route path="product_service" element={
+            <ProtectedRoute routeName="product_service">
+              <ProductService />
+            </ProtectedRoute>
+          } />
+          <Route path="receipts" element={
+            <ProtectedRoute routeName="receipts">
+              <Receipts />
+            </ProtectedRoute>
+          } />
+          <Route path="disbursement" element={
+            <ProtectedRoute routeName="disbursement">
+              <Disbursements />
+            </ProtectedRoute>
+          } />
+          <Route path="sales" element={
+            <ProtectedRoute routeName="sales">
+              <Sales />
+            </ProtectedRoute>
+          } />
+          <Route path="collections" element={
+            <ProtectedRoute routeName="collections">
+              <Collections />
+            </ProtectedRoute>
+          } />
+          <Route path="purchase" element={
+            <ProtectedRoute routeName="purchase">
+              <Purchase />
+            </ProtectedRoute>
+          } />
+          <Route path="payments" element={
+            <ProtectedRoute routeName="payments">
+              <Payments />
+            </ProtectedRoute>
+          } />
+          <Route path="customers" element={
+            <ProtectedRoute routeName="customers">
+              <Customer />
+            </ProtectedRoute>
+          } />
+          <Route path="access" element={
+            <ProtectedRoute routeName="access">
+              <Access />
+            </ProtectedRoute>
+          } />
+          <Route path="users" element={
+            <ProtectedRoute routeName="users">
+              <Users />
+            </ProtectedRoute>
+          } />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -247,7 +247,7 @@ const createCollection = async (req, res, next) => {
         check_number || null,
         collection_date || null,
         remarks || null,
-        'COLLECTED',
+        'NOT COLLECTED',
         'PREPARED',
         new Date().toISOString().split('T')[0],
         created_by || null
@@ -310,8 +310,8 @@ const createCollection = async (req, res, next) => {
 
           const attachmentValues = [
             collectionId,
-            attachment.fileName || null,
             attachment.file || null,
+            attachment.fileName || null,
             attachment.remarks || null,
             attachment.uploadedBy || null,
             attachment.date || new Date().toLocaleDateString()
@@ -351,9 +351,123 @@ const createCollection = async (req, res, next) => {
   }
 }
 
+const updateCollectionState = async (req, res, next) => {
+  try {
+    const {
+      updates
+    } = req.body;
+    console.log("body", req.body);
+
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Updates array is required'
+      });
+    }
+
+    let connection;
+    try {
+      connection = await pool.getConnection();
+      await connection.beginTransaction();
+
+      const updatePromises = updates.map(async (update) => {
+        const { id, currentState } = update;
+
+        if (!id || !currentState) {
+          throw new Error('Each update requires id and currentState');
+        }
+
+        let nextState;
+        if (currentState === 'PREPARED') {
+          nextState = 'CHECKED';
+        } else if (currentState === 'CHECKED') {
+          nextState = 'APPROVED';
+        } else {
+          throw new Error(`Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`);
+        }
+
+        if (nextState === 'APPROVED') {
+          const updateQuery = sql.update(Accounting.collections.tablename)
+            .set([Accounting.collections.selectOptionColumns.state, Accounting.collections.selectOptionColumns.status])
+            .where(Accounting.collections.selectOptionColumns.id)
+            .build();
+          const updateValues = [nextState, 'COLLECTED', id];
+
+          const query = sql.select([
+            { col: Accounting.collection_items.selectOptionColumns.sales_id, as: 'sales_id' },
+          ])
+            .from(Accounting.collection_items.tablename)
+            .where(Accounting.collection_items.selectOptionColumns.collection_id)
+            .build();
+          let collection_items = await Query(query, [id], [Accounting.collection_items.prefix_]);
+          console.log("collection_items", collection_items);
+
+          const uniqueSalesIds = [...new Set(collection_items.map(item => item.sales_id))];
+          console.log("uniqueSalesIds", uniqueSalesIds);
+
+          for (const salesId of uniqueSalesIds) {
+            if (salesId) {
+              const updateSalesQuery = sql.update(Accounting.sales.tablename)
+                .set([Accounting.sales.selectOptionColumns.status])
+                .where(Accounting.sales.selectOptionColumns.id)
+                .build();
+              const updateSalesValues = ['PAID', salesId];
+              await connection.execute(updateSalesQuery, updateSalesValues);
+              console.log(`Updated sales ID ${salesId} status to PAID`);
+            }
+          }
+
+          return connection.execute(updateQuery, updateValues);
+        } else {
+          const updateQuery = sql.update(Accounting.collections.tablename)
+            .set([Accounting.collections.selectOptionColumns.state])
+            .where(Accounting.collections.selectOptionColumns.id)
+            .build();
+          const updateValues = [nextState, id];
+          return connection.execute(updateQuery, updateValues);
+        }
+
+      });
+
+      const results = await Promise.all(updatePromises);
+
+      await connection.commit();
+
+      res.status(200).json({
+        success: true,
+        message: `${results.length} collection(s) updated successfully`,
+        data: {
+          updatedCount: results.length,
+          updates: results.map(result => ({ id: result.insertId }))
+        },
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      if (connection) {
+        await connection.rollback();
+      }
+      throw error;
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+
+  } catch (error) {
+    console.error('Error updating collections:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating collections',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+}
+
 module.exports = {
   getCollections,
   getSalesCollection,
   getSalesItemsCollection,
-  createCollection
+  createCollection,
+  updateCollectionState
 }

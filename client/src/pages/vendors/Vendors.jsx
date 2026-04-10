@@ -4,9 +4,11 @@ import { Truck, PackagePlus, ShieldCheck, Search, ArrowRight, Download, Plus } f
 import DynamicTable from '../../components/DynamicTable';
 import RightSideModal from '../../components/RightSideModal';
 import DynamicToast from '../../components/DynamicToast';
+import RouteProtection from '../../components/RouteProtection';
+import ProtectedAction from '../../components/ProtectedAction';
 import useVendors from './useVendors';
 
-export default function Vendors() {
+function VendorsContent() {
   const { vendors, loading, error, createVendor } = useVendors();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -124,10 +126,12 @@ export default function Vendors() {
               <Download size={14} />
               EXPORT LIST
             </button>
-            <button onClick={handleAddVendorClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
-              <PackagePlus size={14} />
-              Add Vendor
-            </button>
+            <ProtectedAction routeName="vendors">
+              <button onClick={handleAddVendorClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+                <PackagePlus size={14} />
+                Add Vendor
+              </button>
+            </ProtectedAction>
           </div>
         </motion.div>
 
@@ -296,5 +300,13 @@ function SummaryCard({ icon, label, value, subText }) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Vendors() {
+  return (
+    <RouteProtection routeName="vendors">
+      <VendorsContent />
+    </RouteProtection>
   );
 }

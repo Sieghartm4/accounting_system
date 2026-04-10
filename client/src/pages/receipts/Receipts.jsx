@@ -1,28 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Receipt, FilePlus, ShieldCheck, CreditCard, ArrowRight, Download } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import DynamicToast from '../../components/DynamicToast';
+import RouteProtection from '../../components/RouteProtection';
+import ProtectedAction from '../../components/ProtectedAction';
 import useReceipts from './useReceipts';
 import ReceiptsForm from './ReceiptsForm';
+import { hasRouteAccess, getAccessLevel } from '../../utils/routeProtection';
 
 export default function Receipts() {
+  return (
+    <RouteProtection routeName="receipts">
+      <ReceiptsContent />
+    </RouteProtection>
+  );
+}
+
+function ReceiptsContent() {
   const { receipts, loading, error, refetchReceipts } = useReceipts();
   const [isAdding, setIsAdding] = useState(false);
+  const [viewingReceipt, setViewingReceipt] = useState(null);
   const [toast, setToast] = useState(null);
+
+  // Check if user has access to enable checkboxes
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const accessLevel = getAccessLevel('receipts', user);
+  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access';
+
+  // Determine checkbox condition based on access level
+  const checkboxCondition = enableCheckboxes 
+    ? { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
+    : null;
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
   };
+
   if (isAdding) return (
-    <ReceiptsForm
-      onBack={() => setIsAdding(false)}
-      onSuccess={async (nextToast) => {
-        if (nextToast) setToast(nextToast);
-        await refetchReceipts();
-      }}
-    />
+    <RouteProtection routeName="receipts">
+      <ReceiptsForm
+        onBack={() => setIsAdding(false)}
+        onSuccess={async (nextToast) => {
+          if (nextToast) setToast(nextToast);
+          await refetchReceipts();
+        }}
+      />
+    </RouteProtection>
+  );
+
+  if (viewingReceipt) return (
+    <RouteProtection routeName="receipts">
+      <ReceiptsForm
+        isViewMode={true}
+        receiptData={viewingReceipt}
+        onBack={() => setViewingReceipt(null)}
+      />
+    </RouteProtection>
   );
 
   if (loading) {
@@ -76,7 +111,7 @@ export default function Receipts() {
                 <Receipt size={24} />
               </div>
               <h1 className="text-4xl font-black text-black tracking-tighter">
-                Official <span className="text-red-600 italic">Receipts</span>
+               Cash <span className="text-red-600 italic">Receipts</span>
               </h1>
             </div>
             {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
@@ -89,10 +124,12 @@ export default function Receipts() {
               <Download size={14} />
               EXPORT DATA
             </button>
-            <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
-              <FilePlus size={14} />
-              New Receipt
-            </button>
+            <ProtectedAction routeName="receipts">
+              <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+                <FilePlus size={14} />
+                New Receipt
+              </button>
+            </ProtectedAction>
           </div>
         </motion.div>
 
@@ -130,6 +167,127 @@ export default function Receipts() {
           data={receipts}
           title="Receipt Ledger"
           enableAddButton={false}
+          enableCheckbox={enableCheckboxes}
+          checkboxColumn="id"
+          checkboxCondition={checkboxCondition}
+          enableActionColumn={true}
+          badgeColumns={[
+            {
+              column: 'status',
+              values: {
+                'COLLECTED': 'green',
+                'NOT COLLECTED': 'red',
+                'PARTIALLY COLLECTED': 'yellow'
+              }
+            },
+            {
+              column: 'state',
+              values: {
+                'PREPARED': 'gray',
+                'CHECKED': 'blue',
+                'APPROVED': 'green',
+                'REJECTED': 'red',
+                'CANCELLED': 'orange'
+              }
+            }
+          ]}
+          actionButtons={[
+            {
+              label: 'View',
+              onClick: async (row) => {
+                try {
+                  console.log('View receipt:', row);
+                  
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(row.id)}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to fetch receipt details');
+                  }
+
+                  console.log('Receipt details:', result);
+                  
+                  // Set receipt data for viewing
+                  setViewingReceipt(result);
+
+                } catch (error) {
+                  console.error('Error fetching receipt details:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch receipt details'
+                  });
+                }
+              }
+            }
+          ]}
+          checkboxActions={[
+            {
+              label: 'Approve Selected',
+              onClick: async (selectedRows) => {
+                try {
+                  console.log('Approving receipts:', selectedRows);
+                  
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const updates = selectedRows.map(row => ({
+                    id: row.id,
+                    currentState: row.state
+                  }));
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/receipt/receipt-state`,
+                    {
+                      method: "PUT",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({ updates })
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to approve receipts');
+                  }
+
+                  // Refresh receipts data
+                  await refetchReceipts();
+
+                  setToast({
+                    type: 'success',
+                    message: result.message || `${selectedRows.length} receipt(s) approved successfully`
+                  });
+
+                } catch (error) {
+                  console.error('Error approving receipts:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to approve receipts'
+                  });
+                }
+              }
+            }
+          ]}
         />
       </motion.div>
     </div>

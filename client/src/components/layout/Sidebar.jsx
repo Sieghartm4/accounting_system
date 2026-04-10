@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, ShieldCheck, Users, Building, Warehouse, ChevronRight, BarChart, FileText, Package, DollarSign, CreditCard, TrendingUp, HandCoins, ShoppingCart, CreditCard as PaymentCard } from 'lucide-react';
+import { LayoutDashboard, Database, ShieldCheck, Users, Building, Warehouse, ChevronRight, BarChart, FileText, Package, DollarSign, CreditCard, TrendingUp, HandCoins, ShoppingCart, CreditCard as PaymentCard, Settings } from 'lucide-react';
+import { getSidebarItems } from '../../utils/routeProtection';
 
 export default function Sidebar({ isCollapsed }) {
     const [isMastersOpen, setIsMastersOpen] = useState(false);
@@ -8,6 +9,23 @@ export default function Sidebar({ isCollapsed }) {
     const [isSalesOpen, setIsSalesOpen] = useState(false);
     const [isPurchaseOpen, setIsPurchaseOpen] = useState(false);
     const location = useLocation();
+    const [user, setUser] = useState(null);
+    const [sidebarItems, setSidebarItems] = useState({});
+
+    useEffect(() => {
+        try {
+            const userData = JSON.parse(localStorage.getItem('user'));
+            setUser(userData);
+            if (userData) {
+                const items = getSidebarItems(userData);
+                setSidebarItems(items);
+                console.log('Sidebar items loaded:', items);
+            }
+        } catch (error) {
+            console.error('Error loading sidebar items:', error);
+            setSidebarItems({ main: [], masters: [], receipts: [], sales: [], purchase: [] });
+        }
+    }, []);
 
     const NavLink = ({ to, icon: Icon, children }) => {
         const isActive = location.pathname === to;
@@ -53,129 +71,188 @@ export default function Sidebar({ isCollapsed }) {
             </div>
 
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-sidebar-scrollbar">
-                <NavLink to="/dashboard" icon={LayoutDashboard}>Dashboard</NavLink>
+                {/* Main Navigation */}
+                {sidebarItems.main?.map((item, index) => {
+                    if (!item || !item.name) return null;
+                    return (
+                        <NavLink key={item.name || index} to={`/${item.name}`} icon={LayoutDashboard}>
+                            {item.label || item.name}
+                        </NavLink>
+                    );
+                })}
 
-                <div className="pt-4">
-                    {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Internal Systems</p>}
-                    <button
-                        onClick={() => setIsMastersOpen(!isMastersOpen)}
-                        className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isMastersOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'
-                            }`}
-                    >
-                        <div className="flex items-center gap-3">
-                            <Database size={20} className={isMastersOpen ? 'text-red-600' : ''} />
-                            {!isCollapsed && <span className="text-sm">Masters</span>}
-                        </div>
-                        {!isCollapsed && <ChevronRight size={14} className={`transition-transform ${isMastersOpen ? 'rotate-90' : ''}`} />}
-                    </button>
+                {/* Masters Section */}
+                {sidebarItems.masters?.length > 0 && (
+                    <div className="pt-4">
+                        {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Internal Systems</p>}
+                        <button
+                            onClick={() => setIsMastersOpen(!isMastersOpen)}
+                            className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isMastersOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <Database size={20} className={isMastersOpen ? 'text-red-600' : ''} />
+                                {!isCollapsed && <span className="text-sm">Masters</span>}
+                            </div>
+                            {!isCollapsed && <ChevronRight size={14} className={`transition-transform ${isMastersOpen ? 'rotate-90' : ''}`} />}
+                        </button>
 
-                    {isMastersOpen && !isCollapsed && (
-                        <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
-                            <Link to="/access" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/access' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <ShieldCheck size={14} /> Access Control
-                            </Link>
-                            <Link to="/users" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/users' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <Users size={14} /> User Management
-                            </Link>
-                            <Link to="/customer" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/customer' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <Users size={14} /> Customer Management
-                            </Link>
-                            <Link to="/vendors" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/vendors' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <Warehouse size={14} /> Vendor Management
-                            </Link>
-                            <Link to="/charts" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/charts' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <BarChart size={14} /> Charts of Accounts
-                            </Link>
-                            <Link to="/proforma" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/proforma' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <FileText size={14} /> Proforma Entries
-                            </Link>
-                            <Link to="/products" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/products' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <Package size={14} /> Product & Service
-                            </Link>
-                            <Link to="/company" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/company' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <Building size={14} /> Company Management
-                            </Link>
-                        </div>
-                    )}
-                </div>
+                        {isMastersOpen && !isCollapsed && (
+                            <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
+                                {sidebarItems.masters?.map((item, index) => {
+                                    if (!item || !item.name) return null;
+                                    const iconMap = {
+                                        access: ShieldCheck,
+                                        users: Users,
+                                        customers: Users,
+                                        vendors: Warehouse,
+                                        charts: BarChart,
+                                        proforma_entries: FileText,
+                                        product_service: Package,
+                                        company: Building
+                                    };
+                                    const Icon = iconMap[item.name] || Settings;
+                                    return (
+                                        <Link 
+                                            key={item.name || index} 
+                                            to={`/${item.name}`} 
+                                            className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                                        >
+                                            <Icon size={14} /> {item.label || item.name}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
 
-                <div className="pt-4">
-                    {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Financial Operations</p>}
-                    <button
-                        onClick={() => setIsReceiptsOpen(!isReceiptsOpen)}
-                        className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isReceiptsOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'
-                            }`}
-                    >
-                        <div className="flex items-center gap-3">
-                            <DollarSign size={20} className={isReceiptsOpen ? 'text-red-600' : ''} />
-                            {!isCollapsed && <span className="text-sm">Receipts & Disbursements</span>}
-                        </div>
-                        {!isCollapsed && <ChevronRight size={14} className={`transition-transform ${isReceiptsOpen ? 'rotate-90' : ''}`} />}
-                    </button>
+                {/* Receipts & Disbursements Section */}
+                {sidebarItems.receipts?.length > 0 && (
+                    <div className="pt-4">
+                        {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Financial Operations</p>}
+                        <button
+                            onClick={() => setIsReceiptsOpen(!isReceiptsOpen)}
+                            className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isReceiptsOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <DollarSign size={20} className={isReceiptsOpen ? 'text-red-600' : ''} />
+                                {!isCollapsed && <span className="text-sm">Receipts & Disbursements</span>}
+                            </div>
+                            {!isCollapsed && <ChevronRight size={14} className={`transition-transform ${isReceiptsOpen ? 'rotate-90' : ''}`} />}
+                        </button>
 
-                    {isReceiptsOpen && !isCollapsed && (
-                        <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
-                            <Link to="/receipts" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/receipts' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <CreditCard size={14} /> Receipts
-                            </Link>
-                            <Link to="/disbursements" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/disbursements' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <DollarSign size={14} /> Disbursements
-                            </Link>
-                        </div>
-                    )}
-                </div>
+                        {isReceiptsOpen && !isCollapsed && (
+                            <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
+                                {sidebarItems.receipts?.map((item, index) => {
+                                    if (!item || !item.name) return null;
+                                    const iconMap = {
+                                        receipts: CreditCard,
+                                        disbursement: DollarSign
+                                    };
+                                    const Icon = iconMap[item.name] || Settings;
+                                    return (
+                                        <Link 
+                                            key={item.name || index} 
+                                            to={`/${item.name}`} 
+                                            className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                                        >
+                                            <Icon size={14} /> {item.label || item.name}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
 
-                <div className="pt-4">
-                    {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Revenue Management</p>}
-                    <button
-                        onClick={() => setIsSalesOpen(!isSalesOpen)}
-                        className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isSalesOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'
-                            }`}
-                    >
-                        <div className="flex items-center gap-3">
-                            <TrendingUp size={20} className={isSalesOpen ? 'text-red-600' : ''} />
-                            {!isCollapsed && <span className="text-sm">Sales & Collections</span>}
-                        </div>
-                        {!isCollapsed && <ChevronRight size={14} className={`transition-transform ${isSalesOpen ? 'rotate-90' : ''}`} />}
-                    </button>
+                {/* Sales & Collections Section */}
+                {sidebarItems.sales?.length > 0 && (
+                    <div className="pt-4">
+                        {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Revenue Management</p>}
+                        <button
+                            onClick={() => setIsSalesOpen(!isSalesOpen)}
+                            className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isSalesOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <TrendingUp size={20} className={isSalesOpen ? 'text-red-600' : ''} />
+                                {!isCollapsed && <span className="text-sm">Sales & Collections</span>}
+                            </div>
+                            {!isCollapsed && <ChevronRight size={14} className={`transition-transform ${isSalesOpen ? 'rotate-90' : ''}`} />}
+                        </button>
 
-                    {isSalesOpen && !isCollapsed && (
-                        <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
-                            <Link to="/sales" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/sales' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <TrendingUp size={14} /> Sales
-                            </Link>
-                            <Link to="/collections" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/collections' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <HandCoins size={14} /> Collections
-                            </Link>
-                        </div>
-                    )}
-                </div>
+                        {isSalesOpen && !isCollapsed && (
+                            <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
+                                {sidebarItems.sales?.map((item, index) => {
+                                    if (!item || !item.name) return null;
+                                    const iconMap = {
+                                        sales: TrendingUp,
+                                        collections: HandCoins
+                                    };
+                                    const Icon = iconMap[item.name] || Settings;
+                                    return (
+                                        <Link 
+                                            key={item.name || index} 
+                                            to={`/${item.name}`} 
+                                            className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                                        >
+                                            <Icon size={14} /> {item.label || item.name}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
 
-                <div className="pt-4">
-                    {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Procurement & Treasury</p>}
-                    <button
-                        onClick={() => setIsPurchaseOpen(!isPurchaseOpen)}
-                        className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isPurchaseOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'
-                            }`}
-                    >
-                        <div className="flex items-center gap-3">
-                            <ShoppingCart size={20} className={isPurchaseOpen ? 'text-red-600' : ''} />
-                            {!isCollapsed && <span className="text-sm">Purchase & Payments</span>}
-                        </div>
-                        {!isCollapsed && <ChevronRight size={14} className={`transition-transform ${isPurchaseOpen ? 'rotate-90' : ''}`} />}
-                    </button>
+                {/* Purchase & Payments Section */}
+                {sidebarItems.purchase?.length > 0 && (
+                    <div className="pt-4">
+                        {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Procurement & Treasury</p>}
+                        <button
+                            onClick={() => setIsPurchaseOpen(!isPurchaseOpen)}
+                            className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isPurchaseOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <ShoppingCart size={20} className={isPurchaseOpen ? 'text-red-600' : ''} />
+                                {!isCollapsed && <span className="text-sm">Purchase & Payments</span>}
+                            </div>
+                            {!isCollapsed && <ChevronRight size={14} className={`transition-transform ${isPurchaseOpen ? 'rotate-90' : ''}`} />}
+                        </button>
 
-                    {isPurchaseOpen && !isCollapsed && (
-                        <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
-                            <Link to="/purchase" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/purchase' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <ShoppingCart size={14} /> Purchase
-                            </Link>
-                            <Link to="/payments" className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/payments' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}>
-                                <PaymentCard size={14} /> Payments
-                            </Link>
+                        {isPurchaseOpen && !isCollapsed && (
+                            <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
+                                {sidebarItems.purchase?.map((item, index) => {
+                                    if (!item || !item.name) return null;
+                                    const iconMap = {
+                                        purchase: ShoppingCart,
+                                        payments: PaymentCard
+                                    };
+                                    const Icon = iconMap[item.name] || Settings;
+                                    return (
+                                        <Link 
+                                            key={item.name || index} 
+                                            to={`/${item.name}`} 
+                                            className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                                        >
+                                            <Icon size={14} /> {item.label || item.name}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Show "No Access" message if no routes available */}
+                {Object.values(sidebarItems).every(items => !items || items.length === 0) && (
+                    <div className="text-center py-8">
+                        <div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <ShieldCheck size={20} className="text-gray-600" />
                         </div>
-                    )}
-                </div>
+                        <p className="text-gray-500 text-sm">No Access</p>
+                        <p className="text-gray-600 text-xs mt-1">Contact administrator</p>
+                    </div>
+                )}
             </nav>
 
             {/* Version Footer */}

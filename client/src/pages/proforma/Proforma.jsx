@@ -2,9 +2,11 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { FileText, ClipboardCheck, ShieldCheck, Clock, ArrowRight, Download } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
+import RouteProtection from '../../components/RouteProtection';
+import ProtectedAction from '../../components/ProtectedAction';
 import useProforma from './useProforma';
 
-export default function Proforma() {
+function ProformaContent() {
   const { proforma, loading, error } = useProforma();
 
   const fadeInUp = {
@@ -68,10 +70,12 @@ export default function Proforma() {
               <Download size={14} />
               EXPORT DRAFTS
             </button>
-            <button className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
-              <ClipboardCheck size={14} />
-              New Entry
-            </button>
+            <ProtectedAction routeName="proforma_entries">
+              <button className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+                <ClipboardCheck size={14} />
+                New Entry
+              </button>
+            </ProtectedAction>
           </div>
         </motion.div>
 
@@ -127,5 +131,13 @@ function SummaryCard({ icon, label, value, subText }) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Proforma() {
+  return (
+    <RouteProtection routeName="proforma_entries">
+      <ProformaContent />
+    </RouteProtection>
   );
 }

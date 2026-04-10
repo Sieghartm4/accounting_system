@@ -1,15 +1,36 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Layers, CheckCircle, ShieldCheck, Wallet, ArrowRight, Download } from 'lucide-react';
+import { Layers, CheckCircle, ShieldCheck, Wallet, ArrowRight, Download, Plus } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import DynamicToast from '../../components/DynamicToast';
+import RouteProtection from '../../components/RouteProtection';
+import ProtectedAction from '../../components/ProtectedAction';
 import useCollections from './useCollections';
 import CollectionsForm from './CollectionsForm';
+import { getAccessLevel } from '../../utils/routeProtection';
 
 export default function Collections() {
+  return (
+    <RouteProtection routeName="collections">
+      <CollectionsContent />
+    </RouteProtection>
+  );
+}
+
+function CollectionsContent() {
   const { collections, loading, error, refetchCollections } = useCollections();
   const [isAdding, setIsAdding] = useState(false);
   const [toast, setToast] = useState(null);
+
+  // Check if user has access to enable checkboxes
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const accessLevel = getAccessLevel('collections', user);
+  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access';
+
+  // Determine checkbox condition based on access level
+  const checkboxCondition = enableCheckboxes 
+    ? { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
+    : null;
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -17,13 +38,15 @@ export default function Collections() {
   };
 
   if (isAdding) return (
-    <CollectionsForm
-      onBack={() => setIsAdding(false)}
-      onSuccess={async (nextToast) => {
-        if (nextToast) setToast(nextToast);
-        await refetchCollections();
-      }}
-    />
+    <RouteProtection routeName="collections">
+      <CollectionsForm
+        onBack={() => setIsAdding(false)}
+        onSuccess={async (nextToast) => {
+          if (nextToast) setToast(nextToast);
+          await refetchCollections();
+        }}
+      />
+    </RouteProtection>
   );
 
   if (loading) {
@@ -77,7 +100,7 @@ export default function Collections() {
                 <Layers size={24} />
               </div>
               <h1 className="text-4xl font-black text-black tracking-tighter">
-                Payment <span className="text-red-600 italic">Collections</span>
+                 <span className="text-red-600 italic">Collections</span>
               </h1>
             </div>
             {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
@@ -90,10 +113,12 @@ export default function Collections() {
               <Download size={14} />
               EXPORT LEDGER
             </button>
-            <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
-              <CheckCircle size={14} />
-              Settle Account
-            </button>
+            <ProtectedAction routeName="collections">
+              <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+                <CheckCircle size={14} />
+                Settle Account
+              </button>
+            </ProtectedAction>
           </div>
         </motion.div>
 
@@ -131,6 +156,62 @@ export default function Collections() {
           data={collections}
           title="Collections Ledger"
           enableAddButton={false}
+          enableCheckbox={enableCheckboxes}
+          checkboxColumn="id"
+          checkboxCondition={checkboxCondition}
+          checkboxActions={[
+            {
+              label: 'Approve Selected',
+              onClick: async (selectedRows) => {
+                try {
+                  console.log('Approving collections:', selectedRows);
+                  
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const updates = selectedRows.map(row => ({
+                    id: row.id,
+                    currentState: row.state
+                  }));
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/collections/collection-state`,
+                    {
+                      method: "PUT",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({ updates })
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to approve collections');
+                  }
+
+                  // Refresh collections data
+                  await refetchCollections();
+
+                  setToast({
+                    type: 'success',
+                    message: result.message || `${selectedRows.length} collection(s) approved successfully`
+                  });
+
+                } catch (error) {
+                  console.error('Error approving collections:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to approve collections'
+                  });
+                }
+              }
+            }
+          ]}
         />
       </motion.div>
     </div>

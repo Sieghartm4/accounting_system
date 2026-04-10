@@ -1,9 +1,11 @@
 import React from 'react';
 import DynamicTable from '../../components/DynamicTable';
 import RightSideModal from '../../components/RightSideModal';
+import RouteProtection from '../../components/RouteProtection';
+import ProtectedAction from '../../components/ProtectedAction';
 import useCompany from './useCompany';
 
-export default function Company() {
+function CompanyContent() {
     const { 
         company, 
         loading, 
@@ -37,12 +39,20 @@ export default function Company() {
 
     return (
         <div className="p-5 h-[100%]">
-            <DynamicTable
-                data={company}
-                enableAddButton={true}
-                title="Company"
-                onAddClick={handleAddClick}
-            />
+            <ProtectedAction routeName="company" fallback={
+              <DynamicTable
+                  data={company}
+                  enableAddButton={false}
+                  title="Company"
+              />
+            }>
+              <DynamicTable
+                  data={company}
+                  enableAddButton={true}
+                  title="Company"
+                  onAddClick={handleAddClick}
+              />
+            </ProtectedAction>
 
             <RightSideModal
                 isOpen={isModalOpen}
@@ -165,4 +175,12 @@ export default function Company() {
             </RightSideModal>
         </div>
     );
+}
+
+export default function Company() {
+  return (
+    <RouteProtection routeName="company">
+      <CompanyContent />
+    </RouteProtection>
+  );
 }

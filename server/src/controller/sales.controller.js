@@ -170,8 +170,8 @@ const createSales = async (req, res, next) => {
 
           const attachmentValues = [
             salesId,
-            attachment.fileName || null,
             attachment.file || null,
+            attachment.fileName || null,
             attachment.remarks || null,
             attachment.uploadedBy || null,
             attachment.date || new Date().toLocaleDateString()
@@ -210,7 +210,87 @@ const createSales = async (req, res, next) => {
     });
   }
 }
+
+const updateSalesState = async (req, res, next) => {
+  try {
+    const {
+      updates
+    } = req.body;
+    console.log("body", req.body);
+    
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Updates array is required'
+      });
+    }
+
+    let connection;
+    try {
+      connection = await pool.getConnection();
+      await connection.beginTransaction();
+
+      const updatePromises = updates.map(async (update) => {
+        const { id, currentState } = update;
+        
+        if (!id || !currentState) {
+          throw new Error('Each update requires id and currentState');
+        }
+
+        let nextState;
+        if (currentState === 'PREPARED') {
+          nextState = 'CHECKED';
+        } else if (currentState === 'CHECKED') {
+          nextState = 'APPROVED';
+        } else {
+          throw new Error(`Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`);
+        }
+
+          const updateQuery = sql.update(Accounting.sales.tablename)
+          .set([Accounting.sales.selectOptionColumns.state])
+          .where(Accounting.sales.selectOptionColumns.id)
+          .build();
+          const updateValues = [nextState, id];
+          return connection.execute(updateQuery, updateValues);
+        
+      });
+
+      const results = await Promise.all(updatePromises);
+      
+      await connection.commit();
+
+      res.status(200).json({
+        success: true,
+        message: `${results.length} receipt(s) updated successfully`,
+        data: {
+          updatedCount: results.length,
+          updates: results.map(result => ({ id: result.insertId }))
+        },
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      if (connection) {
+        await connection.rollback();
+      }
+      throw error;
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+
+  } catch (error) {
+    console.error('Error updating sales:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating sales',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+}
 module.exports = {
   getSales,
   createSales,
+  updateSalesState
 }

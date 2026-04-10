@@ -1,15 +1,36 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, Banknote, ShieldCheck, History, ArrowRight, Download } from 'lucide-react';
+import { Wallet, Banknote, ShieldCheck, History, ArrowRight, Download, Plus } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import DynamicToast from '../../components/DynamicToast';
+import RouteProtection from '../../components/RouteProtection';
+import ProtectedAction from '../../components/ProtectedAction';
 import useDisbursements from './useDisbursements';
 import CashDisbursementForm from './CashDisbursementForm';
+import { getAccessLevel } from '../../utils/routeProtection';
 
 export default function Disbursements() {
+  return (
+    <RouteProtection routeName="disbursement">
+      <DisbursementsContent />
+    </RouteProtection>
+  );
+}
+
+function DisbursementsContent() {
   const { disbursements, loading, error, refetchDisbursements } = useDisbursements();
   const [isAdding, setIsAdding] = useState(false);
   const [toast, setToast] = useState(null);
+
+  // Check if user has access to enable checkboxes
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const accessLevel = getAccessLevel('disbursement', user);
+  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access';
+
+  // Determine checkbox condition based on access level
+  const checkboxCondition = enableCheckboxes 
+    ? { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
+    : null;
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -17,13 +38,15 @@ export default function Disbursements() {
   };
 
   if (isAdding) return (
-    <CashDisbursementForm
-      onBack={() => setIsAdding(false)}
-      onSuccess={async (nextToast) => {
-        if (nextToast) setToast(nextToast);
-        await refetchDisbursements();
-      }}
-    />
+    <RouteProtection routeName="disbursement">
+      <CashDisbursementForm
+        onBack={() => setIsAdding(false)}
+        onSuccess={async (nextToast) => {
+          if (nextToast) setToast(nextToast);
+          await refetchDisbursements();
+        }}
+      />
+    </RouteProtection>
   );
 
   if (loading) {
@@ -77,7 +100,7 @@ export default function Disbursements() {
                 <Wallet size={24} />
               </div>
               <h1 className="text-4xl font-black text-black tracking-tighter">
-                Payment <span className="text-red-600 italic">Disbursements</span>
+                Cash <span className="text-red-600 italic">Disbursements</span>
               </h1>
             </div>
             {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
@@ -90,10 +113,12 @@ export default function Disbursements() {
               <Download size={14} />
               EXPORT VOUCHERS
             </button>
-            <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
-              <Banknote size={14} />
-              New Disbursement
-            </button>
+            <ProtectedAction routeName="disbursement">
+              <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+                <Banknote size={14} />
+                New Disbursement
+              </button>
+            </ProtectedAction>
           </div>
         </motion.div>
 
@@ -131,6 +156,61 @@ export default function Disbursements() {
           data={disbursements}
           title="Disbursement Ledger"
           enableAddButton={false}
+          enableCheckbox={enableCheckboxes}
+          checkboxColumn="id"
+          checkboxCondition={checkboxCondition}
+          checkboxActions={[
+            {
+              label: 'Approve Selected',
+              onClick: async (selectedRows) => {
+                try {
+                  console.log('Approving disbursements:', selectedRows);
+                  
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const updates = selectedRows.map(row => ({
+                    id: row.id,
+                    currentState: row.state
+                  }));
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/disbursement-state`,
+                    {
+                      method: "PUT",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({ updates })
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to approve disbursements');
+                  }
+
+                  await refetchDisbursements();
+
+                  setToast({
+                    type: 'success',
+                    message: result.message || `${selectedRows.length} disbursement(s) approved successfully`
+                  });
+
+                } catch (error) {
+                  console.error('Error approving disbursements:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to approve disbursements'
+                  });
+                }
+              }
+            }
+          ]}
         />
       </motion.div>
     </div>

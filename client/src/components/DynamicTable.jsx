@@ -17,6 +17,14 @@ const DynamicTable = ({
   enableCheckbox = false,
   checkboxColumn = null,        // which column value to use as unique key (e.g. 'id', 'name')
   checkboxActions = [],         // array of { label, onClick(selectedRows) } buttons shown when rows are selected
+  // --- CONDITIONAL CHECKBOX PROPS ---
+  checkboxCondition = null,      // { column: 'status', value: 'prepared' } - only show checkboxes for rows with this column value
+  checkboxConditionAll = false,   // if true, show checkboxes for all rows (overrides checkboxCondition)
+  // --- ACTION COLUMN PROPS ---
+  enableActionColumn = false,     // if true, shows an action column with buttons
+  actionButtons = [],            // array of { label, onClick(row), icon } buttons for each row
+  // --- BADGE PROPS ---
+  badgeColumns = [],             // array of { column: 'status', values: { 'PAID': 'green', 'UNPAID': 'red' } } for dynamic badges
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterColumn, setFilterColumn] = useState('');
@@ -41,6 +49,16 @@ const DynamicTable = ({
     return String(idx);
   };
 
+  // Check if row should have checkbox based on condition
+  const shouldShowCheckbox = (row) => {
+    if (!enableCheckbox) return false;
+    if (checkboxConditionAll) return true;
+    if (checkboxCondition && checkboxCondition.column && checkboxCondition.value) {
+      return String(row[checkboxCondition.column]).toLowerCase() === String(checkboxCondition.value).toLowerCase();
+    }
+    return true; // Default to true if no condition
+  };
+
   const handleRowClick = (row) => {
     if (enableRowClick && onRowClick && returnColumn && row[returnColumn] !== undefined) {
       onRowClick(row[returnColumn], row);
@@ -48,6 +66,27 @@ const DynamicTable = ({
   };
 
   const renderCellValue = (value, header, row) => {
+    // Check if this column should render a badge
+    const badgeColumn = badgeColumns.find(badge => badge.column === header);
+    if (badgeColumn && badgeColumn.values && value) {
+      const badgeColor = badgeColumn.values[String(value).toUpperCase()] || 'gray';
+      const colorClasses = {
+        green: 'bg-green-100 text-green-800 border-green-200',
+        red: 'bg-red-100 text-red-800 border-red-200',
+        yellow: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        blue: 'bg-blue-100 text-blue-800 border-blue-200',
+        purple: 'bg-purple-100 text-purple-800 border-purple-200',
+        gray: 'bg-gray-100 text-gray-800 border-gray-200',
+        orange: 'bg-orange-100 text-orange-800 border-orange-200'
+      };
+      
+      return (
+        <span className={`inline-flex items-center justify-center text-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${colorClasses[badgeColor] || colorClasses.gray}`}>
+          {String(value)}
+        </span>
+      );
+    }
+
     if (typeof value === 'string' && value.startsWith('data:image/')) {
       return (
         <div className="relative group w-8 h-8">
@@ -158,7 +197,9 @@ const DynamicTable = ({
     return values.sort();
   }, [data, filterColumn]);
 
-  const allVisibleKeys = filteredAndSortedData.map((row, idx) => getRowKey(row, idx));
+  const allVisibleKeys = filteredAndSortedData
+    .map((row, idx) => shouldShowCheckbox(row) ? getRowKey(row, idx) : null)
+    .filter(key => key !== null);
   const allChecked = allVisibleKeys.length > 0 && allVisibleKeys.every(k => selectedKeys.has(k));
   const someChecked = allVisibleKeys.some(k => selectedKeys.has(k));
 
@@ -345,7 +386,7 @@ const DynamicTable = ({
               <button
                 key={i}
                 onClick={() => action.onClick(selectedRows)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-700 text-[10px] font-black rounded-lg hover:bg-red-600 hover:text-white hover:border-red-600 transition-all uppercase tracking-widest"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 border border-green-600 text-white text-[10px] font-black rounded-lg hover:bg-green-200 hover:text-green-700 hover:border-green-300 hover:cursor-pointer transition-all uppercase tracking-widest"
               >
                 {action.icon && <span className="w-3 h-3">{action.icon}</span>}
                 {action.label}
@@ -377,16 +418,18 @@ const DynamicTable = ({
               {/* CHECKBOX HEADER COLUMN */}
               {enableCheckbox && (
                 <th className="px-4 py-4 w-10">
-                  <input
-                    type="checkbox"
-                    className="row-checkbox"
-                    checked={allChecked}
-                    ref={el => {
-                      if (el) el.indeterminate = someChecked && !allChecked;
-                    }}
-                    onChange={handleHeaderCheckbox}
-                    title={allChecked ? 'Uncheck all' : 'Check all'}
-                  />
+                  {allVisibleKeys.length > 0 && (
+                    <input
+                      type="checkbox"
+                      className="row-checkbox"
+                      checked={allChecked}
+                      ref={el => {
+                        if (el) el.indeterminate = someChecked && !allChecked;
+                      }}
+                      onChange={handleHeaderCheckbox}
+                      title={allChecked ? 'Uncheck all' : 'Check all'}
+                    />
+                  )}
                 </th>
               )}
               {headers.map((header) => visibleColumns.has(header) && (
@@ -408,6 +451,12 @@ const DynamicTable = ({
                   </div>
                 </th>
               ))}
+              {/* ACTION COLUMN HEADER */}
+              {enableActionColumn && (
+                <th className="px-6 py-4 text-center">
+                  <span className="text-[12px] font-black text-black uppercase tracking-[2px]">Actions</span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -423,12 +472,14 @@ const DynamicTable = ({
                   {/* CHECKBOX ROW CELL */}
                   {enableCheckbox && (
                     <td className="px-4 py-4 w-10" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        className="row-checkbox"
-                        checked={isChecked}
-                        onChange={(e) => handleRowCheckbox(rowKey, e)}
-                      />
+                      {shouldShowCheckbox(row) && (
+                        <input
+                          type="checkbox"
+                          className="row-checkbox"
+                          checked={isChecked}
+                          onChange={(e) => handleRowCheckbox(rowKey, e)}
+                        />
+                      )}
                     </td>
                   )}
                   {headers.map((header) => visibleColumns.has(header) && (
@@ -436,6 +487,27 @@ const DynamicTable = ({
                       {renderCellValue(row[header], header, row)}
                     </td>
                   ))}
+                  {/* ACTION COLUMN CELL */}
+                  {enableActionColumn && (
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {actionButtons.map((button, buttonIdx) => (
+                          <button
+                            key={buttonIdx}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              button.onClick(row);
+                            }}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black rounded-lg transition-all uppercase tracking-widest border border-blue-500/50 cursor-pointer"
+                            title={button.label}
+                          >
+                            {button.icon && <span className="w-3 h-3">{button.icon}</span>}
+                            {button.label}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}

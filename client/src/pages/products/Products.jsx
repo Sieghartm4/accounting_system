@@ -4,9 +4,19 @@ import { Package, PlusSquare, ShieldCheck, Layers, ArrowRight, Download, Plus } 
 import DynamicTable from '../../components/DynamicTable';
 import RightSideModal from '../../components/RightSideModal';
 import DynamicToast from '../../components/DynamicToast';
+import RouteProtection from '../../components/RouteProtection';
+import ProtectedAction from '../../components/ProtectedAction';
 import useProductService from './useProductService';
 
 export default function ProductService() {
+  return (
+    <RouteProtection routeName="product_service">
+      <ProductServiceContent />
+    </RouteProtection>
+  );
+}
+
+function ProductServiceContent() {
   const { productService, loading, error, createProductService } = useProductService();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -136,10 +146,12 @@ export default function ProductService() {
               <Download size={14} />
               EXPORT CATALOG
             </button>
-            <button onClick={handleAddProductClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
-              <PlusSquare size={14} />
-              Add New
-            </button>
+            <ProtectedAction routeName="product_service">
+              <button onClick={handleAddProductClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+                <PlusSquare size={14} />
+                Add New
+              </button>
+            </ProtectedAction>
           </div>
         </motion.div>
 
