@@ -20,6 +20,10 @@ export default function Sales() {
 function SalesContent() {
   const { sales, loading, error, refetchSales } = useSales();
   const [isAdding, setIsAdding] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingSales, setEditingSales] = useState(null);
+  const [isViewing, setIsViewing] = useState(false);
+  const [viewingSales, setViewingSales] = useState(null);
   const [toast, setToast] = useState(null);
 
   // Check if user has access to enable checkboxes
@@ -28,7 +32,7 @@ function SalesContent() {
   const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access';
 
   // Determine checkbox condition based on access level
-  const checkboxCondition = enableCheckboxes 
+  const checkboxCondition = enableCheckboxes
     ? { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
     : null;
 
@@ -44,6 +48,36 @@ function SalesContent() {
         onSuccess={async (nextToast) => {
           if (nextToast) setToast(nextToast);
           await refetchSales();
+        }}
+      />
+    </RouteProtection>
+  );
+
+  if (isEditing) return (
+    <RouteProtection routeName="sales">
+      <SalesForm
+        isViewMode={false}
+        salesData={editingSales}
+        onBack={() => setIsEditing(false)}
+        onSuccess={async (nextToast) => {
+          if (nextToast) setToast(nextToast);
+          await refetchSales();
+          setIsEditing(false);
+        }}
+      />
+    </RouteProtection>
+  );
+
+  if (isViewing) return (
+    <RouteProtection routeName="sales">
+      <SalesForm
+        isViewMode={true}
+        salesData={viewingSales}
+        onBack={() => setIsViewing(false)}
+        onSuccess={async (nextToast) => {
+          if (nextToast) setToast(nextToast);
+          await refetchSales();
+          setIsViewing(false);
         }}
       />
     </RouteProtection>
@@ -79,7 +113,7 @@ function SalesContent() {
           onClose={() => setToast(null)}
         />
       )}
-      
+
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
         {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -88,7 +122,7 @@ function SalesContent() {
           <span className="text-black">Sales Performance</span>
         </nav> */}
 
-        <motion.div 
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -124,29 +158,29 @@ function SalesContent() {
 
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard 
-            icon={<TrendingUp className="text-red-600" size={20} />} 
-            label="Gross Sales" 
-            value={sales?.length || 0} 
+          <SummaryCard
+            icon={<TrendingUp className="text-red-600" size={20} />}
+            label="Gross Sales"
+            value={sales?.length || 0}
             subText="Orders"
           />
-          <SummaryCard 
-            icon={<Zap className="text-black" size={20} />} 
-            label="Velocity" 
-            value="High" 
+          <SummaryCard
+            icon={<Zap className="text-black" size={20} />}
+            label="Velocity"
+            value="High"
             subText="Demand Scale"
           />
-          <SummaryCard 
-            icon={<ShieldCheck className="text-gray-400" size={20} />} 
-            label="Verification" 
-            value="Secure" 
+          <SummaryCard
+            icon={<ShieldCheck className="text-gray-400" size={20} />}
+            label="Verification"
+            value="Secure"
             subText="Certified"
           />
         </div>
       </div>
 
       {/* --- TABLE SECTION --- */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -159,13 +193,79 @@ function SalesContent() {
           enableCheckbox={enableCheckboxes}
           checkboxColumn="id"
           checkboxCondition={checkboxCondition}
+          enableActionColumn={true}
+          actionButtons={[
+            {
+              label: 'View',
+              onClick: async (row) => {
+                try {
+                  console.log('View sales:', row);
+
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/sales/${Number(row.id)}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to fetch sales details');
+                  }
+
+                  console.log('Sales details:', result);
+
+                  // Set sales data for viewing
+                  setViewingSales(result);
+                  setIsViewing(true);
+
+                } catch (error) {
+                  console.error('Error fetching sales details:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch sales details'
+                  });
+                }
+              }
+            },
+          ]}
+          badgeColumns={[
+            {
+              column: 'status',
+              values: {
+                'PAID': 'green',
+                'UNPAID': 'red',
+                'PARTIALLY PAID': 'yellow'
+              }
+            },
+            {
+              column: 'state',
+              values: {
+                'PREPARED': 'gray',
+                'CHECKED': 'blue',
+                'APPROVED': 'green',
+                'REJECTED': 'red',
+                'CANCELLED': 'orange'
+              }
+            }
+          ]}
           checkboxActions={[
             {
               label: 'Approve Selected',
               onClick: async (selectedRows) => {
                 try {
                   console.log('Approving sales:', selectedRows);
-                  
+
                   const token = localStorage.getItem('token');
                   if (!token) {
                     throw new Error('No authentication token found');
@@ -218,7 +318,7 @@ function SalesContent() {
   );
 }
 
-{/* --- HELPER COMPONENT (Fixed: This was likely missing) --- */}
+{/* --- HELPER COMPONENT (Fixed: This was likely missing) --- */ }
 function SummaryCard({ icon, label, value, subText }) {
   return (
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">

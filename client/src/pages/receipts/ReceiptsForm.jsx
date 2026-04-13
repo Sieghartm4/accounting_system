@@ -228,6 +228,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
   ]);
 
   const [toast, setToast] = useState(null);
+  const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' });
 
   const modeOfPaymentOptions = ['CASH', 'CHECK', 'BANK_TRANSFER', 'CARD', 'E-WALLET', 'OTHERS'];
 
@@ -660,8 +661,11 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
   };
 
   useEffect(() => {
-    generateJournalEntries();
-  }, [receiptItems, modeOfPayment, bankName, chartsOfAccounts]);
+    // Only auto-generate journal entries in add/edit mode, not in view mode
+    if (!isViewMode) {
+      generateJournalEntries();
+    }
+  }, [receiptItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
   return (
     <div className="h-full flex flex-col overflow-x-hidden bg-[#F3F4F6]">
       <style dangerouslySetInnerHTML={{
@@ -715,9 +719,9 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
               <div>
                 <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Customer <span className="text-red-600">*</span></label>
                 {isViewMode ? (
-                  <div className={inputBase + " text-gray-400 py-1.5"}>{customerSearch || 'No customer selected'}</div>
+                  <div className={inputBase + " text-black py-1.5"}>{customerSearch || 'No customer selected'}</div>
                 ) : customerLoading ? (
-                  <div className={inputBase + " text-gray-400 py-1.5"}>Loading customers...</div>
+                  <div className={inputBase + " text-black py-1.5"}>Loading customers...</div>
                 ) : (
                   <SearchableDropdown placeholder="Search customer..." value={customerSearch} onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); }} onSelect={opt => { setSelectedCustomer(opt.value); setCustomerSearch(opt.label); }} options={customerOptions} inputClassName={inputBase} emptyText={customerError || 'No customers found'} />
                 )}
@@ -730,7 +734,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                 <div>
                   <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Mode of Payment</label>
                   {isViewMode ? (
-                    <div className={inputBase + " text-gray-400 py-1.5"}>{modeSearch || 'No mode selected'}</div>
+                    <div className={inputBase + " text-black py-1.5"}>{modeSearch || 'No mode selected'}</div>
                   ) : (
                     <SearchableDropdown placeholder="Select mode..." value={modeSearch} onChange={v => { setModeSearch(v); setModeOfPayment(''); }} onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }} options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))} inputClassName={inputBase} emptyText="No modes found" />
                   )}
@@ -1101,7 +1105,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                         <td className="py-1.5 px-1">
                           <input 
                             disabled={isViewMode || !entry.isManual} 
-                            className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
+                            className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
                             placeholder="0.00" 
                             type="number" 
                             value={entry.debit} 
@@ -1188,7 +1192,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                                     src={file.file} 
                                     alt={file.fileName || 'Attachment'} 
                                     className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
-                                    onClick={() => window.open(file.file, '_blank')}
+                                    onClick={() => setImageModal({ isOpen: true, imageSrc: file.file })}
                                     title="Click to view full size"
                                     onLoad={() => console.log('Image loaded successfully:', file.fileName)}
                                     onError={(e) => {
@@ -1260,6 +1264,30 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
             </div>
           </motion.div>
         </main>
+
+      {/* --- IMAGE MODAL --- */}
+      {imageModal.isOpen && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300"
+          onClick={() => setImageModal({ isOpen: false, imageSrc: '' })}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setImageModal({ isOpen: false, imageSrc: '' });
+            }}
+            className="absolute top-6 right-6 text-white hover:text-red-500 transition-colors"
+          >
+            <ArrowLeft size={32} />
+          </button>
+          <img
+            src={imageModal.imageSrc}
+            alt="Preview"
+            className="max-w-full max-h-full rounded-2xl shadow-2xl border-4 border-white/10 p-2 scale-in animate-in zoom-in-95 duration-300"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
       </div>
     </div>
   );

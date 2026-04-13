@@ -169,13 +169,13 @@ const fmt = (n = 0) => Number(n).toLocaleString('en-PH', { minimumFractionDigits
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CollectionsForm({ onBack, onSuccess, isViewMode = false, collectionData = null }) {
+export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, paymentData = null }) {
 
-  // ── Collection items ──────────────────────────────────────────────────────
+  // ── Payment items ──────────────────────────────────────────────────────
   // Each item shape (what lives in state):
   // {
   //   id                 : React key (frontend only)
-  //   salesItemId        : si_id from sales_items  → ci_sales_id (STORED)
+  //   purchaseItemId     : pi_id from purchase_items → ci_purchase_id (STORED)
   //   invoiceRef         : document_reference       (display only)
   //   description        : product name             (display only)
   //   responsibilityCenter                           (display only)
@@ -186,15 +186,15 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
   //   amount             : discounted + vat − wht   → ci_amount (STORED)
   //   isOther            : false for invoice items
   // }
-  const [collectionItems, setCollectionItems] = useState([]);
+  const [paymentItems, setPaymentItems] = useState([]);
   const [journalEntries,  setJournalEntries]  = useState([]);
 
   // ── Remote data ──────────────────────────────────────────────────────────
-  const [customers,        setCustomers]        = useState([]);
-  const [customerLoading,  setCustomerLoading]  = useState(false);
-  const [customerError,    setCustomerError]    = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState('');
-  const [customerSearch,   setCustomerSearch]   = useState('');
+  const [vendors,        setVendors]        = useState([]);
+  const [vendorLoading,  setVendorLoading]  = useState(false);
+  const [vendorError,    setVendorError]    = useState('');
+  const [selectedVendor, setSelectedVendor] = useState('');
+  const [vendorSearch,   setVendorSearch]   = useState('');
 
   const [chartsOfAccounts, setChartsOfAccounts] = useState([]);
 
@@ -213,31 +213,31 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
   const [toast, setToast] = useState(null);
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' });
 
-  // ── Sales invoice modal ───────────────────────────────────────────────────
+  // ── Purchase invoice modal ───────────────────────────────────────────────────
   const [isModalOpen,      setIsModalOpen]      = useState(false);
-  const [salesData,        setSalesData]        = useState([]);
-  const [salesDataLoading, setSalesDataLoading] = useState(false);
-  const [salesDataError,   setSalesDataError]   = useState('');
-  const [selectedSales,    setSelectedSales]    = useState([]);
+  const [purchaseData,        setPurchaseData]        = useState([]);
+  const [purchaseDataLoading, setPurchaseDataLoading] = useState(false);
+  const [purchaseDataError,   setPurchaseDataError]   = useState('');
+  const [selectedPurchases,    setSelectedPurchases]    = useState([]);
 
   const modeOfPaymentOptions = ['CASH', 'CHECK', 'BANK_TRANSFER', 'CARD', 'E-WALLET', 'OTHERS'];
 
-  const coaOptions      = chartsOfAccounts.map(a => ({ label: a.name || a.account_name, sublabel: a.code || a.account_code, value: a.id }));
-  const customerOptions = customers.map(c => ({ label: c.name || c.customer_name, sublabel: c.code, value: c.id }));
+  const coaOptions    = chartsOfAccounts.map(a => ({ label: a.name || a.account_name, sublabel: a.code || a.account_code, value: a.id }));
+  const vendorOptions = vendors.map(v => ({ label: v.name || v.vendor_name, sublabel: v.code, value: v.id }));
 
   // ── Fetchers ──────────────────────────────────────────────────────────────
-  const fetchCustomers = async () => {
+  const fetchVendors = async () => {
     try {
-      setCustomerLoading(true);
+      setVendorLoading(true);
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authorization token found');
-      const res    = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, { headers: { Authorization: `Bearer ${token}` } });
+      const res    = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const result = await res.json();
-      if (result.success) setCustomers(result.data);
-      else setCustomerError(result.message || 'Failed to fetch customers');
-    } catch (err) { setCustomerError(err.message); }
-    finally { setCustomerLoading(false); }
+      if (result.success) setVendors(result.data);
+      else setVendorError(result.message || 'Failed to fetch vendors');
+    } catch (err) { setVendorError(err.message); }
+    finally { setVendorLoading(false); }
   };
 
   const fetchChartsOfAccounts = async () => {
@@ -251,52 +251,52 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
     } catch (err) { console.error('COA fetch error:', err.message); }
   };
 
-  const fetchSalesData = async () => {
+  const fetchPurchaseData = async () => {
     try {
-      setSalesDataLoading(true);
-      setSalesDataError('');
+      setPurchaseDataLoading(true);
+      setPurchaseDataError('');
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authorization token found');
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/collections/sales-collection/`,
+        `${import.meta.env.VITE_SERVER_LINK}/payments/purchase-payment/`,
         { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const result = await res.json();
-      if (result.success) setSalesData(result.data || []);
-      else setSalesDataError(result.message || 'Failed to fetch sales data');
-    } catch (err) { setSalesDataError(err.message); }
-    finally { setSalesDataLoading(false); }
+      if (result.success) setPurchaseData(result.data || []);
+      else setPurchaseDataError(result.message || 'Failed to fetch purchase data');
+    } catch (err) { setPurchaseDataError(err.message); }
+    finally { setPurchaseDataLoading(false); }
   };
 
-  useEffect(() => { fetchCustomers(); fetchChartsOfAccounts(); }, []);
+  useEffect(() => { fetchVendors(); fetchChartsOfAccounts(); }, []);
   useEffect(() => {
-    if (isModalOpen) { fetchSalesData(); setSelectedSales([]); }
+    if (isModalOpen) { fetchPurchaseData(); setSelectedPurchases([]); }
   }, [isModalOpen]);
 
-  // Populate form with collection data when in view mode
+  // Populate form with payment data when in view mode
   useEffect(() => {
-    if (isViewMode && collectionData) {
-      console.log('Populating form with collection data:', collectionData);
+    if (isViewMode && paymentData) {
+      console.log('Populating form with payment data:', paymentData);
       
-      // Populate basic collection info
-      if (collectionData.data && collectionData.data.length > 0) {
-        const collection = collectionData.data[0];
-        setSelectedCustomer(collection.customer);
-        setCustomerSearch(collection.customer);
-        setDocumentReference(collection.doc_ref || '');
-        setModeOfPayment(collection.mode_of_payment || '');
-        setModeSearch(collection.mode_of_payment || '');
-        setBankName(collection.bank_name || '');
-        setCheckNumber(collection.check_number || '');
-        setRemarks(collection.remarks || '');
+      // Populate basic payment info
+      if (paymentData.data && paymentData.data.length > 0) {
+        const payment = paymentData.data[0];
+        setSelectedVendor(payment.vendor);
+        setVendorSearch(payment.vendor);
+        setDocumentReference(payment.doc_ref || '');
+        setModeOfPayment(payment.mode_of_payment || '');
+        setModeSearch(payment.mode_of_payment || '');
+        setBankName(payment.bank_name || '');
+        setCheckNumber(payment.check_number || '');
+        setRemarks(payment.remarks || '');
       }
 
-      // Populate collection items
-      if (collectionData.items && collectionData.items.length > 0) {
-        const items = collectionData.items.map(item => ({
+      // Populate payment items
+      if (paymentData.items && paymentData.items.length > 0) {
+        const items = paymentData.items.map(item => ({
           id: item.id,
-          salesItemId: item.sales_id,
+          purchaseItemId: item.purchase_id,
           invoiceRef: item.invoice_ref || '',
           description: item.product_service_name || item.description || '',
           responsibilityCenter: item.responsibility_center || '',
@@ -307,12 +307,12 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
           amount: parseFloat(item.amount) || 0,
           isOther: false
         }));
-        setCollectionItems(items);
+        setPaymentItems(items);
       }
 
       // Populate journal entries
-      if (collectionData.journal && collectionData.journal.length > 0) {
-        const journal = collectionData.journal.map(entry => ({
+      if (paymentData.journal && paymentData.journal.length > 0) {
+        const journal = paymentData.journal.map(entry => ({
           id: entry.id,
           account: entry.charts_of_accounts_name,
           accountSearch: entry.charts_of_accounts_name,
@@ -325,9 +325,9 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
       }
 
       // Populate attachments
-      if (collectionData.attachments && collectionData.attachments.length > 0) {
-        console.log('Processing attachments:', collectionData.attachments);
-        const attachments = collectionData.attachments.map(att => {
+      if (paymentData.attachments && paymentData.attachments.length > 0) {
+        console.log('Processing attachments:', paymentData.attachments);
+        const attachments = paymentData.attachments.map(att => {
           console.log('Processing attachment:', att.id, att.name, 'File data type:', typeof att.file, 'File data length:', att.file ? att.file.length : 'null');
           return {
             id: att.id,
@@ -342,35 +342,35 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
         setAttachments(attachments);
       }
     }
-  }, [isViewMode, collectionData]);
+  }, [isViewMode, paymentData]);
 
   // ── Item helpers ──────────────────────────────────────────────────────────
-  const removeCollectionItem = (id) => setCollectionItems(prev => prev.filter(i => i.id !== id));
-  const toggleSalesSelection = (saleId) =>
-    setSelectedSales(prev => prev.includes(saleId) ? prev.filter(id => id !== saleId) : [...prev, saleId]);
+  const removePaymentItem = (id) => setPaymentItems(prev => prev.filter(i => i.id !== id));
+  const togglePurchaseSelection = (purchaseId) =>
+    setSelectedPurchases(prev => prev.includes(purchaseId) ? prev.filter(id => id !== purchaseId) : [...prev, purchaseId]);
 
-  // ── Add selected invoices → fetch their line items → map to collection items ──
-  const handleAddSelectedSales = async () => {
+  // ── Add selected purchases → fetch their line items → map to payment items ──
+  const handleAddSelectedPurchases = async () => {
     try {
-      if (selectedSales.length === 0) {
-        setToast({ type: 'warning', message: 'Please select at least one sales invoice' });
+      if (selectedPurchases.length === 0) {
+        setToast({ type: 'warning', message: 'Please select at least one purchase invoice' });
         return;
       }
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authorization token found');
 
       const queryParams = new URLSearchParams();
-      selectedSales.forEach(id => queryParams.append('sales_id', id));
+      selectedPurchases.forEach(id => queryParams.append('purchase_id', id));
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/collections/sales-items-collection?${queryParams.toString()}`,
+        `${import.meta.env.VITE_SERVER_LINK}/payments/purchase-items-payment?${queryParams.toString()}`,
         { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } }
       );
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const result = await response.json();
-      if (!result.success) throw new Error(result.message || 'Failed to fetch sales items');
+      if (!result.success) throw new Error(result.message || 'Failed to fetch purchase items');
 
-      // ── Map sales_items → collection items ──────────────────────────────
+      // ── Map purchase_items → payment items ──────────────────────────────
       //  We compute amounts here so the accountant sees the full breakdown.
       //  vat IS included — it is part of ci_amount (Discounted + VAT − WHT).
       const newItems = result.data.map(s => {
@@ -384,7 +384,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
 
         return {
           id:                  Date.now() + Math.random(),
-          salesItemId:         s.id,                        // → ci_sales_id
+          purchaseItemId:      s.id,                        // → ci_purchase_id
           invoiceRef:          s.document_reference || '',  // display only
           description:         s.product_service_name || s.description || '', // display only
           responsibilityCenter: s.responsibility_center || '', // display only
@@ -397,16 +397,16 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
         };
       });
 
-      // Clear existing collection items
-      setCollectionItems([]);
-      // Add new items to collection
-      setCollectionItems([...newItems]);
+      // Clear existing payment items
+      setPaymentItems([]);
+      // Add new items to payment
+      setPaymentItems([...newItems]);
       setIsModalOpen(false);
-      setSelectedSales([]);
-      setToast({ type: 'success', message: `${newItems.length} item(s) added from sales invoice` });
+      setSelectedPurchases([]);
+      setToast({ type: 'success', message: `${newItems.length} item(s) added from purchase invoice` });
 
     } catch (error) {
-      console.error('Error adding selected sales:', error);
+      console.error('Error adding selected purchases:', error);
       setToast({ type: 'error', message: 'Error: ' + error.message });
     }
   };
@@ -427,28 +427,29 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
     }
   };
 
-  const summary = computeSummary(collectionItems);
+  const summary = computeSummary(paymentItems);
 
   // ── Auto-generate journal entries ─────────────────────────────────────────
   //
   //  Per item:
-  //    CR  Accounts Receivable   gross      ← closes the full AR (asset decreases)
-  //    DR  Sales Discounts       discAmt    ← discount expense
-  //    DR  Creditable WHT        whtAmount  ← asset: BIR owes us later
+  //    DR  Accounts Payable     amount     ← closes the full AP (liability decreases)
+  //    DR  Purchase Discounts   discAmt    ← discount received
+  //    DR  Input VAT             vatAmt     ← VAT input claimable
+  //    DR  Creditable WHT        whtAmount  ← tax withheld (asset)
   //
   //  One combined:
-  //    DR  Cash / Bank           totalCash  ← actual money received
+  //    CR  Cash / Bank           totalCash  ← actual money paid
   //
   //  Balance proof per item:
-  //    DR side = discAmt + whtAmount + (amount)
-  //            = discAmt + whtAmt + (discounted + vatAmt − whtAmt)
-  //            = discAmt + discounted + vatAmt
-  //            = discAmt + (gross − discAmt) + vatAmt
-  //            = gross + vatAmt   ← note: AR was originally booked at gross + vatAmt in the Sales JE
-  //    CR side = gross + vatAmt  ✅
+  //    DR side = amount + discAmt + vatAmt + whtAmount
+  //            = (discounted + vatAmt − whtAmt) + discAmt + vatAmt + whtAmount
+  //            = discounted + discAmt + 2*vatAmt
+  //            = (gross − discAmt) + discAmt + 2*vatAmt
+  //            = gross + 2*vatAmt   ← note: AP was originally booked at gross + vatAmt in the Purchase JE
+  //    CR side = gross + 2*vatAmt  ✅
   // ─────────────────────────────────────────────────────────────────────────
   const generateJournalEntries = () => {
-    if (collectionItems.length === 0) { setJournalEntries([]); return; }
+    if (paymentItems.length === 0) { setJournalEntries([]); return; }
 
     const entries = [];
 
@@ -465,36 +466,36 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
       paymentAccount ??= chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('cash in bank'));
     }
 
-    const arAccount = chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('accounts receivable'));
+    const apAccount = chartsOfAccounts.find(a => (a.name || '').toLowerCase().includes('accounts payable'));
 
     let totalCash = 0;
 
-    collectionItems.filter(i => !i.isOther).forEach(item => {
+    paymentItems.filter(i => !i.isOther).forEach(item => {
       totalCash += item.amount || 0;
 
-      // CR  Accounts Receivable — amount collected
-      if (arAccount && item.amount > 0) {
+      // DR  Accounts Payable — amount paid
+      if (apAccount && item.amount > 0) {
         entries.push({
           id:            Date.now() + Math.random(),
-          account:       arAccount.id,
-          accountSearch: arAccount.name,
+          account:       apAccount.id,
+          accountSearch: apAccount.name,
           center:        item.responsibilityCenter || '',
-          debit:         0,
-          credit:        parseFloat(item.amount.toFixed(2)),
+          debit:         parseFloat(item.amount.toFixed(2)),
+          credit:        0,
           isManual:      false,
         });
       }
     });
 
-    // DR  Cash / Bank — one combined entry
+    // CR  Cash / Bank — one combined entry
     if (paymentAccount && totalCash > 0) {
       entries.push({
         id:            Date.now() + Math.random(),
         account:       paymentAccount.id,
         accountSearch: paymentAccount.name,
         center:        '',
-        debit:         parseFloat(totalCash.toFixed(2)),
-        credit:        0,
+        debit:         0,
+        credit:        parseFloat(totalCash.toFixed(2)),
         isManual:      false,
       });
     }
@@ -507,7 +508,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
     if (!isViewMode) {
       generateJournalEntries(); 
     }
-  }, [collectionItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
+  }, [paymentItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
 
   // ── Post Transaction ──────────────────────────────────────────────────────
   const fileToBase64 = (file) =>
@@ -520,13 +521,13 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
 
   const handlePostTransaction = async () => {
     try {
-      if (!selectedCustomer) { setToast({ type: 'warning', message: 'Please select a customer' }); return; }
+      if (!selectedVendor) { setToast({ type: 'warning', message: 'Please select a vendor' }); return; }
       if (!modeOfPayment)    { setToast({ type: 'warning', message: 'Please select mode of payment' }); return; }
       if ((modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && !bankName) {
         setToast({ type: 'warning', message: 'Please enter bank name' }); return;
       }
-      if (collectionItems.filter(i => !i.isOther).length === 0) {
-        setToast({ type: 'warning', message: 'Please add at least one collection item from a sales invoice' }); return;
+      if (paymentItems.filter(i => !i.isOther).length === 0) {
+        setToast({ type: 'warning', message: 'Please add at least one payment item from a purchase invoice' }); return;
       }
 
       const token = localStorage.getItem('token');
@@ -535,16 +536,16 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
       const userData  = JSON.parse(localStorage.getItem('user') || '{}');
       const createdBy = userData.mu_username || userData.username || 'Unknown User';
 
-      // ── collection_items payload — ONLY what the DB schema stores ──
-      //   ci_sales_id       → salesItemId
+      // ── payment_items payload — ONLY what the DB schema stores ──
+      //   ci_purchase_id    → purchaseItemId
       //   ci_amount         → amount       (discounted + VAT − WHT)
       //   ci_witholding_tax → whtAmount
-      const preparedItems = collectionItems
+      const preparedItems = paymentItems
         .filter(item => !item.isOther)
         .map(item => ({
-          sales_id:       item.salesItemId,
-          amount:         item.amount,
-          witholding_tax: item.whtAmount,
+          purchase_id:     item.purchaseItemId,
+          amount:           item.amount,
+          witholding_tax:   item.whtAmount,
         }));
 
       const preparedJournalEntries = journalEntries.map(entry => ({
@@ -556,36 +557,36 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
 
       const preparedAttachments = await Promise.all(
         attachments.map(async att => ({
-          fileName:   att.fileName,
-          file:       att.file ? await fileToBase64(att.file) : null,
-          remarks:    att.remarks,
-          uploadedBy: att.uploadedBy,
-          date:       att.date,
+          name:           att.fileName,
+          file:           att.file ? await fileToBase64(att.file) : null,
+          remarks:        att.remarks,
+          uploaded_by:    att.uploadedBy,
+          uploaded_date:  att.date,
         }))
       );
 
-      // ── collections header payload — matches DB columns exactly ──
-      // c_customer_id, c_document_reference, c_mode_of_payment,
-      // c_bank_name, c_check_number, c_collection_date, c_remarks, c_created_by
-      const collectionData = {
-        customer_id:        selectedCustomer,
+      // ── payments header payload — matches DB columns exactly ──
+      // c_vendor_id, c_document_reference, c_mode_of_payment,
+      // c_bank_name, c_check_number, c_payment_date, c_remarks, c_created_by
+      const paymentData = {
+        vendor_id:         selectedVendor,
         document_reference: documentReference,
         mode_of_payment:    modeOfPayment,
         bank_name:          bankName    || '',
         check_number:       checkNumber || '',
-        collection_date:    new Date().toISOString().split('T')[0],
+        payment_date:       new Date().toISOString().split('T')[0],
         remarks,
         total_amount_due:   summary.totalCashCollected,
         created_by:         createdBy,
-        collection_items:   preparedItems,
+        payment_items:      preparedItems,
         journal_entries:    preparedJournalEntries,
         attachments:        preparedAttachments,
       };
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/collections`, {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/payments`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body:    JSON.stringify(collectionData),
+        body:    JSON.stringify(paymentData),
       });
 
       if (!response.ok) {
@@ -595,16 +596,16 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
 
       const result = await response.json();
       if (result.success) {
-        const nextToast = { type: 'success', message: 'Collection posted successfully!' };
+        const nextToast = { type: 'success', message: 'Payment posted successfully!' };
         setToast(nextToast);
         if (onSuccess) await onSuccess(nextToast);
         onBack();
       } else {
-        setToast({ type: 'error', message: result.message || 'Failed to post collection' });
+        setToast({ type: 'error', message: result.message || 'Failed to post payment' });
       }
 
     } catch (error) {
-      console.error('Error posting collection:', error);
+      console.error('Error posting payment:', error);
       setToast({ type: 'error', message: 'Error: ' + error.message });
     }
   };
@@ -641,7 +642,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
       {/* TOP NAV */}
       <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <nav className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors" onClick={onBack}>
-          <ArrowLeft size={17} /><span className="text-black">Back to Collections</span>
+          <ArrowLeft size={17} /><span className="text-black">Back to Payments</span>
         </nav>
         {!isViewMode && (
           <div className="flex gap-2">
@@ -652,7 +653,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
               onClick={handlePostTransaction}
               className="px-6 py-2 bg-red-600 text-white text-[12px] font-black rounded-lg hover:bg-red-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-red-200"
             >
-              <Save size={14} /> Post Collection
+              <Save size={14} /> Post Payment
             </button>
           </div>
         )}
@@ -671,20 +672,20 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
             </h3>
             <div className="grid grid-cols-1 gap-2.5">
               <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Customer <span className="text-red-600">*</span></label>
+                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Vendor <span className="text-red-600">*</span></label>
                 {isViewMode ? (
-                  <div className={inputBase + " text-black py-1.5"}>{customerSearch || 'No customer selected'}</div>
-                ) : customerLoading ? (
-                  <div className={inputBase + " text-black py-1.5"}>Loading customers…</div>
+                  <div className={inputBase + " text-black py-1.5"}>{vendorSearch || 'No vendor selected'}</div>
+                ) : vendorLoading ? (
+                  <div className={inputBase + " text-black py-1.5"}>Loading vendors…</div>
                 ) : (
                   <SearchableDropdown
-                    placeholder="Search customer..."
-                    value={customerSearch}
-                    onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); }}
-                    onSelect={opt => { setSelectedCustomer(opt.value); setCustomerSearch(opt.label); }}
-                    options={customerOptions}
+                    placeholder="Search vendor..."
+                    value={vendorSearch}
+                    onChange={v => { setVendorSearch(v); setSelectedVendor(''); }}
+                    onSelect={opt => { setSelectedVendor(opt.value); setVendorSearch(opt.label); }}
+                    options={vendorOptions}
                     inputClassName={inputBase}
-                    emptyText={customerError || 'No customers found'}
+                    emptyText={vendorError || 'No vendors found'}
                   />
                 )}
               </div>
@@ -756,8 +757,8 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
         <main className="flex-1 overflow-y-auto custom-table-scroller space-y-4 pr-1 min-h-0">
           <motion.div initial="hidden" animate="visible" variants={fadeInUp} className="space-y-4">
 
-            {/* 1. COLLECTION ITEMS */}
-            <TableSection title="Collection Items" icon={<Receipt size={14} />}>
+            {/* 1. PAYMENT ITEMS */}
+            <TableSection title="Payment Items" icon={<Receipt size={14} />}>
               <div className="w-full flex flex-col gap-[2px] mb-3">
                 <div className="h-[2px] w-full bg-red-600 rounded-full" />
                 <div className="h-[1px] w-full bg-black/10" />
@@ -769,9 +770,9 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                 </span>
               </div> */}
 
-              {collectionItems.length === 0 ? (
+              {paymentItems.length === 0 ? (
                 <div className="py-10 text-center text-gray-400 text-[13px] font-bold border-2 border-dashed border-gray-100 rounded-xl">
-                  No items yet. Click "Add Sales Items" to select outstanding invoices.
+                  No items yet. Click "Add Purchase Items" to select outstanding invoices.
                 </div>
               ) : (
                 <div className="overflow-x-auto custom-table-scroller">
@@ -800,7 +801,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {collectionItems.map(item => (
+                      {paymentItems.map(item => (
                         <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                           <td className="py-2 px-2 text-center">
                             <span className="font-mono text-[11px] bg-gray-100 px-2 py-0.5 rounded text-gray-700">
@@ -830,7 +831,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                           </td>
                           <td className="py-2 px-1 text-center">
                             {!isViewMode && (
-                              <button onClick={() => removeCollectionItem(item.id)} className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors">
+                              <button onClick={() => removePaymentItem(item.id)} className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors">
                                 <Trash2 size={14} />
                               </button>
                             )}
@@ -859,7 +860,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                     onClick={() => setIsModalOpen(true)}
                     className="w-full py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-2"
                   >
-                    <Plus size={14} /> Add Sales Items
+                    <Plus size={14} /> Add Purchase Items
                   </button>
                 </div>
               )}
@@ -1096,7 +1097,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                       ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed resize-none' 
                       : 'bg-gray-50 border-none focus:ring-1 focus:ring-red-500'
                   }`} 
-                  placeholder="Enter collection notes or justification here..." 
+                  placeholder="Enter payment notes or justification here..." 
                   value={remarks} 
                   onChange={e => setRemarks(e.target.value)} 
                 />
@@ -1107,24 +1108,24 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
         </main>
       </div>
 
-      {/* ── SALES INVOICE MODAL ── */}
-      <RightSideModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Select Sales Invoices" size="2xl">
+      {/* ── PURCHASE INVOICE MODAL ── */}
+      <RightSideModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Select Purchase Invoices" size="2xl">
         <div className="space-y-4">
           <p className="text-[12px] text-gray-500 font-semibold">
-            Select outstanding sales invoices to collect. Their line items will be fetched and amounts auto-computed (Discounted + VAT − WHT).
+            Select outstanding purchase invoices to pay. Their line items will be fetched and amounts auto-computed (Discounted + VAT − WHT).
           </p>
 
-          {salesDataLoading ? (
+          {purchaseDataLoading ? (
             <div className="p-8 bg-gray-50 rounded-xl border border-gray-200 text-center">
-              <p className="text-[12px] text-gray-400 font-bold animate-pulse">Loading sales invoices…</p>
+              <p className="text-[12px] text-gray-400 font-bold animate-pulse">Loading purchase invoices…</p>
             </div>
-          ) : salesDataError ? (
+          ) : purchaseDataError ? (
             <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-center">
-              <p className="text-[12px] text-red-600 font-bold">{salesDataError}</p>
+              <p className="text-[12px] text-red-600 font-bold">{purchaseDataError}</p>
             </div>
-          ) : salesData.length === 0 ? (
+          ) : purchaseData.length === 0 ? (
             <div className="p-8 bg-gray-50 rounded-xl border border-gray-200 text-center">
-              <p className="text-[12px] text-gray-400 font-bold">No outstanding sales invoices found.</p>
+              <p className="text-[12px] text-gray-400 font-bold">No outstanding purchase invoices found.</p>
             </div>
           ) : (
             <div className="overflow-hidden border border-gray-200 rounded-xl">
@@ -1141,18 +1142,18 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                   </colgroup>
                   <thead className="bg-black sticky top-0 z-10">
                     <tr>
-                      {['', 'Customer', 'Doc Ref', 'Terms', 'Date Due', 'Amount Due', 'Status'].map((h, i) => (
+                      {['', 'Vendor', 'Doc Ref', 'Terms', 'Date Due', 'Amount Due', 'Status'].map((h, i) => (
                         <th key={i} className="px-4 py-3 text-center text-[11px] font-black uppercase text-white tracking-wider border-b-2 border-red-600">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
-                    {salesData.map((sale, idx) => {
-                      const isChecked = selectedSales.includes(sale.id);
+                    {purchaseData.map((purchase, idx) => {
+                      const isChecked = selectedPurchases.includes(purchase.id);
                       return (
                         <tr
-                          key={sale.id}
-                          onClick={() => toggleSalesSelection(sale.id)}
+                          key={purchase.id}
+                          onClick={() => togglePurchaseSelection(purchase.id)}
                           className={`cursor-pointer transition-colors ${isChecked ? 'bg-red-50' : idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50/40 hover:bg-gray-100'}`}
                         >
                           <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
@@ -1160,29 +1161,29 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                               <input
                                 type="checkbox"
                                 checked={isChecked}
-                                onChange={() => toggleSalesSelection(sale.id)}
+                                onChange={() => togglePurchaseSelection(purchase.id)}
                                 className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                               />
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-center text-[12px] font-bold text-gray-900 truncate" title={sale.customer}>{sale.customer || '—'}</td>
-                          <td className="px-4 py-3 text-center text-[11px] font-mono font-bold text-gray-700">{sale.doc_ref || '—'}</td>
-                          <td className="px-4 py-3 text-center text-[11px] font-bold text-gray-500 uppercase">{sale.terms || '—'}</td>
-                          <td className="px-4 py-3 text-center text-[11px] font-mono text-gray-600">{sale.date_due || '—'}</td>
+                          <td className="px-4 py-3 text-center text-[12px] font-bold text-gray-900 truncate" title={purchase.vendor}>{purchase.vendor || '—'}</td>
+                          <td className="px-4 py-3 text-center text-[11px] font-mono font-bold text-gray-700">{purchase.doc_ref || '—'}</td>
+                          <td className="px-4 py-3 text-center text-[11px] font-bold text-gray-500 uppercase">{purchase.terms || '—'}</td>
+                          <td className="px-4 py-3 text-center text-[11px] font-mono text-gray-600">{purchase.date_due || '—'}</td>
                           <td className="px-4 py-3 text-center text-[12px] font-black tabular-nums text-gray-900">
-                            {parseFloat(sale.amount_due || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                            {parseFloat(purchase.amount_due || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span className={`inline-flex items-center px-2.5 py-0.5 text-[10px] font-black rounded-full border ${
-                              sale.status === 'COLLECTED'
+                              purchase.status === 'PAID'
                                 ? 'bg-green-50 text-green-700 border-green-200'
-                                : sale.status === 'PARTIALLY COLLECTED'
+                                : purchase.status === 'PARTIALLY PAID'
                                 ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                : sale.status === 'NOT COLLECTED'
+                                : purchase.status === 'UNPAID'
                                 ? 'bg-red-50 text-red-700 border-red-200'
                                 : 'bg-gray-50 text-gray-600 border-gray-200'
                             }`}>
-                              {sale.status || 'UNKNOWN'}
+                              {purchase.status || 'UNKNOWN'}
                             </span>
                           </td>
                         </tr>
@@ -1194,31 +1195,31 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
             </div>
           )}
 
-          {selectedSales.length > 0 && (
+          {selectedPurchases.length > 0 && (
             <div className="px-3 py-2 bg-red-50 border border-red-100 rounded-lg text-center">
               <p className="text-[11px] font-black text-red-600 uppercase tracking-wide">
-                {selectedSales.length} invoice{selectedSales.length > 1 ? 's' : ''} selected
+                {selectedPurchases.length} invoice{selectedPurchases.length > 1 ? 's' : ''} selected
               </p>
             </div>
           )}
 
           <div className="flex justify-end gap-3 pt-2">
             <button
-              onClick={() => { setIsModalOpen(false); setSelectedSales([]); }}
+              onClick={() => { setIsModalOpen(false); setSelectedPurchases([]); }}
               className="px-4 py-2 bg-gray-100 text-gray-600 text-[12px] font-black rounded-lg hover:bg-gray-200 transition-colors uppercase"
             >
               Cancel
             </button>
             <button
-              onClick={handleAddSelectedSales}
-              disabled={selectedSales.length === 0}
+              onClick={handleAddSelectedPurchases}
+              disabled={selectedPurchases.length === 0}
               className={`px-6 py-2 text-[12px] font-black rounded-lg uppercase tracking-wider transition-colors ${
-                selectedSales.length === 0
+                selectedPurchases.length === 0
                   ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   : 'bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-200'
               }`}
             >
-              Add {selectedSales.length > 0 ? `(${selectedSales.length})` : ''} Selected
+              Add {selectedPurchases.length > 0 ? `(${selectedPurchases.length})` : ''} Selected
             </button>
           </div>
         </div>

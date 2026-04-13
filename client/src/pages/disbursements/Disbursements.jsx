@@ -20,6 +20,7 @@ export default function Disbursements() {
 function DisbursementsContent() {
   const { disbursements, loading, error, refetchDisbursements } = useDisbursements();
   const [isAdding, setIsAdding] = useState(false);
+  const [viewingDisbursement, setViewingDisbursement] = useState(null);
   const [toast, setToast] = useState(null);
 
   // Check if user has access to enable checkboxes
@@ -28,7 +29,7 @@ function DisbursementsContent() {
   const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access';
 
   // Determine checkbox condition based on access level
-  const checkboxCondition = enableCheckboxes 
+  const checkboxCondition = enableCheckboxes
     ? { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
     : null;
 
@@ -45,6 +46,16 @@ function DisbursementsContent() {
           if (nextToast) setToast(nextToast);
           await refetchDisbursements();
         }}
+      />
+    </RouteProtection>
+  );
+
+  if (viewingDisbursement) return (
+    <RouteProtection routeName="disbursement">
+      <CashDisbursementForm
+        isViewMode={true}
+        disbursementData={viewingDisbursement}
+        onBack={() => setViewingDisbursement(null)}
       />
     </RouteProtection>
   );
@@ -79,7 +90,7 @@ function DisbursementsContent() {
           onClose={() => setToast(null)}
         />
       )}
-      
+
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
         <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -88,7 +99,7 @@ function DisbursementsContent() {
           <span className="text-black">Disbursement Vouchers</span>
         </nav>
 
-        <motion.div 
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -124,29 +135,29 @@ function DisbursementsContent() {
 
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard 
-            icon={<Wallet className="text-red-600" size={20} />} 
-            label="Total Vouchers" 
-            value={disbursements?.length || 0} 
+          <SummaryCard
+            icon={<Wallet className="text-red-600" size={20} />}
+            label="Total Vouchers"
+            value={disbursements?.length || 0}
             subText="Processed"
           />
-          <SummaryCard 
-            icon={<History className="text-black" size={20} />} 
-            label="Recent Cycles" 
-            value="Current" 
+          <SummaryCard
+            icon={<History className="text-black" size={20} />}
+            label="Recent Cycles"
+            value="Current"
             subText="Live Period"
           />
-          <SummaryCard 
-            icon={<ShieldCheck className="text-gray-400" size={20} />} 
-            label="Compliance" 
-            value="SECURE" 
+          <SummaryCard
+            icon={<ShieldCheck className="text-gray-400" size={20} />}
+            label="Compliance"
+            value="SECURE"
             subText="Verified Ready"
           />
         </div>
       </div>
 
       {/* --- TABLE SECTION --- */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -159,13 +170,78 @@ function DisbursementsContent() {
           enableCheckbox={enableCheckboxes}
           checkboxColumn="id"
           checkboxCondition={checkboxCondition}
+          enableActionColumn={true}
+          badgeColumns={[
+            {
+              column: 'status',
+              values: {
+                'PAID': 'green',
+                'UNPAID': 'red',
+                'PARTIALLY PAID': 'yellow'
+              }
+            },
+            {
+              column: 'state',
+              values: {
+                'PREPARED': 'gray',
+                'CHECKED': 'blue',
+                'APPROVED': 'green',
+                'REJECTED': 'red',
+                'CANCELLED': 'orange'
+              }
+            }
+          ]}
+          actionButtons={[
+            {
+              label: 'View',
+              onClick: async (row) => {
+                try {
+                  console.log('View disbursement:', row);
+
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${Number(row.id)}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to fetch disbursement details');
+                  }
+
+                  console.log('Disbursement details:', result);
+
+                  // Set disbursement data for viewing
+                  setViewingDisbursement(result);
+
+                } catch (error) {
+                  console.error('Error fetching disbursement details:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch disbursement details'
+                  });
+                }
+              }
+            }
+          ]}
           checkboxActions={[
             {
               label: 'Approve Selected',
               onClick: async (selectedRows) => {
                 try {
                   console.log('Approving disbursements:', selectedRows);
-                  
+
                   const token = localStorage.getItem('token');
                   if (!token) {
                     throw new Error('No authentication token found');

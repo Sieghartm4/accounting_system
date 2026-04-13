@@ -55,6 +55,102 @@ const getCashDisbursements = async (req, res, next) => {
     }
 }
 
+const getAllCashDisbursements = async (req, res, next) => {
+  const { cash_disbursement_id } = req.params;
+  const cashDisbursementId = Number(cash_disbursement_id);
+  console.log('Converted cash_disbursement_id:', cashDisbursementId, 'type:', typeof cashDisbursementId);
+  try {
+    const cash_disbursements_query = sql.select([
+      { col: Accounting.cash_disbursements.selectOptionColumns.id, as: 'id' },
+      { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.document_reference, as: 'doc_ref' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.payment_date, as: 'payment_date' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.mode_of_payment, as: 'mode' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.bank_name, as: 'bank_name' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.check_number, as: 'check_number' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.remarks, as: 'remarks' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.total_amount_due, as: 'amount_due' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.status, as: 'status' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.state, as: 'state' }
+    ])
+      .from(Accounting.cash_disbursements.tablename)
+      .innerJoin(Master.vendors.tablename, Accounting.cash_disbursements.selectOptionColumns.vendor_id, Master.vendors.selectOptionColumns.id)
+      .where(Accounting.cash_disbursements.selectOptionColumns.id)
+      .build();
+
+    let cash_disbursement = await Query(cash_disbursements_query, [cashDisbursementId], [Accounting.cash_disbursements.prefix_, Master.vendors.prefix_]);
+
+    const cash_disbursement_items_query = sql.select([
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.id, as: 'id' },
+      { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.description, as: 'description' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.unit, as: 'unit' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.quantity, as: 'quantity' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.discount, as: 'discount' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.vat, as: 'vat' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.cash_disbursement_items.tablename)
+      .innerJoin(Master.products_service.tablename, Accounting.cash_disbursement_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.cash_disbursement_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
+      .where(Accounting.cash_disbursement_items.selectOptionColumns.cash_disbursement_id)
+      .build();
+
+    let cash_disbursement_items = await Query(cash_disbursement_items_query, [cashDisbursementId], [Accounting.cash_disbursement_items.prefix_]);
+    const cash_disbursement_journal_query = sql.select([
+      { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' },
+      { col: Accounting.journal_entries.selectOptionColumns.amount, as: 'amount' },
+      { col: Accounting.journal_entries.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.journal_entries.tablename)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.journal_entries.selectOptionColumns.coa_id, Master.charts_of_accounts.selectOptionColumns.id)
+      .where(Accounting.journal_entries.selectOptionColumns.db_name)
+      .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
+      .build();
+
+    let cash_disbursement_journal = await Query(cash_disbursement_journal_query, ['cash_disbursements', cashDisbursementId], [Accounting.journal_entries.prefix_]);
+
+    const cash_disbursement_attachments_query = sql.select([
+      { col: Accounting.cash_disbursement_attachments.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.cash_disbursement_attachments.selectOptionColumns.file, as: 'file' },
+      { col: Accounting.cash_disbursement_attachments.selectOptionColumns.name, as: 'name' },
+      { col: Accounting.cash_disbursement_attachments.selectOptionColumns.remarks, as: 'remarks' },
+      { col: Accounting.cash_disbursement_attachments.selectOptionColumns.uploaded_by, as: 'uploaded_by' },
+      { col: Accounting.cash_disbursement_attachments.selectOptionColumns.uploaded_date, as: 'uploaded_date' }
+    ])
+      .from(Accounting.cash_disbursement_attachments.tablename)
+      .where(Accounting.cash_disbursement_attachments.selectOptionColumns.cash_disburssement_id)
+      .build();
+
+    let cash_disbursement_attachments = await Query(cash_disbursement_attachments_query, [cashDisbursementId], [Accounting.cash_disbursement_attachments.prefix_]);
+
+    console.log(cash_disbursement, cash_disbursement_items, cash_disbursement_journal, cash_disbursement_attachments)
+    res.status(200).json({
+      success: true,
+      message: 'Cash disbursements retrieved successfully',
+      data: cash_disbursement,
+      items: cash_disbursement_items,
+      journal: cash_disbursement_journal,
+      attachments: cash_disbursement_attachments,
+      count: cash_disbursement.length,
+      timestamp: new Date().toISOString()
+    })
+
+  } catch (error) {
+    console.error('Error fetching cash disbursements:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching receipts',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    })
+  }
+}
+
 const createCashDisbursement = async (req, res, next) => {
     try {
         const { 
@@ -309,6 +405,7 @@ const updateDisbursementState = async (req, res, next) => {
 }
 module.exports = {
     getCashDisbursements,
+    getAllCashDisbursements,
     createCashDisbursement,
     updateDisbursementState
 }

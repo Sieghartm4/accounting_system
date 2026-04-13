@@ -20,6 +20,8 @@ export default function Collections() {
 function CollectionsContent() {
   const { collections, loading, error, refetchCollections } = useCollections();
   const [isAdding, setIsAdding] = useState(false);
+  const [isViewing, setIsViewing] = useState(false);
+  const [viewingCollection, setViewingCollection] = useState(null);
   const [toast, setToast] = useState(null);
 
   // Check if user has access to enable checkboxes
@@ -28,7 +30,7 @@ function CollectionsContent() {
   const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access';
 
   // Determine checkbox condition based on access level
-  const checkboxCondition = enableCheckboxes 
+  const checkboxCondition = enableCheckboxes
     ? { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
     : null;
 
@@ -44,6 +46,19 @@ function CollectionsContent() {
         onSuccess={async (nextToast) => {
           if (nextToast) setToast(nextToast);
           await refetchCollections();
+        }}
+      />
+    </RouteProtection>
+  );
+
+  if (isViewing) return (
+    <RouteProtection routeName="collections">
+      <CollectionsForm
+        isViewMode={true}
+        collectionData={viewingCollection}
+        onBack={() => {
+          setIsViewing(false);
+          setViewingCollection(null);
         }}
       />
     </RouteProtection>
@@ -71,7 +86,7 @@ function CollectionsContent() {
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-      
+
       {toast && (
         <DynamicToast
           type={toast.type}
@@ -79,7 +94,7 @@ function CollectionsContent() {
           onClose={() => setToast(null)}
         />
       )}
-      
+
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
         {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -88,7 +103,7 @@ function CollectionsContent() {
           <span className="text-black">Account Collections</span>
         </nav> */}
 
-        <motion.div 
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -100,7 +115,7 @@ function CollectionsContent() {
                 <Layers size={24} />
               </div>
               <h1 className="text-4xl font-black text-black tracking-tighter">
-                 <span className="text-red-600 italic">Collections</span>
+                <span className="text-red-600 italic">Collections</span>
               </h1>
             </div>
             {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
@@ -124,29 +139,29 @@ function CollectionsContent() {
 
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard 
-            icon={<Wallet className="text-red-600" size={20} />} 
-            label="Total Collected" 
-            value={collections?.length || 0} 
+          <SummaryCard
+            icon={<Wallet className="text-red-600" size={20} />}
+            label="Total Collected"
+            value={collections?.length || 0}
             subText="Entries"
           />
-          <SummaryCard 
-            icon={<CheckCircle className="text-black" size={20} />} 
-            label="Verified" 
-            value="Active" 
+          <SummaryCard
+            icon={<CheckCircle className="text-black" size={20} />}
+            label="Verified"
+            value="Active"
             subText="Compliance"
           />
-          <SummaryCard 
-            icon={<ShieldCheck className="text-gray-400" size={20} />} 
-            label="Integrity" 
-            value="Valid" 
+          <SummaryCard
+            icon={<ShieldCheck className="text-gray-400" size={20} />}
+            label="Integrity"
+            value="Valid"
             subText="Audit Status"
           />
         </div>
       </div>
 
       {/* --- TABLE SECTION --- */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -157,15 +172,79 @@ function CollectionsContent() {
           title="Collections Ledger"
           enableAddButton={false}
           enableCheckbox={enableCheckboxes}
+          enableActionColumn={true}
           checkboxColumn="id"
           checkboxCondition={checkboxCondition}
+          actionButtons={[
+            {
+              label: 'View',
+              onClick: async (row) => {
+                try {
+                  console.log('Viewing collection:', row);
+                  
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/collections/${row.id}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      }
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to fetch collection details');
+                  }
+
+                  console.log('Collection details fetched:', result);
+                  setViewingCollection(result);
+                  setIsViewing(true);
+
+                } catch (error) {
+                  console.error('Error fetching collection details:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch collection details'
+                  });
+                }
+              }
+            }
+          ]}
+          badgeColumns={[
+            {
+              column: 'status',
+              values: {
+                'COLLECTED': 'green',
+                'NOT COLLECTED': 'red',
+                'PARTIALLY COLLECTED': 'yellow'
+              }
+            },
+            {
+              column: 'state',
+              values: {
+                'PREPARED': 'gray',
+                'CHECKED': 'blue',
+                'APPROVED': 'green',
+                'REJECTED': 'red',
+                'CANCELLED': 'orange'
+              }
+            }
+          ]}
           checkboxActions={[
             {
               label: 'Approve Selected',
               onClick: async (selectedRows) => {
                 try {
                   console.log('Approving collections:', selectedRows);
-                  
+
                   const token = localStorage.getItem('token');
                   if (!token) {
                     throw new Error('No authentication token found');

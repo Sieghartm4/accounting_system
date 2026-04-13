@@ -11,10 +11,18 @@ export const hasRouteAccess = (routeName, user) => {
     return false;
   }
 
-  return user.route_access.some(route => 
-    route.name === routeName && 
-    (route.status === 'Full Access' || route.status === 'Check Access' || route.status === 'Approve Access')
-  );
+  return user.route_access.some(route => {
+    if (!route || typeof route !== 'object') {
+      console.warn('Invalid route object:', route);
+      return false;
+    }
+    if (!route.name || typeof route.name !== 'string') {
+      console.warn('Invalid route.name:', route.name);
+      return false;
+    }
+    return route.name === routeName && 
+      (route.status === 'Full Access' || route.status === 'Check Access' || route.status === 'Approve Access');
+  });
 };
 
 /**
@@ -28,9 +36,17 @@ export const hasFullAccess = (routeName, user) => {
     return false;
   }
 
-  return user.route_access.some(route => 
-    route.name.toLowerCase() === routeName.toLowerCase() && route.status === 'Full Access'
-  );
+  return user.route_access.some(route => {
+    if (!route || typeof route !== 'object') {
+      console.warn('Invalid route object:', route);
+      return false;
+    }
+    if (!route.name || typeof route.name !== 'string') {
+      console.warn('Invalid route.name:', route.name);
+      return false;
+    }
+    return route.name.toLowerCase() === routeName.toLowerCase() && route.status === 'Full Access';
+  });
 };
 
 /**
@@ -44,9 +60,17 @@ export const hasCheckAccess = (routeName, user) => {
     return false;
   }
 
-  return user.route_access.some(route => 
-    route.name.toLowerCase() === routeName.toLowerCase() && route.status === 'Check Access'
-  );
+  return user.route_access.some(route => {
+    if (!route || typeof route !== 'object') {
+      console.warn('Invalid route object:', route);
+      return false;
+    }
+    if (!route.name || typeof route.name !== 'string') {
+      console.warn('Invalid route.name:', route.name);
+      return false;
+    }
+    return route.name.toLowerCase() === routeName.toLowerCase() && route.status === 'Check Access';
+  });
 };
 
 /**
@@ -60,9 +84,17 @@ export const hasApproveAccess = (routeName, user) => {
     return false;
   }
 
-  return user.route_access.some(route => 
-    route.name.toLowerCase() === routeName.toLowerCase() && route.status === 'Approve Access'
-  );
+  return user.route_access.some(route => {
+    if (!route || typeof route !== 'object') {
+      console.warn('Invalid route object:', route);
+      return false;
+    }
+    if (!route.name || typeof route.name !== 'string') {
+      console.warn('Invalid route.name:', route.name);
+      return false;
+    }
+    return route.name.toLowerCase() === routeName.toLowerCase() && route.status === 'Approve Access';
+  });
 };
 
 /**
@@ -87,7 +119,7 @@ export const getAccessLevel = (routeName, user) => {
   }
 
   const route = user.route_access.find(route => 
-    route.name.toLowerCase() === routeName.toLowerCase()
+    route && route.name && route.name.toLowerCase() === routeName.toLowerCase()
   );
   return route ? route.status : null;
 };
@@ -103,7 +135,7 @@ export const getAccessibleRoutes = (user) => {
   }
 
   return user.route_access
-    .filter(route => route.status === 'Full Access' || route.status === 'Check Access' || route.status === 'Approve Access')
+    .filter(route => route && route.name && route.status && (route.status === 'Full Access' || route.status === 'Check Access' || route.status === 'Approve Access'))
     .map(route => route.name);
 };
 
@@ -125,7 +157,8 @@ export const ROUTE_CONFIG = {
   sales: { name: 'sales', label: 'Sales', icon: 'TrendingUp' },
   collections: { name: 'collections', label: 'Collections', icon: 'HandCoins' },
   purchase: { name: 'purchase', label: 'Purchase', icon: 'ShoppingCart' },
-  payments: { name: 'payments', label: 'Payments', icon: 'PaymentCard' }
+  payments: { name: 'payments', label: 'Payments', icon: 'PaymentCard' },
+  adjustments: { name: 'adjustments', label: 'Adjustments', icon: 'FileSpreadsheet' }
 };
 
 /**
@@ -141,7 +174,8 @@ export const getSidebarItems = (user) => {
     masters: [],
     receipts: [],
     sales: [],
-    purchase: []
+    purchase: [],
+    adjustments: []
   };
 
   // Main navigation
@@ -180,6 +214,11 @@ export const getSidebarItems = (user) => {
       items.purchase.push(ROUTE_CONFIG[route]);
     }
   });
+
+  // Adjustments section
+  if (hasRouteAccess('adjustments', user)) {
+    items.adjustments.push(ROUTE_CONFIG.adjustments);
+  }
 
   return items;
 };

@@ -67,11 +67,11 @@ const getSalesCollection = async (req, res, next) => {
     ])
       .from(Accounting.sales.tablename)
       .innerJoin(Master.customers.tablename, Accounting.sales.selectOptionColumns.customer_id, Master.customers.selectOptionColumns.id)
-      .whereNot(Accounting.sales.selectOptionColumns.status)
-      .where(Accounting.sales.selectOptionColumns.state)
+      .andWhereNot(Accounting.sales.selectOptionColumns.status)
+      .andWhere(Accounting.sales.selectOptionColumns.state)
       .build();
-    let sales = await Query(query, ['APPROVED', 'COLLECTED'], [Accounting.sales.prefix_, Master.customers.prefix_]);
-    console.log(query);
+    let sales = await Query(query, ['APPROVED', 'PAID'], [Accounting.sales.prefix_, Master.customers.prefix_]);
+    console.log("SALES QUERY",sales);
     res.status(200).json({
       success: true,
       message: 'Sales retrieved successfully',
@@ -187,6 +187,108 @@ const getSalesItemsCollection = async (req, res, next) => {
     });
   }
 };
+
+const getAllCollections = async (req, res, next) => {
+  const { collection_id } = req.params;
+  const collectionId = Number(collection_id);
+  console.log('Converted collection_id:', collectionId, 'type:', typeof collectionId);
+  
+  if (!collection_id || isNaN(collectionId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid collection ID provided',
+      timestamp: new Date().toISOString(),
+    });
+  }
+  
+  try {
+    const collection_query = sql.select([
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id}`, as: 'id' },
+      { col: `${Master.customers.tablename}.${Master.customers.selectOptionColumns.name}`, as: 'customer' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.document_reference}`, as: 'doc_ref' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.mode_of_payment}`, as: 'mode_of_payment' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.bank_name}`, as: 'bank_name' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.check_number}`, as: 'check_number' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.collection_date}`, as: 'collection_date' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.remarks}`, as: 'remarks' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.status}`, as: 'status' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.state}`, as: 'state' }
+    ])
+      .from(Accounting.collections.tablename)
+      .innerJoin(Master.customers.tablename, `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.customer_id}`, `${Master.customers.tablename}.${Master.customers.selectOptionColumns.id}`)
+      .where(`${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id}`)
+      .build();
+
+    let collection = await Query(collection_query, [collectionId], [Accounting.collections.prefix_, Master.customers.prefix_]);
+
+    const collection_items_query = sql.select([
+      { col: Accounting.collection_items.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.sales.selectOptionColumns.document_reference, as: 'invoice_ref' },
+      { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
+      { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
+      { col: Accounting.sales_items.selectOptionColumns.vat, as: 'vat' },
+      { col: Accounting.collection_items.selectOptionColumns.amount, as: 'amount' },
+      { col: Accounting.collection_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
+      { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
+    ])
+      .from(Accounting.collection_items.tablename)
+      .innerJoin(Accounting.sales.tablename, Accounting.sales.selectOptionColumns.id, Accounting.collection_items.selectOptionColumns.sales_id)
+      .innerJoin(Accounting.sales_items.tablename, Accounting.sales_items.selectOptionColumns.sales_id, Accounting.collection_items.selectOptionColumns.sales_id)
+      .innerJoin(Master.products_service.tablename, Master.products_service.selectOptionColumns.id, Accounting.sales_items.selectOptionColumns.product_service)
+      .where(Accounting.collection_items.selectOptionColumns.collection_id)
+      .build();
+
+    let collection_items = await Query(collection_items_query, [collectionId], [Accounting.collection_items.prefix_]);
+    const collection_journal_query = sql.select([
+      { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' },
+      { col: Accounting.journal_entries.selectOptionColumns.amount, as: 'amount' },
+      { col: Accounting.journal_entries.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.journal_entries.tablename)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.journal_entries.selectOptionColumns.coa_id, Master.charts_of_accounts.selectOptionColumns.id)
+      .where(Accounting.journal_entries.selectOptionColumns.db_name)
+      .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
+      .build();
+
+    let collection_journal = await Query(collection_journal_query, ['collections', collectionId], [Accounting.journal_entries.prefix_]);
+
+    const collection_attachments_query = sql.select([
+      { col: Accounting.collection_attachments.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.collection_attachments.selectOptionColumns.file, as: 'name' },
+      { col: Accounting.collection_attachments.selectOptionColumns.name, as: 'file' },
+      { col: Accounting.collection_attachments.selectOptionColumns.remarks, as: 'remarks' },
+      { col: Accounting.collection_attachments.selectOptionColumns.uploaded_by, as: 'uploaded_by' },
+      { col: Accounting.collection_attachments.selectOptionColumns.uploaded_date, as: 'uploaded_date' }
+    ])
+      .from(Accounting.collection_attachments.tablename)
+      .where(Accounting.collection_attachments.selectOptionColumns.collection_id)
+      .build();
+
+    let collection_attachments = await Query(collection_attachments_query, [collectionId], [Accounting.collection_attachments.prefix_]);
+
+    console.log(collection, collection_items, collection_journal, collection_attachments)
+    res.status(200).json({
+      success: true,
+      message: 'Collection retrieved successfully',
+      data: collection,
+      items: collection_items,
+      journal: collection_journal,
+      attachments: collection_attachments,
+      count: collection.length,
+      timestamp: new Date().toISOString()
+    })
+
+  } catch (error) {
+    console.error('Error fetching collection:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching collection',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    })
+  }
+}
 
 const createCollection = async (req, res, next) => {
   try {
@@ -466,6 +568,7 @@ const updateCollectionState = async (req, res, next) => {
 
 module.exports = {
   getCollections,
+  getAllCollections,
   getSalesCollection,
   getSalesItemsCollection,
   createCollection,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, ShieldCheck, Users, Building, Warehouse, ChevronRight, BarChart, FileText, Package, DollarSign, CreditCard, TrendingUp, HandCoins, ShoppingCart, CreditCard as PaymentCard, Settings } from 'lucide-react';
+import { LayoutDashboard, Database, ShieldCheck, Users, Building, Warehouse, ChevronRight, BarChart, FileText, Package, DollarSign, CreditCard, TrendingUp, HandCoins, ShoppingCart, CreditCard as PaymentCard, Settings, FileSpreadsheet } from 'lucide-react';
 import { getSidebarItems } from '../../utils/routeProtection';
 
 export default function Sidebar({ isCollapsed }) {
@@ -8,6 +8,7 @@ export default function Sidebar({ isCollapsed }) {
     const [isReceiptsOpen, setIsReceiptsOpen] = useState(false);
     const [isSalesOpen, setIsSalesOpen] = useState(false);
     const [isPurchaseOpen, setIsPurchaseOpen] = useState(false);
+    const [isAdjustmentsOpen, setIsAdjustmentsOpen] = useState(false);
     const location = useLocation();
     const [user, setUser] = useState(null);
     const [sidebarItems, setSidebarItems] = useState({});
@@ -23,7 +24,7 @@ export default function Sidebar({ isCollapsed }) {
             }
         } catch (error) {
             console.error('Error loading sidebar items:', error);
-            setSidebarItems({ main: [], masters: [], receipts: [], sales: [], purchase: [] });
+            setSidebarItems({ main: [], masters: [], receipts: [], sales: [], purchase: [], adjustments: [] });
         }
     }, []);
 
@@ -112,9 +113,9 @@ export default function Sidebar({ isCollapsed }) {
                                     };
                                     const Icon = iconMap[item.name] || Settings;
                                     return (
-                                        <Link 
-                                            key={item.name || index} 
-                                            to={`/${item.name}`} 
+                                        <Link
+                                            key={item.name || index}
+                                            to={`/${item.name}`}
                                             className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
                                         >
                                             <Icon size={14} /> {item.label || item.name}
@@ -151,9 +152,9 @@ export default function Sidebar({ isCollapsed }) {
                                     };
                                     const Icon = iconMap[item.name] || Settings;
                                     return (
-                                        <Link 
-                                            key={item.name || index} 
-                                            to={`/${item.name}`} 
+                                        <Link
+                                            key={item.name || index}
+                                            to={`/${item.name}`}
                                             className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
                                         >
                                             <Icon size={14} /> {item.label || item.name}
@@ -190,9 +191,9 @@ export default function Sidebar({ isCollapsed }) {
                                     };
                                     const Icon = iconMap[item.name] || Settings;
                                     return (
-                                        <Link 
-                                            key={item.name || index} 
-                                            to={`/${item.name}`} 
+                                        <Link
+                                            key={item.name || index}
+                                            to={`/${item.name}`}
                                             className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
                                         >
                                             <Icon size={14} /> {item.label || item.name}
@@ -229,9 +230,9 @@ export default function Sidebar({ isCollapsed }) {
                                     };
                                     const Icon = iconMap[item.name] || Settings;
                                     return (
-                                        <Link 
-                                            key={item.name || index} 
-                                            to={`/${item.name}`} 
+                                        <Link
+                                            key={item.name || index}
+                                            to={`/${item.name}`}
                                             className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
                                         >
                                             <Icon size={14} /> {item.label || item.name}
@@ -242,7 +243,43 @@ export default function Sidebar({ isCollapsed }) {
                         )}
                     </div>
                 )}
+                {/* Adjustments Section */}
+                {sidebarItems.adjustments?.length > 0 && (
+                    <div className="pt-4">
+                        {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Adjustments</p>}
+                        <button
+                            onClick={() => setIsAdjustmentsOpen(!isAdjustmentsOpen)}
+                            className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isAdjustmentsOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <FileSpreadsheet size={20} className={isAdjustmentsOpen ? 'text-red-600' : ''} />
+                                {!isCollapsed && <span className="text-sm">Adjustments</span>}
+                            </div>
+                            {!isCollapsed && <ChevronRight size={14} className={`transition-transform ${isAdjustmentsOpen ? 'rotate-90' : ''}`} />}
+                        </button>
 
+                        {isAdjustmentsOpen && !isCollapsed && (
+                            <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
+                                {sidebarItems.adjustments?.map((item, index) => {
+                                    if (!item || !item.name) return null;
+                                    const iconMap = {
+                                        adjustments: FileSpreadsheet
+                                    };
+                                    const Icon = iconMap[item.name] || Settings;
+                                    return (
+                                        <Link
+                                            key={item.name || index}
+                                            to={`/${item.name}`}
+                                            className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                                        >
+                                            <Icon size={14} /> {item.label || item.name}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
                 {/* Show "No Access" message if no routes available */}
                 {Object.values(sidebarItems).every(items => !items || items.length === 0) && (
                     <div className="text-center py-8">

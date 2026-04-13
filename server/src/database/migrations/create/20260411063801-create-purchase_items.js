@@ -1,70 +1,73 @@
 'use strict';
 
-/** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('sales_items', {
-      si_id: {
+    await queryInterface.createTable('purchase_items', {
+      pi_id: {
         type: Sequelize.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
+        primaryKey: true
       },
-      si_sales_id: {
+      pi_purchase_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'sales',
-          key: 's_id'
-        }
+          model: 'purchase',
+          key: 'p_id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'CASCADE'
       },
-      si_product_service: {
+      pi_product_service: {
         type: Sequelize.STRING(300),
         allowNull: true
       },
-      si_charts_of_accounts: {
+      pi_charts_of_accounts: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: 'charts_of_accounts',
           key: 'coa_id'
-        }
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
       },
-      si_description: {
+      pi_description: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: true
       },
-      si_unit: {
+      pi_unit: {
         type: Sequelize.STRING(300),
         allowNull: true
       },
-      si_quantity: {
+      pi_quantity: {
         type: Sequelize.INTEGER,
         allowNull: true
       },
-      si_sales_price: {
+      pi_purchase_price: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: false
+        allowNull: true
       },
-      si_discount: {
+      pi_discount: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: false
+        allowNull: true
       },
-      si_vat: {
+      pi_vat: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: false
+        allowNull: true
       },
-      si_witholding_tax: {
+      pi_witholding_tax: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: false
+        allowNull: true
       },
-      si_responsibility_center: {
+      pi_responsibility_center: {
         type: Sequelize.STRING(300),
-        allowNull: false
+        allowNull: true
       }
     });
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('sales_items');
+    await queryInterface.dropTable('purchase_items');
   }
 };

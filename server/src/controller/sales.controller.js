@@ -55,6 +55,101 @@ const getSales = async (req, res, next) => {
   }
 }
 
+const getAllSales = async (req, res, next) => {
+  const { id } = req.params;
+  const salesId = Number(id);
+  console.log('Converted sales_id:', salesId, 'type:', typeof salesId);
+  try {
+    const sales_query = sql.select([
+      { col: Accounting.sales.selectOptionColumns.id, as: 'id' },
+      { col: Master.customers.selectOptionColumns.name, as: 'customer' },
+      { col: Accounting.sales.selectOptionColumns.document_reference, as: 'doc_ref' },
+      { col: Accounting.sales.selectOptionColumns.terms, as: 'terms' },
+      { col: Accounting.sales.selectOptionColumns.date_delivered, as: 'date_delivered' },
+      { col: Accounting.sales.selectOptionColumns.date_due, as: 'date_due' },
+      { col: Accounting.sales.selectOptionColumns.remarks, as: 'remarks' },
+      { col: Accounting.sales.selectOptionColumns.total_amount_due, as: 'amount_due' },
+      { col: Accounting.sales.selectOptionColumns.status, as: 'status' },
+      { col: Accounting.sales.selectOptionColumns.state, as: 'state' }
+    ])
+      .from(Accounting.sales.tablename)
+      .innerJoin(Master.customers.tablename, Accounting.sales.selectOptionColumns.customer_id, Master.customers.selectOptionColumns.id)
+      .where(Accounting.sales.selectOptionColumns.id)
+      .build();
+
+    let sales = await Query(sales_query, [salesId], [Accounting.sales.prefix_, Master.customers.prefix_]);
+
+    const sales_items_query = sql.select([
+      { col: Accounting.sales_items.selectOptionColumns.id, as: 'id' },
+      { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.sales_items.selectOptionColumns.description, as: 'description' },
+      { col: Accounting.sales_items.selectOptionColumns.unit, as: 'unit' },
+      { col: Accounting.sales_items.selectOptionColumns.quantity, as: 'quantity' },
+      { col: Accounting.sales_items.selectOptionColumns.sales_price, as: 'sales_price' },
+      { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
+      { col: Accounting.sales_items.selectOptionColumns.vat, as: 'vat' },
+      { col: Accounting.sales_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
+      { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.sales_items.tablename)
+      .innerJoin(Master.products_service.tablename, Accounting.sales_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.sales_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
+      .where(Accounting.sales_items.selectOptionColumns.sales_id)
+      .build();
+
+    let sales_items = await Query(sales_items_query, [salesId], [Accounting.sales_items.prefix_]);
+    const sales_journal_query = sql.select([
+      { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' },
+      { col: Accounting.journal_entries.selectOptionColumns.amount, as: 'amount' },
+      { col: Accounting.journal_entries.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.journal_entries.tablename)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.journal_entries.selectOptionColumns.coa_id, Master.charts_of_accounts.selectOptionColumns.id)
+      .where(Accounting.journal_entries.selectOptionColumns.db_name)
+      .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
+      .build();
+
+    let sales_journal = await Query(sales_journal_query, ['sales', salesId], [Accounting.journal_entries.prefix_]);
+
+    const sales_attachments_query = sql.select([
+      { col: Accounting.sales_attachments.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.sales_attachments.selectOptionColumns.file, as: 'file' },
+      { col: Accounting.sales_attachments.selectOptionColumns.name, as: 'name' },
+      { col: Accounting.sales_attachments.selectOptionColumns.remarks, as: 'remarks' },
+      { col: Accounting.sales_attachments.selectOptionColumns.uploaded_by, as: 'uploaded_by' },
+      { col: Accounting.sales_attachments.selectOptionColumns.uploaded_date, as: 'uploaded_date' }
+    ])
+      .from(Accounting.sales_attachments.tablename)
+      .where(Accounting.sales_attachments.selectOptionColumns.sales_id)
+      .build();
+
+    let sales_attachments = await Query(sales_attachments_query, [salesId], [Accounting.sales_attachments.prefix_]);
+
+    console.log(sales, sales_items, sales_journal, sales_attachments)
+    res.status(200).json({
+      success: true,
+      message: 'Sales retrieved successfully',
+      data: sales,
+      items: sales_items,
+      journal: sales_journal,
+      attachments: sales_attachments,
+      count: sales.length,
+      timestamp: new Date().toISOString()
+    })
+
+  } catch (error) {
+    console.error('Error fetching sales:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching sales',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    })
+  }
+}
+
 const createSales = async (req, res, next) => {
   try {
     const {
@@ -97,7 +192,6 @@ const createSales = async (req, res, next) => {
         terms || null,
         date_delivered || null,
         date_due || null,
-        'SALES',
         remarks || null,
         total_amount_due || null,
         'UNPAID',
@@ -291,6 +385,7 @@ const updateSalesState = async (req, res, next) => {
 }
 module.exports = {
   getSales,
+  getAllSales,
   createSales,
   updateSalesState
 }

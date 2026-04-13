@@ -59,33 +59,28 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
   const anchorRef = useRef(null);
   const closeTimer = useRef(null);
   const filtered = options.filter(o => !value || o.label.toLowerCase().includes(value.toLowerCase()) || (o.sublabel || '').toLowerCase().includes(value.toLowerCase()));
-  const handleBlur = () => {
-    if (disabled) return;
-    closeTimer.current = setTimeout(() => setOpen(false), 180);
-  };
-  const handleFocus = () => {
-    if (disabled) return;
-    clearTimeout(closeTimer.current);
-    setOpen(true);
-  };
-  const handleSelect = (opt) => { clearTimeout(closeTimer.current); onSelect(opt); setOpen(false); };
+  const handleBlur = () => { closeTimer.current = setTimeout(() => setOpen(false), 180); };
+  const handleFocus = () => { if (!disabled) { clearTimeout(closeTimer.current); setOpen(true); } };
+  const handleSelect = (opt) => { if (!disabled) { clearTimeout(closeTimer.current); onSelect(opt); setOpen(false); } };
+  
+  if (disabled) {
+    return (
+      <div className="relative w-full">
+        <input 
+          type="text" 
+          placeholder={placeholder} 
+          value={value} 
+          readOnly
+          className={`${inputClassName} cursor-not-allowed text-black`} 
+          autoComplete="off" 
+        />
+      </div>
+    );
+  }
+  
   return (
     <div ref={anchorRef} className="relative w-full">
-      <input
-        type="text"
-        disabled={disabled}
-        placeholder={placeholder}
-        value={value}
-        onChange={e => {
-          if (disabled) return;
-          onChange(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        className={`${inputClassName} ${disabled ? 'cursor-not-allowed' : ''}`}
-        autoComplete="off"
-      />
+      <input type="text" placeholder={placeholder} value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={handleFocus} onBlur={handleBlur} className={inputClassName} autoComplete="off" />
       <PortalDropdown anchorRef={anchorRef} open={open}>
         {filtered.length > 0 ? filtered.map((opt, i) => (
           <div key={opt.value ?? i} onMouseDown={e => { e.preventDefault(); handleSelect(opt); }} className="flex items-center justify-between gap-2 px-3 py-2 text-[12px] font-bold hover:bg-red-50 cursor-pointer transition-colors border-b border-gray-100 last:border-b-0 text-black">
@@ -119,18 +114,20 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
 //  VAT-Exempt item  → vat === 0 AND wht === 0
 //    vatExemptPurchases += discountedAmount
 //
-//  totalNetOfVat    = Σ discountedAmount
+//  totalNetOfVat    = Σ (net-of-VAT base per item)
+//                   = Σ discountedAmount / (1 + vat/100)  for vatable
+//                   + Σ discountedAmount                   for non-vatable
 //
 //  totalAmountDue   = totalDiscounted + totalVAT − totalWHT
 //
 function computeSummary(items) {
-  let totalPurchasePrice = 0;
+  let totalSalesPrice = 0;
   let totalDiscount = 0;
   let totalDiscounted = 0;
   let totalVAT = 0;
-  let vatablePurchases = 0;
-  let vatExemptPurchases = 0;
-  let zeroRatedPurchases = 0;
+  let vatableSales = 0;
+  let vatExemptSales = 0;
+  let zeroRatedSales = 0;
   let totalNoVatDiscount = 0;
   let totalNetOfVat = 0;
   let totalWHT = 0;
@@ -148,9 +145,10 @@ function computeSummary(items) {
     const vatAmt = discounted * (vatPct / 100);
     const whtAmt = discounted * (whtPct / 100);
 
+    // For VAT-exclusive pricing, VATable sales is the discounted amount (before VAT is added)
     const netBase = discounted;
 
-    totalPurchasePrice += gross;
+    totalSalesPrice += gross;
     totalDiscount += discAmt;
     totalDiscounted += discounted;
     totalVAT += vatAmt;
@@ -158,23 +156,23 @@ function computeSummary(items) {
     totalNetOfVat += netBase;
 
     if (vatPct > 0) {
-      vatablePurchases += discounted;
+      vatableSales += netBase; // This is now the discounted amount for VATable items
       totalNoVatDiscount += discAmt;
     } else if (whtPct > 0) {
-      zeroRatedPurchases += discounted;
+      zeroRatedSales += discounted;
     } else {
-      vatExemptPurchases += discounted;
+      vatExemptSales += discounted;
     }
   });
 
   return {
-    totalPurchasePrice,
+    totalSalesPrice,
     totalDiscount,
     totalDiscounted,
     totalVAT,
-    vatablePurchases,
-    vatExemptPurchases,
-    zeroRatedPurchases,
+    vatableSales,
+    vatExemptSales,
+    zeroRatedSales,
     totalNoVatDiscount,
     totalNetOfVat,
     totalWHT,
@@ -187,14 +185,13 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = false, disbursementData = null }) {
-
-  const [disbursementItems, setDisbursementItems] = useState([
+export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, purchaseData = null }) {
+  const [purchaseItems, setPurchaseItems] = useState([
     { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
   ]);
 
   const [journalEntries, setJournalEntries] = useState([
-    { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: false }
+    { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 }
   ]);
 
   const [vendors, setVendors] = useState([]);
@@ -202,6 +199,12 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
   const [vendorError, setVendorError] = useState('');
   const [selectedVendor, setSelectedVendor] = useState('');
   const [vendorSearch, setVendorSearch] = useState('');
+
+  const [customers, setCustomers] = useState([]);
+  const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerError, setCustomerError] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
 
   const [chartsOfAccounts, setChartsOfAccounts] = useState([]);
   const [coaLoading, setCoaLoading] = useState(false);
@@ -216,7 +219,14 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
   const [modeSearch, setModeSearch] = useState('');
   const [bankName, setBankName] = useState('');
   const [checkNumber, setCheckNumber] = useState('');
+  const [category, setCategory] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
   const [documentReference, setDocumentReference] = useState('');
+  const [terms, setTerms] = useState('');
+  const [termsOption, setTermsOption] = useState('DAYS');
+  const [termsNumber, setTermsNumber] = useState('');
+  const [dateDelivered, setDateDelivered] = useState('');
+  const [dateDue, setDateDue] = useState('');
   const [remarks, setRemarks] = useState('');
 
   const [attachments, setAttachments] = useState([
@@ -227,9 +237,12 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' });
 
   const modeOfPaymentOptions = ['CASH', 'CHECK', 'BANK_TRANSFER', 'CARD', 'E-WALLET', 'OTHERS'];
+  const categoryOptions = ['OPERATIONAL EXPENSES', 'ADMINISTRATIVE EXPENSES', 'MARKETING EXPENSES', 'MAINTENANCE EXPENSES', 'UTILITIES EXPENSES', 'RENT EXPENSES', 'SUPPLIES EXPENSES', 'PROFESSIONAL FEES', 'INSURANCE EXPENSES', 'OTHER EXPENSES'];
+  const termsOptions = ['DAYS', 'MONTHS', 'DURATION OF TIME'];
 
   const coaOptions = chartsOfAccounts.map(a => ({ label: a.name || a.account_name, sublabel: a.code || a.account_code, value: a.id }));
   const vendorOptions = vendors.map(v => ({ label: v.name || v.code, sublabel: v.code, value: v.id }));
+  const customerOptions = customers.map(c => ({ label: c.name || c.customer_name, sublabel: c.code, value: c.id }));
   const productOptions = products.map(p => ({ label: p.name || p.product_name, sublabel: p.code || p.product_code, value: p.id }));
 
   const fetchVendors = async () => {
@@ -242,6 +255,18 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       const result = await res.json();
       if (result.success) setVendors(result.data); else setVendorError(result.message || 'Failed to fetch vendors');
     } catch (err) { setVendorError(err.message); } finally { setVendorLoading(false); }
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      setCustomerLoading(true);
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No authorization token found");
+      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, { method: "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const result = await res.json();
+      if (result.success) setCustomers(result.data); else setCustomerError(result.message || 'Failed to fetch customers');
+    } catch (err) { setCustomerError(err.message); } finally { setCustomerLoading(false); }
   };
 
   const fetchChartsOfAccounts = async () => {
@@ -278,14 +303,14 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
 
   // Populate form data when in view mode
   useEffect(() => {
-    if (isViewMode && disbursementData) {
-      console.log('Populating disbursement form with data:', disbursementData);
+    if (isViewMode && purchaseData) {
+      console.log('Populating purchase form with data:', purchaseData);
       
       // Handle the API response structure
-      const mainData = disbursementData.data ? disbursementData.data[0] : disbursementData;
-      const itemsData = disbursementData.items || [];
-      const journalData = disbursementData.journal || [];
-      const attachmentsData = disbursementData.attachments || [];
+      const mainData = purchaseData.data ? purchaseData.data[0] : purchaseData;
+      const itemsData = purchaseData.items || [];
+      const journalData = purchaseData.journal || [];
+      const attachmentsData = purchaseData.attachments || [];
       
       // Set vendor
       if (mainData && mainData.vendor) {
@@ -294,15 +319,29 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       
       // Set basic details
       setDocumentReference(mainData?.doc_ref || '');
-      setModeOfPayment(mainData?.mode || '');
-      setModeSearch(mainData?.mode || '');
-      setBankName(mainData?.bank_name || '');
-      setCheckNumber(mainData?.check_number || '');
+      
+      // Parse terms field to separate option and number
+      if (mainData?.terms) {
+        const termsParts = mainData.terms.trim().split(' ');
+        if (termsParts.length >= 2) {
+          setTermsNumber(termsParts[0]);
+          setTermsOption(termsParts.slice(1).join(' '));
+        } else {
+          setTermsNumber('');
+          setTermsOption(mainData.terms);
+        }
+      } else {
+        setTermsNumber('');
+        setTermsOption('');
+      }
+      
+      setDateDelivered(mainData?.date_delivered || '');
+      setDateDue(mainData?.date_due || '');
       setRemarks(mainData?.remarks || '');
       
-      // Populate disbursement items
+      // Populate purchase items
       if (itemsData && itemsData.length > 0) {
-        console.log('Processing disbursement items:', itemsData);
+        console.log('Processing purchase items:', itemsData);
         const items = itemsData.map(item => ({
           id: item.id,
           productId: item.product_service_id,
@@ -319,8 +358,8 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
           responsibilityCenter: item.responsibility_center,
           isOther: false
         }));
-        console.log('Final disbursement items array:', items);
-        setDisbursementItems(items);
+        console.log('Final purchase items array:', items);
+        setPurchaseItems(items);
       }
       
       // Populate journal entries
@@ -346,19 +385,14 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
           const attFile = typeof att.file === 'string' ? att.file : '';
           const attName = typeof att.name === 'string' ? att.name : '';
 
-          // Some API responses return base64 in `name` and filename in `file`.
-          const base64 = attFile.startsWith('data:image/')
-            ? attFile
-            : (attName.startsWith('data:image/') ? attName : null);
-
-          const fileName = !attFile.startsWith('data:') && attFile
-            ? attFile
-            : (!attName.startsWith('data:') && attName ? attName : '');
+          // API response: file contains base64 data, name contains the filename
+          const base64 = attFile.startsWith('data:image/') ? attFile : null;
+          const fileName = attName || attFile.split('/').pop() || '';
 
           return {
             id: att.id,
-            fileName,
-            file: base64, // Preserve base64 data from server for view mode
+            fileName: fileName,
+            file: base64 || attFile, // Preserve base64 data from server for view mode
             remarks: att.remarks || '',
             uploadedBy: att.uploaded_by || 'Current User',
             date: att.uploaded_date || new Date().toLocaleDateString()
@@ -368,13 +402,13 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
         setAttachments(attachments);
       }
     }
-  }, [isViewMode, disbursementData]);
+  }, [isViewMode, purchaseData]);
 
-  const addDisbursementItem = (isOther = false) => setDisbursementItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
-  const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
-  const removeDisbursementItem = (id) => setDisbursementItems(prev => prev.filter(i => i.id !== id));
+  const addPurchaseItem = (isOther = false) => setPurchaseItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
+  const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0 }]);
+  const removePurchaseItem = (id) => setPurchaseItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
-  const updateDisbursementItem = (id, field, value) => setDisbursementItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+  const updatePurchaseItem = (id, field, value) => setPurchaseItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   const updateJournalEntry = (id, field, value) => setJournalEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
   const addAttachment = () => setAttachments(prev => [...prev, { id: Date.now(), fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }]);
   const removeAttachment = (id) => setAttachments(prev => prev.filter(a => a.id !== id));
@@ -386,7 +420,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
     }
   };
 
-  const summary = computeSummary(disbursementItems);
+  const summary = computeSummary(purchaseItems);
 
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
@@ -397,37 +431,26 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
     });
   };
 
-  const inputBase = "w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all " +
+  const inputBase = "w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all " + 
     (isViewMode ? "bg-gray-100 border border-gray-300 text-black cursor-not-allowed" : "bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500 text-center");
-  const tableInput = "w-full rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none " +
-    (isViewMode ? "bg-gray-100 border border-gray-300 text-black cursor-not-allowed" : "bg-gray-50/50 border border-gray-200 focus:ring-1 focus:ring-red-400");
+  const tableInput = "w-full rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none " + 
+    (isViewMode ? "bg-gray-100 border border-gray-300 text-black! cursor-not-allowed" : "bg-gray-50/50 focus:ring-1 focus:ring-red-400");
   const pctInput = tableInput + " pr-4";
 
   const fadeInUp = { hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
   const generateJournalEntries = () => {
     const entries = [];
+    let totalDebitAmount = 0;
     let totalCreditAmount = 0;
+    let totalGrossAmount = 0;
+    let totalDiscountedAmount = 0;
+    let totalVatAmount = 0;
+    let totalWhtAmount = 0;
+    let totalDiscountAmount = 0;
 
-    let paymentAccount = '';
-
-    if (modeOfPayment === 'CASH') {
-      paymentAccount = chartsOfAccounts.find(a =>
-        (a.name || '').toLowerCase().includes('cash on hand')
-      );
-    } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
-      paymentAccount = chartsOfAccounts.find(a =>
-        (a.name || '').toLowerCase().includes(bankName.toLowerCase())
-      );
-
-      if (!paymentAccount) {
-        paymentAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('cash in bank')
-        );
-      }
-    }
-
-    disbursementItems.forEach((item) => {
+    // First pass: calculate totals
+    purchaseItems.forEach((item) => {
       const qty = parseFloat(item.qty) || 0;
       const price = parseFloat(item.price) || 0;
       const discountPct = parseFloat(item.discount) || 0;
@@ -439,105 +462,116 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       const discountedAmount = gross - discountAmount;
       const vatAmount = discountedAmount * (vatPct / 100);
       const whtAmount = discountedAmount * (whtPct / 100);
-      const totalAmount = discountedAmount + vatAmount - whtAmount;
 
-      totalCreditAmount += totalAmount;
+      totalGrossAmount += gross;
+      totalDiscountAmount += discountAmount;
+      totalDiscountedAmount += discountedAmount;
+      totalVatAmount += vatAmount;
+      totalWhtAmount += whtAmount;
+    });
 
-      const selectedCoa = chartsOfAccounts.find(a => a.id === item.coa);
+    // Find accounts payable account
+    const apAccount = chartsOfAccounts.find(a =>
+      (a.name || '').toLowerCase().includes('accounts payable')
+    );
 
-      if (selectedCoa && gross > 0) {
-        entries.push({
-          id: Date.now() + Math.random(),
-          account: selectedCoa.id,
-          accountSearch: selectedCoa.name,
-          center: item.responsibilityCenter || '',
-          debit: parseFloat(gross.toFixed(2)),
-          credit: 0,
-          isManual: false,
-        });
-      }
+    // 1. Expense Accounts (DEBIT) - the purchase items themselves
+    purchaseItems.forEach((item) => {
+      if (item.coa) {
+        const selectedCoa = chartsOfAccounts.find(a => a.id === item.coa);
+        const qty = parseFloat(item.qty) || 0;
+        const price = parseFloat(item.price) || 0;
+        const gross = qty * price;
 
-      if (vatAmount > 0) {
-        const inputVatAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('input vat')
-        );
-
-        if (inputVatAccount) {
+        if (selectedCoa && gross > 0) {
           entries.push({
             id: Date.now() + Math.random(),
-            account: inputVatAccount.id,
-            accountSearch: inputVatAccount.name,
+            account: selectedCoa.id,
+            accountSearch: selectedCoa.name,
             center: item.responsibilityCenter || '',
-            debit: parseFloat(vatAmount.toFixed(2)),
+            debit: parseFloat(gross.toFixed(2)),
             credit: 0,
             isManual: false,
           });
-        }
-      }
-
-      if (whtAmount > 0) {
-        const whtAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('withholding tax - expanded')
-        );
-
-        if (whtAccount) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: whtAccount.id,
-            accountSearch: whtAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: 0,
-            credit: parseFloat(whtAmount.toFixed(2)),
-            isManual: false,
-          });
-        }
-      }
-
-      if (discountAmount > 0) {
-        const discountAccount = chartsOfAccounts.find(a =>
-          (a.name || '').toLowerCase().includes('purchase discounts')
-        );
-
-        if (discountAccount) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: discountAccount.id,
-            accountSearch: discountAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: 0,
-            credit: parseFloat(discountAmount.toFixed(2)),
-            isManual: false,
-          });
+          totalDebitAmount += gross;
         }
       }
     });
 
-    const totalCashPaid = disbursementItems.reduce((sum, item) => {
-      const qty = parseFloat(item.qty) || 0;
-      const price = parseFloat(item.price) || 0;
-      const discountPct = parseFloat(item.discount) || 0;
-      const vatPct = parseFloat(item.vat) || 0;
-      const whtPct = parseFloat(item.wht) || 0;
+    // 2. Input VAT (DEBIT) - for VATable purchases
+    if (totalVatAmount > 0) {
+      const inputVatAccount = chartsOfAccounts.find(a =>
+        (a.name || '').toLowerCase().includes('input vat')
+      );
 
-      const gross = qty * price;
-      const discountAmount = gross * (discountPct / 100);
-      const discountedAmount = gross - discountAmount;
-      const vatAmount = discountedAmount * (vatPct / 100);
-      const whtAmount = discountedAmount * (whtPct / 100);
+      if (inputVatAccount) {
+        entries.push({
+          id: Date.now() + Math.random(),
+          account: inputVatAccount.id,
+          accountSearch: inputVatAccount.name,
+          center: purchaseItems[0]?.responsibilityCenter || '',
+          debit: parseFloat(totalVatAmount.toFixed(2)),
+          credit: 0,
+          isManual: false,
+        });
+        totalDebitAmount += totalVatAmount;
+      }
+    }
 
-      return sum + (discountedAmount + vatAmount - whtAmount);
-    }, 0);
+    // 3. Purchase Discounts (CREDIT)
+    if (totalDiscountAmount > 0) {
+      const discountAccount = chartsOfAccounts.find(a =>
+        (a.name || '').toLowerCase().includes('purchase discounts')
+      );
 
-    if (paymentAccount && totalCashPaid > 0) {
+      if (discountAccount) {
+        entries.push({
+          id: Date.now() + Math.random(),
+          account: discountAccount.id,
+          accountSearch: discountAccount.name,
+          center: purchaseItems[0]?.responsibilityCenter || '',
+          debit: 0,
+          credit: parseFloat(totalDiscountAmount.toFixed(2)),
+          isManual: false,
+        });
+        totalCreditAmount += totalDiscountAmount;
+      }
+    }
+
+    // 4. Creditable Withholding Tax (CREDIT)
+    if (totalWhtAmount > 0) {
+      const whtAccount = chartsOfAccounts.find(a => {
+        const name = (a.name || '').toLowerCase();
+        return name.includes('creditable withholding tax') || name.includes('creditable witholding tax');
+      });
+
+      if (whtAccount) {
+        entries.push({
+          id: Date.now() + Math.random(),
+          account: whtAccount.id,
+          accountSearch: whtAccount.name,
+          center: purchaseItems[0]?.responsibilityCenter || '',
+          debit: 0,
+          credit: parseFloat(totalWhtAmount.toFixed(2)),
+          isManual: false,
+        });
+        totalCreditAmount += totalWhtAmount;
+      }
+    }
+
+    // 5. Accounts Payable (CREDIT) - what we owe: discounted + VAT - WHT
+    if (apAccount && totalDiscountedAmount > 0) {
+      const apAmount = totalDiscountedAmount + totalVatAmount - totalWhtAmount;
       entries.push({
         id: Date.now() + Math.random(),
-        account: paymentAccount.id,
-        accountSearch: paymentAccount.name,
-        center: '',
+        account: apAccount.id,
+        accountSearch: apAccount.name,
+        center: purchaseItems[0]?.responsibilityCenter || '',
         debit: 0,
-        credit: parseFloat(totalCashPaid.toFixed(2)),
+        credit: parseFloat(apAmount.toFixed(2)),
         isManual: false,
       });
+      totalCreditAmount += apAmount;
     }
 
     setJournalEntries(entries);
@@ -553,18 +587,23 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
         return;
       }
 
-      if (!modeOfPayment) {
-        setToast({ type: 'warning', message: 'Please select mode of payment' });
+      if (!termsOption || !termsNumber) {
+        setToast({ type: 'warning', message: 'Please enter terms option and number' });
         return;
       }
 
-      if ((modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && !bankName) {
-        setToast({ type: 'warning', message: 'Please enter bank name' });
+      if (!dateDelivered) {
+        setToast({ type: 'warning', message: 'Please enter date delivered' });
         return;
       }
 
-      if (disbursementItems.length === 0 || (disbursementItems.length === 1 && disbursementItems[0].isOther)) {
-        setToast({ type: 'warning', message: 'Please add at least one disbursement item' });
+      if (!dateDue) {
+        setToast({ type: 'warning', message: 'Please enter date due' });
+        return;
+      }
+
+      if (purchaseItems.length === 0 || (purchaseItems.length === 1 && purchaseItems[0].isOther)) {
+        setToast({ type: 'warning', message: 'Please add at least one purchase item' });
         return;
       }
 
@@ -574,25 +613,25 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
         return;
       }
 
-      const preparedDisbursementItems = disbursementItems
+      const preparedPurchaseItems = purchaseItems
         .filter(item => !item.isOther)
         .map(item => ({
-          product_id: item.productId || null,
-          account_id: item.coa || item.accountId,
+          product_service: item.productId || null,
+          charts_of_accounts: item.coa || item.accountId,
           description: item.description,
           unit: item.unit || '',
-          qty: parseFloat(item.qty) || 0,
-          price: parseFloat(item.price) || 0,
+          quantity: parseFloat(item.qty) || 0,
+          purchase_price: parseFloat(item.price) || 0,
           discount: parseFloat(item.discount) || 0,
           vat: parseFloat(item.vat) || 0,
-          wtax: parseFloat(item.wht) || 0,
+          witholding_tax: parseFloat(item.wht) || 0,
           responsibility_center: item.responsibilityCenter || ''
         }));
 
       const preparedJournalEntries = journalEntries
         .filter(entry => !entry.isOther)
         .map(entry => ({
-          account_id: entry.account || entry.accountId,
+          charts_of_accounts: entry.account || entry.accountId,
           responsibility_center: entry.center || '',
           debit: parseFloat(entry.debit) || 0,
           credit: parseFloat(entry.credit) || 0
@@ -600,36 +639,35 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
 
       const preparedAttachments = await Promise.all(
         attachments.map(async att => ({
-          fileName: att.fileName,
+          name: att.fileName,
           file: att.file ? await fileToBase64(att.file) : null,
           remarks: att.remarks,
-          uploadedBy: att.uploadedBy,
-          date: att.date
+          uploaded_by: att.uploadedBy,
+          uploaded_date: att.date
         }))
       );
 
-      const disbursementData = {
+      const purchaseDataPayload = {
         vendor_id: selectedVendor,
         document_reference: documentReference,
-        payment_date: new Date().toISOString().split('T')[0],
-        mode_of_payment: modeOfPayment,
-        bank_name: bankName || '',
-        check_number: checkNumber || '',
+        terms: `${termsNumber} ${termsOption}`,
+        date_delivered: dateDelivered,
+        date_due: dateDue,
         remarks: remarks,
         total_amount_due: summary.totalAmountDue,
         created_by: createdBy,
-        disbursement_items: preparedDisbursementItems,
+        purchase_items: preparedPurchaseItems,
         journal_entries: preparedJournalEntries,
         attachments: preparedAttachments
       };
-
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/cash_disbursements`, {
+      
+      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/purchase`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(disbursementData)
+        body: JSON.stringify(purchaseDataPayload)
       });
 
       if (!response.ok) {
@@ -641,16 +679,16 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       const result = await response.json();
 
       if (result.success) {
-        const nextToast = { type: 'success', message: 'Cash disbursement created successfully!' };
+        const nextToast = { type: 'success', message: 'Purchase created successfully!' };
         setToast(nextToast);
         if (onSuccess) await onSuccess(nextToast);
         onBack();
       } else {
-        setToast({ type: 'error', message: result.message || 'Failed to create cash disbursement' });
+        setToast({ type: 'error', message: result.message || 'Failed to create purchase' });
       }
 
     } catch (error) {
-      console.error('Error posting cash disbursement:', error);
+      console.error('Error posting purchase:', error);
       setToast({ type: 'error', message: 'Error: ' + error.message });
     }
   };
@@ -660,8 +698,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
     if (!isViewMode) {
       generateJournalEntries();
     }
-  }, [disbursementItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
-
+  }, [purchaseItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
   return (
     <div className="h-full flex flex-col overflow-x-hidden bg-[#F3F4F6]">
       <style dangerouslySetInnerHTML={{
@@ -688,7 +725,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       {/* TOP NAV */}
       <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <nav className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors" onClick={onBack}>
-          <ArrowLeft size={17} /><span className="text-black">Back to Cash Disbursements</span>
+          <ArrowLeft size={17} /><span className="text-black">Back to Purchases</span>
         </nav>
         {!isViewMode && (
           <div className="flex gap-2">
@@ -713,35 +750,40 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
             </h3>
             <div className="grid grid-cols-1 gap-2.5">
               <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Vendor / Payee <span className="text-red-600">*</span></label>
-                {isViewMode ? (
-                  <div className={inputBase + " text-black py-1.5 cursor-not-allowed"}>{vendorSearch || 'No vendor selected'}</div>
-                ) : vendorLoading ? (
-                  <div className={inputBase + " text-gray-400 py-1.5"}>Loading vendors…</div>
-                ) : (
-                  <SearchableDropdown placeholder="Search vendor..." value={vendorSearch} onChange={v => { setVendorSearch(v); setSelectedVendor(''); }} onSelect={opt => { setSelectedVendor(opt.value); setVendorSearch(opt.label); }} options={vendorOptions} inputClassName={inputBase} emptyText={vendorError || 'No vendors found'} />
-                )}
+                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Vendor <span className="text-red-600">*</span></label>
+                {vendorLoading
+                  ? <div className={inputBase + " text-gray-400 py-1.5"}>Loading vendors…</div>
+                  : <SearchableDropdown disabled={isViewMode} placeholder="Search vendor..." value={vendorSearch} onChange={v => { setVendorSearch(v); setSelectedVendor(''); }} onSelect={opt => { setSelectedVendor(opt.value); setVendorSearch(opt.label); }} options={vendorOptions} inputClassName={inputBase} emptyText={vendorError || 'No vendors found'} />
+                }
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <SidebarInput label="Reference" placeholder="INV-000" value={documentReference} onChange={e => setDocumentReference(e.target.value)} disabled={isViewMode} />
-                <SidebarInput label="Date" type="date" disabled={isViewMode} />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Mode of Payment</label>
-                  {isViewMode ? (
-                    <div className={inputBase + " text-black py-1.5 cursor-not-allowed"}>{modeSearch || 'No mode selected'}</div>
-                  ) : (
-                    <SearchableDropdown placeholder="Select mode..." value={modeSearch} onChange={v => { setModeSearch(v); setModeOfPayment(''); }} onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }} options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))} inputClassName={inputBase} emptyText="No modes found" />
-                  )}
-                </div>
-              </div>
-              {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+              <SidebarInput label="Document Reference" placeholder="INV-000" value={documentReference} onChange={e => setDocumentReference(e.target.value)} disabled={isViewMode} />
+              <div>
+                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Terms <span className="text-red-600">*</span></label>
                 <div className="grid grid-cols-2 gap-2">
-                  <SidebarInput label="Bank Name" placeholder="Enter bank name" value={bankName} onChange={e => setBankName(e.target.value)} disabled={isViewMode} />
-                  <SidebarInput label="Check #" placeholder="Enter check number" value={checkNumber} onChange={e => setCheckNumber(e.target.value)} disabled={isViewMode} />
+                  <select 
+                    disabled={isViewMode}
+                    value={termsOption} 
+                    onChange={e => setTermsOption(e.target.value)} 
+                    className={inputBase}
+                  >
+                    {termsOptions.map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                  <input 
+                    disabled={isViewMode}
+                    type="number" 
+                    placeholder="Number" 
+                    value={termsNumber} 
+                    onChange={e => setTermsNumber(e.target.value)} 
+                    className={inputBase}
+                  />
                 </div>
-              )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <SidebarInput label="Date Delivered" type="date" value={dateDelivered} onChange={e => setDateDelivered(e.target.value)} disabled={isViewMode} />
+                <SidebarInput label="Date Due" type="date" value={dateDue} onChange={e => setDateDue(e.target.value)} disabled={isViewMode} />
+              </div>
             </div>
           </section>
 
@@ -765,7 +807,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                 {/* 1. Total Purchase Price = Σ(qty × price) */}
                 <SummaryRow
                   label="Total Purchase Price"
-                  value={fmt(summary.totalPurchasePrice)}
+                  value={fmt(summary.totalSalesPrice)}
                   formula="Σ (Qty × Price)"
                 />
                 <SDivider />
@@ -799,15 +841,15 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                 {/* 5. VATable Purchases = Σ net-of-VAT base for vat>0 items */}
                 <SummaryRow
                   label="VATable Purchases"
-                  value={fmt(summary.vatablePurchases)}
-                  formula="Discounted Amount where VAT > 0"
+                  value={fmt(summary.vatableSales)}
+                  formula="Discounted ÷ (1 + VAT%) where VAT > 0"
                 />
                 <SDivider />
 
                 {/* 6. VAT-Exempt = Σ discounted where vat=0 and wht=0 */}
                 <SummaryRow
                   label="VAT-Exempt Purchases"
-                  value={fmt(summary.vatExemptPurchases)}
+                  value={fmt(summary.vatExemptSales)}
                   formula="Items with 0% VAT & 0% WHT"
                 />
                 <SDivider />
@@ -815,7 +857,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                 {/* 7. Zero-Rated = Σ discounted where vat=0 but wht>0 */}
                 <SummaryRow
                   label="Zero Rated Purchases"
-                  value={fmt(summary.zeroRatedPurchases)}
+                  value={fmt(summary.zeroRatedSales)}
                   formula="Items with 0% VAT but WHT > 0"
                 />
                 <SDivider />
@@ -832,7 +874,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                 <SummaryRow
                   label="Total Net of VAT"
                   value={fmt(summary.totalNetOfVat)}
-                  formula="Discounted Amount (VAT-exclusive pricing)"
+                  formula="VATable: Disc÷(1+VAT%); Others: Discounted"
                 />
                 <SDivider />
 
@@ -873,8 +915,8 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
         <main className="flex-1 overflow-y-auto custom-table-scroller space-y-4 pr-1 min-h-0">
           <motion.div initial="hidden" animate="visible" variants={fadeInUp} className="space-y-4">
 
-            {/* 1. DISBURSEMENT ITEMS */}
-            <TableSection title="Disbursement Items" icon={<Wallet size={14} />}>
+            {/* 1. PURCHASE ITEMS */}
+            <TableSection title="Purchase Items" icon={<Wallet size={14} />}>
               <div className="w-full flex flex-col gap-[2px] mb-3">
                 <div className="h-[2px] w-full bg-red-600 rounded-full" />
                 <div className="h-[1px] w-full bg-black/10" />
@@ -899,67 +941,64 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                   <thead>
                     <tr className="border-b border-gray-100">
                       {['Product/Service', 'Charts of Accounts', 'Description', 'Unit', 'Qty', 'Price', 'Disc %', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
-                        <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center whitespace-nowrap px-1">{h}</th>
+                        <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {disbursementItems.map((item) => (
+                    {purchaseItems.map((item) => (
                       <tr key={item.id} className={item.isOther ? 'bg-gray-50/30' : ''}>
                         <td className="py-1 px-1">
-                          <SearchableDropdown 
+                          <SearchableDropdown
                             disabled={isViewMode || item.isOther}
-                            placeholder="Search product..." 
-                            value={item.productSearch} 
-                            onChange={v => updateDisbursementItem(item.id, 'productSearch', v)} 
-                            onSelect={opt => { updateDisbursementItem(item.id, 'productId', opt.value); updateDisbursementItem(item.id, 'productSearch', opt.label); }} 
-                            options={productOptions} 
+                            placeholder="Search product..."
+                            value={item.productSearch}
+                            onChange={v => updatePurchaseItem(item.id, 'productSearch', v)}
+                            onSelect={opt => { updatePurchaseItem(item.id, 'productId', opt.value); updatePurchaseItem(item.id, 'productSearch', opt.label); }}
+                            options={productOptions}
                             inputClassName={`${tableInput} ${(isViewMode || item.isOther) ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                            emptyText={productError || 'No products found'} 
+                            emptyText={productError || 'No products found'}
                           />
                         </td>
                         <td className="py-1 px-1">
-                          <SearchableDropdown disabled={isViewMode} placeholder="Search account..." value={item.coaSearch} onChange={v => updateDisbursementItem(item.id, 'coaSearch', v)} onSelect={opt => { updateDisbursementItem(item.id, 'coa', opt.value); updateDisbursementItem(item.id, 'coaSearch', opt.label); }} options={coaOptions} inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} emptyText="No accounts found" />
+                          <SearchableDropdown disabled={isViewMode} placeholder="Search account..." value={item.coaSearch} onChange={v => updatePurchaseItem(item.id, 'coaSearch', v)} onSelect={opt => { updatePurchaseItem(item.id, 'coa', opt.value); updatePurchaseItem(item.id, 'coaSearch', opt.label); }} options={coaOptions} inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} emptyText="No accounts found" />
                         </td>
                         <td className="py-1 px-1">
-                          <input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Details..." value={item.description} onChange={e => updateDisbursementItem(item.id, 'description', e.target.value)} />
+                          <input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Details..." value={item.description} onChange={e => updatePurchaseItem(item.id, 'description', e.target.value)} />
                         </td>
                         <td className="py-1 px-1">
-                          <input disabled={isViewMode || item.isOther} className={`${tableInput} ${(isViewMode || item.isOther) ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : 'pc'} value={item.isOther ? '' : item.unit} onChange={e => updateDisbursementItem(item.id, 'unit', e.target.value)} />
+                          <input disabled={isViewMode || item.isOther} className={`${tableInput} ${(isViewMode || item.isOther) ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : 'pc'} value={item.isOther ? '' : item.unit} onChange={e => updatePurchaseItem(item.id, 'unit', e.target.value)} />
                         </td>
                         <td className="py-1 px-1">
-                          <input disabled={isViewMode || item.isOther} type="number" min="0" className={`${tableInput} ${(isViewMode || item.isOther) ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : '1'} value={item.isOther ? '' : item.qty} onChange={e => updateDisbursementItem(item.id, 'qty', parseFloat(e.target.value) || 0)} />
+                          <input disabled={isViewMode || item.isOther} type="number" min="0" className={`${tableInput} ${(isViewMode || item.isOther) ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : '1'} value={item.isOther ? '' : item.qty} onChange={e => updatePurchaseItem(item.id, 'qty', parseFloat(e.target.value) || 0)} />
                         </td>
                         <td className="py-1 px-1">
-                          <input disabled={isViewMode} className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} type="number" min="0" step="0.01" placeholder="0.00" value={item.price} onChange={e => updateDisbursementItem(item.id, 'price', parseFloat(e.target.value) || 0)} />
+                          <input disabled={isViewMode} className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} type="number" min="0" step="0.01" placeholder="0.00" value={item.price} onChange={e => updatePurchaseItem(item.id, 'price', parseFloat(e.target.value) || 0)} />
                         </td>
-                        {/* DISCOUNT % */}
                         <td className="py-1 px-1">
                           <div className="relative">
-                            <input disabled={isViewMode} className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.discount || 0} onChange={e => updateDisbursementItem(item.id, 'discount', parseFloat(e.target.value) || 0)} />
+                            <input disabled={isViewMode} className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.discount || 0} onChange={e => updatePurchaseItem(item.id, 'discount', parseFloat(e.target.value) || 0)} />
                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">%</span>
                           </div>
                         </td>
-                        {/* VAT % */}
                         <td className="py-1 px-1">
                           <div className="relative">
-                            <input disabled={isViewMode} className={`${pctInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent cursor-not-allowed' : ''}`} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.vat} onChange={e => updateDisbursementItem(item.id, 'vat', parseFloat(e.target.value) || 0)} />
+                            <input disabled={isViewMode} className={`${pctInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.vat} onChange={e => updatePurchaseItem(item.id, 'vat', parseFloat(e.target.value) || 0)} />
                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-red-400 font-black pointer-events-none">%</span>
                           </div>
                         </td>
-                        {/* WHT % */}
                         <td className="py-1 px-1">
                           <div className="relative">
-                            <input disabled={isViewMode} className={`${pctInput + ' font-black text-blue-600'} ${isViewMode ? 'bg-transparent cursor-not-allowed' : ''}`} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.wht} onChange={e => updateDisbursementItem(item.id, 'wht', parseFloat(e.target.value) || 0)} />
+                            <input disabled={isViewMode} className={`${pctInput + ' font-black text-blue-600'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.wht} onChange={e => updatePurchaseItem(item.id, 'wht', parseFloat(e.target.value) || 0)} />
                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-blue-400 font-black pointer-events-none">%</span>
                           </div>
                         </td>
                         <td className="py-1 px-1">
-                          <input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Select" value={item.responsibilityCenter} onChange={e => updateDisbursementItem(item.id, 'responsibilityCenter', e.target.value)} />
+                          <input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Select" value={item.responsibilityCenter} onChange={e => updatePurchaseItem(item.id, 'responsibilityCenter', e.target.value)} />
                         </td>
                         <td className="py-1 px-1 text-center">
                           {!isViewMode && (
-                            <button onClick={() => removeDisbursementItem(item.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors">
+                            <button onClick={() => removePurchaseItem(item.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors">
                               <Trash2 size={15} />
                             </button>
                           )}
@@ -969,17 +1008,16 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                   </tbody>
                 </table>
               </div>
-
               {!isViewMode && (
-                <div className="flex gap-3 mt-3">
-                  <button onClick={() => addDisbursementItem(false)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-2">
-                    <Plus size={14} /> ADD Product/Service
-                  </button>
-                  <button onClick={() => addDisbursementItem(true)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2">
-                    <Plus size={14} /> ADD Others
-                  </button>
-                </div>
-              )}
+              <div className="flex gap-2 mt-3">
+                <button onClick={() => addPurchaseItem(false)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-2">
+                  <Plus size={14} /> ADD Product/Service
+                </button>
+                <button onClick={() => addPurchaseItem(true)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2">
+                  <Plus size={14} /> ADD Others
+                </button>
+              </div>
+            )}
             </TableSection>
 
             {/* 2. JOURNAL ENTRIES */}
@@ -1011,15 +1049,13 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                           <SearchableDropdown disabled={isViewMode} placeholder="Search account..." value={entry.accountSearch} onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)} onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }} options={coaOptions} inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} emptyText="No accounts found" />
                         </td>
                         <td className="py-1.5 px-1"><input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Center..." value={entry.center} onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} /></td>
-                        <td className="py-1.5 px-1"><input disabled={isViewMode || !entry.isManual} className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.debit} onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} readOnly={isViewMode || !entry.isManual} /></td>
-                        <td className="py-1.5 px-1"><input disabled={isViewMode || !entry.isManual} className={`${tableInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.credit} onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} readOnly={isViewMode || !entry.isManual} /></td>
+                        <td className="py-1.5 px-1"><input disabled={isViewMode} className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.debit} onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} /></td>
+                        <td className="py-1.5 px-1"><input disabled={isViewMode} className={`${tableInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.credit} onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} /></td>
                         <td className="py-1.5 text-center">
-                          {!isViewMode && entry.isManual ? (
+                          {!isViewMode && (
                             <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
                               <Trash2 size={15} className="mx-auto" />
                             </button>
-                          ) : (
-                            <span className="text-gray-300 text-[11px] italic">Auto</span>
                           )}
                         </td>
                       </tr>
@@ -1120,14 +1156,14 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                   </table>
                 </div>
                 {!isViewMode && (
-                  <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
-                    <Plus size={15} /> Add File
-                  </button>
-                )}
+                <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
+                  <Plus size={15} /> Add File
+                </button>
+              )}
               </TableSection>
 
               <TableSection title="Remarks" icon={<FileText size={14} />}>
-                <textarea disabled={isViewMode} className={`w-full min-h-[100px] mt-4 p-4 bg-gray-50 border-none rounded-xl text-[14px] font-bold focus:ring-1 focus:ring-red-500 outline-none ${isViewMode ? 'cursor-not-allowed' : ''}`} placeholder="Enter justification or internal notes here..." value={remarks} onChange={e => setRemarks(e.target.value)} />
+                <textarea disabled={isViewMode} className={`w-full min-h-[100px] mt-4 p-4 rounded-xl text-[14px] font-bold focus:ring-1 focus:ring-red-500 outline-none ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : 'bg-gray-50 border-none'}`} placeholder="Enter justification or internal notes here..." value={remarks} onChange={e => setRemarks(e.target.value)} />
               </TableSection>
             </div>
           </motion.div>
@@ -1206,13 +1242,13 @@ function SidebarInput({ label, placeholder, type = 'text', required, dark, value
       <label className={`text-[11px] font-black uppercase ${dark ? 'text-gray-500' : 'text-gray-400'} block`}>
         {label} {required && <span className="text-red-600">*</span>}
       </label>
-      <input
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
+      <input 
+        type={type} 
+        placeholder={placeholder} 
+        value={value} 
+        onChange={onChange} 
         disabled={disabled}
-        className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${dark ? 'bg-gray-900 border-gray-800 text-white focus:ring-red-600' : 'bg-gray-50 border-gray-200 text-black focus:ring-red-500'} border focus:ring-1 ${disabled ? 'cursor-not-allowed' : ''}`}
+        className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all border focus:ring-1 ${disabled ? 'bg-gray-100 border-gray-300 text-black cursor-not-allowed' : (dark ? 'bg-gray-900 border-gray-800 text-white focus:ring-red-600' : 'bg-gray-50 border-gray-200 text-black focus:ring-red-500')}`} 
       />
     </div>
   );

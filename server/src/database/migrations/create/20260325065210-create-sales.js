@@ -33,10 +33,6 @@ module.exports = {
         type: Sequelize.STRING(300),
         allowNull: false
       },
-      s_category: {
-        type: Sequelize.STRING(120),
-        allowNull: false
-      },
       s_remarks: {
         type: Sequelize.TEXT('long'),
         allowNull: false

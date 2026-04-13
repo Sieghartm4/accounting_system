@@ -181,7 +181,6 @@ const Accounting = {
       "terms",
       "date_delivered",
       "date_due",
-      "category",
       "remarks",
       "total_amount_due",
       "status",
@@ -196,7 +195,6 @@ const Accounting = {
       "s_terms",
       "s_date_delivered",
       "s_date_due",
-      "s_category",
       "s_remarks",
       "s_total_amount_due",
       "s_status",
@@ -211,7 +209,6 @@ const Accounting = {
     terms: "s_terms",
     date_delivered: "s_date_delivered",
     date_due: "s_date_due",
-    category: "s_category",
     remarks: "s_remarks",
     total_amount_due: "s_total_amount_due",
     status: "s_status",
@@ -226,7 +223,6 @@ const Accounting = {
     terms: "terms",
     date_delivered: "date_delivered",
     date_due: "date_due",
-    category: "category",
     remarks: "remarks",
     total_amount_due: "total_amount_due",
     status: "status",
@@ -247,7 +243,6 @@ const Accounting = {
     terms: "ENUM",
     date_delivered: "STRING",
     date_due: "STRING",
-    category: "STRING",
     remarks: "TEXT",
     total_amount_due: "DECIMAL",
     status: "ENUM",
@@ -334,6 +329,221 @@ const Accounting = {
     state: "ENUM",
     created_date: "STRING",
     created_by: "STRING"
+  }
+},
+	purchase: {
+  tablename: "purchase",
+  prefix: "p",
+  prefix_: "p_",
+  insertColumns: [
+      "vendor_id",
+      "document_reference",
+      "terms",
+      "date_delivered",
+      "date_due",
+      "remarks",
+      "total_amount_due",
+      "status",
+      "state",
+      "created_date",
+      "created_by"
+    ],
+  selectColumns: [
+      "p_id",
+      "p_vendor_id",
+      "p_document_reference",
+      "p_terms",
+      "p_date_delivered",
+      "p_date_due",
+      "p_remarks",
+      "p_total_amount_due",
+      "p_status",
+      "p_state",
+      "p_created_date",
+      "p_created_by"
+    ],
+  selectOptionColumns: {
+    id: "p_id",
+    vendor_id: "p_vendor_id",
+    document_reference: "p_document_reference",
+    terms: "p_terms",
+    date_delivered: "p_date_delivered",
+    date_due: "p_date_due",
+    remarks: "p_remarks",
+    total_amount_due: "p_total_amount_due",
+    status: "p_status",
+    state: "p_state",
+    created_date: "p_created_date",
+    created_by: "p_created_by"
+  },
+  updateOptionColumns: {
+    id: "id",
+    vendor_id: "vendor_id",
+    document_reference: "document_reference",
+    terms: "terms",
+    date_delivered: "date_delivered",
+    date_due: "date_due",
+    remarks: "remarks",
+    total_amount_due: "total_amount_due",
+    status: "status",
+    state: "state",
+    created_date: "created_date",
+    created_by: "created_by"
+  },
+  selectDateFormatColumns: {
+
+  },
+  selectMiscColumns: {
+
+  },
+  columnDataTypes: {
+    id: "INTEGER",
+    vendor_id: "INTEGER",
+    document_reference: "STRING",
+    terms: "ENUM",
+    date_delivered: "STRING",
+    date_due: "STRING",
+    remarks: "TEXT",
+    total_amount_due: "DECIMAL",
+    status: "ENUM",
+    state: "ENUM",
+    created_date: "STRING",
+    created_by: "STRING"
+  }
+},
+	purchase_items: {
+  tablename: "purchase_items",
+  prefix: "pi",
+  prefix_: "pi_",
+  insertColumns: [
+      "purchase_id",
+      "product_service",
+      "charts_of_accounts",
+      "description",
+      "unit",
+      "quantity",
+      "purchase_price",
+      "discount",
+      "vat",
+      "witholding_tax",
+      "responsibility_center"
+    ],
+  selectColumns: [
+      "pi_id",
+      "pi_purchase_id",
+      "pi_product_service",
+      "pi_charts_of_accounts",
+      "pi_description",
+      "pi_unit",
+      "pi_quantity",
+      "pi_purchase_price",
+      "pi_discount",
+      "pi_vat",
+      "pi_witholding_tax",
+      "pi_responsibility_center"
+    ],
+  selectOptionColumns: {
+    id: "pi_id",
+    purchase_id: "pi_purchase_id",
+    product_service: "pi_product_service",
+    charts_of_accounts: "pi_charts_of_accounts",
+    description: "pi_description",
+    unit: "pi_unit",
+    quantity: "pi_quantity",
+    purchase_price: "pi_purchase_price",
+    discount: "pi_discount",
+    vat: "pi_vat",
+    witholding_tax: "pi_witholding_tax",
+    responsibility_center: "pi_responsibility_center"
+  },
+  updateOptionColumns: {
+    id: "id",
+    purchase_id: "purchase_id",
+    product_service: "product_service",
+    charts_of_accounts: "charts_of_accounts",
+    description: "description",
+    unit: "unit",
+    quantity: "quantity",
+    purchase_price: "purchase_price",
+    discount: "discount",
+    vat: "vat",
+    witholding_tax: "witholding_tax",
+    responsibility_center: "responsibility_center"
+  },
+  selectDateFormatColumns: {
+
+  },
+  selectMiscColumns: {
+
+  },
+  columnDataTypes: {
+    id: "INTEGER",
+    purchase_id: "INTEGER",
+    product_service: "STRING",
+    charts_of_accounts: "INTEGER",
+    description: "TEXT",
+    unit: "STRING",
+    quantity: "INTEGER",
+    purchase_price: "DECIMAL",
+    discount: "DECIMAL",
+    vat: "DECIMAL",
+    witholding_tax: "DECIMAL",
+    responsibility_center: "STRING"
+  }
+},
+	purchase_attachments: {
+  tablename: "purchase_attachments",
+  prefix: "pa",
+  prefix_: "pa_",
+  insertColumns: [
+      "purchase_id",
+      "file",
+      "name",
+      "remarks",
+      "uploaded_by",
+      "uploaded_date"
+    ],
+  selectColumns: [
+      "pa_id",
+      "pa_purchase_id",
+      "pa_file",
+      "pa_name",
+      "pa_remarks",
+      "pa_uploaded_by",
+      "pa_uploaded_date"
+    ],
+  selectOptionColumns: {
+    id: "pa_id",
+    purchase_id: "pa_purchase_id",
+    file: "pa_file",
+    name: "pa_name",
+    remarks: "pa_remarks",
+    uploaded_by: "pa_uploaded_by",
+    uploaded_date: "pa_uploaded_date"
+  },
+  updateOptionColumns: {
+    id: "id",
+    purchase_id: "purchase_id",
+    file: "file",
+    name: "name",
+    remarks: "remarks",
+    uploaded_by: "uploaded_by",
+    uploaded_date: "uploaded_date"
+  },
+  selectDateFormatColumns: {
+
+  },
+  selectMiscColumns: {
+
+  },
+  columnDataTypes: {
+    id: "INTEGER",
+    purchase_id: "INTEGER",
+    file: "TEXT",
+    name: "STRING",
+    remarks: "TEXT",
+    uploaded_by: "STRING",
+    uploaded_date: "STRING"
   }
 },
 	cash_disbursement_items: {
@@ -507,7 +717,7 @@ const Accounting = {
       "description",
       "unit",
       "quantity",
-      "purchase_price",
+      "sales_price",
       "discount",
       "vat",
       "witholding_tax",
@@ -521,7 +731,7 @@ const Accounting = {
       "si_description",
       "si_unit",
       "si_quantity",
-      "si_purchase_price",
+      "si_sales_price",
       "si_discount",
       "si_vat",
       "si_witholding_tax",
@@ -535,7 +745,7 @@ const Accounting = {
     description: "si_description",
     unit: "si_unit",
     quantity: "si_quantity",
-    purchase_price: "si_purchase_price",
+    sales_price: "si_sales_price",
     discount: "si_discount",
     vat: "si_vat",
     witholding_tax: "si_witholding_tax",
@@ -549,7 +759,7 @@ const Accounting = {
     description: "description",
     unit: "unit",
     quantity: "quantity",
-    purchase_price: "purchase_price",
+    sales_price: "sales_price",
     discount: "discount",
     vat: "vat",
     witholding_tax: "witholding_tax",
@@ -569,7 +779,7 @@ const Accounting = {
     description: "TEXT",
     unit: "STRING",
     quantity: "INTEGER",
-    purchase_price: "DECIMAL",
+    sales_price: "DECIMAL",
     discount: "DECIMAL",
     vat: "DECIMAL",
     witholding_tax: "DECIMAL",
@@ -901,6 +1111,269 @@ const Accounting = {
     date: "STRING"
   }
 },
+payments: {
+  tablename: 'payments',
+  prefix: 'c',
+  prefix_: 'c_',
+  insertColumns: [
+    "vendor_id",
+    "document_reference",
+    "mode_of_payment",
+    "bank_name",
+    "check_number",
+    "payment_date",
+    "remarks",
+    "status",
+    "state",
+    "created_date",
+    "created_by"
+  ],
+  selectColumns: [
+    "c_id",
+    "c_vendor_id",
+    "c_document_reference",
+    "c_mode_of_payment",
+    "c_bank_name",
+    "c_check_number",
+    "c_payment_date",
+    "c_remarks",
+    "c_status",
+    "c_state",
+    "c_created_date",
+    "c_created_by"
+  ],
+  selectOptionColumns: {
+    id: "c_id",
+    vendor_id: "c_vendor_id",
+    document_reference: "c_document_reference",
+    mode_of_payment: "c_mode_of_payment",
+    bank_name: "c_bank_name",
+    check_number: "c_check_number",
+    payment_date: "c_payment_date",
+    remarks: "c_remarks",
+    status: "c_status",
+    state: "c_state",
+    created_date: "c_created_date",
+    created_by: "c_created_by"
+  },
+  updateOptionColumns: {
+    id: "id",
+    vendor_id: "vendor_id",
+    document_reference: "document_reference",
+    mode_of_payment: "mode_of_payment",
+    bank_name: "bank_name",
+    check_number: "check_number",
+    payment_date: "payment_date",
+    remarks: "remarks",
+    status: "status",
+    state: "state",
+    created_date: "created_date",
+    created_by: "created_by"
+  },
+  selectDateFormatColumns: {
+
+  },
+  selectMiscColumns: {
+
+  },
+  columnDataTypes: {
+    id: "INTEGER",
+    vendor_id: "INTEGER",
+    document_reference: "STRING",
+    mode_of_payment: "ENUM",
+    bank_name: "STRING",
+    check_number: "TEXT",
+    payment_date: "STRING",
+    remarks: "TEXT",
+    status: "ENUM",
+    state: "ENUM",
+    created_date: "STRING",
+    created_by: "STRING"
+  }
+},
+payment_items: {
+  tablename: 'payment_items',
+  prefix: 'ci',
+  prefix_: 'ci_',
+  insertColumns: [
+    "payment_id",
+    "purchase_id",
+    "amount",
+    "witholding_tax"
+  ],
+  selectColumns: [
+    "ci_id",
+    "ci_payment_id",
+    "ci_purchase_id",
+    "ci_amount",
+    "ci_witholding_tax"
+  ],
+  selectOptionColumns: {
+    id: "ci_id",
+    payment_id: "ci_payment_id",
+    purchase_id: "ci_purchase_id",
+    amount: "ci_amount",
+    witholding_tax: "ci_witholding_tax"
+  },
+  updateOptionColumns: {
+    id: "id",
+    payment_id: "payment_id",
+    purchase_id: "purchase_id",
+    amount: "amount",
+    witholding_tax: "witholding_tax"
+  },
+  selectDateFormatColumns: {
+
+  },
+  selectMiscColumns: {
+
+  },
+  columnDataTypes: {
+    id: "INTEGER",
+    payment_id: "INTEGER",
+    purchase_id: "INTEGER",
+    amount: "DECIMAL",
+    witholding_tax: "DECIMAL"
+  }
+},
+payment_attachments: {
+  tablename: 'payment_attachments',
+  prefix: 'ca',
+  prefix_: 'ca_',
+  insertColumns: [
+    "payment_id",
+    "file",
+    "name",
+    "remarks",
+    "uploaded_by",
+    "uploaded_date"
+  ],
+  selectColumns: [
+    "ca_id",
+    "ca_payment_id",
+    "ca_file",
+    "ca_name",
+    "ca_remarks",
+    "ca_uploaded_by",
+    "ca_uploaded_date"
+  ],
+  selectOptionColumns: {
+    id: "ca_id",
+    payment_id: "ca_payment_id",
+    file: "ca_file",
+    name: "ca_name",
+    remarks: "ca_remarks",
+    uploaded_by: "ca_uploaded_by",
+    uploaded_date: "ca_uploaded_date"
+  },
+  updateOptionColumns: {
+    id: "id",
+    payment_id: "payment_id",
+    file: "file",
+    name: "name",
+    remarks: "remarks",
+    uploaded_by: "uploaded_by",
+    uploaded_date: "uploaded_date"
+  },
+  selectMiscColumns: {
+
+  },
+  columnDataTypes: {
+    id: "INTEGER",
+    payment_id: "INTEGER",
+    file: "TEXT",
+    name: "STRING",
+    remarks: "TEXT",
+    uploaded_by: "STRING",
+    uploaded_date: "STRING"
+  }
+},
+  adjustments: {
+    tablename: 'adjustments',
+    prefix: 'a',
+    prefix_: 'a_',
+    insertColumns: [
+      "a_document_reference",
+      "a_posting_date",
+      "a_remarks",
+      "a_status",
+      "a_total_amount",
+      "a_created_date",
+      "a_created_by"
+    ],
+    updateColumns: [
+      "a_document_reference",
+      "a_posting_date",
+      "a_remarks",
+      "a_status",
+      "a_total_amount"
+    ],
+    selectOptionColumns: {
+      id: "a_id",
+      document_reference: "a_document_reference",
+      posting_date: "a_posting_date",
+      remarks: "a_remarks",
+      status: "a_status",
+      total_amount: "a_total_amount",
+      created_date: "a_created_date",
+      created_by: "a_created_by"
+    },
+    selectMiscColumns: {
+
+    },
+    columnDataTypes: {
+      id: "INTEGER",
+      document_reference: "STRING",
+      posting_date: "STRING",
+      remarks: "TEXT",
+      status: "ENUM",
+      total_amount: "DECIMAL",
+      created_date: "STRING",
+      created_by: "STRING"
+    }
+  },
+  adjustment_attachments: {
+    tablename: 'adjustment_attachments',
+    prefix: 'aa',
+    prefix_: 'aa_',
+    insertColumns: [
+      "aa_adjustment_id",
+      "aa_file",
+      "aa_name",
+      "aa_remarks",
+      "aa_uploaded_by",
+      "aa_uploaded_date"
+    ],
+    updateColumns: [
+      "aa_adjustment_id",
+      "aa_file",
+      "aa_name",
+      "aa_remarks",
+      "aa_uploaded_by",
+      "aa_uploaded_date"
+    ],
+    selectOptionColumns: {
+      id: "aa_id",
+      adjustment_id: "aa_adjustment_id",
+      file: "aa_file",
+      name: "aa_name",
+      remarks: "aa_remarks",
+      uploaded_by: "aa_uploaded_by",
+      uploaded_date: "aa_uploaded_date"
+    },
+    selectMiscColumns: {
+
+    },
+    columnDataTypes: {
+      id: "INTEGER",
+      adjustment_id: "INTEGER",
+      file: "TEXT",
+      name: "STRING",
+      remarks: "TEXT",
+      uploaded_by: "STRING",
+      uploaded_date: "STRING"
+    }
+  }
 };
 
 exports.Accounting = Accounting;

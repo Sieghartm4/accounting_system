@@ -9,12 +9,15 @@ const { cashDisbursementRouter } = require('../routes/cash_disbursement.routes')
 const { receiptRouter } = require('../routes/receipt.routes')
 const { salesRouter } = require('../routes/sales.routes')
 const { collectionRouter } = require('../routes/collection.routes')
+const { purchaseRouter } = require('../routes/purchase.routes')
+const { paymentRouter } = require('../routes/payments.routes')
 const { journalEntriesRouter } = require('../routes/journal_entries.routes')
 const { chartsOfAccountsRouter } = require('../routes/charts_of_accounts.routes')
 const { customerRouter } = require('../routes/customer.routes')
 const { vendorRouter } = require('../routes/vendor.routes')
 const { productServiceRouter } = require('../routes/product_service.routes')
 const { proformaEntriesRouter } = require('../routes/proforma_entries.routes')
+const { adjustmentsRouter } = require('../routes/adjustments.routes')
 
 const initRoutes = (app) => {
   app.use('/credentials', credentialsRouter)
@@ -28,12 +31,15 @@ const initRoutes = (app) => {
   app.use('/receipt', receiptRouter)
   app.use('/sales', salesRouter)
   app.use('/collections', collectionRouter)
+  app.use('/purchase', purchaseRouter)
+  app.use('/payments', paymentRouter)
   app.use('/journal_entries', journalEntriesRouter)
   app.use('/charts_of_accounts', chartsOfAccountsRouter)
   app.use('/customer', customerRouter)
   app.use('/vendors', vendorRouter)
   app.use('/product_service', productServiceRouter)
   app.use('/proforma_entries', proformaEntriesRouter)
+  app.use('/adjustments', adjustmentsRouter)
 
 }
 

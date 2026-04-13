@@ -18,6 +18,7 @@ import Collections from './pages/collections/Collections'
 import Purchase from './pages/purchase/Purchase'
 import Payments from './pages/payments/Payments'
 import Customer from './pages/customers/Customer'
+import Adjustments from './pages/adjustments/Adjustments'
 
 function App() {
   return (
@@ -98,6 +99,11 @@ function App() {
           <Route path="users" element={
             <ProtectedRoute routeName="users">
               <Users />
+            </ProtectedRoute>
+          } />
+          <Route path="adjustments" element={
+            <ProtectedRoute routeName="adjustments">
+              <Adjustments />
             </ProtectedRoute>
           } />
         </Route>
