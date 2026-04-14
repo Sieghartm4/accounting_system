@@ -49,7 +49,7 @@ function VendorsContent() {
         formData.type,
         formData.status
       );
-      
+
       if (result.success) {
         setToast({
           type: 'success',
@@ -92,7 +92,7 @@ function VendorsContent() {
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-      
+
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
         {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -101,7 +101,7 @@ function VendorsContent() {
           <span className="text-black">Vendor Masterlist</span>
         </nav> */}
 
-        <motion.div 
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -137,29 +137,29 @@ function VendorsContent() {
 
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard 
-            icon={<Truck className="text-red-600" size={20} />} 
-            label="Total Suppliers" 
-            value={vendors?.length || 0} 
+          <SummaryCard
+            icon={<Truck className="text-red-600" size={20} />}
+            label="Total Suppliers"
+            value={vendors?.length || 0}
             subText="Active Partners"
           />
-          <SummaryCard 
-            icon={<ShieldCheck className="text-black" size={20} />} 
-            label="KYC Verified" 
-            value={vendors?.length > 0 ? Math.floor(vendors.length * 0.85) : 0} 
+          <SummaryCard
+            icon={<ShieldCheck className="text-black" size={20} />}
+            label="KYC Verified"
+            value={vendors?.length > 0 ? Math.floor(vendors.length * 0.85) : 0}
             subText="Compliance"
           />
-          <SummaryCard 
-            icon={<Search className="text-gray-400" size={20} />} 
-            label="Review Req." 
-            value="2" 
+          <SummaryCard
+            icon={<Search className="text-gray-400" size={20} />}
+            label="Review Req."
+            value="2"
             subText="In Progress"
           />
         </div>
       </div>
 
       {/* --- TABLE SECTION --- */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -169,13 +169,23 @@ function VendorsContent() {
           data={vendors}
           title="Vendor table"
           enableAddButton={false}
+          badgeColumns={[
+            {
+              column: 'status',
+              values: {
+                'ACTIVE': 'green',
+                'INACTIVE': 'red',
+                'PENDING': 'yellow'
+              }
+            }
+          ]}
         />
       </motion.div>
-      
+
       {/* Add Vendor Modal */}
-      <RightSideModal 
-        isOpen={isModalOpen} 
-        onClose={handleCloseModal} 
+      <RightSideModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
         title="Create New Vendor"
       >
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -187,13 +197,13 @@ function VendorsContent() {
               <input
                 type="text"
                 value={formData.code}
-                onChange={(e) => setFormData({...formData, code: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter vendor code..."
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Vendor Name <span className="text-red-600">*</span>
@@ -201,13 +211,13 @@ function VendorsContent() {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter vendor name..."
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Category <span className="text-red-600">*</span>
@@ -215,20 +225,20 @@ function VendorsContent() {
               <input
                 type="text"
                 value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter category..."
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Type <span className="text-red-600">*</span>
               </label>
               <select
                 value={formData.type}
-                onChange={(e) => setFormData({...formData, type: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
@@ -239,14 +249,14 @@ function VendorsContent() {
                 <option value="non-profit">Non-Profit</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Status <span className="text-red-600">*</span>
               </label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({...formData, status: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
@@ -255,7 +265,7 @@ function VendorsContent() {
               </select>
             </div>
           </div>
-          
+
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -274,7 +284,7 @@ function VendorsContent() {
           </div>
         </form>
       </RightSideModal>
-      
+
       {/* Toast Notification */}
       {toast && (
         <DynamicToast

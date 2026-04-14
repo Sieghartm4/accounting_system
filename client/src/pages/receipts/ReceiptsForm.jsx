@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Save, Plus, Trash2, Wallet,
-  FileText, Paperclip, Calculator, Layers, Landmark
+  FileText, Paperclip, Calculator, Layers, Landmark, ChevronDown, Minus
 } from 'lucide-react';
 import ReactDOM from 'react-dom';
 import DynamicToast from '../../components/DynamicToast';
@@ -62,22 +62,22 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
   const handleBlur = () => { closeTimer.current = setTimeout(() => setOpen(false), 180); };
   const handleFocus = () => { if (!disabled) { clearTimeout(closeTimer.current); setOpen(true); } };
   const handleSelect = (opt) => { if (!disabled) { clearTimeout(closeTimer.current); onSelect(opt); setOpen(false); } };
-  
+
   if (disabled) {
     return (
       <div className="relative w-full">
-        <input 
-          type="text" 
-          placeholder={placeholder} 
-          value={value} 
+        <input
+          type="text"
+          placeholder={placeholder}
+          value={value}
           readOnly
-          className={`${inputClassName} cursor-not-allowed text-black`} 
-          autoComplete="off" 
+          className={`${inputClassName} cursor-not-allowed text-black`}
+          autoComplete="off"
         />
       </div>
     );
   }
-  
+
   return (
     <div ref={anchorRef} className="relative w-full">
       <input type="text" placeholder={placeholder} value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={handleFocus} onBlur={handleBlur} className={inputClassName} autoComplete="off" />
@@ -188,7 +188,7 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, receiptData = null }) {
   const [receiptItems, setReceiptItems] = useState([
-    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
+    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
   ]);
 
   const [journalEntries, setJournalEntries] = useState([
@@ -297,7 +297,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
   useEffect(() => {
     if (isViewMode && receiptData) {
       console.log('Populating form with receipt data:', receiptData);
-      
+
       // Populate basic receipt info
       if (receiptData.data && receiptData.data.length > 0) {
         const receipt = receiptData.data[0];
@@ -320,7 +320,6 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
           coa: item.charts_of_accounts_name,
           coaSearch: item.charts_of_accounts_name,
           description: item.description || '',
-          unit: item.unit || '',
           qty: item.quantity || 1,
           price: parseFloat(item.sales_price) || 0,
           discount: parseFloat(item.discount) || 0,
@@ -366,7 +365,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
     }
   }, [isViewMode, receiptData]);
 
-  const addReceiptItem = (isOther = false) => setReceiptItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
+  const addReceiptItem = (isOther = false) => setReceiptItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removeReceiptItem = (id) => setReceiptItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
@@ -393,9 +392,9 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
     });
   };
 
-  const inputBase = "w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all " + 
+  const inputBase = "w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all " +
     (isViewMode ? "bg-gray-100 border border-gray-300 text-black cursor-not-allowed" : "bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500 text-center");
-  const tableInput = "w-full rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none " + 
+  const tableInput = "w-full rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none " +
     (isViewMode ? "bg-gray-100 border border-gray-300 text-black! cursor-not-allowed" : "bg-gray-50/50 focus:ring-1 focus:ring-red-400");
   const pctInput = tableInput + " pr-4";
 
@@ -585,7 +584,6 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
           product_id: item.productId || null,
           account_id: item.coa || item.accountId,
           description: item.description,
-          unit: item.unit || '',
           qty: parseFloat(item.qty) || 0,
           price: parseFloat(item.price) || 0,
           discount: parseFloat(item.discount) || 0,
@@ -627,7 +625,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
         journal_entries: preparedJournalEntries,
         attachments: preparedAttachments
       };
-      
+
       const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/receipt`, {
         method: 'POST',
         headers: {
@@ -690,7 +688,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
       )}
 
       {/* TOP NAV */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+      <div className="flex items-center justify-between flex-shrink-0">
         <nav className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors" onClick={onBack}>
           <ArrowLeft size={17} /><span className="text-black">{isViewMode ? 'Back to Receipts' : 'Back to Receipts'}</span>
         </nav>
@@ -705,535 +703,372 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
       </div>
 
       {/* BODY */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      <div className="flex-1 flex flex-col gap-2 min-h-0">
 
-        {/* LEFT SIDEBAR */}
-        <aside className="w-72 flex-shrink-0 flex flex-col gap-3 h-full overflow-y-auto sidebar-scroll pb-2">
-
-          {/* Basic Details */}
-          <section className="bg-black rounded-2xl p-4 text-white shadow-xl flex-shrink-0">
-            <h3 className="text-[12px] font-black uppercase tracking-[3px] text-red-500 mb-3 flex items-center gap-2">
-              <Landmark size={12} /> Basic Details
-            </h3>
-            <div className="grid grid-cols-1 gap-2.5">
-              <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Customer <span className="text-red-600">*</span></label>
+        {/* BASIC DETAILS - FULL WIDTH TOP */}
+        <fieldset className="bg-black rounded-2xl p-3 text-white shadow-xl">
+          <legend className="bg-red-600 text-[13px] font-black uppercase tracking-[3px] text-white flex items-center justify-center gap-2 px-4 py-1 rounded-lg mx-auto w-fit">
+            <Landmark size={18} /> Basic Details
+          </legend>
+          <div className={`grid gap-3 ${(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') ? 'grid-cols-6' : 'grid-cols-4'}`}>
+            <div className="col-span-1">
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Customer <span className="text-red-600">*</span></legend>
                 {isViewMode ? (
                   <div className={inputBase + " text-black py-1.5"}>{customerSearch || 'No customer selected'}</div>
                 ) : customerLoading ? (
                   <div className={inputBase + " text-black py-1.5"}>Loading customers...</div>
                 ) : (
-                  <SearchableDropdown placeholder="Search customer..." value={customerSearch} onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); }} onSelect={opt => { setSelectedCustomer(opt.value); setCustomerSearch(opt.label); }} options={customerOptions} inputClassName={inputBase} emptyText={customerError || 'No customers found'} />
+                  <SearchableDropdown placeholder="Customer *" value={customerSearch} onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); }} onSelect={opt => { setSelectedCustomer(opt.value); setCustomerSearch(opt.label); }} options={customerOptions} inputClassName={inputBase} emptyText={customerError || 'No customers found'} />
                 )}
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <SidebarInput label="Reference" placeholder="INV-000" value={documentReference} onChange={e => setDocumentReference(e.target.value)} disabled={isViewMode} />
-                <SidebarInput label="Date" type="date" disabled={isViewMode} />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Mode of Payment</label>
-                  {isViewMode ? (
-                    <div className={inputBase + " text-black py-1.5"}>{modeSearch || 'No mode selected'}</div>
-                  ) : (
-                    <SearchableDropdown placeholder="Select mode..." value={modeSearch} onChange={v => { setModeSearch(v); setModeOfPayment(''); }} onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }} options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))} inputClassName={inputBase} emptyText="No modes found" />
-                  )}
+              </fieldset>
+            </div>
+            <div className="col-span-1">
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Reference Number</legend>
+                <input
+                  type="text"
+                  placeholder="Reference"
+                  value={documentReference}
+                  onChange={e => setDocumentReference(e.target.value)}
+                  disabled={isViewMode}
+                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                    ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                    : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                    }`}
+                />
+              </fieldset>
+            </div>
+            <fieldset>
+              <legend className="text-[11px] font-black uppercase text-gray-100">Mode of Payment</legend>
+              {isViewMode ? (
+                <div className={inputBase + " text-black py-1.5"}>{modeSearch || 'No mode selected'}</div>
+              ) : (
+                <SearchableDropdown placeholder="Mode *" value={modeSearch} onChange={v => { setModeSearch(v); setModeOfPayment(''); }} onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }} options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))} inputClassName={inputBase} emptyText="No modes found" />
+              )}
+            </fieldset>
+            <fieldset>
+              <legend className="text-[11px] font-black uppercase text-gray-100">Collection Date</legend>
+              <input
+                type="date"
+                disabled={isViewMode}
+                className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                  ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                  : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                  }`}
+              />
+            </fieldset>
+            {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Bank Name</legend>
+                <input
+                  type="text"
+                  placeholder="Bank Name"
+                  value={bankName}
+                  onChange={e => setBankName(e.target.value)}
+                  disabled={isViewMode}
+                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                    ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                    : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                    }`}
+                />
+              </fieldset>
+            )}
+            {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Check #</legend>
+                <input
+                  type="text"
+                  placeholder="Check #"
+                  value={checkNumber}
+                  onChange={e => setCheckNumber(e.target.value)}
+                  disabled={isViewMode}
+                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                    ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                    : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                    }`}
+                />
+              </fieldset>
+            )}
+          </div>
+        </fieldset>
+
+        {/* MAIN CONTENT AREA */}
+        <div className="flex-1 flex gap-2 min-h-0">
+
+          {/* LEFT SIDEBAR - SUMMARY ONLY */}
+          <aside className="w-full flex-shrink-0 flex flex-col gap-2 h-full overflow-y-auto sidebar-scroll max-w-[20%]">
+
+            {/* ── SUMMARY ── */}
+            <section className=" bg-white rounded-2xl border-2 border-red-100 shadow-xl shadow-red-500/5 flex-1 flex flex-col min-h-0 overflow-hidden">
+
+              {/* Header: Solid Red with White Text */}
+              <header className="bg-red-600 p-4 flex-shrink-0">
+                <h3 className="text-[clamp(14px,1.4vw,16px)] font-black uppercase tracking-[3px] text-white flex items-center gap-2">
+                  <Calculator size={16} className="shrink-0 text-white" />
+                  Summary
+                </h3>
+              </header>
+
+              {/* Scrollable rows */}
+              <div className="custom-table-scroller overflow-y-auto min-h-0 flex-1 custom-scrollbar p-4 py-2">
+                <div className="space-y-0">
+                  <SummaryRow
+                    label="Total Sales Price"
+                    value={fmt(summary.totalSalesPrice)}
+                  // formula="Σ (Qty × Price)" 
+                  />
+                  <SDivider />
+
+                  <SummaryRow
+                    label="Total Discount"
+                    value={fmt(summary.totalDiscount)}
+                    color="text-red-500" // Standardized to red theme
+                  // formula="Σ (Gross × Disc%)"
+                  />
+                  <SDivider />
+
+                  <SummaryRow
+                    label="Total Discounted Amount"
+                    value={fmt(summary.totalDiscounted)}
+                  // formula="Σ (Gross − Discount Amt)"
+                  />
+                  <SDivider />
+
+                  <SummaryRow
+                    label="Total VAT"
+                    value={fmt(summary.totalVAT)}
+                    color="text-red-600"
+                  // formula="Σ (Discounted × VAT%)"
+                  />
+                  <SDivider />
+
+                  <SummaryRow
+                    label="VATable Sales"
+                    value={fmt(summary.vatableSales)}
+                  // formula="Discounted Amount where VAT > 0"
+                  />
+                  <SDivider />
+
+                  <SummaryRow
+                    label="VAT-Exempt Sales"
+                    value={fmt(summary.vatExemptSales)}
+                  // formula="Items with 0% VAT & 0% WHT"
+                  />
+                  <SDivider />
+
+                  <SummaryRow
+                    label="Zero Rated Sales"
+                    value={fmt(summary.zeroRatedSales)}
+                  // formula="Items with 0% VAT but WHT > 0"
+                  />
+                  <SDivider />
+
+                  <SummaryRow
+                    label="Total No. VAT Discount"
+                    value={fmt(summary.totalNoVatDiscount)}
+                  // formula="Discount on VATable items (pre-VAT)"
+                  />
+                  <SDivider />
+
+                  <SummaryRow
+                    label="Total Net of VAT"
+                    value={fmt(summary.totalNetOfVat)}
+                  // formula="Discounted Amount (VAT-exclusive pricing)"
+                  />
+                  <SDivider />
+
+                  <SummaryRow
+                    label="Total Withholding Tax"
+                    value={fmt(summary.totalWHT)}
+                    color="text-red-700" // Darker red for contrast
+                  // formula="Σ (Discounted × WHT%)"
+                  />
                 </div>
               </div>
-              {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
-                <div className="grid grid-cols-2 gap-2">
-                  <SidebarInput label="Bank Name" placeholder="Enter bank name" value={bankName} onChange={e => setBankName(e.target.value)} disabled={isViewMode} />
-                  <SidebarInput label="Check #" placeholder="Enter check number" value={checkNumber} onChange={e => setCheckNumber(e.target.value)} disabled={isViewMode} />
+
+              {/* Total Amount Due footer */}
+              <div className="p-4 pt-0 flex-shrink-0">
+                <div className="flex flex-col gap-[2px] mb-3">
+                  <div className="h-[3px] w-full bg-red-600 rounded-full" />
+                  <div className="h-[1px] w-full bg-gray-200" />
                 </div>
-              )}
-            </div>
-          </section>
 
-          {/* ── SUMMARY ── */}
-          <section className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex-1 flex flex-col min-h-0">
-            <h3 className="text-[12px] font-black uppercase tracking-[3px] text-gray-900 mb-2 flex items-center gap-2 flex-shrink-0">
-              <Calculator size={12} /> Summary
-            </h3>
+                {/* Formula hint: Commented out as requested */}
+                {/* <div className="mb-2 px-2 py-1.5 bg-red-50 rounded-lg border border-red-100 text-center">
+                  <p className="text-[clamp(10px,1vw,11px)] font-black uppercase tracking-wide text-red-400">
+                    Discounted Amount + VAT − WHT
+                  </p>
+                </div> */}
 
-            {/* Hint badge
-            <div className="mb-2 flex-shrink-0 px-2 py-1 bg-amber-50 rounded-lg border border-amber-100">
-              <p className="text-[9px] font-black uppercase tracking-wide text-amber-600 leading-snug">
-                Disc / VAT / WHT are entered as&nbsp;<span className="text-red-500">%</span>&nbsp;values (e.g. 12 = 12%)
-              </p>
-            </div> */}
+                <div className="text-center bg-red-50 rounded-xl py-3 border border-gray-100">
+                  <p className="text-[clamp(11px,1.1vw,12px)] font-black text-gray-600 uppercase tracking-[4px] mb-1">
+                    Total Cash Receipt
+                  </p>
 
-            {/* Scrollable rows */}
-            <div className="overflow-y-auto min-h-0 flex-1">
-              <div className="space-y-0">
-
-                {/* 1. Total Sales Price = Σ(qty × price) */}
-                <SummaryRow
-                  label="Total Sales Price"
-                  value={fmt(summary.totalSalesPrice)}
-                  formula="Σ (Qty × Price)"
-                />
-                <SDivider />
-
-                {/* 2. Total Discount = Σ(gross × disc%) */}
-                <SummaryRow
-                  label="Total Discount"
-                  value={fmt(summary.totalDiscount)}
-                  color="text-orange-500"
-                  formula="Σ (Gross × Disc%)"
-                />
-                <SDivider />
-
-                {/* 3. Total Discounted Amount = Σ(gross − discAmt) */}
-                <SummaryRow
-                  label="Total Discounted Amount"
-                  value={fmt(summary.totalDiscounted)}
-                  formula="Σ (Gross − Discount Amt)"
-                />
-                <SDivider />
-
-                {/* 4. Total VAT = Σ(discounted × vat%) */}
-                <SummaryRow
-                  label="Total VAT"
-                  value={fmt(summary.totalVAT)}
-                  color="text-red-600"
-                  formula="Σ (Discounted × VAT%)"
-                />
-                <SDivider />
-
-                {/* 5. VATable Sales = Σ net-of-VAT base for vat>0 items */}
-                <SummaryRow
-                  label="VATable Sales"
-                  value={fmt(summary.vatableSales)}
-                  formula="Discounted Amount where VAT > 0"
-                />
-                <SDivider />
-
-                {/* 6. VAT-Exempt = Σ discounted where vat=0 and wht=0 */}
-                <SummaryRow
-                  label="VAT-Exempt Sales"
-                  value={fmt(summary.vatExemptSales)}
-                  formula="Items with 0% VAT & 0% WHT"
-                />
-                <SDivider />
-
-                {/* 7. Zero-Rated = Σ discounted where vat=0 but wht>0 */}
-                <SummaryRow
-                  label="Zero Rated Sales"
-                  value={fmt(summary.zeroRatedSales)}
-                  formula="Items with 0% VAT but WHT > 0"
-                />
-                <SDivider />
-
-                {/* 8. Total No. VAT Discount = discount on vatable items only */}
-                <SummaryRow
-                  label="Total No. VAT Discount"
-                  value={fmt(summary.totalNoVatDiscount)}
-                  formula="Discount on VATable items (pre-VAT)"
-                />
-                <SDivider />
-
-                {/* 9. Total Net of VAT = Σ (discounted / (1+vat%) or discounted) */}
-                <SummaryRow
-                  label="Total Net of VAT"
-                  value={fmt(summary.totalNetOfVat)}
-                  formula="Discounted Amount (VAT-exclusive pricing)"
-                />
-                <SDivider />
-
-                {/* 10. Total WHT = Σ(discounted × wht%) */}
-                <SummaryRow
-                  label="Total Withholding Tax"
-                  value={fmt(summary.totalWHT)}
-                  color="text-blue-600"
-                  formula="Σ (Discounted × WHT%)"
-                />
-              </div>
-            </div>
-
-            {/* Total Amount Due footer */}
-            <div className="mt-3 flex-shrink-0">
-              <div className="flex flex-col gap-[2px] mb-2">
-                <div className="h-[2px] w-full bg-red-600 rounded-full" />
-                <div className="h-[1px] w-full bg-black/10" />
-              </div>
-              {/* Formula hint */}
-              <div className="mb-2 px-2 py-1 bg-red-50 rounded-lg border border-red-100 text-center">
-                <p className="text-[9px] font-black uppercase tracking-wide text-red-400">
-                  Discounted Amount + VAT − WHT
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[3px] mb-1">Total Amount Due</p>
-                <p className="text-2xl font-black text-black tracking-tighter leading-none flex items-baseline justify-center gap-1">
-                  <span className="text-[13px] text-red-600">PHP</span>
-                  {fmt(summary.totalAmountDue)}
-                </p>
-              </div>
-            </div>
-          </section>
-        </aside>
-
-        {/* MAIN CONTENT */}
-        <main className="flex-1 overflow-y-auto custom-table-scroller space-y-4 pr-1 min-h-0">
-          <motion.div initial="hidden" animate="visible" variants={fadeInUp} className="space-y-4">
-
-            {/* 1. DISBURSEMENT ITEMS */}
-            <TableSection title="Receipt Items" icon={<Wallet size={14} />}>
-              <div className="w-full flex flex-col gap-[2px] mb-3">
-                <div className="h-[2px] w-full bg-red-600 rounded-full" />
-                <div className="h-[1px] w-full bg-black/10" />
-              </div>
-
-
-              <div className="overflow-x-auto custom-table-scroller">
-                <table className="w-full text-center min-w-[1100px]" style={{ tableLayout: 'fixed' }}>
-                  <colgroup>
-                    <col style={{ width: '13%' }} />
-                    <col style={{ width: '13%' }} />
-                    <col style={{ width: '16%' }} />
-                    <col style={{ width: '6%' }} />
-                    <col style={{ width: '6%' }} />
-                    <col style={{ width: '10%' }} />
-                    <col style={{ width: '9%' }} />
-                    <col style={{ width: '8%' }} />
-                    <col style={{ width: '8%' }} />
-                    <col style={{ width: '13%' }} />
-                    <col style={{ width: '5%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr className="border-b border-gray-100">
-                      {['Product/Service', 'Charts of Accounts', 'Description', 'Unit', 'Qty', 'Price', 'Disc %', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
-                        <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {receiptItems.map((item) => (
-                      <tr key={item.id} className={item.isOther ? 'bg-gray-50/30' : ''}>
-                        <td className="py-1 px-1">
-                          <SearchableDropdown
-                            disabled={isViewMode || item.isOther}
-                            placeholder="Search product..."
-                            value={item.productSearch}
-                            onChange={v => updateReceiptItem(item.id, 'productSearch', v)}
-                            onSelect={opt => { updateReceiptItem(item.id, 'productId', opt.value); updateReceiptItem(item.id, 'productSearch', opt.label); }}
-                            options={productOptions}
-                            inputClassName={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                            emptyText={productError || 'No products found'}
-                          />
-                        </td>
-                        <td className="py-1 px-1">
-                          <SearchableDropdown 
-                            disabled={isViewMode}
-                            placeholder="Search account..." 
-                            value={item.coaSearch} 
-                            onChange={v => updateReceiptItem(item.id, 'coaSearch', v)} 
-                            onSelect={opt => { updateReceiptItem(item.id, 'coa', opt.value); updateReceiptItem(item.id, 'coaSearch', opt.label); }} 
-                            options={coaOptions} 
-                            inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                            emptyText="No accounts found" 
-                          />
-                        </td>
-                        <td className="py-1 px-1">
-                          <input 
-                            disabled={isViewMode}
-                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                            placeholder="Details..." 
-                            value={item.description} 
-                            onChange={e => updateReceiptItem(item.id, 'description', e.target.value)} 
-                          />
-                        </td>
-                        <td className="py-1 px-1">
-                          <input 
-                            disabled={isViewMode || item.isOther} 
-                            className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
-                            placeholder={item.isOther ? '' : 'pc'} 
-                            value={item.isOther ? '' : item.unit} 
-                            onChange={e => updateReceiptItem(item.id, 'unit', e.target.value)} 
-                          />
-                        </td>
-                        <td className="py-1 px-1">
-                          <input 
-                            disabled={isViewMode || item.isOther} 
-                            type="number" 
-                            min="0" 
-                            className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
-                            placeholder={item.isOther ? '' : '1'} 
-                            value={item.isOther ? '' : item.qty} 
-                            onChange={e => updateReceiptItem(item.id, 'qty', parseFloat(e.target.value) || 0)} 
-                          />
-                        </td>
-                        <td className="py-1 px-1">
-                          <input 
-                            disabled={isViewMode}
-                            className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
-                            type="number" 
-                            min="0" 
-                            step="0.01" 
-                            placeholder="0.00" 
-                            value={item.price} 
-                            onChange={e => updateReceiptItem(item.id, 'price', parseFloat(e.target.value) || 0)} 
-                          />
-                        </td>
-                        <td className="py-1 px-1">
-                          <div className="relative">
-                            <input 
-                              disabled={isViewMode}
-                              className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                              type="number" 
-                              min="0" 
-                              max="100" 
-                              step="0.01" 
-                              placeholder="0" 
-                              value={item.discount || 0} 
-                              onChange={e => updateReceiptItem(item.id, 'discount', parseFloat(e.target.value) || 0)} 
-                            />
-                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">%</span>
-                          </div>
-                        </td>
-                        <td className="py-1 px-1">
-                          <div className="relative">
-                            <input 
-                              disabled={isViewMode}
-                              className={`${pctInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
-                              type="number" 
-                              min="0" 
-                              max="100" 
-                              step="0.01" 
-                              placeholder="0" 
-                              value={item.vat} 
-                              onChange={e => updateReceiptItem(item.id, 'vat', parseFloat(e.target.value) || 0)} 
-                            />
-                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-red-400 font-black pointer-events-none">%</span>
-                          </div>
-                        </td>
-                        <td className="py-1 px-1">
-                          <div className="relative">
-                            <input 
-                              disabled={isViewMode}
-                              className={`${pctInput + ' font-black text-blue-600'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
-                              type="number" 
-                              min="0" 
-                              max="100" 
-                              step="0.01" 
-                              placeholder="0" 
-                              value={item.wht} 
-                              onChange={e => updateReceiptItem(item.id, 'wht', parseFloat(e.target.value) || 0)} 
-                            />
-                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-blue-400 font-black pointer-events-none">%</span>
-                          </div>
-                        </td>
-                        <td className="py-1 px-1">
-                          <input 
-                            disabled={isViewMode}
-                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                            placeholder="Select" 
-                            value={item.responsibilityCenter} 
-                            onChange={e => updateReceiptItem(item.id, 'responsibilityCenter', e.target.value)} 
-                          />
-                        </td>
-                        <td className="py-1 px-1 text-center">
-                          {!isViewMode && (
-                            <button onClick={() => removeReceiptItem(item.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors">
-                              <Trash2 size={15} />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {!isViewMode && (
-                <div className="flex gap-2 mt-3">
-                  <button onClick={() => addReceiptItem(false)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-2">
-                    <Plus size={14} /> ADD Product/Service
-                  </button>
-                  <button onClick={() => addReceiptItem(true)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2">
-                    <Plus size={14} /> ADD Others
-                  </button>
+                  <p className="text-[clamp(22px,2.5vw,28px)] font-black text-black tracking-tighter leading-none flex items-baseline justify-center gap-2">
+                    <span className="text-[clamp(12px,1.3vw,15px)] text-red-600 font-black">PHP</span>
+                    {fmt(summary.totalAmountDue)}
+                  </p>
                 </div>
-              )}
-            </TableSection>
-
-            {/* 2. JOURNAL ENTRIES */}
-            <TableSection title="Journal Entries" icon={<Layers size={14} />}>
-              <div className="w-full flex flex-col gap-[2px] mb-4">
-                <div className="h-[2px] w-full bg-red-600 rounded-full" />
-                <div className="h-[1px] w-full bg-black/10" />
               </div>
-              <div className="overflow-x-auto custom-table-scroller">
-                <table className="w-full text-center" style={{ tableLayout: 'fixed', minWidth: 600 }}>
-                  <colgroup>
-                    <col style={{ width: '40%' }} />
-                    <col style={{ width: '22%' }} />
-                    <col style={{ width: '16%' }} />
-                    <col style={{ width: '16%' }} />
-                    <col style={{ width: '6%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr className="border-b border-gray-100">
-                      {['Charts of Account', 'Responsibility Center', 'Debit', 'Credit', ''].map((h, i) => (
-                        <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {journalEntries.map((entry) => (
-                      <tr key={entry.id}>
-                        <td className="py-1.5 px-1">
-                          <SearchableDropdown 
-                            disabled={isViewMode}
-                            placeholder="Search account..." 
-                            value={entry.accountSearch} 
-                            onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)} 
-                            onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }} 
-                            options={coaOptions} 
-                            inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                            emptyText="No accounts found" 
-                          />
-                        </td>
-                        <td className="py-1.5 px-1">
-                          <input 
-                            disabled={isViewMode}
-                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                            placeholder="Center..." 
-                            value={entry.center} 
-                            onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} 
-                          />
-                        </td>
-                        <td className="py-1.5 px-1">
-                          <input 
-                            disabled={isViewMode || !entry.isManual} 
-                            className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                            placeholder="0.00" 
-                            type="number" 
-                            value={entry.debit} 
-                            onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} 
-                            readOnly={!entry.isManual} 
-                          />
-                        </td>
-                        <td className="py-1.5 px-1">
-                          <input 
-                            disabled={isViewMode || !entry.isManual} 
-                            className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`} 
-                            placeholder="0.00" 
-                            type="number" 
-                            value={entry.credit} 
-                            onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} 
-                            readOnly={!entry.isManual} 
-                          />
-                        </td>
-                        <td className="py-1.5 text-center">
-                          {!isViewMode && entry.isManual ? (
-                            <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
-                              <Trash2 size={15} className="mx-auto" />
-                            </button>
-                          ) : (
-                            <span className="text-gray-300 text-[11px] italic">{isViewMode ? '' : 'Auto'}</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-gray-50/50">
-                      <td colSpan={2} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
-                      <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.debit) || 0), 0))}</td>
-                      <td className="py-2 px-1 text-center text-[13px] font-black text-red-600">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0))}</td>
-                      <td />
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-              {!isViewMode && (
-                <button onClick={addJournalEntry} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
-                  <Plus size={15} /> Add Ledger Row
-                </button>
-              )}
-            </TableSection>
+            </section>
+          </aside>
 
-            {/* 3. ATTACHMENTS & REMARKS */}
-            <div className="grid grid-cols-1 gap-4">
-              <TableSection title="Attachments" icon={<Paperclip size={14} />}>
-                <div className="w-full flex flex-col gap-[2px] mb-4">
+          {/* MAIN CONTENT */}
+          <main className="flex-1 overflow-y-auto custom-table-scroller space-y-4 pr-1 min-h-0">
+            <motion.div initial="hidden" animate="visible" variants={fadeInUp} className="space-y-4">
+
+              {/* 1. RECEIPT ITEMS */}
+              <TableSection title="Receipt Items" icon={<Wallet size={14} />}>
+                <div className="w-full flex flex-col gap-[2px] mb-3">
                   <div className="h-[2px] w-full bg-red-600 rounded-full" />
                   <div className="h-[1px] w-full bg-black/10" />
                 </div>
+
+
                 <div className="overflow-x-auto custom-table-scroller">
-                  <table className="w-full text-center" style={{ tableLayout: 'fixed', minWidth: 800 }}>
+                  <table className="w-full text-center min-w-[1100px]" style={{ tableLayout: 'fixed' }}>
                     <colgroup>
-                      <col style={{ width: '20%' }} /><col style={{ width: '20%' }} /><col style={{ width: '25%' }} /><col style={{ width: '15%' }} /><col style={{ width: '15%' }} /><col style={{ width: '5%' }} />
+                      <col style={{ width: '13%' }} />
+                      <col style={{ width: '13%' }} />
+                      <col style={{ width: '16%' }} />
+                      <col style={{ width: '6%' }} />
+                      <col style={{ width: '10%' }} />
+                      <col style={{ width: '9%' }} />
+                      <col style={{ width: '8%' }} />
+                      <col style={{ width: '8%' }} />
+                      <col style={{ width: '13%' }} />
+                      <col style={{ width: '5%' }} />
                     </colgroup>
                     <thead>
                       <tr className="border-b border-gray-100">
-                        {['File Name', 'File', 'Remarks', 'Uploaded By', 'Date', ''].map((h, i) => (
-                          <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 tracking-tighter text-center px-1">{h}</th>
+                        {['Product/Service', 'COA', 'Description', 'Qty', 'Price', 'Disc %', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
+                          <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {attachments.map((file) => (
-                        <tr key={file.id}>
-                          <td className="py-2 px-1">
-                            <input 
-                              disabled={isViewMode}
-                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                              placeholder="e.g. Invoice_Scan" 
-                              value={file.fileName}
-                              onChange={(e) => updateAttachment(file.id, 'fileName', e.target.value)}
+                      {receiptItems.map((item) => (
+                        <tr key={item.id} className={item.isOther ? 'bg-gray-50/30' : ''}>
+                          <td className="py-1 px-1">
+                            <SearchableDropdown
+                              disabled={isViewMode || item.isOther}
+                              placeholder="Search product..."
+                              value={item.productSearch}
+                              onChange={v => updateReceiptItem(item.id, 'productSearch', v)}
+                              onSelect={opt => { updateReceiptItem(item.id, 'productId', opt.value); updateReceiptItem(item.id, 'productSearch', opt.label); }}
+                              options={productOptions}
+                              inputClassName={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              emptyText={productError || 'No products found'}
                             />
                           </td>
-                          <td className="py-2 px-1">
-                            {isViewMode ? (
-                              <div className={`${tableInput} text-black cursor-not-allowed flex items-center justify-center`}>
-                                {file.file && typeof file.file === 'string' && file.file.startsWith('data:image/') ? (
-                                  <img 
-                                    src={file.file} 
-                                    alt={file.fileName || 'Attachment'} 
-                                    className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
-                                    onClick={() => setImageModal({ isOpen: true, imageSrc: file.file })}
-                                    title="Click to view full size"
-                                    onLoad={() => console.log('Image loaded successfully:', file.fileName)}
-                                    onError={(e) => {
-                                      console.error('Image failed to load:', file.fileName, e);
-                                      e.target.style.display = 'none';
-                                      const fallback = document.createElement('span');
-                                      fallback.className = 'text-red-600 text-[10px] font-bold';
-                                      fallback.textContent = 'Image error';
-                                      e.target.parentNode.appendChild(fallback);
-                                    }}
-                                  />
-                                ) : file.file && typeof file.file === 'string' ? (
-                                  <span className="text-blue-600 text-[11px] font-bold" title={file.file.substring(0, 50) + '...'}>Non-image file</span>
-                                ) : file.file ? (
-                                  <span className="text-orange-600 text-[11px] font-bold">Invalid file data</span>
-                                ) : (
-                                  <span className="text-gray-400 text-[11px] italic">No file</span>
-                                )}
-                              </div>
-                            ) : (
-                              <input 
-                                type="file" 
-                                className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full" 
-                                onChange={(e) => handleFileChange(file.id, e.target.files[0])}
+                          <td className="py-1 px-1">
+                            <SearchableDropdown
+                              disabled={isViewMode}
+                              placeholder="Search account..."
+                              value={item.coaSearch}
+                              onChange={v => updateReceiptItem(item.id, 'coaSearch', v)}
+                              onSelect={opt => { updateReceiptItem(item.id, 'coa', opt.value); updateReceiptItem(item.id, 'coaSearch', opt.label); }}
+                              options={coaOptions}
+                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              emptyText="No accounts found"
+                            />
+                          </td>
+                          <td className="py-1 px-1">
+                            <input
+                              disabled={isViewMode}
+                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              placeholder="Details..."
+                              value={item.description}
+                              onChange={e => updateReceiptItem(item.id, 'description', e.target.value)}
+                            />
+                          </td>
+                          <td className="py-1 px-1">
+                            <input
+                              disabled={isViewMode || item.isOther}
+                              type="number"
+                              min="0"
+                              className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                              placeholder={item.isOther ? '' : '1'}
+                              value={item.isOther ? '' : item.qty}
+                              onChange={e => updateReceiptItem(item.id, 'qty', parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+                          <td className="py-1 px-1">
+                            <input
+                              disabled={isViewMode}
+                              className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={item.price}
+                              onChange={e => updateReceiptItem(item.id, 'price', parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+                          <td className="py-1 px-1">
+                            <div className="relative">
+                              <input
+                                disabled={isViewMode}
+                                className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                placeholder="0"
+                                value={item.discount || 0}
+                                onChange={e => updateReceiptItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
                               />
-                            )}
+                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">%</span>
+                            </div>
                           </td>
-                          <td className="py-2 px-1">
-                            <input 
+                          <td className="py-1 px-1">
+                            <div className="relative">
+                              <input
+                                disabled={isViewMode}
+                                className={`${pctInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                placeholder="0"
+                                value={item.vat}
+                                onChange={e => updateReceiptItem(item.id, 'vat', parseFloat(e.target.value) || 0)}
+                              />
+                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-red-400 font-black pointer-events-none">%</span>
+                            </div>
+                          </td>
+                          <td className="py-1 px-1">
+                            <div className="relative">
+                              <input
+                                disabled={isViewMode}
+                                className={`${pctInput + ' font-black text-blue-600'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                placeholder="0"
+                                value={item.wht}
+                                onChange={e => updateReceiptItem(item.id, 'wht', parseFloat(e.target.value) || 0)}
+                              />
+                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-blue-400 font-black pointer-events-none">%</span>
+                            </div>
+                          </td>
+                          <td className="py-1 px-1">
+                            <input
                               disabled={isViewMode}
-                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                              placeholder="Add note..." 
-                              value={file.remarks}
-                              onChange={(e) => updateAttachment(file.id, 'remarks', e.target.value)}
+                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              placeholder="Select"
+                              value={item.responsibilityCenter}
+                              onChange={e => updateReceiptItem(item.id, 'responsibilityCenter', e.target.value)}
                             />
                           </td>
-                          <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">{file.uploadedBy}</td>
-                          <td className="py-2 px-1 text-[12px] font-bold text-gray-600 tabular-nums">{file.date}</td>
-                          <td className="py-2 text-center">
+                          <td className="py-1 px-1 text-center">
                             {!isViewMode && (
-                              <button onClick={() => removeAttachment(file.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"><Trash2 size={15} /></button>
+                              <button onClick={() => removeReceiptItem(item.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors">
+                                <Trash2 size={15} />
+                              </button>
                             )}
                           </td>
                         </tr>
@@ -1242,52 +1077,263 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                   </table>
                 </div>
                 {!isViewMode && (
-                  <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
-                    <Plus size={15} /> Add File
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => addReceiptItem(false)}
+                      className="flex-1 py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-2"
+                    >
+                      <Plus size={14} /> ADD Product/Service
+                    </button>
+
+                    <button
+                      onClick={() => addReceiptItem(true)}
+                      className="flex-1 py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-black text-black transition-all duration-300 hover:bg-gray-100 hover:border-gray-600 border-gray-400 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/5 flex items-center justify-center gap-2"
+                    >
+                      <Plus size={14} /> ADD Others
+                    </button>
+                  </div>
+                )}
+              </TableSection>
+
+              {/* 2. JOURNAL ENTRIES */}
+              <TableSection title="Journal Entries" icon={<Layers size={14} />}>
+                <div className="w-full flex flex-col gap-[2px] mb-4">
+                  <div className="h-[2px] w-full bg-red-600 rounded-full" />
+                  <div className="h-[1px] w-full bg-black/10" />
+                </div>
+                <div className="overflow-x-auto custom-table-scroller">
+                  <table className="w-full text-center" style={{ tableLayout: 'fixed', minWidth: 600 }}>
+                    <colgroup>
+                      <col style={{ width: '35%' }} />
+                      <col style={{ width: '18%' }} />
+                      <col style={{ width: '18%' }} />
+                      <col style={{ width: '22%' }} />
+                      <col style={{ width: '6%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        {['Charts of Account', 'Debit', 'Credit', 'Responsibility Center', ''].map((h, i) => (
+                          <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {journalEntries.map((entry) => (
+                        <tr key={entry.id}>
+                          <td className="py-1.5 px-1">
+                            <SearchableDropdown
+                              disabled={isViewMode}
+                              placeholder="Search account..."
+                              value={entry.accountSearch}
+                              onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)}
+                              onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }}
+                              options={coaOptions}
+                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              emptyText="No accounts found"
+                            />
+                          </td>
+                          <td className="py-1.5 px-1">
+                            <input
+                              disabled={isViewMode || !entry.isManual}
+                              className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              placeholder="0.00"
+                              type="number"
+                              value={entry.debit}
+                              onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)}
+                              readOnly={!entry.isManual}
+                            />
+                          </td>
+                          <td className="py-1.5 px-1">
+                            <input
+                              disabled={isViewMode || !entry.isManual}
+                              className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                              placeholder="0.00"
+                              type="number"
+                              value={entry.credit}
+                              onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)}
+                              readOnly={!entry.isManual}
+                            />
+                          </td>
+                          <td className="py-1.5 px-1">
+                            <input
+                              disabled={isViewMode}
+                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              placeholder="Center..."
+                              value={entry.center}
+                              onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)}
+                            />
+                          </td>
+                          <td className="py-1.5 text-center">
+                            {!isViewMode && entry.isManual ? (
+                              <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
+                                <Trash2 size={15} className="mx-auto" />
+                              </button>
+                            ) : (
+                              <span className="text-gray-300 text-[11px] italic">{isViewMode ? '' : 'Auto'}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-50/50 border">
+                        <td colSpan={1} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
+                        <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.debit) || 0), 0))}</td>
+                        <td className="py-2 px-1 text-center text-[13px] font-black text-red-600">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0))}</td>
+                        <td />
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                {!isViewMode && (
+                  <button
+                    onClick={addJournalEntry}
+                    className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1"
+                  >
+                    <Plus size={15} /> Add Ledger Row
                   </button>
                 )}
               </TableSection>
 
-              <TableSection title="Remarks" icon={<FileText size={14} />}>
-                <textarea 
-                  disabled={isViewMode}
-                  className={`w-full min-h-[100px] mt-4 p-4 rounded-xl text-[14px] font-bold outline-none ${
-                    isViewMode 
-                      ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed resize-none' 
-                      : 'bg-gray-50 border-none focus:ring-1 focus:ring-red-500'
-                  }`} 
-                  placeholder="Enter justification or internal notes here..." 
-                  value={remarks} 
-                  onChange={e => setRemarks(e.target.value)} 
-                />
-              </TableSection>
-            </div>
-          </motion.div>
-        </main>
+              {/* 3. ATTACHMENTS & REMARKS */}
+              <div className="grid grid-cols-1 gap-4">
+                <TableSection title="Attachments" icon={<Paperclip size={14} />}>
+                  <div className="w-full flex flex-col gap-[2px] mb-4">
+                    <div className="h-[2px] w-full bg-red-600 rounded-full" />
+                    <div className="h-[1px] w-full bg-black/10" />
+                  </div>
+                  <div className="overflow-x-auto custom-table-scroller">
+                    <table className="w-full text-center" style={{ tableLayout: 'fixed', minWidth: 800 }}>
+                      <colgroup>
+                        <col style={{ width: '20%' }} /><col style={{ width: '20%' }} /><col style={{ width: '25%' }} /><col style={{ width: '15%' }} /><col style={{ width: '15%' }} /><col style={{ width: '5%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          {['File Name', 'File', 'Remarks', 'Uploaded By', 'Date', ''].map((h, i) => (
+                            <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 tracking-tighter text-center px-1">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {attachments.map((file) => (
+                          <tr key={file.id}>
+                            <td className="py-2 px-1">
+                              <input
+                                disabled={isViewMode}
+                                className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                placeholder="e.g. Invoice_Scan"
+                                value={file.fileName}
+                                onChange={(e) => updateAttachment(file.id, 'fileName', e.target.value)}
+                              />
+                            </td>
+                            <td className="py-2 px-1">
+                              {isViewMode ? (
+                                <div className={`${tableInput} text-black cursor-not-allowed flex items-center justify-center`}>
+                                  {file.file && typeof file.file === 'string' && file.file.startsWith('data:image/') ? (
+                                    <img
+                                      src={file.file}
+                                      alt={file.fileName || 'Attachment'}
+                                      className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
+                                      onClick={() => setImageModal({ isOpen: true, imageSrc: file.file })}
+                                      title="Click to view full size"
+                                      onLoad={() => console.log('Image loaded successfully:', file.fileName)}
+                                      onError={(e) => {
+                                        console.error('Image failed to load:', file.fileName, e);
+                                        e.target.style.display = 'none';
+                                        const fallback = document.createElement('span');
+                                        fallback.className = 'text-red-600 text-[10px] font-bold';
+                                        fallback.textContent = 'Image error';
+                                        e.target.parentNode.appendChild(fallback);
+                                      }}
+                                    />
+                                  ) : file.file && typeof file.file === 'string' ? (
+                                    <span className="text-blue-600 text-[11px] font-bold" title={file.file.substring(0, 50) + '...'}>Non-image file</span>
+                                  ) : file.file ? (
+                                    <span className="text-orange-600 text-[11px] font-bold">Invalid file data</span>
+                                  ) : (
+                                    <span className="text-gray-400 text-[11px] italic">No file</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <input
+                                  type="file"
+                                  className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full"
+                                  onChange={(e) => handleFileChange(file.id, e.target.files[0])}
+                                />
+                              )}
+                            </td>
+                            <td className="py-2 px-1">
+                              <input
+                                disabled={isViewMode}
+                                className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                placeholder="Add note..."
+                                value={file.remarks}
+                                onChange={(e) => updateAttachment(file.id, 'remarks', e.target.value)}
+                              />
+                            </td>
+                            <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">{file.uploadedBy}</td>
+                            <td className="py-2 px-1 text-[12px] font-bold text-gray-600 tabular-nums">{file.date}</td>
+                            <td className="py-2 text-center">
+                              {!isViewMode && (
+                                <button onClick={() => removeAttachment(file.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"><Trash2 size={15} /></button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {!isViewMode && (
+                    <button
+                      onClick={addAttachment}
+                      className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1"
+                    >
+                      <Plus size={15} /> Add File
+                    </button>
+                  )}
+                </TableSection>
 
-      {/* --- IMAGE MODAL --- */}
-      {imageModal.isOpen && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300"
-          onClick={() => setImageModal({ isOpen: false, imageSrc: '' })}
-        >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setImageModal({ isOpen: false, imageSrc: '' });
-            }}
-            className="absolute top-6 right-6 text-white hover:text-red-500 transition-colors"
-          >
-            <ArrowLeft size={32} />
-          </button>
-          <img
-            src={imageModal.imageSrc}
-            alt="Preview"
-            className="max-w-full max-h-full rounded-2xl shadow-2xl border-4 border-white/10 p-2 scale-in animate-in zoom-in-95 duration-300"
-            onClick={(e) => e.stopPropagation()}
-          />
+                <TableSection title="Remarks" icon={<FileText size={14} />}>
+                  <textarea
+                    disabled={isViewMode}
+                    className={`w-full min-h-[100px] mt-4 p-4 rounded-xl text-[14px] font-bold outline-none ${isViewMode
+                      ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed resize-none'
+                      : 'bg-gray-50 border-none focus:ring-1 focus:ring-red-500'
+                      }`}
+                    placeholder="Enter justification or internal notes here..."
+                    value={remarks}
+                    onChange={e => setRemarks(e.target.value)}
+                  />
+                </TableSection>
+              </div>
+            </motion.div>
+          </main>
         </div>
-      )}
+
+        {/* --- IMAGE MODAL --- */}
+        {imageModal.isOpen && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300"
+            onClick={() => setImageModal({ isOpen: false, imageSrc: '' })}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setImageModal({ isOpen: false, imageSrc: '' });
+              }}
+              className="absolute top-6 right-6 text-white hover:text-red-500 transition-colors"
+            >
+              <ArrowLeft size={32} />
+            </button>
+            <img
+              src={imageModal.imageSrc}
+              alt="Preview"
+              className="max-w-full max-h-full rounded-2xl shadow-2xl border-4 border-white/10 p-2 scale-in animate-in zoom-in-95 duration-300"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1297,19 +1343,44 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
 function TableSection({ title, icon, children }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">{icon}</div>
-        <h2 className="text-[15px] font-black uppercase tracking-[1px] text-black">{title}</h2>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between p-4">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">{icon}</div>
+          <h2 className="text-[15px] font-black uppercase tracking-[1px] text-black">{title}</h2>
+        </div>
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+        >
+          {isCollapsed ? (
+            <>
+              <Plus size={16} />
+              <span className="text-[11px] font-black uppercase">Show</span>
+            </>
+          ) : (
+            <>
+              <Minus size={16} />
+              <span className="text-[11px] font-black uppercase">Hide</span>
+            </>
+          )}
+        </button>
       </div>
-      {children}
+      
+      {!isCollapsed && (
+        <div className="px-4 pb-4">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
 
 function SDivider() {
-  return <div className="h-[1px] w-full bg-gray-100" />;
+  return <div className="h-[1px] w-full bg-gray-400" />;
 }
 
 /**
@@ -1318,13 +1389,19 @@ function SDivider() {
  */
 function SummaryRow({ label, value, color = 'text-gray-800', formula }) {
   return (
-    <div className="summary-row relative flex justify-between items-center hover:bg-gray-50 rounded-md transition-colors py-1 px-1 cursor-default">
-      <span className="text-[10.5px] font-black uppercase text-gray-500 leading-tight pr-1 flex-1">{label}</span>
-      <span className={`${color} text-[12px] font-black tabular-nums tracking-tight whitespace-nowrap text-right flex-shrink-0`}>
+    <div className="summary-row relative flex justify-between items-center hover:bg-gray-50 rounded-md transition-colors py-1.5 px-1 cursor-default">
+      {/* Label: 10.5px -> ~12.5px */}
+      <span className="text-[clamp(11px,1.1vw,12.5px)] font-black uppercase text-gray-500 leading-tight pr-1 flex-1">
+        {label}
+      </span>
+
+      {/* Value: 12px -> ~14px */}
+      <span className={`${color} text-[clamp(12px,1.25vw,14px)] font-black tabular-nums tracking-tight whitespace-nowrap text-right flex-shrink-0`}>
         {value}
       </span>
+
       {formula && (
-        <div className="summary-tooltip absolute left-0 bottom-full mb-1 z-50 bg-gray-900 text-white text-[10px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none">
+        <div className="summary-tooltip absolute left-0 bottom-full mb-1 z-50 bg-gray-900 text-white text-[11px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none">
           <span className="text-gray-300 font-medium">{formula}</span>
           <div className="absolute left-3 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900" />
         </div>
@@ -1339,17 +1416,16 @@ function SidebarInput({ label, placeholder, type = 'text', required, dark, value
       <label className={`text-[11px] font-black uppercase ${dark ? 'text-gray-500' : 'text-gray-400'} block`}>
         {label} {required && <span className="text-red-600">*</span>}
       </label>
-      <input 
-        type={type} 
-        placeholder={placeholder} 
-        value={value} 
+      <input
+        type={type}
+        placeholder={placeholder}
+        value={value}
         onChange={onChange}
         disabled={disabled}
-        className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${
-          disabled 
-            ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed' 
-            : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
-        }`}
+        className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${disabled
+          ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+          : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+          }`}
       />
     </div>
   );

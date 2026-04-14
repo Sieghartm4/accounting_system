@@ -65,6 +65,11 @@ const DynamicTable = ({
     }
   };
 
+  // Function to convert underscores to spaces for display
+  const formatHeader = (header) => {
+    return header.replace(/_/g, ' ');
+  };
+
   const renderCellValue = (value, header, row) => {
     // Check if this column should render a badge
     const badgeColumn = badgeColumns.find(badge => badge.column === header);
@@ -443,7 +448,7 @@ const DynamicTable = ({
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-[12px] font-black text-black uppercase tracking-[2px] transition-colors">
-                      {header}
+                      {formatHeader(header)}
                     </span>
                     {sortColumn === header && (
                       <div className={`w-1 h-3 bg-red-600 rounded-full ${sortDirection === 'desc' ? 'rotate-180' : ''} transition-transform`} />

@@ -30,7 +30,6 @@ const getReceipts = async (req, res, next) => {
       { col: Accounting.receipts.selectOptionColumns.check_number, as: 'check_number' },
       { col: Accounting.receipts.selectOptionColumns.remarks, as: 'remarks' },
       { col: Accounting.receipts.selectOptionColumns.total_amount_due, as: 'amount_due' },
-      { col: Accounting.receipts.selectOptionColumns.status, as: 'status' },
       { col: Accounting.receipts.selectOptionColumns.state, as: 'state' }
     ])
       .from(Accounting.receipts.tablename)
@@ -71,7 +70,6 @@ const getAllReceipts = async (req, res, next) => {
       { col: Accounting.receipts.selectOptionColumns.check_number, as: 'check_number' },
       { col: Accounting.receipts.selectOptionColumns.remarks, as: 'remarks' },
       { col: Accounting.receipts.selectOptionColumns.total_amount_due, as: 'amount_due' },
-      { col: Accounting.receipts.selectOptionColumns.status, as: 'status' },
       { col: Accounting.receipts.selectOptionColumns.state, as: 'state' }
     ])
       .from(Accounting.receipts.tablename)
@@ -86,7 +84,6 @@ const getAllReceipts = async (req, res, next) => {
       { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
       { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
       { col: Accounting.receipt_items.selectOptionColumns.description, as: 'description' },
-      { col: Accounting.receipt_items.selectOptionColumns.unit, as: 'unit' },
       { col: Accounting.receipt_items.selectOptionColumns.quantity, as: 'quantity' },
       { col: Accounting.receipt_items.selectOptionColumns.sales_price, as: 'sales_price' },
       { col: Accounting.receipt_items.selectOptionColumns.discount, as: 'discount' },
@@ -203,7 +200,6 @@ const createReceipts = async (req, res, next) => {
         check_number || null,
         remarks || null,
         total_amount_due || null,
-        'NOT COLLECTED',
         'PREPARED',
         new Date().toISOString().split('T')[0],
         created_by || null
@@ -225,7 +221,6 @@ const createReceipts = async (req, res, next) => {
             item.product_id || null,
             item.account_id || null,
             item.description || null,
-            item.unit || '',
             item.qty || 0,
             item.price || 0,
             item.discount || 0,
@@ -349,21 +344,13 @@ const updateReceiptState = async (req, res, next) => {
           throw new Error(`Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`);
         }
 
-        if (nextState === 'APPROVED') {
-          const updateQuery = sql.update(Accounting.receipts.tablename)
-            .set([Accounting.receipts.selectOptionColumns.state, Accounting.receipts.selectOptionColumns.status])
-            .where(Accounting.receipts.selectOptionColumns.id)
-            .build();
-          const updateValues = [nextState, 'COLLECTED', id];
-          return connection.execute(updateQuery, updateValues);
-        } else {
           const updateQuery = sql.update(Accounting.receipts.tablename)
             .set([Accounting.receipts.selectOptionColumns.state])
             .where(Accounting.receipts.selectOptionColumns.id)
             .build();
           const updateValues = [nextState, id];
           return connection.execute(updateQuery, updateValues);
-        }
+        
       });
 
       const results = await Promise.all(updatePromises);

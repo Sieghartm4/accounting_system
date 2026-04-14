@@ -7,7 +7,7 @@
  * @returns {boolean} - Whether user has access
  */
 export const hasRouteAccess = (routeName, user) => {
-  if (!user || !user.route_access) {
+  if (!user || !user.route_access || !routeName || typeof routeName !== 'string') {
     return false;
   }
 
@@ -32,7 +32,7 @@ export const hasRouteAccess = (routeName, user) => {
  * @returns {boolean} - Whether user has full access
  */
 export const hasFullAccess = (routeName, user) => {
-  if (!user || !user.route_access) {
+  if (!user || !user.route_access || !routeName || typeof routeName !== 'string') {
     return false;
   }
 
@@ -56,7 +56,7 @@ export const hasFullAccess = (routeName, user) => {
  * @returns {boolean} - Whether user has check access
  */
 export const hasCheckAccess = (routeName, user) => {
-  if (!user || !user.route_access) {
+  if (!user || !user.route_access || !routeName || typeof routeName !== 'string') {
     return false;
   }
 
@@ -80,7 +80,7 @@ export const hasCheckAccess = (routeName, user) => {
  * @returns {boolean} - Whether user has approve access
  */
 export const hasApproveAccess = (routeName, user) => {
-  if (!user || !user.route_access) {
+  if (!user || !user.route_access || !routeName || typeof routeName !== 'string') {
     return false;
   }
 
@@ -114,12 +114,12 @@ export const canCreateEdit = (routeName, user) => {
  * @returns {string|null} - Access level: 'Full Access', 'Check Access', 'Approve Access', or null
  */
 export const getAccessLevel = (routeName, user) => {
-  if (!user || !user.route_access) {
+  if (!user || !user.route_access || !routeName || typeof routeName !== 'string') {
     return null;
   }
 
   const route = user.route_access.find(route => 
-    route && route.name && route.name.toLowerCase() === routeName.toLowerCase()
+    route && route.name && typeof route.name === 'string' && route.name.toLowerCase() === routeName.toLowerCase()
   );
   return route ? route.status : null;
 };

@@ -17,13 +17,13 @@ export default function Access() {
 }
 
 function AccessContent() {
-  const { 
-    access, 
-    loading, 
-    error, 
-    handleAccessRowClick, 
-    selectedAccessId, 
-    routeAccessData, 
+  const {
+    access,
+    loading,
+    error,
+    handleAccessRowClick,
+    selectedAccessId,
+    routeAccessData,
     routeAccessLoading,
     createAccess,
     updateRouteAccess,
@@ -77,7 +77,7 @@ function AccessContent() {
 
       // Call the API with single update
       const result = await updateRouteAccess(route_access_Data);
-      
+
       if (result.success) {
         setToast({
           type: 'success',
@@ -102,7 +102,7 @@ function AccessContent() {
     e.preventDefault();
     try {
       const result = await createAccess(formData.access_name, formData.status);
-      
+
       if (result.success) {
         setToast({
           type: 'success',
@@ -138,7 +138,7 @@ function AccessContent() {
       ],
       onChange: async (selectedRows, selectedValue) => {
         console.log(`Setting access to "${selectedValue}" for:`, selectedRows);
-        
+
         try {
           // Prepare data for bulk update - updates array at root level
           const route_access_Data = {
@@ -151,13 +151,13 @@ function AccessContent() {
 
           // Call the API once with all updates
           const result = await updateRouteAccess(route_access_Data);
-          
+
           if (result.success) {
             // Update the status for each selected row locally
             selectedRows.forEach(row => {
               row.status = selectedValue;
             });
-            
+
             setToast({
               type: 'success',
               message: `Access set to "${selectedValue}" for ${selectedRows.length} route(s).`
@@ -201,10 +201,10 @@ function AccessContent() {
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-      
+
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
-        <motion.div 
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -236,22 +236,22 @@ function AccessContent() {
 
         {/* --- SECURITY STATUS TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SecurityCard 
-            icon={<Key className="text-red-600" size={20} />} 
-            label="Active Roles" 
-            value={access?.length || 0} 
+          <SecurityCard
+            icon={<Key className="text-red-600" size={20} />}
+            label="Active Roles"
+            value={access?.length || 0}
             subText="Defined"
           />
-          <SecurityCard 
-            icon={<Fingerprint className="text-black" size={20} />} 
-            label="MFA Enabled" 
-            value="100%" 
+          <SecurityCard
+            icon={<Fingerprint className="text-black" size={20} />}
+            label="MFA Enabled"
+            value="100%"
             subText="Strict Mode"
           />
-          <SecurityCard 
-            icon={<ShieldAlert className="text-gray-400" size={20} />} 
-            label="Blocked IPs" 
-            value="0" 
+          <SecurityCard
+            icon={<ShieldAlert className="text-gray-400" size={20} />}
+            label="Blocked IPs"
+            value="0"
             subText="No threats"
           />
         </div>
@@ -259,9 +259,9 @@ function AccessContent() {
 
       {/* --- TWO-COLUMN GRID SECTION --- */}
       <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-8 pb-4">
-        
+
         {/* LEFT COLUMN: Main Access Table */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           className="flex flex-col min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
@@ -273,11 +273,21 @@ function AccessContent() {
             enableAddButton={false}
             returnColumn="access_id"
             onRowClick={handleAccessRowClick}
+            badgeColumns={[
+              {
+                column: 'status',
+                values: {
+                  'ACTIVE': 'green',
+                  'INACTIVE': 'red',
+                  'PENDING': 'yellow'
+                }
+              }
+            ]}
           />
         </motion.div>
 
         {/* RIGHT COLUMN: Route Access Details */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           className="flex flex-col min-h-0"
@@ -285,8 +295,8 @@ function AccessContent() {
           {selectedAccessId ? (
             routeAccessLoading ? (
               <div className="h-full w-full flex flex-col items-center justify-center bg-white rounded-2xl border border-dashed border-gray-200">
-                 <div className="w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full animate-spin mb-2"></div>
-                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fetching Routes...</p>
+                <div className="w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fetching Routes...</p>
               </div>
             ) : (
               <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100 border-l-4">
@@ -298,10 +308,21 @@ function AccessContent() {
                   optionColumns={new Set(['status'])}
                   onOptionChange={handleRouteStatusChange}
                   selectOptions={routeAccessOptions}
-                  // --- CHECKBOX ENABLED ---
                   enableCheckbox={true}
-                  checkboxColumn="route_id"        // use your actual unique column name here
+                  checkboxColumn="route_id"
                   checkboxActions={routeCheckboxActions}
+                  badgeColumns={[
+                    {
+                      column: 'status',
+                      values: {
+                        'FULL ACCESS': 'green',
+                        'READ ONLY': 'red',
+                        'NO ACCESS': 'yellow',
+                        'APPROVE ACCESS': 'blue',
+                        'CHECK ACCESS': 'purple'
+                      }
+                    }
+                  ]}
                 />
               </div>
             )
@@ -318,11 +339,11 @@ function AccessContent() {
           )}
         </motion.div>
       </div>
-      
+
       {/* Add Role Modal */}
-      <RightSideModal 
-        isOpen={isModalOpen} 
-        onClose={handleCloseModal} 
+      <RightSideModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
         title="Create New Role"
       >
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -334,31 +355,29 @@ function AccessContent() {
               <input
                 type="text"
                 value={formData.access_name}
-                onChange={(e) => setFormData({...formData, access_name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, access_name: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter role name..."
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Status <span className="text-red-600">*</span>
               </label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({...formData, status: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
-                <option value="Full Access">Full Access</option>
-                <option value="No Access">No Access</option>
-                <option value="Check Access">Check Access</option>
-                <option value="Approve Access">Approve Access</option>
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="INACTIVE">INACTIVE</option>
               </select>
             </div>
           </div>
-          
+
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -377,7 +396,7 @@ function AccessContent() {
           </div>
         </form>
       </RightSideModal>
-      
+
       {/* Toast Notification */}
       {toast && (
         <DynamicToast

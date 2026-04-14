@@ -23,11 +23,9 @@ const getAdjustments = async (req, res, next) => {
                     { col: Accounting.adjustments.selectOptionColumns.id, as: 'id' },
                     { col: Accounting.adjustments.selectOptionColumns.document_reference, as: 'document_reference' },
                     { col: Accounting.adjustments.selectOptionColumns.posting_date, as: 'posting_date' },
-                    { col: Accounting.adjustments.selectOptionColumns.remarks, as: 'remarks' },
-                    { col: Accounting.adjustments.selectOptionColumns.status, as: 'status' },
                     { col: Accounting.adjustments.selectOptionColumns.total_amount, as: 'total_amount' },
-                    { col: Accounting.adjustments.selectOptionColumns.created_date, as: 'created_date' },
-                    { col: Accounting.adjustments.selectOptionColumns.created_by, as: 'created_by' }
+                    { col: Accounting.adjustments.selectOptionColumns.created_by, as: 'prepared_by' },
+                    { col: Accounting.adjustments.selectOptionColumns.status, as: 'status' },
                 ])
                 .from(Accounting.adjustments.tablename)
                 .build();
@@ -54,6 +52,7 @@ const getAdjustments = async (req, res, next) => {
 const getAdjustmentById = async (req, res, next) => {
     try {
         const { adjustment_id } = req.params;
+        console.log("adjustment_id", adjustment_id);
         const adjustmentId = Number(adjustment_id);
         if (!adjustment_id || isNaN(adjustmentId)) {
             return res.status(400).json({
@@ -95,12 +94,30 @@ const getAdjustmentById = async (req, res, next) => {
 
         let adjustment_attachments = await Query(adjustment_attachments_query, [adjustmentId], [Accounting.adjustment_attachments.prefix_]);
 
-        console.log(adjustment, adjustment_attachments)
+        // Journal entries query
+        const journal_entries_query = sql.select([
+            { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+            { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'account_name' },
+            { col: Accounting.journal_entries.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
+            { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' },
+            { col: Accounting.journal_entries.selectOptionColumns.amount, as: 'amount' },
+            { col: Accounting.journal_entries.selectOptionColumns.date, as: 'date' }
+        ])
+            .from(Accounting.journal_entries.tablename)
+            .innerJoin(Master.charts_of_accounts.tablename, Accounting.journal_entries.selectOptionColumns.coa_id, Master.charts_of_accounts.selectOptionColumns.id)
+            .where(Accounting.journal_entries.selectOptionColumns.db_name)
+            .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
+            .build();
+
+        let journal_entries = await Query(journal_entries_query, ['adjustments', adjustmentId], [Accounting.journal_entries.prefix_]);
+
+        console.log(adjustment, adjustment_attachments, journal_entries)
         res.status(200).json({
             success: true,
             message: 'Adjustment retrieved successfully',
             data: adjustment,
             attachments: adjustment_attachments,
+            journal_entries: journal_entries,
             timestamp: new Date().toISOString()
         })
 
@@ -119,8 +136,7 @@ const createAdjustment = async (req, res, next) => {
         const { 
             document_reference, 
             posting_date, 
-            remarks, 
-            status, 
+            remarks,
             total_amount, 
             created_by, 
             adjustment_attachments,
@@ -150,7 +166,7 @@ const createAdjustment = async (req, res, next) => {
                 document_reference || null,
                 posting_date || null,
                 remarks || null,
-                status || 'PREPARED BY',
+                'PREPARED',
                 total_amount || null,
                 new Date().toISOString().split('T')[0],
                 created_by || null
@@ -239,102 +255,82 @@ const createAdjustment = async (req, res, next) => {
 }
 
 const updateAdjustment = async (req, res, next) => {
+  try {
+    const {
+      updates
+    } = req.body;
+    console.log("body", req.body);
+
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Updates array is required'
+      });
+    }
+
+    let connection;
     try {
-        const { adjustment_id } = req.params;
-        const { 
-            document_reference, 
-            posting_date, 
-            remarks, 
-            status, 
-            total_amount
-        } = req.body;
-        
-        if (!adjustment_id || isNaN(adjustment_id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid adjustment ID provided'
-            });
+      connection = await pool.getConnection();
+      await connection.beginTransaction();
+
+      const updatePromises = updates.map(async (update) => {
+        const { id, currentState } = update;
+
+        if (!id || !currentState) {
+          throw new Error('Each update requires id and currentState');
         }
-        
-        if (!document_reference || !posting_date || !remarks || !total_amount) {
-            return res.status(400).json({
-                success: false,
-                message: 'All required fields must be provided'
-            });
+
+        let nextState;
+        if (currentState === 'PREPARED') {
+          nextState = 'CHECKED';
+        } else if (currentState === 'CHECKED') {
+          nextState = 'APPROVED';
+        } else {
+          throw new Error(`Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`);
         }
-        
+
         const updateQuery = sql.update(Accounting.adjustments.tablename)
-            .set({
-                document_reference: document_reference || null,
-                posting_date: posting_date || null,
-                remarks: remarks || null,
-                status: status || null,
-                total_amount: total_amount || null
-            })
-            .where(Accounting.adjustments.selectOptionColumns.id)
-            .build();
-            
-        const updateValues = [
-            document_reference || null,
-            posting_date || null,
-            remarks || null,
-            status || null,
-            total_amount || null,
-            Number(adjustment_id)
-        ];
-        
-        let result = await Query(updateQuery, updateValues, [Accounting.adjustments.prefix_]);
-        
-        res.status(200).json({
-            success: true,
-            message: 'Adjustment updated successfully',
-            data: result,
-            timestamp: new Date().toISOString()
-        });
+          .set([Accounting.adjustments.selectOptionColumns.status])
+          .where(Accounting.adjustments.selectOptionColumns.id)
+          .build();
+        const updateValues = [nextState, id];
+
+        return connection.execute(updateQuery, updateValues);
+      });
+
+      const results = await Promise.all(updatePromises);
+
+      await connection.commit();
+
+      res.status(200).json({
+        success: true,
+        message: `${results.length} adjustment(s) updated successfully`,
+        data: {
+          updatedCount: results.length,
+          updates: results.map(result => ({ id: result.insertId }))
+        },
+        timestamp: new Date().toISOString()
+      });
 
     } catch (error) {
-        console.error('Error updating adjustment:', error)
-        return res.status(500).json({
-            success: false,
-            message: 'Server error while updating adjustment',
-            error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-        });
+      if (connection) {
+        await connection.rollback();
+      }
+      throw error;
+    } finally {
+      if (connection) {
+        connection.release();
+      }
     }
-}
 
-const deleteAdjustment = async (req, res, next) => {
-    try {
-        const { adjustment_id } = req.params;
-        const adjustmentId = Number(adjustment_id);
-        
-        if (!adjustment_id || isNaN(adjustmentId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid adjustment ID provided'
-            });
-        }
-        
-        const deleteQuery = sql.delete(Accounting.adjustments.tablename)
-            .where(Accounting.adjustments.selectOptionColumns.id)
-            .build();
-            
-        let result = await Query(deleteQuery, [adjustmentId], [Accounting.adjustments.prefix_]);
-        
-        res.status(200).json({
-            success: true,
-            message: 'Adjustment deleted successfully',
-            data: result,
-            timestamp: new Date().toISOString()
-        });
-
-    } catch (error) {
-        console.error('Error deleting adjustment:', error)
-        return res.status(500).json({
-            success: false,
-            message: 'Server error while deleting adjustment',
-            error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-        });
-    }
+  } catch (error) {
+    console.error('Error updating adjustments:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating adjustments',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
 }
 
 module.exports = {
@@ -342,5 +338,4 @@ module.exports = {
     getAdjustmentById,
     createAdjustment,
     updateAdjustment,
-    deleteAdjustment
 }

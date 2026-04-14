@@ -22,7 +22,7 @@ module.exports = {
         allowNull: true
       },
       a_status: {
-        type: Sequelize.ENUM('PREPARED BY', 'CHECKED BY', 'APPROVED BY', 'REJECTED BY'),
+        type: Sequelize.ENUM('PREPARED', 'CHECKED', 'APPROVED', 'REJECTED'),
         allowNull: true
       },
       a_total_amount: {

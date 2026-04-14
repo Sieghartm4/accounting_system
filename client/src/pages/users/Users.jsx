@@ -44,7 +44,7 @@ function UsersContent() {
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-      
+
       {/* --- TOP NAVIGATION BREADCRUMB --- */}
       {/* <nav className="flex-shrink-0 flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
         <span className="hover:text-red-600 cursor-pointer transition-colors">Internal Systems</span>
@@ -54,7 +54,7 @@ function UsersContent() {
 
       {/* --- PAGE HEADER & ACTIONS --- */}
       <div className="flex-shrink-0">
-        <motion.div 
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -90,41 +90,51 @@ function UsersContent() {
 
         {/* --- USER STATISTICS TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <AccountCard 
-            icon={<UserCheck className="text-red-600" size={20} />} 
-            label="Total Personnel" 
-            value={users?.length || 0} 
+          <AccountCard
+            icon={<UserCheck className="text-red-600" size={20} />}
+            label="Total Personnel"
+            value={users?.length || 0}
             subText="Active Profiles"
           />
-          <AccountCard 
-            icon={<Shield className="text-black" size={20} />} 
-            label="Super Admins" 
-            value="2" 
+          <AccountCard
+            icon={<Shield className="text-black" size={20} />}
+            label="Super Admins"
+            value="2"
             subText="Elevated Access"
           />
-          <AccountCard 
-            icon={<Activity className="text-green-600" size={20} />} 
-            label="Online Now" 
-            value="Active" 
+          <AccountCard
+            icon={<Activity className="text-green-600" size={20} />}
+            label="Online Now"
+            value="Active"
             subText="Live Sync"
           />
         </div>
       </div>
 
       {/* --- TABLE SECTION (The "Fixed" Container) --- */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.99 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.2 }}
         className="flex-1 min-h-0 bg-white rounded-2xl shadow-2xl shadow-gray-200/50 overflow-hidden border border-gray-100"
       >
-        <DynamicTable 
-          data={users} 
+        <DynamicTable
+          data={users}
           title="Users table"
           enableAddButton={false}
           enableRowClick={false}
           returnColumn="username"
           onRowClick={handleUserRowClick}
+          badgeColumns={[
+            {
+              column: 'status',
+              values: {
+                'ACTIVE': 'green',
+                'INACTIVE': 'red',
+                'PENDING': 'yellow'
+              }
+            }
+          ]}
         />
       </motion.div>
     </div>

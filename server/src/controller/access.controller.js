@@ -44,7 +44,6 @@ const createAccess = async (req, res, next) => {
 
         let queries = []
         
-        // First, create the access role
         queries.push({
             sql: sql.insert(Master.master_access.tablename, {
                 columns: Master.master_access.insertColumns,
@@ -100,7 +99,7 @@ const createAccess = async (req, res, next) => {
                 values: [
                     newAccessId,
                     route,
-                    'active'
+                    'Full Access'
                 ]
             });
         });

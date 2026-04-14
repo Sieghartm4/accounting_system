@@ -173,17 +173,9 @@ function ReceiptsContent() {
           enableActionColumn={true}
           badgeColumns={[
             {
-              column: 'status',
-              values: {
-                'COLLECTED': 'green',
-                'NOT COLLECTED': 'red',
-                'PARTIALLY COLLECTED': 'yellow'
-              }
-            },
-            {
               column: 'state',
               values: {
-                'PREPARED': 'gray',
+                'PREPARED': 'yellow',
                 'CHECKED': 'blue',
                 'APPROVED': 'green',
                 'REJECTED': 'red',

@@ -99,7 +99,6 @@ const Accounting = {
       "check_number",
       "remarks",
       "total_amount_due",
-      "status",
       "state",
       "created_date",
       "created_by"
@@ -114,7 +113,6 @@ const Accounting = {
       "r_check_number",
       "r_remarks",
       "r_total_amount_due",
-      "r_status",
       "r_state",
       "r_created_date",
       "r_created_by"
@@ -129,7 +127,6 @@ const Accounting = {
     check_number: "r_check_number",
     remarks: "r_remarks",
     total_amount_due: "r_total_amount_due",
-    status: "r_status",
     state: "r_state",
     created_date: "r_created_date",
     created_by: "r_created_by"
@@ -144,7 +141,6 @@ const Accounting = {
     check_number: "check_number",
     remarks: "remarks",
     total_amount_due: "total_amount_due",
-    status: "status",
     state: "state",
     created_date: "created_date",
     created_by: "created_by"
@@ -165,7 +161,6 @@ const Accounting = {
     check_number: "STRING",
     remarks: "TEXT",
     total_amount_due: "DECIMAL",
-    status: "ENUM",
     state: "ENUM",
     created_date: "STRING",
     created_by: "STRING"
@@ -635,7 +630,6 @@ const Accounting = {
       "product_service",
       "charts_of_accounts",
       "description",
-      "unit",
       "quantity",
       "sales_price",
       "discount",
@@ -649,7 +643,6 @@ const Accounting = {
       "ri_product_service",
       "ri_charts_of_accounts",
       "ri_description",
-      "ri_unit",
       "ri_quantity",
       "ri_sales_price",
       "ri_discount",
@@ -663,7 +656,6 @@ const Accounting = {
     product_service: "ri_product_service",
     charts_of_accounts: "ri_charts_of_accounts",
     description: "ri_description",
-    unit: "ri_unit",
     quantity: "ri_quantity",
     sales_price: "ri_sales_price",
     discount: "ri_discount",
@@ -677,7 +669,6 @@ const Accounting = {
     product_service: "product_service",
     charts_of_accounts: "charts_of_accounts",
     description: "description",
-    unit: "unit",
     quantity: "quantity",
     sales_price: "sales_price",
     discount: "discount",
@@ -697,7 +688,6 @@ const Accounting = {
     product_service: "STRING",
     charts_of_accounts: "INTEGER",
     description: "TEXT",
-    unit: "STRING",
     quantity: "INTEGER",
     sales_price: "DECIMAL",
     discount: "DECIMAL",
@@ -1293,6 +1283,16 @@ payment_attachments: {
     prefix: 'a',
     prefix_: 'a_',
     insertColumns: [
+      "document_reference",
+      "posting_date",
+      "remarks",
+      "status",
+      "total_amount",
+      "created_date",
+      "created_by"
+    ],
+    selectColumns: [
+      "a_id",
       "a_document_reference",
       "a_posting_date",
       "a_remarks",
@@ -1300,13 +1300,6 @@ payment_attachments: {
       "a_total_amount",
       "a_created_date",
       "a_created_by"
-    ],
-    updateColumns: [
-      "a_document_reference",
-      "a_posting_date",
-      "a_remarks",
-      "a_status",
-      "a_total_amount"
     ],
     selectOptionColumns: {
       id: "a_id",
@@ -1317,6 +1310,19 @@ payment_attachments: {
       total_amount: "a_total_amount",
       created_date: "a_created_date",
       created_by: "a_created_by"
+    },
+    updateOptionColumns: {
+      id: "id",
+      document_reference: "document_reference",
+      posting_date: "posting_date",
+      remarks: "remarks",
+      status: "status",
+      total_amount: "total_amount",
+      created_date: "created_date",
+      created_by: "created_by"
+    },
+    selectDateFormatColumns: {
+
     },
     selectMiscColumns: {
 
@@ -1337,14 +1343,15 @@ payment_attachments: {
     prefix: 'aa',
     prefix_: 'aa_',
     insertColumns: [
-      "aa_adjustment_id",
-      "aa_file",
-      "aa_name",
-      "aa_remarks",
-      "aa_uploaded_by",
-      "aa_uploaded_date"
+      "adjustment_id",
+      "file",
+      "name",
+      "remarks",
+      "uploaded_by",
+      "uploaded_date"
     ],
-    updateColumns: [
+    selectColumns: [
+      "aa_id",
       "aa_adjustment_id",
       "aa_file",
       "aa_name",
@@ -1360,6 +1367,18 @@ payment_attachments: {
       remarks: "aa_remarks",
       uploaded_by: "aa_uploaded_by",
       uploaded_date: "aa_uploaded_date"
+    },
+    updateOptionColumns: {
+      id: "id",
+      adjustment_id: "adjustment_id",
+      file: "file",
+      name: "name",
+      remarks: "remarks",
+      uploaded_by: "uploaded_by",
+      uploaded_date: "uploaded_date"
+    },
+    selectDateFormatColumns: {
+
     },
     selectMiscColumns: {
 
