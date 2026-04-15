@@ -4,14 +4,14 @@
 
 const Joi = require('joi');
 
-const SalesItemsSchema = Joi.object({
+const PurchaseItemsSchema = Joi.object({
  	id: Joi.number().integer().required().messages({
         'any.required': 'id is required.',
         'number.base': 'id must be a valid integer.',
       }),
- 	salesId: Joi.number().integer().required().messages({
-        'any.required': 'salesId is required.',
-        'number.base': 'salesId must be a valid integer.',
+ 	purchaseId: Joi.number().integer().required().messages({
+        'any.required': 'purchaseId is required.',
+        'number.base': 'purchaseId must be a valid integer.',
       }),
  	productService: Joi.string().trim().required().messages({
         'any.required': 'productService is required.',
@@ -25,13 +25,17 @@ const SalesItemsSchema = Joi.object({
         'any.required': 'description is required.',
         'string.empty': 'description must be a valid text.',
       }),
+ 	unit: Joi.string().trim().required().messages({
+        'any.required': 'unit is required.',
+        'string.empty': 'unit must be a valid string.',
+      }),
  	quantity: Joi.number().integer().required().messages({
         'any.required': 'quantity is required.',
         'number.base': 'quantity must be a valid integer.',
       }),
- 	salesPrice: Joi.string().trim().required().messages({
-        'any.required': 'salesPrice is required.',
-        'string.empty': 'salesPrice must be a valid decimal.',
+ 	purchasePrice: Joi.string().trim().required().messages({
+        'any.required': 'purchasePrice is required.',
+        'string.empty': 'purchasePrice must be a valid decimal.',
       }),
  	discount: Joi.string().trim().required().messages({
         'any.required': 'discount is required.',
@@ -53,23 +57,24 @@ const SalesItemsSchema = Joi.object({
 
 
 /** Field references for clean, type-safe access */
-const SalesItemsField = {
+const PurchaseItemsField = {
     Id: 'id',
-    SalesId: 'sales_id',
+    PurchaseId: 'purchase_id',
     ProductService: 'product_service',
     ChartsOfAccounts: 'charts_of_accounts',
     Description: 'description',
+    Unit: 'unit',
     Quantity: 'quantity',
-    SalesPrice: 'sales_price',
+    PurchasePrice: 'purchase_price',
     Discount: 'discount',
     Vat: 'vat',
     WitholdingTax: 'witholding_tax',
     ResponsibilityCenter: 'responsibility_center',
-    All: ['id', 'sales_id', 'product_service', 'charts_of_accounts', 'description', 'quantity', 'sales_price', 'discount', 'vat', 'witholding_tax', 'responsibility_center'],
+    All: ['id', 'purchase_id', 'product_service', 'charts_of_accounts', 'description', 'unit', 'quantity', 'purchase_price', 'discount', 'vat', 'witholding_tax', 'responsibility_center'],
 };
 
 
 module.exports = {
-  SalesItemsSchema,
-  SalesItemsField, 
+  PurchaseItemsSchema,
+  PurchaseItemsField, 
 };

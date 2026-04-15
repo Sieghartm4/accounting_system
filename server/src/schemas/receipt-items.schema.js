@@ -25,10 +25,6 @@ const ReceiptItemsSchema = Joi.object({
         'any.required': 'description is required.',
         'string.empty': 'description must be a valid text.',
       }),
- 	unit: Joi.string().trim().required().messages({
-        'any.required': 'unit is required.',
-        'string.empty': 'unit must be a valid string.',
-      }),
  	quantity: Joi.number().integer().required().messages({
         'any.required': 'quantity is required.',
         'number.base': 'quantity must be a valid integer.',
@@ -63,14 +59,13 @@ const ReceiptItemsField = {
     ProductService: 'product_service',
     ChartsOfAccounts: 'charts_of_accounts',
     Description: 'description',
-    Unit: 'unit',
     Quantity: 'quantity',
     SalesPrice: 'sales_price',
     Discount: 'discount',
     Vat: 'vat',
     WitholdingTax: 'witholding_tax',
     ResponsibilityCenter: 'responsibility_center',
-    All: ['id', 'receipts_id', 'product_service', 'charts_of_accounts', 'description', 'unit', 'quantity', 'sales_price', 'discount', 'vat', 'witholding_tax', 'responsibility_center'],
+    All: ['id', 'receipts_id', 'product_service', 'charts_of_accounts', 'description', 'quantity', 'sales_price', 'discount', 'vat', 'witholding_tax', 'responsibility_center'],
 };
 
 

@@ -125,7 +125,6 @@ const getPurchaseItemsPayment = async (req, res, next) => {
 
       // Line item detail
       { col: Accounting.purchase_items.selectOptionColumns.description, as: 'description' },
-      { col: Accounting.purchase_items.selectOptionColumns.unit, as: 'unit' },
       { col: Accounting.purchase_items.selectOptionColumns.quantity, as: 'quantity' },
       { col: Accounting.purchase_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
 

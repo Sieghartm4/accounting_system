@@ -4,34 +4,30 @@
 
 const Joi = require('joi');
 
-const ReceiptsSchema = Joi.object({
+const PurchaseSchema = Joi.object({
  	id: Joi.number().integer().required().messages({
         'any.required': 'id is required.',
         'number.base': 'id must be a valid integer.',
       }),
- 	customerId: Joi.number().integer().required().messages({
-        'any.required': 'customerId is required.',
-        'number.base': 'customerId must be a valid integer.',
+ 	vendorId: Joi.number().integer().required().messages({
+        'any.required': 'vendorId is required.',
+        'number.base': 'vendorId must be a valid integer.',
       }),
  	documentReference: Joi.string().trim().required().messages({
         'any.required': 'documentReference is required.',
         'string.empty': 'documentReference must be a valid string.',
       }),
- 	collectionDate: Joi.string().trim().required().messages({
-        'any.required': 'collectionDate is required.',
-        'string.empty': 'collectionDate must be a valid string.',
+ 	terms: Joi.string().trim().required().messages({
+        'any.required': 'terms is required.',
+        'string.empty': 'terms must be a valid enum.',
       }),
- 	modeOfPayment: Joi.string().trim().required().messages({
-        'any.required': 'modeOfPayment is required.',
-        'string.empty': 'modeOfPayment must be a valid string.',
+ 	dateDelivered: Joi.string().trim().required().messages({
+        'any.required': 'dateDelivered is required.',
+        'string.empty': 'dateDelivered must be a valid string.',
       }),
- 	bankName: Joi.string().trim().required().messages({
-        'any.required': 'bankName is required.',
-        'string.empty': 'bankName must be a valid string.',
-      }),
- 	checkNumber: Joi.string().trim().required().messages({
-        'any.required': 'checkNumber is required.',
-        'string.empty': 'checkNumber must be a valid string.',
+ 	dateDue: Joi.string().trim().required().messages({
+        'any.required': 'dateDue is required.',
+        'string.empty': 'dateDue must be a valid string.',
       }),
  	remarks: Joi.string().trim().required().messages({
         'any.required': 'remarks is required.',
@@ -40,6 +36,10 @@ const ReceiptsSchema = Joi.object({
  	totalAmountDue: Joi.string().trim().required().messages({
         'any.required': 'totalAmountDue is required.',
         'string.empty': 'totalAmountDue must be a valid decimal.',
+      }),
+ 	status: Joi.string().trim().required().messages({
+        'any.required': 'status is required.',
+        'string.empty': 'status must be a valid enum.',
       }),
  	state: Joi.string().trim().required().messages({
         'any.required': 'state is required.',
@@ -57,24 +57,24 @@ const ReceiptsSchema = Joi.object({
 
 
 /** Field references for clean, type-safe access */
-const ReceiptsField = {
+const PurchaseField = {
     Id: 'id',
-    CustomerId: 'customer_id',
+    VendorId: 'vendor_id',
     DocumentReference: 'document_reference',
-    CollectionDate: 'collection_date',
-    ModeOfPayment: 'mode_of_payment',
-    BankName: 'bank_name',
-    CheckNumber: 'check_number',
+    Terms: 'terms',
+    DateDelivered: 'date_delivered',
+    DateDue: 'date_due',
     Remarks: 'remarks',
     TotalAmountDue: 'total_amount_due',
+    Status: 'status',
     State: 'state',
     CreatedDate: 'created_date',
     CreatedBy: 'created_by',
-    All: ['id', 'customer_id', 'document_reference', 'collection_date', 'mode_of_payment', 'bank_name', 'check_number', 'remarks', 'total_amount_due', 'state', 'created_date', 'created_by'],
+    All: ['id', 'vendor_id', 'document_reference', 'terms', 'date_delivered', 'date_due', 'remarks', 'total_amount_due', 'status', 'state', 'created_date', 'created_by'],
 };
 
 
 module.exports = {
-  ReceiptsSchema,
-  ReceiptsField, 
+  PurchaseSchema,
+  PurchaseField, 
 };

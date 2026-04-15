@@ -84,7 +84,6 @@ const getAllPurchase = async (req, res, next) => {
       { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
       { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
       { col: Accounting.purchase_items.selectOptionColumns.description, as: 'description' },
-      { col: Accounting.purchase_items.selectOptionColumns.unit, as: 'unit' },
       { col: Accounting.purchase_items.selectOptionColumns.quantity, as: 'quantity' },
       { col: Accounting.purchase_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
       { col: Accounting.purchase_items.selectOptionColumns.discount, as: 'discount' },
@@ -93,7 +92,7 @@ const getAllPurchase = async (req, res, next) => {
       { col: Accounting.purchase_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
     ])
       .from(Accounting.purchase_items.tablename)
-      .innerJoin(Master.products_service.tablename, Accounting.purchase_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
+      .leftJoin(Master.products_service.tablename, Accounting.purchase_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
       .innerJoin(Master.charts_of_accounts.tablename, Accounting.purchase_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
       .where(Accounting.purchase_items.selectOptionColumns.purchase_id)
       .build();
@@ -166,7 +165,7 @@ const createPurchase = async (req, res, next) => {
       attachments
     } = req.body;
     console.log(req.body)
-    if (!vendor_id || !document_reference || !terms || !date_delivered || !date_due || !remarks || !total_amount_due || !created_by) {
+    if (!vendor_id || !document_reference || !terms || !date_delivered || !date_due || !total_amount_due || !created_by) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
@@ -195,7 +194,7 @@ const createPurchase = async (req, res, next) => {
         remarks || null,
         total_amount_due || null,
         'UNPAID',
-        'PREPARED BY',
+        'PREPARED',
         new Date().toISOString().split('T')[0],
         created_by || null
       ];
@@ -216,7 +215,6 @@ const createPurchase = async (req, res, next) => {
             item.product_service || null,
             item.charts_of_accounts || null,
             item.description || null,
-            item.unit || '',
             item.quantity || 0,
             item.purchase_price || 0,
             item.discount || 0,
@@ -331,12 +329,12 @@ const updatePurchaseState = async (req, res, next) => {
         }
 
         let nextState;
-        if (currentState === 'PREPARED BY') {
-          nextState = 'CHECKED BY';
-        } else if (currentState === 'CHECKED BY') {
-          nextState = 'APPROVED BY';
+        if (currentState === 'PREPARED') {
+          nextState = 'CHECKED';
+        } else if (currentState === 'CHECKED') {
+          nextState = 'APPROVED';
         } else {
-          throw new Error(`Invalid current state: ${currentState}. Only PREPARED BY and CHECKED BY can be updated.`);
+          throw new Error(`Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`);
         }
 
           const updateQuery = sql.update(Accounting.purchase.tablename)

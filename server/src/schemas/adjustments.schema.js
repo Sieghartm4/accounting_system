@@ -4,46 +4,30 @@
 
 const Joi = require('joi');
 
-const SalesSchema = Joi.object({
+const AdjustmentsSchema = Joi.object({
  	id: Joi.number().integer().required().messages({
         'any.required': 'id is required.',
         'number.base': 'id must be a valid integer.',
-      }),
- 	customerId: Joi.number().integer().required().messages({
-        'any.required': 'customerId is required.',
-        'number.base': 'customerId must be a valid integer.',
       }),
  	documentReference: Joi.string().trim().required().messages({
         'any.required': 'documentReference is required.',
         'string.empty': 'documentReference must be a valid string.',
       }),
- 	terms: Joi.string().trim().required().messages({
-        'any.required': 'terms is required.',
-        'string.empty': 'terms must be a valid enum.',
-      }),
- 	dateDelivered: Joi.string().trim().required().messages({
-        'any.required': 'dateDelivered is required.',
-        'string.empty': 'dateDelivered must be a valid string.',
-      }),
- 	dateDue: Joi.string().trim().required().messages({
-        'any.required': 'dateDue is required.',
-        'string.empty': 'dateDue must be a valid string.',
+ 	postingDate: Joi.string().trim().required().messages({
+        'any.required': 'postingDate is required.',
+        'string.empty': 'postingDate must be a valid string.',
       }),
  	remarks: Joi.string().trim().required().messages({
         'any.required': 'remarks is required.',
         'string.empty': 'remarks must be a valid text.',
       }),
- 	totalAmountDue: Joi.string().trim().required().messages({
-        'any.required': 'totalAmountDue is required.',
-        'string.empty': 'totalAmountDue must be a valid decimal.',
-      }),
  	status: Joi.string().trim().required().messages({
         'any.required': 'status is required.',
         'string.empty': 'status must be a valid enum.',
       }),
- 	state: Joi.string().trim().required().messages({
-        'any.required': 'state is required.',
-        'string.empty': 'state must be a valid enum.',
+ 	totalAmount: Joi.string().trim().required().messages({
+        'any.required': 'totalAmount is required.',
+        'string.empty': 'totalAmount must be a valid decimal.',
       }),
  	createdDate: Joi.string().trim().required().messages({
         'any.required': 'createdDate is required.',
@@ -57,24 +41,20 @@ const SalesSchema = Joi.object({
 
 
 /** Field references for clean, type-safe access */
-const SalesField = {
+const AdjustmentsField = {
     Id: 'id',
-    CustomerId: 'customer_id',
     DocumentReference: 'document_reference',
-    Terms: 'terms',
-    DateDelivered: 'date_delivered',
-    DateDue: 'date_due',
+    PostingDate: 'posting_date',
     Remarks: 'remarks',
-    TotalAmountDue: 'total_amount_due',
     Status: 'status',
-    State: 'state',
+    TotalAmount: 'total_amount',
     CreatedDate: 'created_date',
     CreatedBy: 'created_by',
-    All: ['id', 'customer_id', 'document_reference', 'terms', 'date_delivered', 'date_due', 'remarks', 'total_amount_due', 'status', 'state', 'created_date', 'created_by'],
+    All: ['id', 'document_reference', 'posting_date', 'remarks', 'status', 'total_amount', 'created_date', 'created_by'],
 };
 
 
 module.exports = {
-  SalesSchema,
-  SalesField, 
+  AdjustmentsSchema,
+  AdjustmentsField, 
 };

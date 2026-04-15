@@ -36,10 +36,6 @@ module.exports = {
         type: Sequelize.TEXT('long'),
         allowNull: true
       },
-      pi_unit: {
-        type: Sequelize.STRING(300),
-        allowNull: true
-      },
       pi_quantity: {
         type: Sequelize.INTEGER,
         allowNull: true

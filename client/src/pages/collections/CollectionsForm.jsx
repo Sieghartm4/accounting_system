@@ -204,6 +204,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
   const [bankName,          setBankName]          = useState('');
   const [checkNumber,       setCheckNumber]       = useState('');
   const [documentReference, setDocumentReference] = useState('');
+  const [collectionDate,    setCollectionDate]    = useState('');
   const [remarks,           setRemarks]           = useState('');
 
   const [attachments, setAttachments] = useState([]);
@@ -287,6 +288,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
         setModeSearch(collection.mode_of_payment || '');
         setBankName(collection.bank_name || '');
         setCheckNumber(collection.check_number || '');
+        setCollectionDate(collection.collection_date || '');
         setRemarks(collection.remarks || '');
       }
 
@@ -382,7 +384,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
 
         return {
           id:                  Date.now() + Math.random(),
-          salesItemId:         s.id,                        // → ci_sales_id
+          salesItemId:         s.sales_id,                  // → ci_sales_id
           invoiceRef:          s.document_reference || '',  // display only
           description:         s.product_service_name || s.description || '', // display only
           responsibilityCenter: s.responsibility_center || '', // display only
@@ -571,7 +573,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
         mode_of_payment:    modeOfPayment,
         bank_name:          bankName    || '',
         check_number:       checkNumber || '',
-        collection_date:    new Date().toISOString().split('T')[0],
+        collection_date:    collectionDate || new Date().toISOString().split('T')[0],
         remarks,
         total_amount_due:   summary.totalCashCollected,
         created_by:         createdBy,
@@ -721,6 +723,8 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
               <legend className="text-[11px] font-black uppercase text-gray-100">Collection Date</legend>
               <input
                 type="date"
+                value={collectionDate}
+                onChange={e => setCollectionDate(e.target.value)}
                 disabled={isViewMode}
                 className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
                   ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
