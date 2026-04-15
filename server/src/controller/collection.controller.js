@@ -183,7 +183,7 @@ const getSalesItemsCollection = async (req, res, next) => {
 
 const getAllCollections = async (req, res, next) => {
   const { collection_id } = req.params;
-  const collectionId = Number(collection_id);
+  const collectionId = Number(4);
   console.log('Converted collection_id:', collectionId, 'type:', typeof collectionId);
   
   if (!collection_id || isNaN(collectionId)) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft, Save, Plus, Trash2,
+  ArrowLeft, Save, Plus, Trash2, Minus,
   FileText, Paperclip, Calculator, Layers, Landmark, Receipt
 } from 'lucide-react';
 import ReactDOM from 'react-dom';
@@ -206,9 +206,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
   const [documentReference, setDocumentReference] = useState('');
   const [remarks,           setRemarks]           = useState('');
 
-  const [attachments, setAttachments] = useState([
-    { id: 1, fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }
-  ]);
+  const [attachments, setAttachments] = useState([]);
 
   const [toast, setToast] = useState(null);
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' });
@@ -639,7 +637,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
       {toast && <DynamicToast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
 
       {/* TOP NAV */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+      <div className="flex items-center justify-between flex-shrink-0">
         <nav className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors" onClick={onBack}>
           <ArrowLeft size={17} /><span className="text-black">Back to Collections</span>
         </nav>
@@ -659,19 +657,17 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
       </div>
 
       {/* BODY */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      <div className="flex-1 flex flex-col gap-2 min-h-0">
 
-        {/* ── LEFT SIDEBAR ── */}
-        <aside className="w-72 flex-shrink-0 flex flex-col gap-3 h-full overflow-y-auto sidebar-scroll pb-2">
-
-          {/* Basic Details */}
-          <section className="bg-black rounded-2xl p-4 text-white shadow-xl flex-shrink-0">
-            <h3 className="text-[12px] font-black uppercase tracking-[3px] text-red-500 mb-3 flex items-center gap-2">
-              <Landmark size={12} /> Basic Details
-            </h3>
-            <div className="grid grid-cols-1 gap-2.5">
-              <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Customer <span className="text-red-600">*</span></label>
+        {/* BASIC DETAILS - FULL WIDTH TOP */}
+        <fieldset className="bg-black rounded-2xl p-3 text-white shadow-xl">
+          <legend className="bg-red-600 text-[13px] font-black uppercase tracking-[3px] text-white flex items-center justify-center gap-2 px-4 py-1 rounded-lg mx-auto w-fit">
+            <Landmark size={18} /> Basic Details
+          </legend>
+          <div className={`grid gap-3 ${(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') ? 'grid-cols-6' : 'grid-cols-4'}`}>
+            <div className="col-span-1">
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Customer <span className="text-red-600">*</span></legend>
                 {isViewMode ? (
                   <div className={inputBase + " text-black py-1.5"}>{customerSearch || 'No customer selected'}</div>
                 ) : customerLoading ? (
@@ -687,73 +683,139 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                     emptyText={customerError || 'No customers found'}
                   />
                 )}
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <SidebarInput label="OR / Reference" placeholder="OR-000" value={documentReference} onChange={e => setDocumentReference(e.target.value)} disabled={isViewMode} />
-                <SidebarInput label="Date" type="date" disabled={isViewMode} />
-              </div>
-              <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Mode of Payment</label>
-                {isViewMode ? (
-                  <div className={inputBase + " text-black py-1.5"}>{modeSearch || 'No mode selected'}</div>
-                ) : (
-                  <SearchableDropdown
-                    placeholder="Select mode..."
-                    value={modeSearch}
-                    onChange={v => { setModeSearch(v); setModeOfPayment(''); }}
-                    onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }}
-                    options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))}
-                    inputClassName={inputBase}
-                    emptyText="No modes found"
-                  />
-                )}
-              </div>
-              {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
-                <div className="grid grid-cols-2 gap-2">
-                  <SidebarInput label="Bank Name" placeholder="Enter bank name" value={bankName} onChange={e => setBankName(e.target.value)} disabled={isViewMode} />
-                  <SidebarInput label="Check #" placeholder="Check number" value={checkNumber} onChange={e => setCheckNumber(e.target.value)} disabled={isViewMode} />
-                </div>
+              </fieldset>
+            </div>
+            <div className="col-span-1">
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">OR / Reference</legend>
+                <input
+                  type="text"
+                  placeholder="OR-000"
+                  value={documentReference}
+                  onChange={e => setDocumentReference(e.target.value)}
+                  disabled={isViewMode}
+                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                    ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                    : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                    }`}
+                />
+              </fieldset>
+            </div>
+            <fieldset>
+              <legend className="text-[11px] font-black uppercase text-gray-100">Mode of Payment</legend>
+              {isViewMode ? (
+                <div className={inputBase + " text-black py-1.5"}>{modeSearch || 'No mode selected'}</div>
+              ) : (
+                <SearchableDropdown
+                  placeholder="Select mode..."
+                  value={modeSearch}
+                  onChange={v => { setModeSearch(v); setModeOfPayment(''); }}
+                  onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }}
+                  options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))}
+                  inputClassName={inputBase}
+                  emptyText="No modes found"
+                />
               )}
-            </div>
-          </section>
+            </fieldset>
+            <fieldset>
+              <legend className="text-[11px] font-black uppercase text-gray-100">Collection Date</legend>
+              <input
+                type="date"
+                disabled={isViewMode}
+                className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                  ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                  : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                  }`}
+              />
+            </fieldset>
+            {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Bank Name</legend>
+                <input
+                  type="text"
+                  placeholder="Enter bank name"
+                  value={bankName}
+                  onChange={e => setBankName(e.target.value)}
+                  disabled={isViewMode}
+                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                    ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                    : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                    }`}
+                />
+              </fieldset>
+            )}
+            {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Check #</legend>
+                <input
+                  type="text"
+                  placeholder="Check number"
+                  value={checkNumber}
+                  onChange={e => setCheckNumber(e.target.value)}
+                  disabled={isViewMode}
+                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                    ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                    : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                    }`}
+                />
+              </fieldset>
+            )}
+          </div>
+        </fieldset>
 
-          {/* SUMMARY */}
-          <section className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex-1 flex flex-col min-h-0">
-            <h3 className="text-[12px] font-black uppercase tracking-[3px] text-gray-900 mb-2 flex items-center gap-2 flex-shrink-0">
-              <Calculator size={12} /> Summary
-            </h3>
-            <div className="overflow-y-auto min-h-0 flex-1 space-y-0">
-              <SummaryRow label="Total Invoice Amount" value={fmt(summary.totalGross)}         formula="Σ (Qty × Price)" />
-              <SDivider />
-              <SummaryRow label="Total Discount"       value={fmt(summary.totalDiscount)}      formula="Σ (Gross × Disc%)"        color="text-orange-500" />
-              <SDivider />
-              <SummaryRow label="Total VAT"            value={fmt(summary.totalVAT)}           formula="Σ (Discounted × VAT%)"    color="text-red-600" />
-              <SDivider />
-              <SummaryRow label="Total WHT"            value={fmt(summary.totalWHT)}           formula="Σ (Discounted × WHT%)"    color="text-blue-600" />
-              <SDivider />
-              <SummaryRow label="Total Amount Due" value={fmt(summary.totalCashCollected)} formula="Discounted + VAT - WHT"   color="text-green-600" />
-            </div>
-            <div className="mt-3 flex-shrink-0">
-              <div className="flex flex-col gap-[2px] mb-2">
-                <div className="h-[2px] w-full bg-red-600 rounded-full" />
-                <div className="h-[1px] w-full bg-black/10" />
-              </div>
-              <div className="mb-2 px-2 py-1 bg-red-50 rounded-lg border border-red-100 text-center">
-                <p className="text-[9px] font-black uppercase tracking-wide text-red-400">Discounted + VAT − WHT</p>
-              </div>
-              <div className="text-center">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[3px] mb-1">Total Amount Due</p>
-                <p className="text-2xl font-black text-black tracking-tighter leading-none flex items-baseline justify-center gap-1">
-                  <span className="text-[13px] text-red-600">PHP</span>
-                  {fmt(summary.totalCashCollected)}
-                </p>
-              </div>
-            </div>
-          </section>
-        </aside>
+        {/* MAIN CONTENT AREA */}
+        <div className="flex-1 flex gap-2 min-h-0">
 
-        {/* ── MAIN CONTENT ── */}
-        <main className="flex-1 overflow-y-auto custom-table-scroller space-y-4 pr-1 min-h-0">
+          {/* LEFT SIDEBAR - SUMMARY ONLY */}
+          <aside className="w-full flex-shrink-0 flex flex-col gap-2 h-full overflow-y-auto sidebar-scroll max-w-[20%]">
+
+            {/* ── SUMMARY ── */}
+            <section className=" bg-white rounded-2xl border-2 border-red-100 shadow-xl shadow-red-500/5 flex-1 flex flex-col min-h-0 overflow-hidden">
+
+              {/* Header: Solid Red with White Text */}
+              <header className="bg-red-600 p-4 flex-shrink-0">
+                <h3 className="text-[clamp(14px,1.4vw,16px)] font-black uppercase tracking-[3px] text-white flex items-center gap-2">
+                  <Calculator size={16} className="shrink-0 text-white" />
+                  Summary
+                </h3>
+              </header>
+
+              {/* Scrollable rows */}
+              <div className="custom-table-scroller overflow-y-auto min-h-0 flex-1 custom-scrollbar p-4 py-2">
+                <div className="space-y-0">
+                  <SummaryRow label="Total Invoice Amount" value={fmt(summary.totalGross)}  />
+                  <SDivider />
+                  <SummaryRow label="Total Discount"       value={fmt(summary.totalDiscount)}       />
+                  <SDivider />
+                  <SummaryRow label="Total VAT"            value={fmt(summary.totalVAT)}            />
+                  <SDivider />
+                  <SummaryRow label="Total WHT"            value={fmt(summary.totalWHT)}  />
+                </div>
+              </div>
+
+              {/* Total Amount Due footer */}
+              <div className="p-4 pt-0 flex-shrink-0">
+                <div className="flex flex-col gap-[2px] mb-3">
+                  <div className="h-[3px] w-full bg-red-600 rounded-full" />
+                  <div className="h-[1px] w-full bg-gray-200" />
+                </div>
+
+                <div className="text-center bg-red-500 rounded-xl py-3 border border-gray-100">
+                  <p className="text-[clamp(11px,1.1vw,12px)] font-black text-gray-200 uppercase tracking-[4px] mb-1">
+                    Total Amount Due
+                  </p>
+
+                  <p className="text-[clamp(22px,2.5vw,28px)] font-black text-white tracking-tighter leading-none flex items-baseline justify-center gap-2">
+                    <span className="text-[clamp(12px,1.3vw,15px)] text-green-300 font-black">PHP</span>
+                    {fmt(summary.totalCashCollected)}
+                  </p>
+                </div>
+              </div>
+            </section>
+          </aside>
+
+          {/* MAIN CONTENT */}
+          <main className="flex-1 overflow-y-auto custom-table-scroller space-y-4 pr-1 min-h-0">
           <motion.div initial="hidden" animate="visible" variants={fadeInUp} className="space-y-4">
 
             {/* 1. COLLECTION ITEMS */}
@@ -857,7 +919,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                 <div className="mt-3">
                   <button
                     onClick={() => setIsModalOpen(true)}
-                    className="w-full py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-2"
                   >
                     <Plus size={14} /> Add Sales Items
                   </button>
@@ -982,7 +1044,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
               {!isViewMode && (
                 <button
                   onClick={addJournalEntry}
-                  className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1"
+                  className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1"
                 >
                   <Plus size={15} /> Add Ledger Row
                 </button>
@@ -1082,7 +1144,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                   </table>
                 </div>
                 {!isViewMode && (
-                  <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
+                  <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1">
                     <Plus size={15} /> Add File
                   </button>
                 )}
@@ -1106,6 +1168,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
           </motion.div>
         </main>
       </div>
+    </div>
 
       {/* ── SALES INVOICE MODAL ── */}
       <RightSideModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Select Sales Invoices" size="2xl">
@@ -1255,26 +1318,59 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
 function TableSection({ title, icon, children }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">{icon}</div>
-        <h2 className="text-[15px] font-black uppercase tracking-[1px] text-black">{title}</h2>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between p-4 pb-2">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">{icon}</div>
+          <h2 className="text-[15px] font-black uppercase tracking-[1px] text-black">{title}</h2>
+        </div>
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+        >
+          {isCollapsed ? (
+            <>
+              <Plus size={16} />
+              <span className="text-[11px] font-black uppercase">Show</span>
+            </>
+          ) : (
+            <>
+              <Minus size={16} />
+              <span className="text-[11px] font-black uppercase">Hide</span>
+            </>
+          )}
+        </button>
       </div>
-      {children}
+      
+      {!isCollapsed && (
+        <div className="px-4 pb-4">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
 
-function SDivider() { return <div className="h-[1px] w-full bg-gray-100" />; }
+function SDivider() { return <div className="h-[1px] w-full bg-gray-400" />; }
 
 function SummaryRow({ label, value, color = 'text-gray-800', formula }) {
   return (
-    <div className="summary-row relative flex justify-between items-center hover:bg-gray-50 rounded-md transition-colors py-1 px-1 cursor-default">
-      <span className="text-[10.5px] font-black uppercase text-gray-500 leading-tight pr-1 flex-1">{label}</span>
-      <span className={`${color} text-[12px] font-black tabular-nums tracking-tight whitespace-nowrap text-right flex-shrink-0`}>{value}</span>
+    <div className="summary-row relative flex justify-between items-center hover:bg-gray-50 rounded-md transition-colors py-1.5 px-1 cursor-default">
+      {/* Label: 10.5px -> ~12.5px */}
+      <span className="text-[clamp(11px,1.1vw,12.5px)] font-black uppercase text-gray-500 leading-tight pr-1 flex-1">
+        {label}
+      </span>
+
+      {/* Value: 12px -> ~14px */}
+      <span className={`${color} text-[clamp(12px,1.25vw,14px)] font-black tabular-nums tracking-tight whitespace-nowrap text-right flex-shrink-0`}>
+        {value}
+      </span>
+
       {formula && (
-        <div className="summary-tooltip absolute left-0 bottom-full mb-1 z-50 bg-gray-900 text-white text-[10px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none">
+        <div className="summary-tooltip absolute left-0 bottom-full mb-1 z-50 bg-gray-900 text-white text-[11px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none">
           <span className="text-gray-300 font-medium">{formula}</span>
           <div className="absolute left-3 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900" />
         </div>

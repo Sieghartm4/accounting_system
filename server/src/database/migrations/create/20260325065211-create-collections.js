@@ -39,7 +39,7 @@ module.exports = {
       },
       c_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: true
       },
       c_status: {
         type: Sequelize.ENUM('COLLECTED', 'NOT COLLECTED', 'PARTIALLY COLLECTED'),
