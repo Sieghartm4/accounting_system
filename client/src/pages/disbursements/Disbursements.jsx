@@ -93,11 +93,11 @@ function DisbursementsContent() {
 
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
-        <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+        {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
           <span>Treasury</span>
           <ArrowRight size={10} />
           <span className="text-black">Disbursement Vouchers</span>
-        </nav>
+        </nav> */}
 
         <motion.div
           initial="hidden"

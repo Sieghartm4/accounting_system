@@ -107,30 +107,23 @@ const getSalesItemsCollection = async (req, res, next) => {
     }
 
     const query = sql.select([
-      // Sales item identity
       { col: Accounting.sales_items.selectOptionColumns.id, as: 'id' },
       { col: Accounting.sales_items.selectOptionColumns.sales_id, as: 'sales_id' },
 
-      // Product info (display only)
       { col: Accounting.sales_items.selectOptionColumns.product_service, as: 'product_service' },
       { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
 
-      // COA / AR account
       { col: Accounting.sales_items.selectOptionColumns.charts_of_accounts, as: 'charts_of_accounts' },
       { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'coa_name' },
 
-      // Invoice reference (from parent sales header)
       { col: Accounting.sales.selectOptionColumns.document_reference, as: 'document_reference' },
 
-      // Line item detail
       { col: Accounting.sales_items.selectOptionColumns.description, as: 'description' },
-      { col: Accounting.sales_items.selectOptionColumns.unit, as: 'unit' },
       { col: Accounting.sales_items.selectOptionColumns.quantity, as: 'quantity' },
-      { col: Accounting.sales_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
+      { col: Accounting.sales_items.selectOptionColumns.sales_price, as: 'sales_price' },
 
-      // Rate fields — all needed to compute ci_amount correctly
       { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
-      { col: Accounting.sales_items.selectOptionColumns.vat, as: 'vat' },           // ← CRITICAL: must be returned
+      { col: Accounting.sales_items.selectOptionColumns.vat, as: 'vat' },
       { col: Accounting.sales_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
 
       { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
@@ -141,7 +134,7 @@ const getSalesItemsCollection = async (req, res, next) => {
         Accounting.sales_items.selectOptionColumns.sales_id,
         Accounting.sales.selectOptionColumns.id
       )
-      .innerJoin(
+      .leftJoin(
         Master.products_service.tablename,
         Accounting.sales_items.selectOptionColumns.product_service,
         Master.products_service.selectOptionColumns.id

@@ -8,6 +8,66 @@ import ReactDOM from 'react-dom';
 import DynamicToast from '../../components/DynamicToast';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Drag to Scroll Hook
+// ─────────────────────────────────────────────────────────────────────────────
+function useDragToScroll() {
+  const ref = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const handleMouseDown = (e) => {
+      setIsDragging(true);
+      setStartX(e.pageX - element.offsetLeft);
+      setScrollLeft(element.scrollLeft);
+      element.style.cursor = 'grabbing';
+      element.style.userSelect = 'none';
+    };
+
+    const handleMouseLeave = () => {
+      setIsDragging(false);
+      element.style.cursor = 'grab';
+      element.style.userSelect = 'auto';
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      element.style.cursor = 'grab';
+      element.style.userSelect = 'auto';
+    };
+
+    const handleMouseMove = (e) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      const x = e.pageX - element.offsetLeft;
+      const walk = (x - startX) * 2; // Adjust scroll speed
+      element.scrollLeft = scrollLeft - walk;
+    };
+
+    // Add cursor style
+    element.style.cursor = 'grab';
+
+    element.addEventListener('mousedown', handleMouseDown);
+    element.addEventListener('mouseleave', handleMouseLeave);
+    element.addEventListener('mouseup', handleMouseUp);
+    element.addEventListener('mousemove', handleMouseMove);
+
+    return () => {
+      element.removeEventListener('mousedown', handleMouseDown);
+      element.removeEventListener('mouseleave', handleMouseLeave);
+      element.removeEventListener('mouseup', handleMouseUp);
+      element.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [isDragging, startX, scrollLeft]);
+
+  return ref;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
 // ─────────────────────────────────────────────────────────────────────────────
 const MIN_DROPDOWN_WIDTH = 260;
@@ -223,9 +283,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
   const [documentReference, setDocumentReference] = useState('');
   const [remarks, setRemarks] = useState('');
 
-  const [attachments, setAttachments] = useState([
-    { id: 1, fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }
-  ]);
+  const [attachments, setAttachments] = useState([]);
 
   const [toast, setToast] = useState(null);
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' });
@@ -400,6 +458,9 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
 
   const fadeInUp = { hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
+  // Apply drag-to-scroll to receipt items table
+  const receiptItemsScrollRef = useDragToScroll();
+
   const generateJournalEntries = () => {
     const entries = [];
     let totalCreditAmount = 0;
@@ -567,8 +628,19 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
         return;
       }
 
-      if (receiptItems.length === 0 || (receiptItems.length === 1 && receiptItems[0].isOther)) {
-        setToast({ type: 'warning', message: 'Please add at least one receipt item' });
+      // Check if there are valid items (either regular items with product OR Other items with required fields)
+      const hasValidItems = receiptItems.some(item => {
+        if (item.isOther) {
+          // Other items are valid if they have description and charts of accounts
+          return item.description.trim() !== '' && item.coa !== '';
+        } else {
+          // Regular items are valid if they have a product
+          return item.productId !== '';
+        }
+      });
+
+      if (!hasValidItems) {
+        setToast({ type: 'warning', message: 'Please add at least one valid receipt item' });
         return;
       }
 
@@ -579,12 +651,11 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
       }
 
       const preparedReceiptItems = receiptItems
-        .filter(item => !item.isOther)
         .map(item => ({
-          product_id: item.productId || null,
+          product_id: item.isOther ? null : (item.productId || null),
           account_id: item.coa || item.accountId,
           description: item.description,
-          qty: parseFloat(item.qty) || 0,
+          qty: item.isOther ? 1 : (parseFloat(item.qty) || 0), // Other items default to qty 1
           price: parseFloat(item.price) || 0,
           discount: parseFloat(item.discount) || 0,
           vat: parseFloat(item.vat) || 0,
@@ -901,13 +972,13 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                   </p>
                 </div> */}
 
-                <div className="text-center bg-red-50 rounded-xl py-3 border border-gray-100">
-                  <p className="text-[clamp(11px,1.1vw,12px)] font-black text-gray-600 uppercase tracking-[4px] mb-1">
+                <div className="text-center bg-red-500 rounded-xl py-3 border border-gray-100">
+                  <p className="text-[clamp(11px,1.1vw,12px)] font-black text-gray-200 uppercase tracking-[4px] mb-1">
                     Total Cash Receipt
                   </p>
 
-                  <p className="text-[clamp(22px,2.5vw,28px)] font-black text-black tracking-tighter leading-none flex items-baseline justify-center gap-2">
-                    <span className="text-[clamp(12px,1.3vw,15px)] text-red-600 font-black">PHP</span>
+                  <p className="text-[clamp(22px,2.5vw,28px)] font-black text-white tracking-tighter leading-none flex items-baseline justify-center gap-2">
+                    <span className="text-[clamp(12px,1.3vw,15px)] text-green-300 font-black">PHP</span>
                     {fmt(summary.totalAmountDue)}
                   </p>
                 </div>
@@ -927,7 +998,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                 </div>
 
 
-                <div className="overflow-x-auto custom-table-scroller">
+                <div ref={receiptItemsScrollRef} className="overflow-x-auto custom-table-scroller">
                   <table className="w-full text-center min-w-[1100px]" style={{ tableLayout: 'fixed' }}>
                     <colgroup>
                       <col style={{ width: '13%' }} />
@@ -952,16 +1023,22 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                       {receiptItems.map((item) => (
                         <tr key={item.id} className={item.isOther ? 'bg-gray-50/30' : ''}>
                           <td className="py-1 px-1">
-                            <SearchableDropdown
-                              disabled={isViewMode || item.isOther}
-                              placeholder="Search product..."
-                              value={item.productSearch}
-                              onChange={v => updateReceiptItem(item.id, 'productSearch', v)}
-                              onSelect={opt => { updateReceiptItem(item.id, 'productId', opt.value); updateReceiptItem(item.id, 'productSearch', opt.label); }}
-                              options={productOptions}
-                              inputClassName={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              emptyText={productError || 'No products found'}
-                            />
+                            {item.isOther ? (
+                              <div className="cursor-not-allowed text-center text-gray-400 text-[11px] italic py-2">
+                                
+                              </div>
+                            ) : (
+                              <SearchableDropdown
+                                disabled={isViewMode}
+                                placeholder="Search product..."
+                                value={item.productSearch}
+                                onChange={v => updateReceiptItem(item.id, 'productSearch', v)}
+                                onSelect={opt => { updateReceiptItem(item.id, 'productId', opt.value); updateReceiptItem(item.id, 'productSearch', opt.label); }}
+                                options={productOptions}
+                                inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                emptyText={productError || 'No products found'}
+                              />
+                            )}
                           </td>
                           <td className="py-1 px-1">
                             <SearchableDropdown

@@ -375,7 +375,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
       //  vat IS included — it is part of ci_amount (Discounted + VAT − WHT).
       const newItems = result.data.map(s => {
         const qty     = parseFloat(s.quantity)       || 0;
-        const price   = parseFloat(s.purchase_price) || 0;
+        const price   = parseFloat(s.sales_price) || 0;
         const discPct = parseFloat(s.discount)       || 0;
         const vatPct  = parseFloat(s.vat)            || 0; // ← MUST include VAT
         const whtPct  = parseFloat(s.witholding_tax) || 0;

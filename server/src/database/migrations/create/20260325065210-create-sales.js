@@ -35,7 +35,7 @@ module.exports = {
       },
       s_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: true
       },
       s_total_amount_due: {
         type: Sequelize.DECIMAL(18, 2),

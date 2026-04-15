@@ -85,7 +85,6 @@ const getAllCashDisbursements = async (req, res, next) => {
       { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
       { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
       { col: Accounting.cash_disbursement_items.selectOptionColumns.description, as: 'description' },
-      { col: Accounting.cash_disbursement_items.selectOptionColumns.unit, as: 'unit' },
       { col: Accounting.cash_disbursement_items.selectOptionColumns.quantity, as: 'quantity' },
       { col: Accounting.cash_disbursement_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
       { col: Accounting.cash_disbursement_items.selectOptionColumns.discount, as: 'discount' },
@@ -94,7 +93,7 @@ const getAllCashDisbursements = async (req, res, next) => {
       { col: Accounting.cash_disbursement_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
     ])
       .from(Accounting.cash_disbursement_items.tablename)
-      .innerJoin(Master.products_service.tablename, Accounting.cash_disbursement_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
+      .leftJoin(Master.products_service.tablename, Accounting.cash_disbursement_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
       .innerJoin(Master.charts_of_accounts.tablename, Accounting.cash_disbursement_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
       .where(Accounting.cash_disbursement_items.selectOptionColumns.cash_disbursement_id)
       .build();
@@ -169,7 +168,7 @@ const createCashDisbursement = async (req, res, next) => {
         } = req.body;
         console.log(req.body)
         
-        if (!vendor_id || !document_reference || !payment_date || !mode_of_payment || !remarks || !total_amount_due || !created_by) {
+        if (!vendor_id || !document_reference || !payment_date || !mode_of_payment || !total_amount_due || !created_by) {
             return res.status(400).json({
                 success: false,
                 message: 'All fields are required'
@@ -225,7 +224,6 @@ const createCashDisbursement = async (req, res, next) => {
                         item.product_id || null,
                         item.account_id || null,
                         item.description || null,
-                        item.unit || '',
                         item.qty || 0,
                         item.price || 0,
                         item.discount || 0,

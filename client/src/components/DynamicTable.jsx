@@ -141,8 +141,8 @@ const DynamicTable = ({
       );
     }
 
-    return value !== null && value !== undefined ? String(value) : (
-      <span className="text-gray-300 italic">-</span>
+    return value !== null && value !== undefined && String(value).trim() !== '' ? String(value) : (
+      <span className="text-gray-300 italic">N/A</span>
     );
   };
 

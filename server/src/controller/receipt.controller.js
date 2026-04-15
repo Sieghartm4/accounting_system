@@ -92,7 +92,7 @@ const getAllReceipts = async (req, res, next) => {
       { col: Accounting.receipt_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
     ])
       .from(Accounting.receipt_items.tablename)
-      .innerJoin(Master.products_service.tablename, Accounting.receipt_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
+      .leftJoin(Master.products_service.tablename, Accounting.receipt_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
       .innerJoin(Master.charts_of_accounts.tablename, Accounting.receipt_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
       .where(Accounting.receipt_items.selectOptionColumns.receipts_id)
       .build();
@@ -166,7 +166,7 @@ const createReceipts = async (req, res, next) => {
       attachments
     } = req.body;
     console.log(req.body)
-    if (!customer_id || !document_reference || !payment_date || !mode_of_payment || !remarks || !total_amount_due || !created_by) {
+    if (!customer_id || !document_reference || !payment_date || !mode_of_payment || !total_amount_due || !created_by) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
@@ -219,9 +219,9 @@ const createReceipts = async (req, res, next) => {
           const itemValues = [
             receiptId,
             item.product_id || null,
-            item.account_id || null,
-            item.description || null,
-            item.qty || 0,
+            item.account_id ,
+            item.description ,
+            item.qty || null,
             item.price || 0,
             item.discount || 0,
             item.vat || 0,
@@ -278,6 +278,7 @@ const createReceipts = async (req, res, next) => {
           await connection.execute(attachmentQuery, attachmentValues);
         }
       }
+      // Allow submission without attachments - attachments are optional
 
       await connection.commit();
 

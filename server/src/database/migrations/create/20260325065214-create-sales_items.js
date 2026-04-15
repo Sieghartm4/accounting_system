@@ -33,10 +33,6 @@ module.exports = {
         type: Sequelize.TEXT('long'),
         allowNull: false
       },
-      si_unit: {
-        type: Sequelize.STRING(300),
-        allowNull: true
-      },
       si_quantity: {
         type: Sequelize.INTEGER,
         allowNull: true

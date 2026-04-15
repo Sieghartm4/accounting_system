@@ -19,7 +19,7 @@ module.exports = {
       },
       ri_product_service: {
         type: Sequelize.STRING(300),
-        allowNull: false
+        allowNull: true
       },
       ri_charts_of_accounts: {
         type: Sequelize.INTEGER,

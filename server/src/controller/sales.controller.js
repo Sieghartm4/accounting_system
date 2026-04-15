@@ -84,7 +84,6 @@ const getAllSales = async (req, res, next) => {
       { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
       { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
       { col: Accounting.sales_items.selectOptionColumns.description, as: 'description' },
-      { col: Accounting.sales_items.selectOptionColumns.unit, as: 'unit' },
       { col: Accounting.sales_items.selectOptionColumns.quantity, as: 'quantity' },
       { col: Accounting.sales_items.selectOptionColumns.sales_price, as: 'sales_price' },
       { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
@@ -93,7 +92,7 @@ const getAllSales = async (req, res, next) => {
       { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
     ])
       .from(Accounting.sales_items.tablename)
-      .innerJoin(Master.products_service.tablename, Accounting.sales_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
+      .leftJoin(Master.products_service.tablename, Accounting.sales_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
       .innerJoin(Master.charts_of_accounts.tablename, Accounting.sales_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
       .where(Accounting.sales_items.selectOptionColumns.sales_id)
       .build();
@@ -166,7 +165,7 @@ const createSales = async (req, res, next) => {
       attachments
     } = req.body;
     console.log(req.body)
-    if (!customer_id || !document_reference || !terms || !date_delivered || !date_due || !remarks || !total_amount_due || !created_by) {
+    if (!customer_id || !document_reference || !terms || !date_delivered || !date_due || !total_amount_due || !created_by) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
@@ -216,7 +215,6 @@ const createSales = async (req, res, next) => {
             item.product_id || null,
             item.account_id || null,
             item.description || null,
-            item.unit || '',
             item.qty || 0,
             item.price || 0,
             item.discount || 0,

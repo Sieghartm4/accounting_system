@@ -2,10 +2,70 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Save, Plus, Trash2, Wallet,
-  FileText, Paperclip, Calculator, Layers, Landmark
+  FileText, Paperclip, Calculator, Layers, Landmark, ChevronDown, Minus
 } from 'lucide-react';
 import ReactDOM from 'react-dom';
 import DynamicToast from '../../components/DynamicToast';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drag to Scroll Hook
+// ─────────────────────────────────────────────────────────────────────────────
+function useDragToScroll() {
+  const ref = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const handleMouseDown = (e) => {
+      setIsDragging(true);
+      setStartX(e.pageX - element.offsetLeft);
+      setScrollLeft(element.scrollLeft);
+      element.style.cursor = 'grabbing';
+      element.style.userSelect = 'none';
+    };
+
+    const handleMouseLeave = () => {
+      setIsDragging(false);
+      element.style.cursor = 'grab';
+      element.style.userSelect = 'auto';
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      element.style.cursor = 'grab';
+      element.style.userSelect = 'auto';
+    };
+
+    const handleMouseMove = (e) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      const x = e.pageX - element.offsetLeft;
+      const walk = (x - startX) * 2; // Adjust scroll speed
+      element.scrollLeft = scrollLeft - walk;
+    };
+
+    // Add cursor style
+    element.style.cursor = 'grab';
+
+    element.addEventListener('mousedown', handleMouseDown);
+    element.addEventListener('mouseleave', handleMouseLeave);
+    element.addEventListener('mouseup', handleMouseUp);
+    element.addEventListener('mousemove', handleMouseMove);
+
+    return () => {
+      element.removeEventListener('mousedown', handleMouseDown);
+      element.removeEventListener('mouseleave', handleMouseLeave);
+      element.removeEventListener('mouseup', handleMouseUp);
+      element.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [isDragging, startX, scrollLeft]);
+
+  return ref;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
@@ -187,7 +247,7 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // ─────────────────────────────────────────────────────────────────────────────
 export default function SalesForm({ onBack, onSuccess, isViewMode = false, salesData = null }) {
   const [salesItems, setSalesItems] = useState([
-    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
+    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
   ]);
 
   const [journalEntries, setJournalEntries] = useState([
@@ -229,9 +289,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
   const [dateDue, setDateDue] = useState('');
   const [remarks, setRemarks] = useState('');
 
-  const [attachments, setAttachments] = useState([
-    { id: 1, fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }
-  ]);
+  const [attachments, setAttachments] = useState([]);
 
   const [toast, setToast] = useState(null);
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' });
@@ -349,7 +407,6 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
           coa: item.charts_of_accounts_id,
           coaSearch: item.charts_of_accounts_name,
           description: item.description,
-          unit: item.unit,
           qty: item.quantity,
           price: item.sales_price,
           discount: item.discount,
@@ -409,7 +466,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
     }
   }, [isViewMode, salesData]);
 
-  const addSalesItem = (isOther = false) => setSalesItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', unit: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
+  const addSalesItem = (isOther = false) => setSalesItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0 }]);
   const removeSalesItem = (id) => setSalesItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
@@ -426,6 +483,8 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
   };
 
   const summary = computeSummary(salesItems);
+
+  const salesItemsScrollRef = useDragToScroll();
 
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
@@ -607,8 +666,19 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
         return;
       }
 
-      if (salesItems.length === 0 || (salesItems.length === 1 && salesItems[0].isOther)) {
-        setToast({ type: 'warning', message: 'Please add at least one sales item' });
+      // Check if there are valid items (either regular items with product OR Other items with required fields)
+      const hasValidItems = salesItems.some(item => {
+        if (item.isOther) {
+          // Other items are valid if they have description and charts of accounts
+          return item.description.trim() !== '' && item.coa !== '';
+        } else {
+          // Regular items are valid if they have a product
+          return item.productId !== '';
+        }
+      });
+
+      if (!hasValidItems) {
+        setToast({ type: 'warning', message: 'Please add at least one valid sales item' });
         return;
       }
 
@@ -619,13 +689,11 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
       }
 
       const preparedSalesItems = salesItems
-        .filter(item => !item.isOther)
         .map(item => ({
-          product_id: item.productId || null,
+          product_id: item.isOther ? null : (item.productId || null),
           account_id: item.coa || item.accountId,
           description: item.description,
-          unit: item.unit || '',
-          qty: parseFloat(item.qty) || 0,
+          qty: item.isOther ? 1 : (parseFloat(item.qty) || 0), // Other items default to qty 1
           price: parseFloat(item.price) || 0,
           discount: parseFloat(item.discount) || 0,
           vat: parseFloat(item.vat) || 0,
@@ -728,7 +796,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
       )}
 
       {/* TOP NAV */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+      <div className="flex items-center justify-between flex-shrink-0">
         <nav className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors" onClick={onBack}>
           <ArrowLeft size={17} /><span className="text-black">Back to Sales</span>
         </nav>
@@ -743,60 +811,119 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
       </div>
 
       {/* BODY */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      <div className="flex-1 flex flex-col gap-2 min-h-0">
 
-        {/* LEFT SIDEBAR */}
-        <aside className="w-72 flex-shrink-0 flex flex-col gap-3 h-full overflow-y-auto sidebar-scroll pb-2">
-
-          {/* Basic Details */}
-          <section className="bg-black rounded-2xl p-4 text-white shadow-xl flex-shrink-0">
-            <h3 className="text-[12px] font-black uppercase tracking-[3px] text-red-500 mb-3 flex items-center gap-2">
-              <Landmark size={12} /> Basic Details
-            </h3>
-            <div className="grid grid-cols-1 gap-2.5">
-              <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Customer <span className="text-red-600">*</span></label>
-                {customerLoading
-                  ? <div className={inputBase + " text-gray-400 py-1.5"}>Loading customers…</div>
-                  : <SearchableDropdown disabled={isViewMode} placeholder="Search customer..." value={customerSearch} onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); }} onSelect={opt => { setSelectedCustomer(opt.value); setCustomerSearch(opt.label); }} options={customerOptions} inputClassName={inputBase} emptyText={customerError || 'No customers found'} />
-                }
-              </div>
-              <SidebarInput label="Document Reference" placeholder="INV-000" value={documentReference} onChange={e => setDocumentReference(e.target.value)} disabled={isViewMode} />
-              <div>
-                <label className="text-[11px] font-black uppercase text-gray-400 block mb-1">Terms <span className="text-red-600">*</span></label>
-                <div className="grid grid-cols-2 gap-2">
-                  <select 
+        {/* BASIC DETAILS - FULL WIDTH TOP */}
+        <fieldset className="bg-black rounded-2xl p-3 text-white shadow-xl">
+          <legend className="bg-red-600 text-[13px] font-black uppercase tracking-[3px] text-white flex items-center justify-center gap-2 px-4 py-1 rounded-lg mx-auto w-fit">
+            <Landmark size={18} /> Basic Details
+          </legend>
+          <div className="grid gap-3 grid-cols-5">
+            <div className="col-span-1">
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Customer <span className="text-red-600">*</span></legend>
+                {isViewMode ? (
+                  <div className={inputBase + " text-black py-1.5"}>{customerSearch || 'No customer selected'}</div>
+                ) : customerLoading ? (
+                  <div className={inputBase + " text-black py-1.5"}>Loading customers...</div>
+                ) : (
+                  <SearchableDropdown placeholder="Customer *" value={customerSearch} onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); }} onSelect={opt => { setSelectedCustomer(opt.value); setCustomerSearch(opt.label); }} options={customerOptions} inputClassName={inputBase} emptyText={customerError || 'No customers found'} />
+                )}
+              </fieldset>
+            </div>
+            <div className="col-span-1">
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Reference Number</legend>
+                <input
+                  type="text"
+                  placeholder="INV-000"
+                  value={documentReference}
+                  onChange={e => setDocumentReference(e.target.value)}
+                  disabled={isViewMode}
+                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                    ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                    : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                  }`}
+                />
+              </fieldset>
+            </div>
+            <div className="col-span-1">
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Terms <span className="text-red-600">*</span></legend>
+                <div className="grid grid-cols-2 gap-1">
+                  <select
                     disabled={isViewMode}
-                    value={termsOption} 
-                    onChange={e => setTermsOption(e.target.value)} 
-                    className={inputBase}
+                    value={termsOption}
+                    onChange={e => setTermsOption(e.target.value)}
+                    className={`w-full px-2 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                      ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                      : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                    }`}
                   >
                     {termsOptions.map(option => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
-                  <input 
+                  <input
                     disabled={isViewMode}
-                    type="number" 
-                    placeholder="Number" 
-                    value={termsNumber} 
-                    onChange={e => setTermsNumber(e.target.value)} 
-                    className={inputBase}
+                    type="number"
+                    placeholder="Number"
+                    value={termsNumber}
+                    onChange={e => setTermsNumber(e.target.value)}
+                    className={`w-full px-2 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                      ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                      : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                    }`}
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <SidebarInput label="Date Delivered" type="date" value={dateDelivered} onChange={e => setDateDelivered(e.target.value)} disabled={isViewMode} />
-                <SidebarInput label="Date Due" type="date" value={dateDue} onChange={e => setDateDue(e.target.value)} disabled={isViewMode} />
-              </div>
+              </fieldset>
             </div>
-          </section>
+          <div className="col-span-1">
+            <fieldset>
+              <legend className="text-[11px] font-black uppercase text-gray-100">Date Delivered</legend>
+              <input
+                type="date"
+                disabled={isViewMode}
+                value={dateDelivered}
+                onChange={e => setDateDelivered(e.target.value)}
+                className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                  ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                  : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                }`}
+              />
+            </fieldset>
+          </div>
+          <div className="col-span-1">
+            <fieldset>
+              <legend className="text-[11px] font-black uppercase text-gray-100">Date Due</legend>
+              <input
+                type="date"
+                disabled={isViewMode}
+                value={dateDue}
+                onChange={e => setDateDue(e.target.value)}
+                className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                  ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                  : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                }`}
+              />
+            </fieldset>
+          </div>
+        </div>
+      </fieldset>
 
-          {/* ── SUMMARY ── */}
-          <section className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex-1 flex flex-col min-h-0">
-            <h3 className="text-[12px] font-black uppercase tracking-[3px] text-gray-900 mb-2 flex items-center gap-2 flex-shrink-0">
-              <Calculator size={12} /> Summary
-            </h3>
+      <div className="flex-1 flex gap-2 min-h-0">
+
+        {/* SUMMARY */}
+        <aside className="w-full flex-shrink-0 flex flex-col gap-2 h-full overflow-y-auto sidebar-scroll max-w-[20%]">
+          <section className="bg-white rounded-2xl border-2 border-red-100 shadow-xl shadow-red-500/5 flex-1 flex flex-col min-h-0 overflow-hidden">
+
+            {/* Header: Solid Red with White Text */}
+            <header className="bg-red-600 p-4 flex-shrink-0">
+              <h3 className="text-[clamp(14px,1.4vw,16px)] font-black uppercase tracking-[3px] text-white flex items-center gap-2">
+                <Calculator size={16} className="shrink-0 text-white" />
+                Summary
+              </h3>
+            </header>
 
             {/* Hint badge
             <div className="mb-2 flex-shrink-0 px-2 py-1 bg-amber-50 rounded-lg border border-amber-100">
@@ -806,14 +933,14 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
             </div> */}
 
             {/* Scrollable rows */}
-            <div className="overflow-y-auto min-h-0 flex-1">
+            <div className="custom-table-scroller overflow-y-auto min-h-0 flex-1 custom-scrollbar p-4 py-2">
               <div className="space-y-0">
 
                 {/* 1. Total Sales Price = Σ(qty × price) */}
                 <SummaryRow
                   label="Total Sales Price"
                   value={fmt(summary.totalSalesPrice)}
-                  formula="Σ (Qty × Price)"
+                  // formula="Σ (Qty × Price)"
                 />
                 <SDivider />
 
@@ -822,7 +949,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                   label="Total Discount"
                   value={fmt(summary.totalDiscount)}
                   color="text-orange-500"
-                  formula="Σ (Gross × Disc%)"
+                  // formula="Σ (Gross × Disc%)"
                 />
                 <SDivider />
 
@@ -830,7 +957,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                 <SummaryRow
                   label="Total Discounted Amount"
                   value={fmt(summary.totalDiscounted)}
-                  formula="Σ (Gross − Discount Amt)"
+                  // formula="Σ (Gross − Discount Amt)"
                 />
                 <SDivider />
 
@@ -839,7 +966,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                   label="Total VAT"
                   value={fmt(summary.totalVAT)}
                   color="text-red-600"
-                  formula="Σ (Discounted × VAT%)"
+                  // formula="Σ (Discounted × VAT%)"
                 />
                 <SDivider />
 
@@ -847,7 +974,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                 <SummaryRow
                   label="VATable Sales"
                   value={fmt(summary.vatableSales)}
-                  formula="Discounted ÷ (1 + VAT%) where VAT > 0"
+                  // formula="Discounted ÷ (1 + VAT%) where VAT > 0"
                 />
                 <SDivider />
 
@@ -855,7 +982,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                 <SummaryRow
                   label="VAT-Exempt Sales"
                   value={fmt(summary.vatExemptSales)}
-                  formula="Items with 0% VAT & 0% WHT"
+                  // formula="Items with 0% VAT & 0% WHT"
                 />
                 <SDivider />
 
@@ -863,7 +990,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                 <SummaryRow
                   label="Zero Rated Sales"
                   value={fmt(summary.zeroRatedSales)}
-                  formula="Items with 0% VAT but WHT > 0"
+                  // formula="Items with 0% VAT but WHT > 0"
                 />
                 <SDivider />
 
@@ -871,7 +998,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                 <SummaryRow
                   label="Total No. VAT Discount"
                   value={fmt(summary.totalNoVatDiscount)}
-                  formula="Discount on VATable items (pre-VAT)"
+                  // formula="Discount on VATable items (pre-VAT)"
                 />
                 <SDivider />
 
@@ -879,7 +1006,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                 <SummaryRow
                   label="Total Net of VAT"
                   value={fmt(summary.totalNetOfVat)}
-                  formula="VATable: Disc÷(1+VAT%); Others: Discounted"
+                  // formula="VATable: Disc÷(1+VAT%); Others: Discounted"
                 />
                 <SDivider />
 
@@ -888,31 +1015,35 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                   label="Total Withholding Tax"
                   value={fmt(summary.totalWHT)}
                   color="text-blue-600"
-                  formula="Σ (Discounted × WHT%)"
+                  // formula="Σ (Discounted × WHT%)"
                 />
               </div>
             </div>
 
-            {/* Total Amount Due footer */}
-            <div className="mt-3 flex-shrink-0">
-              <div className="flex flex-col gap-[2px] mb-2">
-                <div className="h-[2px] w-full bg-red-600 rounded-full" />
-                <div className="h-[1px] w-full bg-black/10" />
+              {/* Total Amount Due footer */}
+              <div className="p-4 pt-0 flex-shrink-0">
+                <div className="flex flex-col gap-[2px] mb-3">
+                  <div className="h-[3px] w-full bg-red-600 rounded-full" />
+                  <div className="h-[1px] w-full bg-black/10" />
+                </div>
+
+                {/* Formula hint: Commented out as requested */}
+                {/* <div className="mb-2 px-2 py-1 bg-red-50 rounded-lg border border-red-100 text-center">
+                  <p className="text-[9px] font-black uppercase tracking-wide text-red-400">
+                    Discounted Amount + VAT − WHT
+                  </p>
+                </div> */}
+
+                <div className="text-center bg-red-500 rounded-xl py-3 border border-gray-100">
+                  <p className="text-[clamp(11px,1.1vw,12px)] font-black text-gray-200 uppercase tracking-[4px] mb-1">
+                    Total Sales
+                  </p>
+                  <p className="text-[clamp(22px,2.5vw,28px)] font-black text-white tracking-tighter leading-none flex items-baseline justify-center gap-2">
+                    <span className="text-[clamp(12px,1.3vw,15px)] text-green-300 font-black">PHP</span>
+                    {fmt(summary.totalAmountDue)}
+                  </p>
+                </div>
               </div>
-              {/* Formula hint */}
-              <div className="mb-2 px-2 py-1 bg-red-50 rounded-lg border border-red-100 text-center">
-                <p className="text-[9px] font-black uppercase tracking-wide text-red-400">
-                  Discounted Amount + VAT − WHT
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[3px] mb-1">Total Amount Due</p>
-                <p className="text-2xl font-black text-black tracking-tighter leading-none flex items-baseline justify-center gap-1">
-                  <span className="text-[13px] text-red-600">PHP</span>
-                  {fmt(summary.totalAmountDue)}
-                </p>
-              </div>
-            </div>
           </section>
         </aside>
 
@@ -928,14 +1059,13 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
               </div>
 
 
-              <div className="overflow-x-auto custom-table-scroller">
+              <div ref={salesItemsScrollRef} className="overflow-x-auto custom-table-scroller">
                 <table className="w-full text-center min-w-[1100px]" style={{ tableLayout: 'fixed' }}>
                   <colgroup>
                     <col style={{ width: '13%' }} />
                     <col style={{ width: '13%' }} />
                     <col style={{ width: '16%' }} />
-                    <col style={{ width: '6%' }} />
-                    <col style={{ width: '6%' }} />
+                    <col style={{ width: '8%' }} />
                     <col style={{ width: '10%' }} />
                     <col style={{ width: '9%' }} />
                     <col style={{ width: '8%' }} />
@@ -945,7 +1075,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                   </colgroup>
                   <thead>
                     <tr className="border-b border-gray-100">
-                      {['Product/Service', 'Charts of Accounts', 'Description', 'Unit', 'Qty', 'Price', 'Disc %', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
+                      {['Product/Service', 'Charts of Accounts', 'Description', 'Qty', 'Price', 'Disc %', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
                         <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
                       ))}
                     </tr>
@@ -956,8 +1086,8 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                         <td className="py-1 px-1">
                           <SearchableDropdown
                             disabled={isViewMode || item.isOther}
-                            placeholder="Search product..."
-                            value={item.productSearch}
+                            placeholder={item.isOther ? '' : 'Search product...'}
+                            value={item.isOther ? '' : item.productSearch}
                             onChange={v => updateSalesItem(item.id, 'productSearch', v)}
                             onSelect={opt => { updateSalesItem(item.id, 'productId', opt.value); updateSalesItem(item.id, 'productSearch', opt.label); }}
                             options={productOptions}
@@ -970,9 +1100,6 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                         </td>
                         <td className="py-1 px-1">
                           <input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Details..." value={item.description} onChange={e => updateSalesItem(item.id, 'description', e.target.value)} />
-                        </td>
-                        <td className="py-1 px-1">
-                          <input disabled={isViewMode || item.isOther} className={`${tableInput} ${(isViewMode || item.isOther) ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : 'pc'} value={item.isOther ? '' : item.unit} onChange={e => updateSalesItem(item.id, 'unit', e.target.value)} />
                         </td>
                         <td className="py-1 px-1">
                           <input disabled={isViewMode || item.isOther} type="number" min="0" className={`${tableInput} ${(isViewMode || item.isOther) ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : '1'} value={item.isOther ? '' : item.qty} onChange={e => updateSalesItem(item.id, 'qty', parseFloat(e.target.value) || 0)} />
@@ -1015,10 +1142,10 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
               </div>
               {!isViewMode && (
               <div className="flex gap-2 mt-3">
-                <button onClick={() => addSalesItem(false)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-2">
+                <button onClick={() => addSalesItem(false)} className="flex-1 py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-2">
                   <Plus size={14} /> ADD Product/Service
                 </button>
-                <button onClick={() => addSalesItem(true)} className="flex-1 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[11px] font-black uppercase text-gray-400 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2">
+                <button onClick={() => addSalesItem(true)} className="flex-1 py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-black text-black transition-all duration-300 hover:bg-gray-100 hover:border-gray-600 border-gray-400 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/5 flex items-center justify-center gap-2">
                   <Plus size={14} /> ADD Others
                 </button>
               </div>
@@ -1077,7 +1204,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                 </table>
               </div>
               {!isViewMode && (
-                <button onClick={addJournalEntry} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
+                <button onClick={addJournalEntry} className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1">
                   <Plus size={15} /> Add Ledger Row
                 </button>
               )}
@@ -1161,10 +1288,10 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                   </table>
                 </div>
                 {!isViewMode && (
-                <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
-                  <Plus size={15} /> Add File
-                </button>
-              )}
+                  <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1">
+                    <Plus size={15} /> Add File
+                  </button>
+                )}
               </TableSection>
 
               <TableSection title="Remarks" icon={<FileText size={14} />}>
@@ -1197,6 +1324,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
           />
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -1205,19 +1333,44 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
 function TableSection({ title, icon, children }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">{icon}</div>
-        <h2 className="text-[15px] font-black uppercase tracking-[1px] text-black">{title}</h2>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between p-4">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">{icon}</div>
+          <h2 className="text-[15px] font-black uppercase tracking-[1px] text-black">{title}</h2>
+        </div>
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+        >
+          {isCollapsed ? (
+            <>
+              <Plus size={16} />
+              <span className="text-[11px] font-black uppercase">Show</span>
+            </>
+          ) : (
+            <>
+              <Minus size={16} />
+              <span className="text-[11px] font-black uppercase">Hide</span>
+            </>
+          )}
+        </button>
       </div>
-      {children}
+      
+      {!isCollapsed && (
+        <div className="px-4 pb-4">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
 
 function SDivider() {
-  return <div className="h-[1px] w-full bg-gray-100" />;
+  return <div className="h-[1px] w-full bg-gray-400" />;
 }
 
 /**
@@ -1226,13 +1379,18 @@ function SDivider() {
  */
 function SummaryRow({ label, value, color = 'text-gray-800', formula }) {
   return (
-    <div className="summary-row relative flex justify-between items-center hover:bg-gray-50 rounded-md transition-colors py-1 px-1 cursor-default">
-      <span className="text-[10.5px] font-black uppercase text-gray-500 leading-tight pr-1 flex-1">{label}</span>
-      <span className={`${color} text-[12px] font-black tabular-nums tracking-tight whitespace-nowrap text-right flex-shrink-0`}>
+    <div className="summary-row relative flex justify-between items-center hover:bg-gray-50 rounded-md transition-colors py-1.5 px-1 cursor-default">
+      {/* Label: 10.5px -> ~12.5px */}
+      <span className="text-[clamp(11px,1.1vw,12.5px)] font-black uppercase text-gray-500 leading-tight pr-1 flex-1">
+        {label}
+      </span>
+
+      {/* Value: 12px -> ~14px */}
+      <span className={`${color} text-[clamp(12px,1.25vw,14px)] font-black tabular-nums tracking-tight whitespace-nowrap text-right flex-shrink-0`}>
         {value}
       </span>
       {formula && (
-        <div className="summary-tooltip absolute left-0 bottom-full mb-1 z-50 bg-gray-900 text-white text-[10px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none">
+        <div className="summary-tooltip absolute left-0 bottom-full mb-1 z-50 bg-gray-900 text-white text-[11px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none">
           <span className="text-gray-300 font-medium">{formula}</span>
           <div className="absolute left-3 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900" />
         </div>

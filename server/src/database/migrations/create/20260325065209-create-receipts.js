@@ -39,7 +39,7 @@ module.exports = {
       },
       r_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: true
       },
       r_total_amount_due: {
         type: Sequelize.DECIMAL(18, 2),

@@ -4,6 +4,7 @@ const { getSales, getAllSales, createSales, updateSalesState } = require('../con
 const salesRouter = express.Router()
 
 salesRouter.get('/', getSales)
+
 salesRouter.get('/:id', getAllSales)
 salesRouter.post('/', createSales)
 salesRouter.put('/sales-state', updateSalesState)

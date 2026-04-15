@@ -39,7 +39,7 @@ module.exports = {
       },
       cd_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: true
       },
       cd_total_amount_due: {
         type: Sequelize.DECIMAL(18, 2),
