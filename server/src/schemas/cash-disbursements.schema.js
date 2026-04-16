@@ -41,10 +41,6 @@ const CashDisbursementsSchema = Joi.object({
         'any.required': 'totalAmountDue is required.',
         'string.empty': 'totalAmountDue must be a valid decimal.',
       }),
- 	status: Joi.string().trim().required().messages({
-        'any.required': 'status is required.',
-        'string.empty': 'status must be a valid enum.',
-      }),
  	state: Joi.string().trim().required().messages({
         'any.required': 'state is required.',
         'string.empty': 'state must be a valid enum.',
@@ -71,11 +67,10 @@ const CashDisbursementsField = {
     CheckNumber: 'check_number',
     Remarks: 'remarks',
     TotalAmountDue: 'total_amount_due',
-    Status: 'status',
     State: 'state',
     CreatedDate: 'created_date',
     CreatedBy: 'created_by',
-    All: ['id', 'vendor_id', 'document_reference', 'payment_date', 'mode_of_payment', 'bank_name', 'check_number', 'remarks', 'total_amount_due', 'status', 'state', 'created_date', 'created_by'],
+    All: ['id', 'vendor_id', 'document_reference', 'payment_date', 'mode_of_payment', 'bank_name', 'check_number', 'remarks', 'total_amount_due', 'state', 'created_date', 'created_by'],
 };
 
 

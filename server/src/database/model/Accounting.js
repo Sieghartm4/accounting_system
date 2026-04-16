@@ -408,6 +408,7 @@ const Accounting = {
       "quantity",
       "purchase_price",
       "discount",
+      "discount_type",
       "vat",
       "witholding_tax",
       "responsibility_center"
@@ -421,6 +422,7 @@ const Accounting = {
       "pi_quantity",
       "pi_purchase_price",
       "pi_discount",
+      "pi_discount_type",
       "pi_vat",
       "pi_witholding_tax",
       "pi_responsibility_center"
@@ -434,6 +436,7 @@ const Accounting = {
     quantity: "pi_quantity",
     purchase_price: "pi_purchase_price",
     discount: "pi_discount",
+    discount_type: "pi_discount_type",
     vat: "pi_vat",
     witholding_tax: "pi_witholding_tax",
     responsibility_center: "pi_responsibility_center"
@@ -447,6 +450,7 @@ const Accounting = {
     quantity: "quantity",
     purchase_price: "purchase_price",
     discount: "discount",
+    discount_type: "discount_type",
     vat: "vat",
     witholding_tax: "witholding_tax",
     responsibility_center: "responsibility_center"
@@ -466,6 +470,7 @@ const Accounting = {
     quantity: "INTEGER",
     purchase_price: "DECIMAL",
     discount: "DECIMAL",
+    discount_type: "STRING",
     vat: "DECIMAL",
     witholding_tax: "DECIMAL",
     responsibility_center: "STRING"
@@ -538,6 +543,7 @@ const Accounting = {
       "quantity",
       "purchase_price",
       "discount",
+      "discount_type",
       "vat",
       "witholding_tax",
       "responsibility_center"
@@ -551,6 +557,7 @@ const Accounting = {
       "cdi_quantity",
       "cdi_purchase_price",
       "cdi_discount",
+      "cdi_discount_type",
       "cdi_vat",
       "cdi_witholding_tax",
       "cdi_responsibility_center"
@@ -564,6 +571,7 @@ const Accounting = {
     quantity: "cdi_quantity",
     purchase_price: "cdi_purchase_price",
     discount: "cdi_discount",
+    discount_type: "cdi_discount_type",
     vat: "cdi_vat",
     witholding_tax: "cdi_witholding_tax",
     responsibility_center: "cdi_responsibility_center"
@@ -577,6 +585,7 @@ const Accounting = {
     quantity: "quantity",
     purchase_price: "purchase_price",
     discount: "discount",
+    discount_type: "discount_type",
     vat: "vat",
     witholding_tax: "witholding_tax",
     responsibility_center: "responsibility_center"
@@ -596,6 +605,7 @@ const Accounting = {
     quantity: "INTEGER",
     purchase_price: "DECIMAL",
     discount: "DECIMAL",
+    discount_type: "STRING",
     vat: "DECIMAL",
     witholding_tax: "DECIMAL",
     responsibility_center: "STRING"
@@ -693,6 +703,7 @@ const Accounting = {
       "quantity",
       "sales_price",
       "discount",
+      "discount_type",
       "vat",
       "witholding_tax",
       "responsibility_center"
@@ -706,6 +717,7 @@ const Accounting = {
       "si_quantity",
       "si_sales_price",
       "si_discount",
+      "si_discount_type",
       "si_vat",
       "si_witholding_tax",
       "si_responsibility_center"
@@ -719,6 +731,7 @@ const Accounting = {
     quantity: "si_quantity",
     sales_price: "si_sales_price",
     discount: "si_discount",
+    discount_type: "si_discount_type",
     vat: "si_vat",
     witholding_tax: "si_witholding_tax",
     responsibility_center: "si_responsibility_center"
@@ -732,6 +745,7 @@ const Accounting = {
     quantity: "quantity",
     sales_price: "sales_price",
     discount: "discount",
+    discount_type: "discount_type",
     vat: "vat",
     witholding_tax: "witholding_tax",
     responsibility_center: "responsibility_center"
@@ -751,6 +765,7 @@ const Accounting = {
     quantity: "INTEGER",
     sales_price: "DECIMAL",
     discount: "DECIMAL",
+    discount_type: "STRING",
     vat: "DECIMAL",
     witholding_tax: "DECIMAL",
     responsibility_center: "STRING"

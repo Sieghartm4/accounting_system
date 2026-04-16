@@ -164,7 +164,7 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
 //
 //  Per item:
 //    gross            = qty × price
-//    discountAmount   = gross × (discount / 100)          ← discount is a % field
+//    discountAmount   = discountType === 'PERCENT' ? gross × (discount / 100) : discount × qty
 //    discountedAmount = gross − discountAmount
 //    vatAmount        = discountedAmount × (vat / 100)    ← vat is a % field (0 or 12)
 //    whtAmount        = discountedAmount × (wht / 100)    ← wht is a % field
@@ -198,12 +198,22 @@ function computeSummary(items) {
   items.forEach(item => {
     const qty = parseFloat(item.qty) || 0;
     const price = parseFloat(item.price) || 0;
-    const discPct = parseFloat(item.discount) || 0;
+    const discountValue = parseFloat(item.discount) || 0;
+    const discountType = item.discountType || 'PERCENT';
     const vatPct = parseFloat(item.vat) || 0;
     const whtPct = parseFloat(item.wht) || 0;
 
     const gross = qty * price;
-    const discAmt = gross * (discPct / 100);
+    
+    // Calculate discount amount based on discount type
+    let discAmt;
+    if (discountType === 'PERCENT') {
+      discAmt = gross * (discountValue / 100);
+    } else {
+      // FIXED amount - apply discount per unit, then multiply by quantity
+      discAmt = discountValue * qty;
+    }
+    
     const discounted = gross - discAmt;
     const vatAmt = discounted * (vatPct / 100);
     const whtAmt = discounted * (whtPct / 100);
@@ -250,7 +260,7 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = false, disbursementData = null }) {
 
   const [disbursementItems, setDisbursementItems] = useState([
-    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
+    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
   ]);
 
   const [journalEntries, setJournalEntries] = useState([
@@ -371,6 +381,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
           qty: item.quantity,
           price: item.purchase_price,
           discount: item.discount,
+          discountType: item.discount_type || 'PERCENT',
           vat: item.vat,
           wht: item.witholding_tax,
           responsibilityCenter: item.responsibility_center,
@@ -427,7 +438,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
     }
   }, [isViewMode, disbursementData]);
 
-  const addDisbursementItem = (isOther = false) => setDisbursementItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
+  const addDisbursementItem = (isOther = false) => setDisbursementItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removeDisbursementItem = (id) => setDisbursementItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
@@ -459,6 +470,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
   const tableInput = "w-full rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none " +
     (isViewMode ? "bg-gray-100 border border-gray-300 text-black cursor-not-allowed" : "bg-gray-50/50 border border-gray-200 focus:ring-1 focus:ring-red-400");
   const pctInput = tableInput + " pr-4";
+  const discountInput = tableInput + " pr-6";
 
   const fadeInUp = { hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
@@ -489,12 +501,22 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
     disbursementItems.forEach((item) => {
       const qty = parseFloat(item.qty) || 0;
       const price = parseFloat(item.price) || 0;
-      const discountPct = parseFloat(item.discount) || 0;
+      const discountValue = parseFloat(item.discount) || 0;
+      const discountType = item.discountType || 'PERCENT';
       const vatPct = parseFloat(item.vat) || 0;
       const whtPct = parseFloat(item.wht) || 0;
 
       const gross = qty * price;
-      const discountAmount = gross * (discountPct / 100);
+      
+      // Calculate discount amount based on discount type
+      let discountAmount;
+      if (discountType === 'PERCENT') {
+        discountAmount = gross * (discountValue / 100);
+      } else {
+        // FIXED amount - apply discount per unit, then multiply by quantity
+        discountAmount = discountValue * qty;
+      }
+      
       const discountedAmount = gross - discountAmount;
       const vatAmount = discountedAmount * (vatPct / 100);
       const whtAmount = discountedAmount * (whtPct / 100);
@@ -574,12 +596,22 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
     const totalCashPaid = disbursementItems.reduce((sum, item) => {
       const qty = parseFloat(item.qty) || 0;
       const price = parseFloat(item.price) || 0;
-      const discountPct = parseFloat(item.discount) || 0;
+      const discountValue = parseFloat(item.discount) || 0;
+      const discountType = item.discountType || 'PERCENT';
       const vatPct = parseFloat(item.vat) || 0;
       const whtPct = parseFloat(item.wht) || 0;
 
       const gross = qty * price;
-      const discountAmount = gross * (discountPct / 100);
+      
+      // Calculate discount amount based on discount type
+      let discountAmount;
+      if (discountType === 'PERCENT') {
+        discountAmount = gross * (discountValue / 100);
+      } else {
+        // FIXED amount - apply discount per unit, then multiply by quantity
+        discountAmount = discountValue * qty;
+      }
+      
       const discountedAmount = gross - discountAmount;
       const vatAmount = discountedAmount * (vatPct / 100);
       const whtAmount = discountedAmount * (whtPct / 100);
@@ -649,6 +681,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
           qty: item.isOther ? 1 : (parseFloat(item.qty) || 0), // Other items default to qty 1
           price: parseFloat(item.price) || 0,
           discount: parseFloat(item.discount) || 0,
+          discount_type: item.discountType || 'PERCENT',
           vat: parseFloat(item.vat) || 0,
           wtax: parseFloat(item.wht) || 0,
           responsibility_center: item.responsibilityCenter || ''
@@ -998,20 +1031,21 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                 <div ref={disbursementItemsScrollRef} className="overflow-x-auto custom-table-scroller">
                   <table className="w-full text-center min-w-[1100px]" style={{ tableLayout: 'fixed' }}>
                     <colgroup>
-                      <col style={{ width: '13%' }} />
-                      <col style={{ width: '13%' }} />
-                      <col style={{ width: '16%' }} />
+                      <col style={{ width: '12%' }} />
+                      <col style={{ width: '12%' }} />
+                      <col style={{ width: '15%' }} />
                       <col style={{ width: '6%' }} />
-                      <col style={{ width: '10%' }} />
                       <col style={{ width: '9%' }} />
+                      <col style={{ width: '7%' }} />
                       <col style={{ width: '8%' }} />
                       <col style={{ width: '8%' }} />
-                      <col style={{ width: '13%' }} />
+                      <col style={{ width: '8%' }} />
+                      <col style={{ width: '12%' }} />
                       <col style={{ width: '5%' }} />
                     </colgroup>
                     <thead>
                       <tr className="border-b border-gray-100">
-                        {['Product/Service', 'Charts of Accounts', 'Description', 'Qty', 'Price', 'Disc %', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
+                        {['Product/Service', 'Charts of Accounts', 'Description', 'Qty', 'Price', 'Disc %', 'Disc Type', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
                           <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center whitespace-nowrap px-1">{h}</th>
                         ))}
                       </tr>
@@ -1052,9 +1086,38 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                           {/* DISCOUNT % */}
                           <td className="py-1 px-1">
                             <div className="relative">
-                              <input disabled={isViewMode} className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.discount || 0} onChange={e => updateDisbursementItem(item.id, 'discount', parseFloat(e.target.value) || 0)} />
-                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">%</span>
+                              <input 
+                                disabled={isViewMode} 
+                                className={`${discountInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                                type="number" 
+                                min="0" 
+                                max={item.discountType === 'PERCENT' ? '100' : '999999'} 
+                                step="0.01" 
+                                placeholder="0" 
+                                value={item.discount || 0} 
+                                onChange={e => updateDisbursementItem(item.id, 'discount', parseFloat(e.target.value) || 0)} 
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 font-black pointer-events-none">
+                                {item.discountType === 'PERCENT' ? '%' : '₱'}
+                              </span>
                             </div>
+                          </td>
+                          {/* DISCOUNT TYPE */}
+                          <td className="py-1 px-1">
+                            {isViewMode ? (
+                              <div className={`${tableInput} text-black py-1.5 text-center`}>
+                                {item.discountType === 'PERCENT' ? 'Percentage' : 'Fixed'}
+                              </div>
+                            ) : (
+                              <select
+                                value={item.discountType || 'PERCENT'}
+                                onChange={e => updateDisbursementItem(item.id, 'discountType', e.target.value)}
+                                className={`w-full px-2 py-1 text-[11px] font-bold border border-gray-200 rounded focus:ring-1 focus:ring-red-400 outline-none`}
+                              >
+                                <option value="PERCENT">PERCENT</option>
+                                <option value="FIXED">FIXED</option>
+                              </select>
+                            )}
                           </td>
                           {/* VAT % */}
                           <td className="py-1 px-1">

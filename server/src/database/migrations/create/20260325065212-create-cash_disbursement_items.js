@@ -45,6 +45,10 @@ module.exports = {
         type: Sequelize.DECIMAL(18, 2),
         allowNull: false
       },
+      cdi_discount_type: {
+        type: Sequelize.ENUM('PERCENT', 'FIXED'),
+        allowNull: true
+      },
       cdi_vat: {
         type: Sequelize.DECIMAL(18, 2),
         allowNull: false

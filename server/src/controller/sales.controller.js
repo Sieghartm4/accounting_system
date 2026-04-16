@@ -87,6 +87,7 @@ const getAllSales = async (req, res, next) => {
       { col: Accounting.sales_items.selectOptionColumns.quantity, as: 'quantity' },
       { col: Accounting.sales_items.selectOptionColumns.sales_price, as: 'sales_price' },
       { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
+      { col: Accounting.sales_items.selectOptionColumns.discount_type, as: 'discount_type' },
       { col: Accounting.sales_items.selectOptionColumns.vat, as: 'vat' },
       { col: Accounting.sales_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
       { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
@@ -218,6 +219,7 @@ const createSales = async (req, res, next) => {
             item.qty || 0,
             item.price || 0,
             item.discount || 0,
+            item.discount_type || null,
             item.vat || 0,
             item.wtax || 0,
             item.responsibility_center || ''

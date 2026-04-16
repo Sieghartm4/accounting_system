@@ -87,6 +87,7 @@ const getAllPurchase = async (req, res, next) => {
       { col: Accounting.purchase_items.selectOptionColumns.quantity, as: 'quantity' },
       { col: Accounting.purchase_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
       { col: Accounting.purchase_items.selectOptionColumns.discount, as: 'discount' },
+      { col: Accounting.purchase_items.selectOptionColumns.discount_type, as: 'discount_type' },
       { col: Accounting.purchase_items.selectOptionColumns.vat, as: 'vat' },
       { col: Accounting.purchase_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
       { col: Accounting.purchase_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
@@ -218,6 +219,7 @@ const createPurchase = async (req, res, next) => {
             item.quantity || 0,
             item.purchase_price || 0,
             item.discount || 0,
+            item.discount_type || null,
             item.vat || 0,
             item.witholding_tax || 0,
             item.responsibility_center || ''

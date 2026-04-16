@@ -201,12 +201,20 @@ function computeSummary(items) {
   items.forEach(item => {
     const qty = parseFloat(item.qty) || 0;
     const price = parseFloat(item.price) || 0;
-    const discPct = parseFloat(item.discount) || 0;
+    const discountValue = parseFloat(item.discount) || 0;
+    const discountType = item.discountType || 'PERCENT';
     const vatPct = parseFloat(item.vat) || 0;
     const whtPct = parseFloat(item.wht) || 0;
 
     const gross = qty * price;
-    const discAmt = gross * (discPct / 100);
+    let discAmt = 0;
+    
+    if (discountType === 'PERCENT') {
+      discAmt = gross * (discountValue / 100);
+    } else {
+      discAmt = discountValue * qty;
+    }
+    
     const discounted = gross - discAmt;
     const vatAmt = discounted * (vatPct / 100);
     const whtAmt = discounted * (whtPct / 100);
@@ -345,7 +353,7 @@ function SidebarInput({ label, placeholder, type = 'text', required, dark, value
 // ─────────────────────────────────────────────────────────────────────────────
 export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, purchaseData = null }) {
   const [purchaseItems, setPurchaseItems] = useState([
-    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
+    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
   ]);
 
   const [journalEntries, setJournalEntries] = useState([
@@ -510,6 +518,7 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
           qty: item.quantity,
           price: item.purchase_price,
           discount: item.discount,
+          discountType: item.discount_type || 'PERCENT',
           vat: item.vat,
           wht: item.witholding_tax,
           responsibilityCenter: item.responsibility_center,
@@ -571,7 +580,7 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
     }
   }, [isViewMode, purchaseData]);
 
-  const addPurchaseItem = (isOther = false) => setPurchaseItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
+  const addPurchaseItem = (isOther = false) => setPurchaseItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0 }]);
   const removePurchaseItem = (id) => setPurchaseItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
@@ -789,6 +798,7 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
           quantity: parseFloat(item.qty) || 0,
           purchase_price: parseFloat(item.price) || 0,
           discount: parseFloat(item.discount) || 0,
+          discount_type: item.discountType || 'PERCENT',
           vat: parseFloat(item.vat) || 0,
           witholding_tax: parseFloat(item.wht) || 0,
           responsibility_center: item.responsibilityCenter || ''
@@ -1111,22 +1121,22 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
 
 
               <div ref={purchaseItemsScrollRef} className="overflow-x-auto custom-table-scroller">
-                <table className="w-full text-center min-w-[1100px]" style={{ tableLayout: 'fixed' }}>
+                <table className="w-full text-center min-w-[1000px]" style={{ tableLayout: 'fixed' }}>
                   <colgroup>
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '16%' }} />
                     <col style={{ width: '14%' }} />
-                    <col style={{ width: '14%' }} />
-                    <col style={{ width: '18%' }} />
-                    <col style={{ width: '7%' }} />
-                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '6%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '8%' }} />
                     <col style={{ width: '9%' }} />
                     <col style={{ width: '8%' }} />
                     <col style={{ width: '8%' }} />
-                    <col style={{ width: '14%' }} />
-                    <col style={{ width: '5%' }} />
+                    <col style={{ width: '9%' }} />
                   </colgroup>
                   <thead>
                     <tr className="border-b border-gray-100">
-                      {['Product/Service', 'Charts of Accounts', 'Description', 'Qty', 'Price', 'Disc %', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
+                      {['Product/Service', 'Charts of Accounts', 'Description', 'Qty', 'Price', 'Disc %', 'Disc Type', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
                         <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
                       ))}
                     </tr>
@@ -1160,9 +1170,38 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
                         </td>
                         <td className="py-1 px-1">
                           <div className="relative">
-                            <input disabled={isViewMode} className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.discount || 0} onChange={e => updatePurchaseItem(item.id, 'discount', parseFloat(e.target.value) || 0)} />
-                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">%</span>
+                            <input
+                              disabled={isViewMode}
+                              className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              type="number"
+                              min="0"
+                              max={item.discountType === 'PERCENT' ? '100' : '999999'}
+                              step="0.01"
+                              placeholder="0"
+                              value={item.discount || 0}
+                              onChange={e => updatePurchaseItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
+                            />
+                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">
+                              {item.discountType === 'PERCENT' ? '%' : '₱'}
+                            </span>
                           </div>
+                        </td>
+                        {/* DISCOUNT TYPE */}
+                        <td className="py-1 px-1">
+                          {isViewMode ? (
+                            <div className={`${tableInput} text-black py-1.5 text-center`}>
+                              {item.discountType === 'PERCENT' ? 'PERCENT' : 'FIXED'}
+                            </div>
+                          ) : (
+                            <select
+                              value={item.discountType || 'PERCENT'}
+                              onChange={e => updatePurchaseItem(item.id, 'discountType', e.target.value)}
+                              className={`w-full px-2 py-1 text-[11px] font-bold border border-gray-200 rounded focus:ring-1 focus:ring-red-400 outline-none`}
+                            >
+                              <option value="PERCENT">PERCENT</option>
+                              <option value="FIXED">FIXED</option>
+                            </select>
+                          )}
                         </td>
                         <td className="py-1 px-1">
                           <div className="relative">
@@ -1178,13 +1217,6 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
                         </td>
                         <td className="py-1 px-1">
                           <input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Select" value={item.responsibilityCenter} onChange={e => updatePurchaseItem(item.id, 'responsibilityCenter', e.target.value)} />
-                        </td>
-                        <td className="py-1 px-1 text-center">
-                          {!isViewMode && (
-                            <button onClick={() => removePurchaseItem(item.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors">
-                              <Trash2 size={15} />
-                            </button>
-                          )}
                         </td>
                       </tr>
                     ))}

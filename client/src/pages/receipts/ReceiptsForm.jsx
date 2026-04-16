@@ -1142,7 +1142,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                           <td className="py-1 px-1">
                             {isViewMode ? (
                               <div className={`${tableInput} text-black py-1.5 text-center`}>
-                                {item.discountType === 'PERCENT' ? '%' : 'FXD'}
+                                {item.discountType === 'PERCENT' ? 'PERCENT' : 'FIXED'}
                               </div>
                             ) : (
                               <select

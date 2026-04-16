@@ -48,6 +48,10 @@ module.exports = {
         type: Sequelize.DECIMAL(18, 2),
         allowNull: true
       },
+      pi_discount_type: {
+        type: Sequelize.ENUM('PERCENT', 'FIXED'),
+        allowNull: true
+      },
       pi_vat: {
         type: Sequelize.DECIMAL(18, 2),
         allowNull: true

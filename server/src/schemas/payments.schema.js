@@ -37,10 +37,6 @@ const PaymentsSchema = Joi.object({
         'any.required': 'remarks is required.',
         'string.empty': 'remarks must be a valid text.',
       }),
- 	status: Joi.string().trim().required().messages({
-        'any.required': 'status is required.',
-        'string.empty': 'status must be a valid enum.',
-      }),
  	state: Joi.string().trim().required().messages({
         'any.required': 'state is required.',
         'string.empty': 'state must be a valid enum.',
@@ -66,11 +62,10 @@ const PaymentsField = {
     CheckNumber: 'check_number',
     PaymentDate: 'payment_date',
     Remarks: 'remarks',
-    Status: 'status',
     State: 'state',
     CreatedDate: 'created_date',
     CreatedBy: 'created_by',
-    All: ['id', 'vendor_id', 'document_reference', 'mode_of_payment', 'bank_name', 'check_number', 'payment_date', 'remarks', 'status', 'state', 'created_date', 'created_by'],
+    All: ['id', 'vendor_id', 'document_reference', 'mode_of_payment', 'bank_name', 'check_number', 'payment_date', 'remarks', 'state', 'created_date', 'created_by'],
 };
 
 
