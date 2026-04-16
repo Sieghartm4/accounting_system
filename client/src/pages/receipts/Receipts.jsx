@@ -26,11 +26,13 @@ function ReceiptsContent() {
   // Check if user has access to enable checkboxes
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const accessLevel = getAccessLevel('receipts', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access';
+  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Full Access';
 
   // Determine checkbox condition based on access level
   const checkboxCondition = enableCheckboxes 
-    ? { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
+    ? accessLevel === 'Full Access' 
+      ? { column: 'state', value: 'APPROVED', exclude: true } // Exclude APPROVED state for Full Access
+      : { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
     : null;
 
   const fadeInUp = {
@@ -232,8 +234,6 @@ function ReceiptsContent() {
               label: 'Approve Selected',
               onClick: async (selectedRows) => {
                 try {
-                  console.log('Approving receipts:', selectedRows);
-                  
                   const token = localStorage.getItem('token');
                   if (!token) {
                     throw new Error('No authentication token found');

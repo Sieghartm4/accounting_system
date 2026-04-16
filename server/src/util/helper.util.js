@@ -269,6 +269,16 @@ class SQLQueryBuilder {
     return this
   }
 
+  whereNotExists(subquery) {
+    this.query.where.push({ type: 'NOT EXISTS', subquery })
+    return this
+  }
+
+  andWhereNotExists(subquery) {
+    this.query.where.push({ type: 'NOT EXISTS', subquery })
+    return this
+  }
+
   // --- BUILDER LOGIC ---
 
   build() {
@@ -334,7 +344,12 @@ class SQLQueryBuilder {
   _formatCondition(cond, isNot = false) {
     // Handle object conditions (from whereIn, whereNot, etc.)
     if (typeof cond === 'object' && cond !== null) {
-      const { column, values, operator } = cond;
+      const { column, values, operator, type, subquery } = cond;
+      
+      // Handle NOT EXISTS subqueries
+      if (type === 'NOT EXISTS') {
+        return `NOT EXISTS (${subquery})`;
+      }
       
       if (operator === 'IN') {
         const placeholders = values.map(() => '?').join(', ');

@@ -27,11 +27,13 @@ function PaymentsContent() {
   // Check if user has access to enable checkboxes
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const accessLevel = getAccessLevel('payments', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access';
+  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Full Access';
 
   // Determine checkbox condition based on access level
   const checkboxCondition = enableCheckboxes
-    ? { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
+    ? accessLevel === 'Full Access' 
+      ? { column: 'state', value: 'APPROVED', exclude: true } // Exclude APPROVED state for Full Access
+      : { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
     : null;
 
   const fadeInUp = {
@@ -221,7 +223,7 @@ function PaymentsContent() {
             {
               column: 'state',
               values: {
-                'PREPARED': 'gray',
+                'PREPARED': 'orange',
                 'CHECKED': 'blue',
                 'APPROVED': 'green',
                 'REJECTED': 'red',

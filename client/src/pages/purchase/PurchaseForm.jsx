@@ -557,6 +557,16 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
         });
         console.log('Final attachments array:', attachments);
         setAttachments(attachments);
+      } else {
+        // Ensure there's always at least one empty attachment row
+        setAttachments([{
+          id: 1,
+          fileName: '',
+          file: null,
+          remarks: '',
+          uploadedBy: 'Current User',
+          date: new Date().toLocaleDateString()
+        }]);
       }
     }
   }, [isViewMode, purchaseData]);
@@ -901,7 +911,7 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
       <div className="flex-1 flex flex-col gap-2 min-h-0">
 
         {/* BASIC DETAILS - FULL WIDTH TOP */}
-        <fieldset className="bg-black rounded-2xl p-3 text-white shadow-xl">
+        <fieldset className="bg-black rounded-2xl p-3 pl-6 pr-6 text-white shadow-xl">
           <legend className="bg-red-600 text-[13px] font-black uppercase tracking-[3px] text-white flex items-center justify-center gap-2 px-4 py-1 rounded-lg mx-auto w-fit">
             <Landmark size={18} /> Basic Details
           </legend>

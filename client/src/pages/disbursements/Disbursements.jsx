@@ -26,11 +26,13 @@ function DisbursementsContent() {
   // Check if user has access to enable checkboxes
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const accessLevel = getAccessLevel('disbursement', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access';
+  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Full Access';
 
   // Determine checkbox condition based on access level
-  const checkboxCondition = enableCheckboxes
-    ? { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
+  const checkboxCondition = enableCheckboxes 
+    ? accessLevel === 'Full Access' 
+      ? { column: 'state', value: 'APPROVED', exclude: true } // Exclude APPROVED state for Full Access
+      : { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
     : null;
 
   const fadeInUp = {
@@ -183,7 +185,7 @@ function DisbursementsContent() {
             {
               column: 'state',
               values: {
-                'PREPARED': 'gray',
+                'PREPARED': 'orange',
                 'CHECKED': 'blue',
                 'APPROVED': 'green',
                 'REJECTED': 'red',
@@ -274,7 +276,7 @@ function DisbursementsContent() {
 
                   setToast({
                     type: 'success',
-                    message: result.message || `${selectedRows.length} disbursement(s) approved successfully`
+                    message: result.message || `${updates.length} disbursement(s) approved successfully`
                   });
 
                 } catch (error) {

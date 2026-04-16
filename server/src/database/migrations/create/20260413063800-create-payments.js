@@ -42,11 +42,6 @@ module.exports = {
         type: Sequelize.TEXT('long'),
         allowNull: true
       },
-      c_status: {
-        type: Sequelize.ENUM('PAID','UNPAID','REJECTED'),
-        allowNull: false,
-        defaultValue: 'UNPAID'
-      },
       c_state: {
         type: Sequelize.ENUM('PREPARED','CHECKED','APPROVED','REJECTED'),
         allowNull: false,

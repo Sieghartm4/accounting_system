@@ -41,10 +41,6 @@ module.exports = {
         type: Sequelize.TEXT('long'),
         allowNull: true
       },
-      c_status: {
-        type: Sequelize.ENUM('COLLECTED', 'NOT COLLECTED', 'PARTIALLY COLLECTED'),
-        allowNull: false
-      },
       c_state: {
         type: Sequelize.ENUM('PREPARED','CHECKED','APPROVED','REJECTED','CANCELLED'),
         allowNull: false

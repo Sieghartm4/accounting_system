@@ -225,9 +225,7 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
   const [documentReference, setDocumentReference] = useState('');
   const [remarks,           setRemarks]           = useState('');
 
-  const [attachments, setAttachments] = useState([
-    { id: 1, fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }
-  ]);
+  const [attachments, setAttachments] = useState([]);
 
   const [toast, setToast] = useState(null);
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' });
@@ -659,7 +657,7 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
       {toast && <DynamicToast type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
 
       {/* TOP NAV */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+      <div className="flex items-center justify-between flex-shrink-0">
         <nav className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors" onClick={onBack}>
           <ArrowLeft size={17} /><span className="text-black">Back to Payments</span>
         </nav>
@@ -682,11 +680,11 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
       <div className="flex-1 flex flex-col gap-2 min-h-0">
 
         {/* BASIC DETAILS - FULL WIDTH TOP */}
-        <fieldset className="bg-black rounded-2xl p-3 text-white shadow-xl">
+        <fieldset className="bg-black rounded-2xl p-3 pl-6 pr-6 text-white shadow-xl">
           <legend className="bg-red-600 text-[13px] font-black uppercase tracking-[3px] text-white flex items-center justify-center gap-2 px-4 py-1 rounded-lg mx-auto w-fit">
             <Landmark size={18} /> Basic Details
           </legend>
-          <div className="grid grid-cols-4 gap-3">
+          <div className={`grid gap-3 ${(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') ? 'grid-cols-6' : 'grid-cols-4'}`}>
             <div className="col-span-1">
               <fieldset>
                 <legend className="text-[11px] font-black uppercase text-gray-100">Vendor <span className="text-red-600">*</span></legend>
@@ -712,30 +710,42 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                 />
               </fieldset>
             </div>
-            <div className="col-span-1">
+            <fieldset>
+              <legend className="text-[11px] font-black uppercase text-gray-100">Mode of Payment</legend>
+              {isViewMode ? (
+                <div className={inputBase + " text-black py-1.5"}>{modeSearch || 'No mode selected'}</div>
+              ) : (
+                <SearchableDropdown
+                  placeholder="Select mode..."
+                  value={modeSearch}
+                  onChange={v => { setModeSearch(v); setModeOfPayment(''); }}
+                  onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }}
+                  options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))}
+                  inputClassName={inputBase}
+                  emptyText="No modes found"
+                />
+              )}
+            </fieldset>
+            <fieldset>
+              <legend className="text-[11px] font-black uppercase text-gray-100">Payment Date</legend>
+              <input
+                type="date"
+                value={new Date().toISOString().split('T')[0]}
+                disabled={isViewMode}
+                className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                  ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                  : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                  }`}
+              />
+            </fieldset>
+            {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
               <fieldset>
-                <legend className="text-[11px] font-black uppercase text-gray-100">Mode of Payment</legend>
-                {isViewMode ? (
-                  <div className={inputBase + " text-black py-1.5"}>{modeSearch || 'No mode selected'}</div>
-                ) : (
-                  <SearchableDropdown
-                    placeholder="Select mode..."
-                    value={modeSearch}
-                    onChange={v => { setModeSearch(v); setModeOfPayment(''); }}
-                    onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }}
-                    options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))}
-                    inputClassName={inputBase}
-                    emptyText="No modes found"
-                  />
-                )}
-              </fieldset>
-            </div>
-            <div className="col-span-1">
-              <fieldset>
-                <legend className="text-[11px] font-black uppercase text-gray-100">Payment Date</legend>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Bank Name</legend>
                 <input
-                  type="date"
-                  value={new Date().toISOString().split('T')[0]}
+                  type="text"
+                  placeholder="Enter bank name"
+                  value={bankName}
+                  onChange={e => setBankName(e.target.value)}
                   disabled={isViewMode}
                   className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
                     ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
@@ -743,44 +753,24 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                     }`}
                 />
               </fieldset>
-            </div>
+            )}
+            {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+              <fieldset>
+                <legend className="text-[11px] font-black uppercase text-gray-100">Check Number</legend>
+                <input
+                  type="text"
+                  placeholder="Check number"
+                  value={checkNumber}
+                  onChange={e => setCheckNumber(e.target.value)}
+                  disabled={isViewMode}
+                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                    ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                    : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                    }`}
+                />
+              </fieldset>
+            )}
           </div>
-          {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <div className="col-span-1">
-                <fieldset>
-                  <legend className="text-[11px] font-black uppercase text-gray-100">Bank Name</legend>
-                  <input
-                    type="text"
-                    placeholder="Enter bank name"
-                    value={bankName}
-                    onChange={e => setBankName(e.target.value)}
-                    disabled={isViewMode}
-                    className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
-                      ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
-                      : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
-                      }`}
-                  />
-                </fieldset>
-              </div>
-              <div className="col-span-1">
-                <fieldset>
-                  <legend className="text-[11px] font-black uppercase text-gray-100">Check Number</legend>
-                  <input
-                    type="text"
-                    placeholder="Check number"
-                    value={checkNumber}
-                    onChange={e => setCheckNumber(e.target.value)}
-                    disabled={isViewMode}
-                    className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
-                      ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
-                      : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
-                      }`}
-                  />
-                </fieldset>
-              </div>
-            </div>
-          )}
         </fieldset>
 
         {/* MAIN CONTENT AREA */}
@@ -1190,7 +1180,7 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
       </div>
 
       {/* ── PURCHASE INVOICE MODAL ── */}
-      <RightSideModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Select Purchase Invoices" size="2xl">
+      <RightSideModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Select Purchase Invoices" size="3xl">
         <div className="space-y-4">
           <p className="text-[12px] text-gray-500 font-semibold">
             Select outstanding purchase invoices to pay. Their line items will be fetched and amounts auto-computed (Discounted + VAT − WHT).
@@ -1214,10 +1204,10 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                 <table className="w-full" style={{ tableLayout: 'fixed' }}>
                   <colgroup>
                     <col style={{ width: '5%' }} />
-                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '40%' }} />
                     <col style={{ width: '18%' }} />
                     <col style={{ width: '13%' }} />
-                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '16%' }} />
                     <col style={{ width: '14%' }} />
                     <col style={{ width: '14%' }} />
                   </colgroup>

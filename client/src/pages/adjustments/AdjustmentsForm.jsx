@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft, Save, Plus, Trash2,
+  ArrowLeft, Save, Plus, Trash2, Minus,
   FileText, Paperclip, Layers, Landmark, Calculator
 } from 'lucide-react';
 import ReactDOM from 'react-dom';
@@ -126,15 +126,23 @@ const fmt = (n = 0) => Number(n).toLocaleString('en-PH', { minimumFractionDigits
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper functions for summary
 // ─────────────────────────────────────────────────────────────────────────────
-function SDivider() { return <div className="h-[1px] w-full bg-gray-100" />; }
+function SDivider() { return <div className="h-[1px] w-full bg-gray-400" />; }
 
 function SummaryRow({ label, value, color = 'text-gray-800', formula }) {
   return (
-    <div className="summary-row relative flex justify-between items-center hover:bg-gray-50 rounded-md transition-colors py-1 px-1 cursor-default">
-      <span className="text-[10.5px] font-black uppercase text-gray-500 leading-tight pr-1 flex-1">{label}</span>
-      <span className={`${color} text-[12px] font-black tabular-nums tracking-tight whitespace-nowrap text-right flex-shrink-0`}>{value}</span>
+    <div className="summary-row relative flex justify-between items-center hover:bg-gray-50 rounded-md transition-colors py-1.5 px-1 cursor-default">
+      {/* Label: 10.5px -> ~12.5px */}
+      <span className="text-[clamp(11px,1.1vw,12.5px)] font-black uppercase text-gray-500 leading-tight pr-1 flex-1">
+        {label}
+      </span>
+
+      {/* Value: 12px -> ~14px */}
+      <span className={`${color} text-[clamp(12px,1.25vw,14px)] font-black tabular-nums tracking-tight whitespace-nowrap text-right flex-shrink-0`}>
+        {value}
+      </span>
+
       {formula && (
-        <div className="summary-tooltip absolute left-0 bottom-full mb-1 z-50 bg-gray-900 text-white text-[10px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none">
+        <div className="summary-tooltip absolute left-0 bottom-full mb-1 z-50 bg-gray-900 text-white text-[11px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none">
           <span className="text-gray-300 font-medium">{formula}</span>
           <div className="absolute left-3 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900" />
         </div>
@@ -413,58 +421,56 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
           </section>
 
           {/* SUMMARY */}
-          <section className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex-1 flex flex-col min-h-0">
-            <h3 className="text-[12px] font-black uppercase tracking-[3px] text-gray-900 mb-2 flex items-center gap-2 flex-shrink-0">
-              <Calculator size={12} /> Summary
-            </h3>
-            <div className="overflow-y-auto min-h-0 flex-1 space-y-0">
-              <SummaryRow label="Total Entries" value={totalEntries} formula="Count of all journal rows" />
-              <SDivider />
-              <SummaryRow label="Manual Entries" value={manualEntries} formula="User-added journal rows" color="text-blue-600" />
-              <SDivider />
-              <SummaryRow label="Auto Entries" value={autoEntries} formula="System-generated rows" color="text-gray-600" />
-              <SDivider />
-              <SummaryRow label="Total Debit" value={fmt(totalDebit)} formula="Sum of all debit amounts" color="text-green-600" />
-              <SDivider />
-              <SummaryRow label="Total Credit" value={fmt(totalCredit)} formula="Sum of all credit amounts" color="text-red-600" />
+          <section className=" bg-white rounded-2xl border-2 border-red-100 shadow-xl shadow-red-500/5 flex-1 flex flex-col min-h-0 overflow-hidden">
+            {/* Header: Solid Red with White Text */}
+            <header className="bg-red-600 p-4 flex-shrink-0">
+              <h3 className="text-[clamp(14px,1.4vw,16px)] font-black uppercase tracking-[3px] text-white flex items-center gap-2">
+                <Calculator size={16} className="shrink-0 text-white" />
+                Summary
+              </h3>
+            </header>
+
+            {/* Scrollable rows */}
+            <div className="custom-table-scroller overflow-y-auto min-h-0 flex-1 custom-scrollbar p-4 py-2">
+              <div className="space-y-0">
+                <SummaryRow label="Total Entries" value={totalEntries}  />
+                <SDivider />
+                <SummaryRow label="Manual Entries" value={manualEntries}  color="text-blue-600" />
+                <SDivider />
+                <SummaryRow label="Auto Entries" value={autoEntries} color="text-gray-600" />
+                <SDivider />
+                <SummaryRow label="Total Debit" value={fmt(totalDebit)} color="text-green-600" />
+                <SDivider />
+                <SummaryRow label="Total Credit" value={fmt(totalCredit)} color="text-red-600" />
+              </div>
             </div>
-            <div className="mt-3 flex-shrink-0">
-              <div className="flex flex-col gap-[2px] mb-2">
-                <div className="h-[2px] w-full bg-red-600 rounded-full" />
-                <div className="h-[1px] w-full bg-black/10" />
+
+            {/* Balance Status footer */}
+            <div className="p-4 pt-0 flex-shrink-0">
+              <div className="flex flex-col gap-[2px] mb-3">
+                <div className="h-[3px] w-full bg-red-600 rounded-full" />
+                <div className="h-[1px] w-full bg-gray-200" />
               </div>
-              <div className={`mb-2 px-2 py-1 rounded-lg border text-center ${
-                isBalanced 
-                  ? 'bg-green-50 border-green-100' 
-                  : 'bg-red-50 border-red-100'
-              }`}>
-                <p className={`text-[9px] font-black uppercase tracking-wide ${
-                  isBalanced ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {isBalanced ? 'Balanced Entry' : 'Unbalanced Entry'}
+
+              <div className="text-center rounded-xl py-3 border border-gray-100 bg-red-500">
+                <p className="text-[clamp(11px,1.1vw,12px)] font-black text-gray-200 uppercase tracking-[4px] mb-1">
+                  Total Amount
                 </p>
-              </div>
-              <div className="text-center">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[3px] mb-1">Balance Status</p>
-                <p className="text-2xl font-black text-black tracking-tighter leading-none flex items-baseline justify-center gap-1">
-                  <span className={`text-[13px] ${isBalanced ? 'text-green-600' : 'text-red-600'}`}>
-                    {isBalanced ? 'Balanced' : 'Unbalanced'}
+
+                <p className="text-[clamp(22px,2.5vw,28px)] font-black text-white tracking-tighter leading-none flex items-baseline justify-center gap-2">
+                  <span className="text-[clamp(12px,1.3vw,15px)] text-green-300 font-black">
+                    PHP
                   </span>
-                  {!isBalanced && (
-                    <span className="text-[16px] text-red-600">
-                      {fmt(Math.abs(totalDebit - totalCredit))}
-                    </span>
-                  )}
+                  {fmt(totalDebit)}
                 </p>
                 {!isBalanced && (
-                  <p className="text-[9px] font-black text-red-500 uppercase tracking-wide mt-1">
-                    Difference: {fmt(Math.abs(totalDebit - totalCredit))}
+                  <p className="text-[clamp(9px,1vw,11px)] font-black text-yellow-200 uppercase tracking-wide mt-1">
+                    Unbalanced: {fmt(Math.abs(totalDebit - totalCredit))}
                   </p>
                 )}
               </div>
             </div>
           </section>
-
         </aside>
 
         {/* ── MAIN CONTENT ── */}
@@ -588,7 +594,7 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
               {!isViewMode && (
                 <button
                   onClick={addJournalEntry}
-                  className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1"
+                  className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1"
                 >
                   <Plus size={15} /> Add Ledger Row
                 </button>
@@ -688,7 +694,7 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
                   </table>
                 </div>
                 {!isViewMode && (
-                  <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed border-gray-100 rounded-lg w-full text-[12px] font-black uppercase text-gray-400 hover:border-red-200 hover:text-red-600 transition-all flex items-center justify-center gap-1">
+                  <button onClick={addAttachment} className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1">
                     <Plus size={15} /> Add File
                   </button>
                 )}
@@ -745,13 +751,38 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
 function TableSection({ title, icon, children }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">{icon}</div>
-        <h2 className="text-[15px] font-black uppercase tracking-[1px] text-black">{title}</h2>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between p-4 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h2 className="text-[15px] font-black uppercase tracking-[1px] text-black">{title}</h2>
+        </div>
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+        >
+          {isCollapsed ? (
+            <>
+              <Plus size={16} />
+              <span className="text-[11px] font-black uppercase">Show</span>
+            </>
+          ) : (
+            <>
+              <Minus size={16} />
+              <span className="text-[11px] font-black uppercase">Hide</span>
+            </>
+          )}
+        </button>
       </div>
-      {children}
+      
+      {!isCollapsed && (
+        <div className="px-4 pb-4">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

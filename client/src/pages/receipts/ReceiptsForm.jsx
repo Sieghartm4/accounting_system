@@ -195,12 +195,22 @@ function computeSummary(items) {
   items.forEach(item => {
     const qty = parseFloat(item.qty) || 0;
     const price = parseFloat(item.price) || 0;
-    const discPct = parseFloat(item.discount) || 0;
+    const discountValue = parseFloat(item.discount) || 0;
+    const discountType = item.discountType || 'PERCENT';
     const vatPct = parseFloat(item.vat) || 0;
     const whtPct = parseFloat(item.wht) || 0;
 
     const gross = qty * price;
-    const discAmt = gross * (discPct / 100);
+    
+    // Calculate discount amount based on discount type
+    let discAmt;
+    if (discountType === 'PERCENT') {
+      discAmt = gross * (discountValue / 100);
+    } else {
+      // FIXED amount - apply discount per unit, then multiply by quantity
+      discAmt = discountValue * qty;
+    }
+    
     const discounted = gross - discAmt;
     const vatAmt = discounted * (vatPct / 100);
     const whtAmt = discounted * (whtPct / 100);
@@ -248,7 +258,7 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, receiptData = null }) {
   const [receiptItems, setReceiptItems] = useState([
-    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
+    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
   ]);
 
   const [journalEntries, setJournalEntries] = useState([
@@ -278,6 +288,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
 
   const [modeOfPayment, setModeOfPayment] = useState('');
   const [modeSearch, setModeSearch] = useState('');
+  const [collectionDate, setCollectionDate] = useState('');
   const [bankName, setBankName] = useState('');
   const [checkNumber, setCheckNumber] = useState('');
   const [documentReference, setDocumentReference] = useState('');
@@ -364,6 +375,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
         setDocumentReference(receipt.doc_ref || '');
         setModeOfPayment(receipt.mode || '');
         setModeSearch(receipt.mode || '');
+        setCollectionDate(receipt.collection_date || '');
         setBankName(receipt.bank_name || '');
         setCheckNumber(receipt.check_number || '');
         setRemarks(receipt.remarks || '');
@@ -381,6 +393,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
           qty: item.quantity || 1,
           price: parseFloat(item.sales_price) || 0,
           discount: parseFloat(item.discount) || 0,
+          discountType: item.discount_type || 'PERCENT',
           vat: parseFloat(item.vat) || 0,
           wht: parseFloat(item.witholding_tax) || 0,
           responsibilityCenter: item.responsibility_center || '',
@@ -423,7 +436,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
     }
   }, [isViewMode, receiptData]);
 
-  const addReceiptItem = (isOther = false) => setReceiptItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
+  const addReceiptItem = (isOther = false) => setReceiptItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removeReceiptItem = (id) => setReceiptItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
@@ -493,12 +506,22 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
     receiptItems.forEach((item) => {
       const qty = parseFloat(item.qty) || 0;
       const price = parseFloat(item.price) || 0;
-      const discountPct = parseFloat(item.discount) || 0;
+      const discountValue = parseFloat(item.discount) || 0;
+      const discountType = item.discountType || 'PERCENT';
       const vatPct = parseFloat(item.vat) || 0;
       const whtPct = parseFloat(item.wht) || 0;
 
       const gross = qty * price;
-      const discountAmount = gross * (discountPct / 100);
+      
+      // Calculate discount amount based on discount type
+      let discountAmount;
+      if (discountType === 'PERCENT') {
+        discountAmount = gross * (discountValue / 100);
+      } else {
+        // FIXED amount - apply discount per unit, then multiply by quantity
+        discountAmount = discountValue * qty;
+      }
+      
       const discountedAmount = gross - discountAmount;
       const vatAmount = discountedAmount * (vatPct / 100);
       const whtAmount = discountedAmount * (whtPct / 100);
@@ -580,12 +603,22 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
     const totalCashAmount = receiptItems.reduce((sum, item) => {
       const qty = parseFloat(item.qty) || 0;
       const price = parseFloat(item.price) || 0;
-      const discountPct = parseFloat(item.discount) || 0;
+      const discountValue = parseFloat(item.discount) || 0;
+      const discountType = item.discountType || 'PERCENT';
       const vatPct = parseFloat(item.vat) || 0;
       const whtPct = parseFloat(item.wht) || 0;
 
       const gross = qty * price;
-      const discountAmount = gross * (discountPct / 100);
+      
+      // Calculate discount amount based on discount type
+      let discountAmount;
+      if (discountType === 'PERCENT') {
+        discountAmount = gross * (discountValue / 100);
+      } else {
+        // FIXED amount - apply discount per unit, then multiply by quantity
+        discountAmount = discountValue * qty;
+      }
+      
       const discountedAmount = gross - discountAmount;
       const vatAmount = discountedAmount * (vatPct / 100);
       const whtAmount = discountedAmount * (whtPct / 100);
@@ -658,6 +691,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
           qty: item.isOther ? 1 : (parseFloat(item.qty) || 0), // Other items default to qty 1
           price: parseFloat(item.price) || 0,
           discount: parseFloat(item.discount) || 0,
+          discount_type: item.discountType || 'PERCENT',
           vat: parseFloat(item.vat) || 0,
           wtax: parseFloat(item.wht) || 0,
           responsibility_center: item.responsibilityCenter || ''
@@ -685,7 +719,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
       const receiptData = {
         customer_id: selectedCustomer,
         document_reference: documentReference,
-        payment_date: new Date().toISOString().split("T")[0],
+        payment_date: collectionDate || new Date().toISOString().split("T")[0],
+        collection_date: collectionDate || new Date().toISOString().split("T")[0],
         mode_of_payment: modeOfPayment,
         bank_name: bankName || "",
         check_number: checkNumber || "",
@@ -777,7 +812,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
       <div className="flex-1 flex flex-col gap-2 min-h-0">
 
         {/* BASIC DETAILS - FULL WIDTH TOP */}
-        <fieldset className="bg-black rounded-2xl p-3 text-white shadow-xl">
+        <fieldset className="bg-black rounded-2xl p-3 pl-6 pr-6 text-white shadow-xl">
           <legend className="bg-red-600 text-[13px] font-black uppercase tracking-[3px] text-white flex items-center justify-center gap-2 px-4 py-1 rounded-lg mx-auto w-fit">
             <Landmark size={18} /> Basic Details
           </legend>
@@ -822,6 +857,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
               <legend className="text-[11px] font-black uppercase text-gray-100">Collection Date</legend>
               <input
                 type="date"
+                value={collectionDate}
+                onChange={e => setCollectionDate(e.target.value)}
                 disabled={isViewMode}
                 className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
                   ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
@@ -868,7 +905,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
         <div className="flex-1 flex gap-2 min-h-0">
 
           {/* LEFT SIDEBAR - SUMMARY ONLY */}
-          <aside className="w-full flex-shrink-0 flex flex-col gap-2 h-full overflow-y-auto sidebar-scroll max-w-[20%]">
+          <aside className="w-full flex-shrink-0 flex flex-col gap-2 h-full overflow-y-auto sidebar-scroll max-w-[18%]">
 
             {/* ── SUMMARY ── */}
             <section className=" bg-white rounded-2xl border-2 border-red-100 shadow-xl shadow-red-500/5 flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -999,22 +1036,22 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
 
 
                 <div ref={receiptItemsScrollRef} className="overflow-x-auto custom-table-scroller">
-                  <table className="w-full text-center min-w-[1100px]" style={{ tableLayout: 'fixed' }}>
+                  <table className="w-full text-center min-w-[1000px]" style={{ tableLayout: 'fixed' }}>
                     <colgroup>
-                      <col style={{ width: '13%' }} />
-                      <col style={{ width: '13%' }} />
+                      <col style={{ width: '12%' }} />
                       <col style={{ width: '16%' }} />
+                      <col style={{ width: '14%' }} />
                       <col style={{ width: '6%' }} />
-                      <col style={{ width: '10%' }} />
+                      <col style={{ width: '9%' }} />
+                      <col style={{ width: '8%' }} />
                       <col style={{ width: '9%' }} />
                       <col style={{ width: '8%' }} />
                       <col style={{ width: '8%' }} />
-                      <col style={{ width: '13%' }} />
-                      <col style={{ width: '5%' }} />
+                      <col style={{ width: '9%' }} />
                     </colgroup>
                     <thead>
                       <tr className="border-b border-gray-100">
-                        {['Product/Service', 'COA', 'Description', 'Qty', 'Price', 'Disc %', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
+                        {['Product/Service', 'COA', 'Description', 'Qty', 'Price', 'Disc', 'Disc Type', 'VAT %', 'WHT %', 'Resp. Center', ''].map((h, i) => (
                           <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
                         ))}
                       </tr>
@@ -1091,14 +1128,32 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                                 className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                 type="number"
                                 min="0"
-                                max="100"
+                                max={item.discountType === 'PERCENT' ? '100' : '999999'}
                                 step="0.01"
                                 placeholder="0"
                                 value={item.discount || 0}
                                 onChange={e => updateReceiptItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
                               />
-                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">%</span>
+                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">
+                                {item.discountType === 'PERCENT' ? '%' : '₱'}
+                              </span>
                             </div>
+                          </td>
+                          <td className="py-1 px-1">
+                            {isViewMode ? (
+                              <div className={`${tableInput} text-black py-1.5 text-center`}>
+                                {item.discountType === 'PERCENT' ? '%' : 'FXD'}
+                              </div>
+                            ) : (
+                              <select
+                                value={item.discountType || 'PERCENT'}
+                                onChange={e => updateReceiptItem(item.id, 'discountType', e.target.value)}
+                                className={`w-full px-2 py-1 text-[11px] font-bold border border-gray-200 rounded focus:ring-1 focus:ring-red-400 outline-none`}
+                              >
+                                <option value="PERCENT">PERCENT</option>
+                                <option value="FIXED">FIXED</option>
+                              </select>
+                            )}
                           </td>
                           <td className="py-1 px-1">
                             <div className="relative">

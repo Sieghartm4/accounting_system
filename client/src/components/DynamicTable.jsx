@@ -54,7 +54,16 @@ const DynamicTable = ({
     if (!enableCheckbox) return false;
     if (checkboxConditionAll) return true;
     if (checkboxCondition && checkboxCondition.column && checkboxCondition.value) {
-      return String(row[checkboxCondition.column]).toLowerCase() === String(checkboxCondition.value).toLowerCase();
+      const rowValue = String(row[checkboxCondition.column]).toLowerCase();
+      const conditionValue = String(checkboxCondition.value).toLowerCase();
+      
+      if (checkboxCondition.exclude) {
+        // Exclude rows that match the condition
+        return rowValue !== conditionValue;
+      } else {
+        // Include only rows that match the condition
+        return rowValue === conditionValue;
+      }
     }
     return true; // Default to true if no condition
   };

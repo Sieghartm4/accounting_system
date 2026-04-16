@@ -38,7 +38,19 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     };
 
     const handleLogout = () => {
+        // Preserve remembered credentials before clearing
+        const rememberedUser = localStorage.getItem('rememberedUser');
+        const rememberedPassword = localStorage.getItem('rememberedPassword');
+        
+        // Clear all localStorage
         localStorage.clear();
+        
+        // Restore remembered credentials if they existed
+        if (rememberedUser && rememberedPassword) {
+            localStorage.setItem('rememberedUser', rememberedUser);
+            localStorage.setItem('rememberedPassword', rememberedPassword);
+        }
+        
         window.location.href = '/';
     };
 

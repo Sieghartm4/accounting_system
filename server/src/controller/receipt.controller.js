@@ -87,6 +87,7 @@ const getAllReceipts = async (req, res, next) => {
       { col: Accounting.receipt_items.selectOptionColumns.quantity, as: 'quantity' },
       { col: Accounting.receipt_items.selectOptionColumns.sales_price, as: 'sales_price' },
       { col: Accounting.receipt_items.selectOptionColumns.discount, as: 'discount' },
+      { col: Accounting.receipt_items.selectOptionColumns.discount_type, as: 'discount_type' },
       { col: Accounting.receipt_items.selectOptionColumns.vat, as: 'vat' },
       { col: Accounting.receipt_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
       { col: Accounting.receipt_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
@@ -224,6 +225,7 @@ const createReceipts = async (req, res, next) => {
             item.qty || null,
             item.price || 0,
             item.discount || 0,
+            item.discount_type || null,
             item.vat || 0,
             item.wtax || 0,
             item.responsibility_center || ''

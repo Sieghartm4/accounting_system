@@ -1,11 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, User, ArrowRight, Loader2, ShieldCheck, PieChart, FileText } from 'lucide-react';
+import { Lock, User, ArrowRight, Loader2, ShieldCheck, PieChart, FileText, Eye, EyeOff } from 'lucide-react';
 import useLogin from './useLogin';
 
 export default function Login() {
   const [formData, setFormData] = useState({ username: '', password: '' });
+  const [rememberDevice, setRememberDevice] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { login, loading, error } = useLogin();
+
+  // Load remembered credentials on component mount
+  useEffect(() => {
+    const rememberedUser = localStorage.getItem('rememberedUser');
+    const rememberedPassword = localStorage.getItem('rememberedPassword');
+    
+    if (rememberedUser && rememberedPassword) {
+      setFormData({ username: rememberedUser, password: rememberedPassword });
+      setRememberDevice(true);
+    }
+  }, []);
+
+  // Save credentials when remember device is checked and form data changes
+  useEffect(() => {
+    if (rememberDevice && formData.username) {
+      localStorage.setItem('rememberedUser', formData.username);
+      localStorage.setItem('rememberedPassword', formData.password);
+    }
+  }, [rememberDevice, formData.username, formData.password]);
+
+  // Remove credentials only when user explicitly unchecks the box
+  const handleRememberDeviceChange = (e) => {
+    const isChecked = e.target.checked;
+    setRememberDevice(isChecked);
+    
+    // Only remove credentials if user explicitly unchecks
+    if (!isChecked) {
+      localStorage.removeItem('rememberedUser');
+      localStorage.removeItem('rememberedPassword');
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -124,20 +157,34 @@ export default function Login() {
                   <Lock size={18} />
                 </span>
                 <input 
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full pl-12 pr-4 py-3.5 border-b-2 border-gray-100 bg-gray-50/50 focus:bg-white focus:border-red-600 outline-none transition-all duration-300 rounded-t-lg" 
+                  className="w-full pl-12 pr-12 py-3.5 border-b-2 border-gray-100 bg-gray-50/50 focus:bg-white focus:border-red-600 outline-none transition-all duration-300 rounded-t-lg" 
                   placeholder="••••••••"
                   required
                 />
+                {!rememberDevice && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="flex items-center justify-between py-2">
               <label className="flex items-center gap-2 cursor-pointer group">
-                <input type="checkbox" className="w-4 h-4 accent-red-600 rounded border-gray-300" />
+                <input 
+                  type="checkbox" 
+                  className="w-4 h-4 accent-red-600 rounded border-gray-300"
+                  checked={rememberDevice}
+                  onChange={handleRememberDeviceChange}
+                />
                 <span className="text-sm text-gray-500 group-hover:text-black transition-colors">Remember device</span>
               </label>
               <a href="#" className="text-sm font-semibold text-red-600 hover:text-black transition-colors">Forgot Access?</a>

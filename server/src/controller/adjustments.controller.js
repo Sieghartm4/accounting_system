@@ -259,8 +259,7 @@ const updateAdjustment = async (req, res, next) => {
     const {
       updates
     } = req.body;
-    console.log("body", req.body);
-
+        
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({
         success: false,
@@ -275,9 +274,14 @@ const updateAdjustment = async (req, res, next) => {
 
       const updatePromises = updates.map(async (update) => {
         const { id, currentState } = update;
-
-        if (!id || !currentState) {
-          throw new Error('Each update requires id and currentState');
+        
+        
+        if (!id) {
+          throw new Error('Each update requires id');
+        }
+        
+        if (!currentState) {
+          throw new Error(`Each update requires currentState. Received: ${JSON.stringify(update)}`);
         }
 
         let nextState;

@@ -28,7 +28,6 @@ const getCollections = async (req, res, next) => {
       { col: `${Accounting.collections.tablename}.c_bank_name`, as: 'bank_name' },
       { col: `${Accounting.collections.tablename}.c_check_number`, as: 'check_number' },
       { col: `${Accounting.collections.tablename}.c_collection_date`, as: 'collection_date' },
-      { col: `${Accounting.collections.tablename}.c_status`, as: 'status' },
       { col: `${Accounting.collections.tablename}.c_state`, as: 'state' }
     ])
       .from(Accounting.collections.tablename)
@@ -69,6 +68,7 @@ const getSalesCollection = async (req, res, next) => {
       .innerJoin(Master.customers.tablename, Accounting.sales.selectOptionColumns.customer_id, Master.customers.selectOptionColumns.id)
       .andWhereNot(Accounting.sales.selectOptionColumns.status)
       .andWhere(Accounting.sales.selectOptionColumns.state)
+      .andWhereNotExists(`SELECT 1 FROM ${Accounting.collection_items.tablename} WHERE ${Accounting.collection_items.selectOptionColumns.sales_id} = ${Accounting.sales.selectOptionColumns.id}`)
       .build();
     let sales = await Query(query, ['APPROVED', 'PAID'], [Accounting.sales.prefix_, Master.customers.prefix_]);
     console.log("SALES QUERY",sales);
@@ -204,7 +204,6 @@ const getAllCollections = async (req, res, next) => {
       { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.check_number}`, as: 'check_number' },
       { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.collection_date}`, as: 'collection_date' },
       { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.remarks}`, as: 'remarks' },
-      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.status}`, as: 'status' },
       { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.state}`, as: 'state' }
     ])
       .from(Accounting.collections.tablename)
@@ -342,7 +341,6 @@ const createCollection = async (req, res, next) => {
         check_number || null,
         collection_date || null,
         remarks || null,
-        'NOT COLLECTED',
         'PREPARED',
         new Date().toISOString().split('T')[0],
         created_by || null
@@ -483,10 +481,10 @@ const updateCollectionState = async (req, res, next) => {
 
         if (nextState === 'APPROVED') {
           const updateQuery = sql.update(Accounting.collections.tablename)
-            .set([Accounting.collections.selectOptionColumns.state, Accounting.collections.selectOptionColumns.status])
+            .set([Accounting.collections.selectOptionColumns.state])
             .where(Accounting.collections.selectOptionColumns.id)
             .build();
-          const updateValues = [nextState, 'COLLECTED', id];
+          const updateValues = [nextState, id];
 
           const query = sql.select([
             { col: Accounting.collection_items.selectOptionColumns.sales_id, as: 'sales_id' },

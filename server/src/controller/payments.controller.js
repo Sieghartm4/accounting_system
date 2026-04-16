@@ -28,7 +28,6 @@ const getPayments = async (req, res, next) => {
       { col: Accounting.payments.selectOptionColumns.bank_name, as: 'bank_name' },
       { col: Accounting.payments.selectOptionColumns.check_number, as: 'check_number' },
       { col: Accounting.payments.selectOptionColumns.payment_date, as: 'payment_date' },
-      { col: Accounting.payments.selectOptionColumns.status, as: 'status' },
       { col: Accounting.payments.selectOptionColumns.state, as: 'state' }
     ])
       .from(Accounting.payments.tablename)
@@ -67,12 +66,15 @@ const getPurchasePayment = async (req, res, next) => {
     ])
       .from(Accounting.purchase.tablename)
       .innerJoin(Master.vendors.tablename, Accounting.purchase.selectOptionColumns.vendor_id, Master.vendors.selectOptionColumns.id)
+      .leftJoin(Accounting.payment_items.tablename, Accounting.purchase.selectOptionColumns.id, Accounting.payment_items.selectOptionColumns.purchase_id)
       .where(Accounting.purchase.selectOptionColumns.state)
       .andWhere(Accounting.purchase.selectOptionColumns.status)
+      .andWhereNotExists(`SELECT 1 FROM ${Accounting.payment_items.tablename} WHERE ${Accounting.payment_items.selectOptionColumns.purchase_id} = ${Accounting.purchase.selectOptionColumns.id}`)
       .build();
     let purchases = await Query(query, ['APPROVED', 'UNPAID'], [Accounting.purchase.prefix_, Master.vendors.prefix_]);
     console.log("PURCHASES QUERY 1", query);
     console.log("PURCHASES QUERY 2", purchases);
+    
     res.status(200).json({
       success: true,
       message: 'Purchases retrieved successfully',
@@ -108,29 +110,23 @@ const getPurchaseItemsPayment = async (req, res, next) => {
     }
 
     const query = sql.select([
-      // Purchase item identity
       { col: Accounting.purchase_items.selectOptionColumns.id, as: 'id' },
       { col: Accounting.purchase_items.selectOptionColumns.purchase_id, as: 'purchase_id' },
 
-      // Product info (display only)
       { col: Accounting.purchase_items.selectOptionColumns.product_service, as: 'product_service' },
       { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
 
-      // COA / AP account
       { col: Accounting.purchase_items.selectOptionColumns.charts_of_accounts, as: 'charts_of_accounts' },
       { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'coa_name' },
 
-      // Invoice reference (from parent purchase header)
       { col: Accounting.purchase.selectOptionColumns.document_reference, as: 'document_reference' },
 
-      // Line item detail
       { col: Accounting.purchase_items.selectOptionColumns.description, as: 'description' },
       { col: Accounting.purchase_items.selectOptionColumns.quantity, as: 'quantity' },
       { col: Accounting.purchase_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
 
-      // Rate fields — all needed to compute ci_amount correctly
       { col: Accounting.purchase_items.selectOptionColumns.discount, as: 'discount' },
-      { col: Accounting.purchase_items.selectOptionColumns.vat, as: 'vat' },           // ← CRITICAL: must be returned
+      { col: Accounting.purchase_items.selectOptionColumns.vat, as: 'vat' },
       { col: Accounting.purchase_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
 
       { col: Accounting.purchase_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
@@ -211,7 +207,6 @@ const getAllPayments = async (req, res, next) => {
       { col: Accounting.payments.selectOptionColumns.check_number, as: 'check_number' },
       { col: Accounting.payments.selectOptionColumns.payment_date, as: 'payment_date' },
       { col: Accounting.payments.selectOptionColumns.remarks, as: 'remarks' },
-      { col: Accounting.payments.selectOptionColumns.status, as: 'status' },
       { col: Accounting.payments.selectOptionColumns.state, as: 'state' }
     ])
       .from(Accounting.payments.tablename)
@@ -349,7 +344,6 @@ const createPayment = async (req, res, next) => {
         check_number || null,
         payment_date || null,
         remarks || null,
-        'UNPAID',
         'PREPARED',
         new Date().toISOString().split('T')[0],
         created_by || null
@@ -490,10 +484,10 @@ const updatePaymentState = async (req, res, next) => {
 
         if (nextState === 'APPROVED') {
           const updateQuery = sql.update(Accounting.payments.tablename)
-            .set([Accounting.payments.selectOptionColumns.state, Accounting.payments.selectOptionColumns.status])
+            .set([Accounting.payments.selectOptionColumns.state])
             .where(Accounting.payments.selectOptionColumns.id)
             .build();
-          const updateValues = [nextState, 'PAID', id];
+          const updateValues = [nextState, id];
 
           const query = sql.select([
             { col: Accounting.payment_items.selectOptionColumns.purchase_id, as: 'purchase_id' },

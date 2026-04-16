@@ -12,7 +12,6 @@ const Accounting = {
       "check_number",
       "remarks",
       "total_amount_due",
-      "status",
       "state",
       "created_date",
       "created_by"
@@ -27,7 +26,6 @@ const Accounting = {
       "cd_check_number",
       "cd_remarks",
       "cd_total_amount_due",
-      "cd_status",
       "cd_state",
       "cd_created_date",
       "cd_created_by"
@@ -42,7 +40,6 @@ const Accounting = {
       check_number: "cd_check_number",
       remarks: "cd_remarks",
       total_amount_due: "cd_total_amount_due",
-      status: "cd_status",
       state: "cd_state",
       created_date: "cd_created_date",
       created_by: "cd_created_by"
@@ -57,7 +54,6 @@ const Accounting = {
       check_number: "check_number",
       remarks: "remarks",
       total_amount_due: "total_amount_due",
-      status: "status",
       state: "state",
       created_date: "created_date",
       created_by: "created_by"
@@ -80,7 +76,6 @@ const Accounting = {
     check_number: "STRING",
     remarks: "TEXT",
     total_amount_due: "DECIMAL",
-    status: "ENUM",
     state: "ENUM",
     created_date: "STRING",
     created_by: "STRING"
@@ -258,7 +253,6 @@ const Accounting = {
       "check_number",
       "collection_date",
       "remarks",
-      "status",
       "state",
       "created_date",
       "created_by"
@@ -272,7 +266,6 @@ const Accounting = {
       "c_check_number",
       "c_collection_date",
       "c_remarks",
-      "c_status",
       "c_state",
       "c_created_date",
       "c_created_by"
@@ -286,7 +279,6 @@ const Accounting = {
     check_number: "c_check_number",
     collection_date: "c_collection_date",
     remarks: "c_remarks",
-    status: "c_status",
     state: "c_state",
     created_date: "c_created_date",
     created_by: "c_created_by"
@@ -300,7 +292,6 @@ const Accounting = {
     check_number: "check_number",
     collection_date: "collection_date",
     remarks: "remarks",
-    status: "status",
     state: "state",
     created_date: "created_date",
     created_by: "created_by"
@@ -320,7 +311,6 @@ const Accounting = {
     check_number: "TEXT",
     collection_date: "STRING",
     remarks: "TEXT",
-    status: "ENUM",
     state: "ENUM",
     created_date: "STRING",
     created_by: "STRING"
@@ -623,6 +613,7 @@ const Accounting = {
       "quantity",
       "sales_price",
       "discount",
+      "discount_type",
       "vat",
       "witholding_tax",
       "responsibility_center"
@@ -636,6 +627,7 @@ const Accounting = {
       "ri_quantity",
       "ri_sales_price",
       "ri_discount",
+      "ri_discount_type",
       "ri_vat",
       "ri_witholding_tax",
       "ri_responsibility_center"
@@ -649,6 +641,7 @@ const Accounting = {
     quantity: "ri_quantity",
     sales_price: "ri_sales_price",
     discount: "ri_discount",
+    discount_type: "ri_discount_type",
     vat: "ri_vat",
     witholding_tax: "ri_witholding_tax",
     responsibility_center: "ri_responsibility_center"
@@ -662,6 +655,7 @@ const Accounting = {
     quantity: "quantity",
     sales_price: "sales_price",
     discount: "discount",
+    discount_type: "discount_type",
     vat: "vat",
     witholding_tax: "witholding_tax",
     responsibility_center: "responsibility_center"
@@ -681,6 +675,7 @@ const Accounting = {
     quantity: "INTEGER",
     sales_price: "DECIMAL",
     discount: "DECIMAL",
+    discount_type: "STRING",
     vat: "DECIMAL",
     witholding_tax: "DECIMAL",
     responsibility_center: "STRING"
@@ -1098,7 +1093,6 @@ payments: {
     "check_number",
     "payment_date",
     "remarks",
-    "status",
     "state",
     "created_date",
     "created_by"
@@ -1112,7 +1106,6 @@ payments: {
     "c_check_number",
     "c_payment_date",
     "c_remarks",
-    "c_status",
     "c_state",
     "c_created_date",
     "c_created_by"
@@ -1126,7 +1119,6 @@ payments: {
     check_number: "c_check_number",
     payment_date: "c_payment_date",
     remarks: "c_remarks",
-    status: "c_status",
     state: "c_state",
     created_date: "c_created_date",
     created_by: "c_created_by"
@@ -1140,7 +1132,6 @@ payments: {
     check_number: "check_number",
     payment_date: "payment_date",
     remarks: "remarks",
-    status: "status",
     state: "state",
     created_date: "created_date",
     created_by: "created_by"
@@ -1160,7 +1151,6 @@ payments: {
     check_number: "TEXT",
     payment_date: "STRING",
     remarks: "TEXT",
-    status: "ENUM",
     state: "ENUM",
     created_date: "STRING",
     created_by: "STRING"

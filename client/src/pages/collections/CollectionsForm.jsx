@@ -662,7 +662,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
       <div className="flex-1 flex flex-col gap-2 min-h-0">
 
         {/* BASIC DETAILS - FULL WIDTH TOP */}
-        <fieldset className="bg-black rounded-2xl p-3 text-white shadow-xl">
+        <fieldset className="bg-black rounded-2xl p-3 pl-6 pr-6 text-white shadow-xl">
           <legend className="bg-red-600 text-[13px] font-black uppercase tracking-[3px] text-white flex items-center justify-center gap-2 px-4 py-1 rounded-lg mx-auto w-fit">
             <Landmark size={18} /> Basic Details
           </legend>
@@ -1175,7 +1175,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
     </div>
 
       {/* ── SALES INVOICE MODAL ── */}
-      <RightSideModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Select Sales Invoices" size="2xl">
+      <RightSideModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Select Sales Invoices" size="3xl">
         <div className="space-y-4">
           <p className="text-[12px] text-gray-500 font-semibold">
             Select outstanding sales invoices to collect. Their line items will be fetched and amounts auto-computed (Discounted + VAT − WHT).
@@ -1199,10 +1199,10 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                 <table className="w-full" style={{ tableLayout: 'fixed' }}>
                   <colgroup>
                     <col style={{ width: '5%' }} />
-                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '40%' }} />
                     <col style={{ width: '18%' }} />
                     <col style={{ width: '13%' }} />
-                    <col style={{ width: '14%' }} />
+                    <col style={{ width: '16%' }} />
                     <col style={{ width: '14%' }} />
                     <col style={{ width: '14%' }} />
                   </colgroup>

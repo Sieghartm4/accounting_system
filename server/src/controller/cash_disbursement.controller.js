@@ -29,7 +29,6 @@ const getCashDisbursements = async (req, res, next) => {
                     { col: Accounting.cash_disbursements.selectOptionColumns.check_number, as: 'check_number' },
                     { col: Accounting.cash_disbursements.selectOptionColumns.remarks, as: 'remarks' },
                     { col: Accounting.cash_disbursements.selectOptionColumns.total_amount_due, as: 'amount_due' },
-                    { col: Accounting.cash_disbursements.selectOptionColumns.status, as: 'status' },
                     { col: Accounting.cash_disbursements.selectOptionColumns.state, as: 'state' }
                 ])
                 .from(Accounting.cash_disbursements.tablename)
@@ -70,7 +69,6 @@ const getAllCashDisbursements = async (req, res, next) => {
       { col: Accounting.cash_disbursements.selectOptionColumns.check_number, as: 'check_number' },
       { col: Accounting.cash_disbursements.selectOptionColumns.remarks, as: 'remarks' },
       { col: Accounting.cash_disbursements.selectOptionColumns.total_amount_due, as: 'amount_due' },
-      { col: Accounting.cash_disbursements.selectOptionColumns.status, as: 'status' },
       { col: Accounting.cash_disbursements.selectOptionColumns.state, as: 'state' }
     ])
       .from(Accounting.cash_disbursements.tablename)
@@ -202,7 +200,6 @@ const createCashDisbursement = async (req, res, next) => {
                 check_number || null,
                 remarks || null,
                 total_amount_due || null,
-                'UNPAID',
                 'PREPARED',
                 new Date().toISOString().split('T')[0],
                 created_by || null
@@ -350,21 +347,13 @@ const updateDisbursementState = async (req, res, next) => {
           throw new Error(`Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`);
         }
 
-        if (nextState === 'APPROVED') {
-          const updateQuery = sql.update(Accounting.cash_disbursements.tablename)
-          .set([Accounting.cash_disbursements.selectOptionColumns.state, Accounting.cash_disbursements.selectOptionColumns.status])
-          .where(Accounting.cash_disbursements.selectOptionColumns.id)
-          .build();
-          const updateValues = [nextState, 'PAID', id];
-          return connection.execute(updateQuery, updateValues);
-        } else {
+
           const updateQuery = sql.update(Accounting.cash_disbursements.tablename)
           .set([Accounting.cash_disbursements.selectOptionColumns.state])
           .where(Accounting.cash_disbursements.selectOptionColumns.id)
           .build();
           const updateValues = [nextState, id];
           return connection.execute(updateQuery, updateValues);
-        }
       });
 
       const results = await Promise.all(updatePromises);

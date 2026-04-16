@@ -45,10 +45,6 @@ module.exports = {
         type: Sequelize.DECIMAL(18, 2),
         allowNull: false
       },
-      cd_status: {
-        type: Sequelize.ENUM('PAID', 'UNPAID', 'PARTIALLY PAID'),
-        allowNull: false
-      },
       cd_state: {
         type: Sequelize.ENUM('PREPARED','CHECKED','APPROVED','REJECTED','CANCELLED'),
         allowNull: false
