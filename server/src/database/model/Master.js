@@ -537,6 +537,121 @@ const Master = {
       purchase_price: "INTEGER",
       unit: "STRING"
     }
+  },
+  vat: {
+    tablename: "vat",
+    prefix: "vat",
+    prefix_: "vat_",
+    insertColumns: [
+      "code",
+      "name",
+      "rate",
+      "type",
+      "sub_type",
+      "description",
+      "status"
+    ],
+    selectColumns: [
+      "vat_id",
+      "vat_code",
+      "vat_name",
+      "vat_rate",
+      "vat_type",
+      "vat_sub_type",
+      "vat_description",
+      "vat_status"
+    ],
+    selectOptionColumns: {
+      id: "vat_id",
+      code: "vat_code",
+      name: "vat_name",
+      rate: "vat_rate",
+      type: "vat_type",
+      sub_type: "vat_sub_type",
+      description: "vat_description",
+      status: "vat_status"
+    },
+    updateOptionColumns: {
+      id: "id",
+      code: "code",
+      name: "name",
+      rate: "rate",
+      type: "type",
+      sub_type: "sub_type",
+      description: "description",
+      status: "status"
+    },
+    selectDateFormatColumns: {
+
+    },
+    selectMiscColumns: {
+
+    },
+    columnDataTypes: {
+      id: "INTEGER",
+      code: "STRING",
+      name: "STRING",
+      rate: "DECIMAL",
+      type: "ENUM",
+      sub_type: "ENUM",
+      description: "TEXT",
+      status: "ENUM"
+    }
+  },
+  withholding_tax: {
+    tablename: "withholding_tax",
+    prefix: "wt",
+    prefix_: "wt_",
+    insertColumns: [
+      "code",
+      "name",
+      "rate",
+      "tax_account",
+      "description",
+      "status"
+    ],
+    selectColumns: [
+      "wt_id",
+      "wt_code",
+      "wt_name",
+      "wt_rate",
+      "wt_tax_account",
+      "wt_description",
+      "wt_status"
+    ],
+    selectOptionColumns: {
+      id: "wt_id",
+      code: "wt_code",
+      name: "wt_name",
+      rate: "wt_rate",
+      tax_account: "wt_tax_account",
+      description: "wt_description",
+      status: "wt_status"
+    },
+    updateOptionColumns: {
+      id: "id",
+      code: "code",
+      name: "name",
+      rate: "rate",
+      tax_account: "tax_account",
+      description: "description",
+      status: "status"
+    },
+    selectDateFormatColumns: {
+
+    },
+    selectMiscColumns: {
+
+    },
+    columnDataTypes: {
+      id: "INTEGER",
+      code: "STRING",
+      name: "STRING",
+      rate: "DECIMAL",
+      tax_account: "STRING",
+      description: "TEXT",
+      status: "ENUM"
+    }
   }
 };
 

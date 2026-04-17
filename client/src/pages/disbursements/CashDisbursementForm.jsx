@@ -114,21 +114,46 @@ function PortalDropdown({ anchorRef, open, children }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Reusable SearchableDropdown
 // ─────────────────────────────────────────────────────────────────────────────
-function SearchableDropdown({ placeholder, value, onChange, onSelect, options, inputClassName, emptyText = 'No results found', disabled = false }) {
+function SearchableDropdown({ placeholder, value, onChange, onSelect, options, inputClassName, emptyText = 'No results found', disabled = false, onFocus }) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef(null);
   const closeTimer = useRef(null);
   const filtered = options.filter(o => !value || o.label.toLowerCase().includes(value.toLowerCase()) || (o.sublabel || '').toLowerCase().includes(value.toLowerCase()));
+  
   const handleBlur = () => {
     if (disabled) return;
-    closeTimer.current = setTimeout(() => setOpen(false), 180);
+    closeTimer.current = setTimeout(() => {
+      setOpen(false);
+      if (activeDropdownRef.current === anchorRef.current) {
+        activeDropdownRef.current = null;
+      }
+    }, 180);
   };
+  
   const handleFocus = () => {
     if (disabled) return;
     clearTimeout(closeTimer.current);
+    
+    // Close any other open dropdown
+    if (activeDropdownRef.current && activeDropdownRef.current !== anchorRef.current) {
+      // Trigger blur on the other dropdown to close it
+      const otherInput = activeDropdownRef.current.querySelector('input');
+      if (otherInput) {
+        otherInput.blur();
+      }
+    }
+    
     setOpen(true);
+    activeDropdownRef.current = anchorRef.current;
+    if (onFocus) onFocus();
   };
-  const handleSelect = (opt) => { clearTimeout(closeTimer.current); onSelect(opt); setOpen(false); };
+  
+  const handleSelect = (opt) => { 
+    clearTimeout(closeTimer.current); 
+    onSelect(opt); 
+    setOpen(false); 
+    activeDropdownRef.current = null;
+  };
   return (
     <div ref={anchorRef} className="relative w-full">
       <input
@@ -200,8 +225,8 @@ function computeSummary(items) {
     const price = parseFloat(item.price) || 0;
     const discountValue = parseFloat(item.discount) || 0;
     const discountType = item.discountType || 'PERCENT';
-    const vatPct = parseFloat(item.vat) || 0;
-    const whtPct = parseFloat(item.wht) || 0;
+    const vatPct = parseFloat(item.vatRate) || 0;
+    const whtPct = parseFloat(item.whtRate) || 0;
 
     const gross = qty * price;
     
@@ -257,10 +282,13 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
+// Global dropdown state to ensure only one dropdown is open at a time
+const activeDropdownRef = React.createRef();
+
 export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = false, disbursementData = null }) {
 
   const [disbursementItems, setDisbursementItems] = useState([
-    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, wht: 0, responsibilityCenter: '', isOther: false }
+    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther: false }
   ]);
 
   const [journalEntries, setJournalEntries] = useState([
@@ -281,6 +309,14 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
   const [products, setProducts] = useState([]);
   const [productLoading, setProductLoading] = useState(false);
   const [productError, setProductError] = useState('');
+
+  const [vatOptions, setVatOptions] = useState([]);
+  const [vatLoading, setVatLoading] = useState(false);
+  const [vatError, setVatError] = useState('');
+
+  const [whtOptions, setWhtOptions] = useState([]);
+  const [whtLoading, setWhtLoading] = useState(false);
+  const [whtError, setWhtError] = useState('');
 
   const [modeOfPayment, setModeOfPayment] = useState('');
   const [modeSearch, setModeSearch] = useState('');
@@ -342,7 +378,101 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
     } catch (err) { setProductError(err.message); } finally { setProductLoading(false); }
   };
 
+  const fetchVat = async () => {
+    try {
+      setVatLoading(true);
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No authorization token found");
+      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const result = await res.json();
+      if (result.success) {
+        const vatData = result.data.map(vat => ({
+          label: `${vat.code} - ${vat.name}`,
+          value: vat.id,
+          rate: parseFloat(vat.rate),
+          code: vat.code,
+          name: vat.name
+        }));
+        setVatOptions(vatData);
+      } else {
+        setVatError(result.message || 'Failed to fetch VAT data');
+      }
+    } catch (err) { 
+      setVatError(err.message); 
+    } finally { 
+      setVatLoading(false); 
+    }
+  };
+
+  const fetchWht = async () => {
+    try {
+      setWhtLoading(true);
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No authorization token found");
+      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/withholding_tax`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const result = await res.json();
+      if (result.success) {
+        const whtData = result.data.map(wht => ({
+          label: `${wht.code} - ${wht.name}`,
+          value: wht.id,
+          rate: parseFloat(wht.rate),
+          code: wht.code,
+          name: wht.name
+        }));
+        setWhtOptions(whtData);
+      } else {
+        setWhtError(result.message || 'Failed to fetch WHT data');
+      }
+    } catch (err) { 
+      setWhtError(err.message); 
+    } finally { 
+      setWhtLoading(false); 
+    }
+  };
+
+  const loadVatOnDemand = async () => {
+    if (vatOptions.length === 0 && !vatLoading) {
+      await fetchVat();
+    }
+  };
+
+  const loadWhtOnDemand = async () => {
+    if (whtOptions.length === 0 && !whtLoading) {
+      await fetchWht();
+    }
+  };
+
   useEffect(() => { fetchVendors(); fetchChartsOfAccounts(); fetchProducts(); }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (activeDropdownRef.current && !activeDropdownRef.current.contains(event.target)) {
+        const input = activeDropdownRef.current.querySelector('input');
+        if (input) {
+          input.blur();
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Populate form data when in view mode
   useEffect(() => {
@@ -382,8 +512,12 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
           price: item.purchase_price,
           discount: item.discount,
           discountType: item.discount_type || 'PERCENT',
-          vat: item.vat,
-          wht: item.witholding_tax,
+          vat: parseFloat(item.vat_code) || 0,
+          vatSearch: `${item.vat_code || ''} - ${item.vat_name || ''}`,
+          vatRate: parseFloat(item.vat_rate) || 0,
+          wht: parseFloat(item.withholding_tax_code) || 0,
+          whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
+          whtRate: parseFloat(item.withholding_tax_rate) || 0,
           responsibilityCenter: item.responsibility_center,
           isOther: false
         }));
@@ -438,7 +572,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
     }
   }, [isViewMode, disbursementData]);
 
-  const addDisbursementItem = (isOther = false) => setDisbursementItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, wht: 0, responsibilityCenter: '', isOther }]);
+  const addDisbursementItem = (isOther = false) => setDisbursementItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removeDisbursementItem = (id) => setDisbursementItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
@@ -469,8 +603,8 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
     (isViewMode ? "bg-gray-100 border border-gray-300 text-black cursor-not-allowed" : "bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500 text-center");
   const tableInput = "w-full rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none " +
     (isViewMode ? "bg-gray-100 border border-gray-300 text-black cursor-not-allowed" : "bg-gray-50/50 border border-gray-200 focus:ring-1 focus:ring-red-400");
-  const pctInput = tableInput + " pr-4";
-  const discountInput = tableInput + " pr-6";
+  const pctInput = tableInput + " pr-1";
+  const discountInput = tableInput;
 
   const fadeInUp = { hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
@@ -503,8 +637,8 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       const price = parseFloat(item.price) || 0;
       const discountValue = parseFloat(item.discount) || 0;
       const discountType = item.discountType || 'PERCENT';
-      const vatPct = parseFloat(item.vat) || 0;
-      const whtPct = parseFloat(item.wht) || 0;
+      const vatPct = parseFloat(item.vatRate) || 0;
+      const whtPct = parseFloat(item.whtRate) || 0;
 
       const gross = qty * price;
       
@@ -599,7 +733,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       const discountValue = parseFloat(item.discount) || 0;
       const discountType = item.discountType || 'PERCENT';
       const vatPct = parseFloat(item.vat) || 0;
-      const whtPct = parseFloat(item.wht) || 0;
+      const whtPct = parseFloat(item.whtRate) || 0;
 
       const gross = qty * price;
       
@@ -1038,9 +1172,9 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                       <col style={{ width: '9%' }} />
                       <col style={{ width: '7%' }} />
                       <col style={{ width: '8%' }} />
-                      <col style={{ width: '8%' }} />
-                      <col style={{ width: '8%' }} />
                       <col style={{ width: '12%' }} />
+                      <col style={{ width: '12%' }} />
+                      <col style={{ width: '10%' }} />
                       <col style={{ width: '5%' }} />
                     </colgroup>
                     <thead>
@@ -1097,9 +1231,9 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                                 value={item.discount || 0} 
                                 onChange={e => updateDisbursementItem(item.id, 'discount', parseFloat(e.target.value) || 0)} 
                               />
-                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 font-black pointer-events-none">
-                                {item.discountType === 'PERCENT' ? '%' : '₱'}
-                              </span>
+                              {item.discountType === 'PERCENT' && (
+                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">%</span>
+                              )}
                             </div>
                           </td>
                           {/* DISCOUNT TYPE */}
@@ -1121,17 +1255,51 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                           </td>
                           {/* VAT % */}
                           <td className="py-1 px-1">
-                            <div className="relative">
-                              <input disabled={isViewMode} className={`${pctInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent cursor-not-allowed' : ''}`} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.vat} onChange={e => updateDisbursementItem(item.id, 'vat', parseFloat(e.target.value) || 0)} />
-                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-red-400 font-black pointer-events-none">%</span>
-                            </div>
+                            {isViewMode ? (
+                              <div className={`${tableInput} text-black py-1.5 text-center`}>
+                                {item.vatSearch}
+                              </div>
+                            ) : (
+                              <SearchableDropdown
+                                placeholder="VAT Rate"
+                                value={item.vatSearch}
+                                onChange={v => updateDisbursementItem(item.id, 'vatSearch', v)}
+                                onFocus={loadVatOnDemand}
+                                onSelect={opt => { 
+                                  updateDisbursementItem(item.id, 'vat', opt.value); 
+                                  updateDisbursementItem(item.id, 'vatSearch', opt.label); 
+                                  updateDisbursementItem(item.id, 'vatRate', opt.rate); 
+                                }}
+                                options={vatOptions}
+                                inputClassName={`${pctInput + ' font-black text-red-600'}`}
+                                emptyText={vatError || 'No VAT rates found'}
+                                disabled={vatLoading}
+                              />
+                            )}
                           </td>
                           {/* WHT % */}
                           <td className="py-1 px-1">
-                            <div className="relative">
-                              <input disabled={isViewMode} className={`${pctInput + ' font-black text-blue-600'} ${isViewMode ? 'bg-transparent cursor-not-allowed' : ''}`} type="number" min="0" max="100" step="0.01" placeholder="0" value={item.wht} onChange={e => updateDisbursementItem(item.id, 'wht', parseFloat(e.target.value) || 0)} />
-                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-blue-400 font-black pointer-events-none">%</span>
-                            </div>
+                            {isViewMode ? (
+                              <div className={`${tableInput} text-black py-1.5 text-center`}>
+                                {item.whtSearch}
+                              </div>
+                            ) : (
+                              <SearchableDropdown
+                                placeholder="WHT Rate"
+                                value={item.whtSearch}
+                                onChange={v => updateDisbursementItem(item.id, 'whtSearch', v)}
+                                onFocus={loadWhtOnDemand}
+                                onSelect={opt => { 
+                                  updateDisbursementItem(item.id, 'wht', opt.value); 
+                                  updateDisbursementItem(item.id, 'whtSearch', opt.label); 
+                                  updateDisbursementItem(item.id, 'whtRate', opt.rate); 
+                                }}
+                                options={whtOptions}
+                                inputClassName={`${pctInput + ' font-black text-blue-600'}`}
+                                emptyText={whtError || 'No WHT rates found'}
+                                disabled={whtLoading}
+                              />
+                            )}
                           </td>
                           <td className="py-1 px-1">
                             <input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Select" value={item.responsibilityCenter} onChange={e => updateDisbursementItem(item.id, 'responsibilityCenter', e.target.value)} />

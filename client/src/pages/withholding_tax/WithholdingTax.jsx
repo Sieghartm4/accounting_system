@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, ClipboardCheck, ShieldCheck, Clock, ArrowRight, Download, Plus, X } from 'lucide-react';
+import { FileText, Percent, ShieldCheck, Clock, ArrowRight, Download, Plus, X, Edit2, Save, Receipt } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import RouteProtection from '../../components/RouteProtection';
 import ProtectedAction from '../../components/ProtectedAction';
 import RightSideModal from '../../components/RightSideModal';
 import DynamicToast from '../../components/DynamicToast';
-import useProforma from './useProforma';
+import useWithholdingTax from './useWithholdingTax';
 
-function ProformaContent() {
-  const { proforma, loading, error, chartsOfAccounts, coaLoading, createProformaEntry } = useProforma();
+function WithholdingTaxContent() {
+  const { withholdingTax, loading, error, createWithholdingTaxEntry, updateWithholdingTaxEntry, refreshWithholdingTax } = useWithholdingTax();
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -17,17 +17,20 @@ function ProformaContent() {
   };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingWithholdingTax, setEditingWithholdingTax] = useState(null);
   const [formData, setFormData] = useState({
-    module: '',
+    id: '',
+    code: '',
     name: '',
-    coa_id: '',
-    t_account: ''
+    rate: '',
+    tax_account: '',
+    description: '',
+    status: 'ACTIVE'
   });
   const [toast, setToast] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [coaSearchTerm, setCoaSearchTerm] = useState('');
-  const [showCoaDropdown, setShowCoaDropdown] = useState(false);
-  const coaDropdownRef = useRef(null);
+
+  const withholdingTaxStatuses = ['ACTIVE', 'INACTIVE'];
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -41,60 +44,63 @@ function ProformaContent() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const result = await createProformaEntry(formData);
+    let result;
+    if (editingWithholdingTax) {
+      result = await updateWithholdingTaxEntry(editingWithholdingTax.id, formData);
+    } else {
+      result = await createWithholdingTaxEntry(formData);
+    }
     
     if (result.success) {
-      setToast({ type: 'success', message: 'Proforma entry created successfully!' });
-      setFormData({ module: '', name: '', coa_id: '', t_account: '' });
+      setToast({ 
+        type: 'success', 
+        message: `Withholding Tax entry ${editingWithholdingTax ? 'updated' : 'created'} successfully!` 
+      });
+      setFormData({ id: '', code: '', name: '', rate: '', tax_account: '', description: '', status: 'ACTIVE' });
+      setEditingWithholdingTax(null);
       setIsModalOpen(false);
     } else {
-      setToast({ type: 'error', message: result.error || 'Failed to create proforma entry' });
+      setToast({ type: 'error', message: result.error || `Failed to ${editingWithholdingTax ? 'update' : 'create'} Withholding Tax entry` });
     }
     
     setIsSubmitting(false);
   };
 
-  const openModal = () => {
-    setFormData({ module: '', name: '', coa_id: '', t_account: '' });
-    setCoaSearchTerm('');
-    setShowCoaDropdown(false);
+  const openModal = (withholdingTaxData = null) => {
+    if (withholdingTaxData) {
+      setEditingWithholdingTax(withholdingTaxData);
+      setFormData({
+        id: withholdingTaxData.id || '',
+        code: withholdingTaxData.code || '',
+        name: withholdingTaxData.name || '',
+        rate: withholdingTaxData.rate || '',
+        tax_account: withholdingTaxData.tax_account || '',
+        description: withholdingTaxData.description || '',
+        status: withholdingTaxData.status || 'ACTIVE'
+      });
+    } else {
+      setEditingWithholdingTax(null);
+      setFormData({ id: '', code: '', name: '', rate: '', tax_account: '', description: '', status: 'ACTIVE' });
+    }
     setIsModalOpen(true);
   };
 
-  const handleCoaSearch = (e) => {
-    const value = e.target.value;
-    setCoaSearchTerm(value);
-    setShowCoaDropdown(true);
+  const formatRate = (rate) => {
+    return `${rate}%`;
   };
 
-  const handleCoaSelect = (coa) => {
-    setFormData(prev => ({ ...prev, coa_id: coa.id }));
-    setCoaSearchTerm(`${coa.code} - ${coa.name}`);
-    setShowCoaDropdown(false);
+  const getStatusBadge = (status) => {
+    const baseClasses = "px-2 py-1 text-xs font-bold rounded-full";
+    return status === 'ACTIVE' 
+      ? `${baseClasses} bg-green-100 text-green-800`
+      : `${baseClasses} bg-red-100 text-red-800`;
   };
-
-  const filteredCoa = chartsOfAccounts.filter(coa => 
-    coa.code?.toLowerCase().includes(coaSearchTerm.toLowerCase()) ||
-    coa.name?.toLowerCase().includes(coaSearchTerm.toLowerCase())
-  );
-
-  // Click outside handler for COA dropdown
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (coaDropdownRef.current && !coaDropdownRef.current.contains(event.target)) {
-        setShowCoaDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Fetching Proforma Data...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Fetching Withholding Tax Data...</p>
       </div>
     );
   }
@@ -110,17 +116,17 @@ function ProformaContent() {
     );
   }
 
+  // Transform data for table display
+  const transformedWithholdingTaxData = withholdingTax.map(item => ({
+    ...item,
+    rate: formatRate(item.rate)
+  }));
+
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
       
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
-        {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          <span>Billing & Invoicing</span>
-          <ArrowRight size={10} />
-          <span className="text-black">Proforma Entries</span>
-        </nav> */}
-
         <motion.div 
           initial="hidden"
           animate="visible"
@@ -130,26 +136,23 @@ function ProformaContent() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
-                <FileText size={24} />
+                <Receipt size={24} />
               </div>
               <h1 className="text-4xl font-black text-black tracking-tighter">
-                Proforma <span className="text-red-600 italic">Invoicing</span>
+                Withholding <span className="text-red-600 italic">Tax Management</span>
               </h1>
             </div>
-            {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
-              Review and manage preliminary invoices and draft financial entries.
-            </p> */}
           </div>
 
           <div className="flex gap-3">
             <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
               <Download size={14} />
-              EXPORT DRAFTS
+              EXPORT DATA
             </button>
-            <ProtectedAction routeName="proforma_entries">
-              <button onClick={openModal} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
-                <ClipboardCheck size={14} />
-                New Entry
+            <ProtectedAction routeName="witholding_tax">
+              <button onClick={() => openModal()} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+                <Plus size={14} />
+                New WHT
               </button>
             </ProtectedAction>
           </div>
@@ -158,22 +161,22 @@ function ProformaContent() {
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <SummaryCard 
-            icon={<FileText className="text-red-600" size={20} />} 
-            label="Draft Entries" 
-            value={proforma?.length || 0} 
-            subText="Pending Review"
+            icon={<Receipt className="text-red-600" size={20} />} 
+            label="Total WHT Rates" 
+            value={withholdingTax?.length || 0} 
+            subText="Configured"
+          />
+          <SummaryCard 
+            icon={<ShieldCheck className="text-green-600" size={20} />} 
+            label="Active Rates" 
+            value={withholdingTax?.filter(w => w.status === 'ACTIVE').length || 0} 
+            subText="In Use"
           />
           <SummaryCard 
             icon={<Clock className="text-black" size={20} />} 
-            label="Awaiting Approval" 
-            value="12" 
-            subText="Queue"
-          />
-          <SummaryCard 
-            icon={<ShieldCheck className="text-gray-400" size={20} />} 
-            label="Verification" 
+            label="System Status" 
             value="Active" 
-            subText="System Status"
+            subText="Operational"
           />
         </div>
       </div>
@@ -186,38 +189,56 @@ function ProformaContent() {
         className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
       >
         <DynamicTable
-          data={proforma}
-          title="Proforma Ledger"
+          data={transformedWithholdingTaxData}
+          title="Withholding Tax Configuration"
           enableAddButton={false}
+          enableActionColumn={true}
+          actionButtons={[
+            {
+              label: 'Edit',
+              onClick: (row) => openModal(row),
+              icon: <Edit2 size={16} />
+            }
+          ]}
+          badgeColumns={[
+            {
+              column: 'status',
+              values: {
+                'ACTIVE': 'green',
+                'INACTIVE': 'red'
+              }
+            }
+          ]}
         />
       </motion.div>
 
-      {/* Right Side Modal for Creating New Entry */}
+      {/* Right Side Modal for Creating/Editing Withholding Tax Entry */}
       <RightSideModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Create New Proforma Entry"
+        title={editingWithholdingTax ? "Edit Withholding Tax Entry" : "Create New Withholding Tax Entry"}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-black uppercase tracking-wider text-gray-700 mb-2">
-              Module
+              WHT Code
             </label>
             <input
               type="text"
-              name="module"
-              value={formData.module}
+              name="code"
+              value={formData.code}
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-              placeholder="Enter module name"
+              placeholder="Enter WHT code"
               required
+              disabled={!!editingWithholdingTax}
             />
           </div>
 
           <div>
             <label className="block text-xs font-black uppercase tracking-wider text-gray-700 mb-2">
-              Entry Name
+              WHT Name
             </label>
             <input
               type="text"
@@ -225,71 +246,73 @@ function ProformaContent() {
               value={formData.name}
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-              placeholder="Enter entry name"
+              placeholder="Enter WHT name"
               required
             />
-          </div>
-
-          <div className="relative" ref={coaDropdownRef}>
-            <label className="block text-xs font-black uppercase tracking-wider text-gray-700 mb-2">
-              Chart of Accounts
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={coaSearchTerm}
-                onChange={handleCoaSearch}
-                onFocus={() => setShowCoaDropdown(true)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                placeholder="Search Chart of Accounts..."
-                required
-              />
-              {coaLoading && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              )}
-            </div>
-            
-            {/* Dropdown */}
-            {showCoaDropdown && (
-              <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {filteredCoa.length > 0 ? (
-                  filteredCoa.map((coa) => (
-                    <div
-                      key={coa.id}
-                      onClick={() => handleCoaSelect(coa)}
-                      className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-bold text-gray-900">{coa.code}</span>
-                        <span className="text-xs text-gray-600">{coa.type}</span>
-                      </div>
-                      <div className="text-xs text-gray-700 mt-1">{coa.name}</div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="px-3 py-4 text-center text-gray-500 text-sm">
-                    {coaLoading ? 'Loading...' : 'No Chart of Accounts found'}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           <div>
             <label className="block text-xs font-black uppercase tracking-wider text-gray-700 mb-2">
-              T-Account
+              Rate (%)
+            </label>
+            <input
+              type="number"
+              name="rate"
+              value={formData.rate}
+              onChange={handleInputChange}
+              step="0.01"
+              min="0"
+              max="100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+              placeholder="Enter rate"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-black uppercase tracking-wider text-gray-700 mb-2">
+              Tax Account
             </label>
             <input
               type="text"
-              name="t_account"
-              value={formData.t_account}
+              name="tax_account"
+              value={formData.tax_account}
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-              placeholder="Enter T-account"
+              placeholder="Enter tax account"
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-black uppercase tracking-wider text-gray-700 mb-2">
+              Description
+            </label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none resize-none"
+              placeholder="Enter description"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-black uppercase tracking-wider text-gray-700 mb-2">
+              Status
+            </label>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+              required
+            >
+              {withholdingTaxStatuses.map(status => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
           </div>
 
           <div className="flex gap-3 pt-4">
@@ -305,7 +328,7 @@ function ProformaContent() {
               disabled={isSubmitting}
               className="flex-1 px-4 py-3 bg-black text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'CREATING...' : 'CREATE ENTRY'}
+              {isSubmitting ? 'SAVING...' : (editingWithholdingTax ? 'UPDATE WHT' : 'CREATE WHT')}
             </button>
           </div>
         </form>
@@ -338,10 +361,10 @@ function SummaryCard({ icon, label, value, subText }) {
   );
 }
 
-export default function Proforma() {
+export default function WithholdingTax() {
   return (
-    <RouteProtection routeName="proforma_entries">
-      <ProformaContent />
+    <RouteProtection routeName="witholding_tax">
+      <WithholdingTaxContent />
     </RouteProtection>
   );
 }

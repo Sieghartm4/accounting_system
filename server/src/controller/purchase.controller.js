@@ -47,7 +47,7 @@ const getPurchase = async (req, res, next) => {
 
   } catch (error) {
     console.error('Error fetching purchases:', error)
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
       message: 'Server error while fetching purchases',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -88,11 +88,16 @@ const getAllPurchase = async (req, res, next) => {
       { col: Accounting.purchase_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
       { col: Accounting.purchase_items.selectOptionColumns.discount, as: 'discount' },
       { col: Accounting.purchase_items.selectOptionColumns.discount_type, as: 'discount_type' },
-      { col: Accounting.purchase_items.selectOptionColumns.vat, as: 'vat' },
-      { col: Accounting.purchase_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
+      { col: Master.vat.selectOptionColumns.code, as: 'vat_code' },
+      { col: Master.vat.selectOptionColumns.name, as: 'vat_name' },
+      { col: Master.vat.selectOptionColumns.rate, as: 'vat_rate' },
+      { col: Master.withholding_tax.selectOptionColumns.code, as: 'withholding_tax_code' },
+      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'withholding_tax_rate' },
       { col: Accounting.purchase_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
     ])
       .from(Accounting.purchase_items.tablename)
+      .innerJoin(Master.withholding_tax.tablename, Accounting.purchase_items.selectOptionColumns.witholding_tax, Master.withholding_tax.selectOptionColumns.id)
+      .innerJoin(Master.vat.tablename, Accounting.purchase_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
       .leftJoin(Master.products_service.tablename, Accounting.purchase_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
       .innerJoin(Master.charts_of_accounts.tablename, Accounting.purchase_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
       .where(Accounting.purchase_items.selectOptionColumns.purchase_id)
@@ -310,7 +315,7 @@ const updatePurchaseState = async (req, res, next) => {
       updates
     } = req.body;
     console.log("body", req.body);
-    
+
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({
         success: false,
@@ -325,7 +330,7 @@ const updatePurchaseState = async (req, res, next) => {
 
       const updatePromises = updates.map(async (update) => {
         const { id, currentState } = update;
-        
+
         if (!id || !currentState) {
           throw new Error('Each update requires id and currentState');
         }
@@ -339,17 +344,17 @@ const updatePurchaseState = async (req, res, next) => {
           throw new Error(`Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`);
         }
 
-          const updateQuery = sql.update(Accounting.purchase.tablename)
+        const updateQuery = sql.update(Accounting.purchase.tablename)
           .set([Accounting.purchase.selectOptionColumns.state])
           .where(Accounting.purchase.selectOptionColumns.id)
           .build();
-          const updateValues = [nextState, id];
-          return connection.execute(updateQuery, updateValues);
-        
+        const updateValues = [nextState, id];
+        return connection.execute(updateQuery, updateValues);
+
       });
 
       const results = await Promise.all(updatePromises);
-      
+
       await connection.commit();
 
       res.status(200).json({

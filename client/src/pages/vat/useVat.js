@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 
-const useProforma = () => {
-  const [proforma, setProforma] = useState([]);
+const useVat = () => {
+  const [vat, setVat] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [chartsOfAccounts, setChartsOfAccounts] = useState([]);
-  const [coaLoading, setCoaLoading] = useState(false);
 
-  const fetchProforma = async () => {
+  const fetchVat = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
@@ -16,7 +14,7 @@ const useProforma = () => {
         throw new Error("No authorization token found");
       }
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/proforma_entries`,
+        `${import.meta.env.VITE_SERVER_LINK}/vat`,
         {
           method: "GET",
           headers: {
@@ -32,9 +30,9 @@ const useProforma = () => {
       const result = await response.json();
 
       if (result.success) {
-        setProforma(result.data);
+        setVat(result.data);
       } else {
-        setError(result.message || 'Failed to fetch proforma');
+        setError(result.message || 'Failed to fetch VAT data');
       }
     } catch (err) {
       setError(err.message);
@@ -43,43 +41,7 @@ const useProforma = () => {
     }
   };
 
-  const fetchChartsOfAccounts = async () => {
-    try {
-      setCoaLoading(true);
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        throw new Error("No authorization token found");
-      }
-      const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        setChartsOfAccounts(result.data);
-      } else {
-        console.error('Failed to fetch charts of accounts:', result.message);
-      }
-    } catch (err) {
-      console.error('Error fetching charts of accounts:', err);
-    } finally {
-      setCoaLoading(false);
-    }
-  };
-
-  const createProformaEntry = async (entryData) => {
+  const createVatEntry = async (vatData) => {
     try {
       const token = localStorage.getItem("token");
 
@@ -88,14 +50,14 @@ const useProforma = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/proforma_entries`,
+        `${import.meta.env.VITE_SERVER_LINK}/vat`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(entryData),
+          body: JSON.stringify(vatData)
         }
       );
 
@@ -106,11 +68,49 @@ const useProforma = () => {
       const result = await response.json();
 
       if (result.success) {
-        // Refresh the proforma list after successful creation
-        await fetchProforma();
+        // Refresh the VAT list
+        await fetchVat();
         return { success: true, data: result.data };
       } else {
-        return { success: false, error: result.message || 'Failed to create proforma entry' };
+        return { success: false, error: result.message };
+      }
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const updateVatEntry = async (id, vatData) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        throw new Error("No authorization token found");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/vat/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(vatData)
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Refresh the VAT list
+        await fetchVat();
+        return { success: true, data: result.data };
+      } else {
+        return { success: false, error: result.message };
       }
     } catch (err) {
       return { success: false, error: err.message };
@@ -118,11 +118,10 @@ const useProforma = () => {
   };
 
   useEffect(() => {
-    fetchProforma();
-    fetchChartsOfAccounts();
+    fetchVat();
   }, []);
 
-  return { proforma, loading, error, chartsOfAccounts, coaLoading, createProformaEntry };
+  return { vat, loading, error, createVatEntry, updateVatEntry, refreshVat: fetchVat };
 };
 
-export default useProforma;
+export default useVat;

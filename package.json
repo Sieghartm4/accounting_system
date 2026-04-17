@@ -20,6 +20,7 @@
     "db:setup": "dotenv -e .env -- npm run db:setup -w server",
     "migration:create": "npm run db:generate:migration -w server --",
     "seeder:create": "npm run db:generate:seeder -w server --"
+    
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0"

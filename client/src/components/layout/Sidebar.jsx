@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, ShieldCheck, Users, Building, Warehouse, ChevronRight, BarChart, FileText, Package, DollarSign, CreditCard, TrendingUp, HandCoins, ShoppingCart, CreditCard as PaymentCard, Settings, FileSpreadsheet } from 'lucide-react';
+import { LayoutDashboard, Database, ShieldCheck, Users, Building, Warehouse, ChevronRight, BarChart, FileText, Package, DollarSign, CreditCard, TrendingUp, HandCoins, ShoppingCart, CreditCard as PaymentCard, Settings, FileSpreadsheet, Percent, Receipt } from 'lucide-react';
 import { getSidebarItems } from '../../utils/routeProtection';
 
 export default function Sidebar({ isCollapsed }) {
@@ -109,7 +109,9 @@ export default function Sidebar({ isCollapsed }) {
                                         charts: BarChart,
                                         proforma_entries: FileText,
                                         product_service: Package,
-                                        company: Building
+                                        company: Building,
+                                        vat: Percent,
+                                        withholding_tax: Receipt
                                     };
                                     const Icon = iconMap[item.name] || Settings;
                                     return (

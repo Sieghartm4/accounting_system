@@ -18,6 +18,8 @@ import Collections from './pages/collections/Collections'
 import Purchase from './pages/purchase/Purchase'
 import Payments from './pages/payments/Payments'
 import Customer from './pages/customers/Customer'
+import Vat from './pages/vat/Vat'
+import WithholdingTax from './pages/withholding_tax/WithholdingTax'
 import Adjustments from './pages/adjustments/Adjustments'
 
 function App() {
@@ -99,6 +101,16 @@ function App() {
           <Route path="users" element={
             <ProtectedRoute routeName="users">
               <Users />
+            </ProtectedRoute>
+          } />
+          <Route path="vat" element={
+            <ProtectedRoute routeName="vat">
+              <Vat />
+            </ProtectedRoute>
+          } />
+          <Route path="witholding_tax" element={
+            <ProtectedRoute routeName="witholding_tax">
+              <WithholdingTax />
             </ProtectedRoute>
           } />
           <Route path="adjustments" element={

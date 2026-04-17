@@ -17,6 +17,8 @@ const { customerRouter } = require('../routes/customer.routes')
 const { vendorRouter } = require('../routes/vendor.routes')
 const { productServiceRouter } = require('../routes/product_service.routes')
 const { proformaEntriesRouter } = require('../routes/proforma_entries.routes')
+const { vatRouter } = require('../routes/vat.routes')
+const { withholdingTaxRouter } = require('../routes/withholding_tax.routes')
 const { adjustmentsRouter } = require('../routes/adjustments.routes')
 
 const initRoutes = (app) => {
@@ -39,6 +41,8 @@ const initRoutes = (app) => {
   app.use('/vendors', vendorRouter)
   app.use('/product_service', productServiceRouter)
   app.use('/proforma_entries', proformaEntriesRouter)
+  app.use('/vat', vatRouter)
+  app.use('/withholding_tax', withholdingTaxRouter)
   app.use('/adjustments', adjustmentsRouter)
 
 }

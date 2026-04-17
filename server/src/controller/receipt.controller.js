@@ -88,11 +88,16 @@ const getAllReceipts = async (req, res, next) => {
       { col: Accounting.receipt_items.selectOptionColumns.sales_price, as: 'sales_price' },
       { col: Accounting.receipt_items.selectOptionColumns.discount, as: 'discount' },
       { col: Accounting.receipt_items.selectOptionColumns.discount_type, as: 'discount_type' },
-      { col: Accounting.receipt_items.selectOptionColumns.vat, as: 'vat' },
-      { col: Accounting.receipt_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
+      { col: Master.vat.selectOptionColumns.code, as: 'vat_code' },
+      { col: Master.vat.selectOptionColumns.name, as: 'vat_name' },
+      { col: Master.vat.selectOptionColumns.rate, as: 'vat_rate' },
+      { col: Master.withholding_tax.selectOptionColumns.code, as: 'withholding_tax_code' },
+      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'withholding_tax_rate' },
       { col: Accounting.receipt_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
     ])
       .from(Accounting.receipt_items.tablename)
+      .innerJoin(Master.vat.tablename, Accounting.receipt_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
+      .innerJoin(Master.withholding_tax.tablename, Accounting.receipt_items.selectOptionColumns.witholding_tax, Master.withholding_tax.selectOptionColumns.id)
       .leftJoin(Master.products_service.tablename, Accounting.receipt_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
       .innerJoin(Master.charts_of_accounts.tablename, Accounting.receipt_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
       .where(Accounting.receipt_items.selectOptionColumns.receipts_id)

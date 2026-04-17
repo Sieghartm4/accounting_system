@@ -152,6 +152,8 @@ export const ROUTE_CONFIG = {
   proforma_entries: { name: 'proforma_entries', label: 'Proforma Entries', icon: 'FileText' },
   product_service: { name: 'product_service', label: 'Product & Service', icon: 'Package' },
   company: { name: 'company', label: 'Company Management', icon: 'Building' },
+  vat: { name: 'vat', label: 'VAT Management', icon: 'Percent' },
+  witholding_tax: { name: 'witholding_tax', label: 'Withholding Tax', icon: 'Receipt' },
   receipts: { name: 'receipts', label: 'Receipts', icon: 'CreditCard' },
   disbursement: { name: 'disbursement', label: 'Disbursements', icon: 'DollarSign' },
   sales: { name: 'sales', label: 'Sales', icon: 'TrendingUp' },
@@ -184,7 +186,7 @@ export const getSidebarItems = (user) => {
   }
 
   // Masters section
-  const masterRoutes = ['access', 'users', 'customers', 'vendors', 'charts', 'proforma_entries', 'product_service', 'company'];
+  const masterRoutes = ['access', 'users', 'customers', 'vendors', 'charts', 'proforma_entries', 'product_service', 'company', 'vat', 'witholding_tax'];
   masterRoutes.forEach(route => {
     if (hasRouteAccess(route, user)) {
       items.masters.push(ROUTE_CONFIG[route]);
