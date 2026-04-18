@@ -96,7 +96,7 @@ const getAllPurchase = async (req, res, next) => {
       { col: Accounting.purchase_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
     ])
       .from(Accounting.purchase_items.tablename)
-      .innerJoin(Master.withholding_tax.tablename, Accounting.purchase_items.selectOptionColumns.witholding_tax, Master.withholding_tax.selectOptionColumns.id)
+      .innerJoin(Master.withholding_tax.tablename, Accounting.purchase_items.selectOptionColumns.withholding_tax, Master.withholding_tax.selectOptionColumns.id)
       .innerJoin(Master.vat.tablename, Accounting.purchase_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
       .leftJoin(Master.products_service.tablename, Accounting.purchase_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
       .innerJoin(Master.charts_of_accounts.tablename, Accounting.purchase_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)

@@ -144,7 +144,7 @@ const createAdjustment = async (req, res, next) => {
         } = req.body;
         console.log(req.body)
         
-        if (!document_reference || !posting_date || !remarks || !total_amount || !created_by) {
+        if (!document_reference || !posting_date || !total_amount || !created_by) {
             return res.status(400).json({
                 success: false,
                 message: 'All required fields must be provided'

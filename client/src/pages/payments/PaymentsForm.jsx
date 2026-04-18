@@ -132,9 +132,18 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
 //
 //  All other fields (gross, discAmt, vatAmt) are DERIVED for display only.
 // ─────────────────────────────────────────────────────────────────────────────
-function computeItemAmounts(qty, price, discPct, vatPct, whtPct) {
-  const gross      = qty * price;
-  const discAmt    = gross * (discPct / 100);
+function computeItemAmounts(qty, price, discountValue, discountType, vatPct, whtPct) {
+  const gross = qty * price;
+  
+  // Calculate discount amount based on discount type
+  let discAmt;
+  if (discountType === 'PERCENT') {
+    discAmt = gross * (discountValue / 100);
+  } else {
+    // FIXED amount - apply discount per unit, then multiply by quantity
+    discAmt = discountValue * qty;
+  }
+  
   const discounted = gross - discAmt;
   const vatAmt     = discounted * (vatPct / 100);
   const whtAmt     = discounted * (whtPct / 100);
@@ -311,19 +320,56 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
 
       // Populate payment items
       if (paymentData.items && paymentData.items.length > 0) {
-        const items = paymentData.items.map(item => ({
-          id: item.id,
-          purchaseItemId: item.purchase_id,
-          invoiceRef: item.invoice_ref || '',
-          description: item.product_service_name || item.description || '',
-          responsibilityCenter: item.responsibility_center || '',
-          gross: parseFloat(item.gross) || 0,
-          discAmt: parseFloat(item.discount) || 0,
-          vatAmt: parseFloat(item.vat) || 0,
-          whtAmount: parseFloat(item.witholding_tax) || 0,
-          amount: parseFloat(item.amount) || 0,
-          isOther: false
-        }));
+        const items = paymentData.items.map(item => {
+          // In view mode, the backend returns computed values
+          // item.discount is the discount value (percentage or fixed amount)
+          // item.vat and item.witholding_tax are the computed tax amounts
+          // item.amount is the final amount due
+          
+          // We need to compute the discount amount based on discount type
+          // Since we don't have the original price, we'll estimate it
+          const finalAmount = parseFloat(item.amount) || 0;
+          const vatAmount = parseFloat(item.vat) || 0;
+          const whtAmount = parseFloat(item.witholding_tax) || 0;
+          const discountValue = parseFloat(item.discount) || 0;
+          const discountType = item.discount_type || 'PERCENT';
+          
+          // Reverse calculate the discount amount
+          // Formula: amount = discounted + vat - wht
+          // So: discounted = amount - vat + wht
+          const discountedAmount = finalAmount - vatAmount + whtAmount;
+          
+          let discAmt;
+          if (discountType === 'PERCENT') {
+            // For percentage, we need to estimate the original gross
+            // Formula: discounted = gross - (gross * discount/100)
+            // So: discounted = gross * (1 - discount/100)
+            // So: gross = discounted / (1 - discount/100)
+            if (discountValue < 100) {
+              const gross = discountedAmount / (1 - discountValue / 100);
+              discAmt = gross - discountedAmount;
+            } else {
+              discAmt = discountValue; // Fallback
+            }
+          } else {
+            // FIXED amount
+            discAmt = discountValue;
+          }
+          
+          return {
+            id: item.id,
+            purchaseItemId: item.purchase_id,
+            invoiceRef: item.invoice_ref || '',
+            description: item.product_service_name || item.description || '',
+            responsibilityCenter: item.responsibility_center || '',
+            gross: parseFloat(item.gross) || 0,
+            discAmt: discAmt,
+            vatAmt: vatAmount,
+            whtAmount: whtAmount,
+            amount: finalAmount,
+            isOther: false
+          };
+        });
         setPaymentItems(items);
       }
 
@@ -391,13 +437,14 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
       //  We compute amounts here so the accountant sees the full breakdown.
       //  vat IS included — it is part of ci_amount (Discounted + VAT − WHT).
       const newItems = result.data.map(s => {
-        const qty     = parseFloat(s.quantity)       || 0;
-        const price   = parseFloat(s.purchase_price) || 0;
-        const discPct = parseFloat(s.discount)       || 0;
-        const vatPct  = parseFloat(s.vat)            || 0; // ← MUST include VAT
-        const whtPct  = parseFloat(s.witholding_tax) || 0;
+        const qty          = parseFloat(s.quantity)       || 0;
+        const price        = parseFloat(s.purchase_price) || 0;
+        const discountVal  = parseFloat(s.discount)       || 0;
+        const discountType = s.discount_type || 'PERCENT';
+        const vatPct       = parseFloat(s.vat)            || 0; // ← MUST include VAT
+        const whtPct       = parseFloat(s.witholding_tax) || 0;
 
-        const computed = computeItemAmounts(qty, price, discPct, vatPct, whtPct);
+        const computed = computeItemAmounts(qty, price, discountVal, discountType, vatPct, whtPct);
 
         return {
           id:                  Date.now() + Math.random(),
@@ -1038,7 +1085,7 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-gray-50/50">
+                    <tr className="bg-gray-50/50 border">
                       <td colSpan={2} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
                       <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(totalDebit)}</td>
                       <td className={`py-2 px-1 text-center text-[13px] font-black ${isBalanced ? 'text-green-600' : 'text-red-600'}`}>

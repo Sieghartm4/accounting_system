@@ -9,7 +9,7 @@ require('dotenv').config()
 const getChartsOfAccounts = async (req, res, next) => {
   try {
     const chartsOfAccounts = await SelectAll(Master.charts_of_accounts.tablename, Master.charts_of_accounts.prefix_)
-    console.log(chartsOfAccounts)
+
     res.status(200).json({
       success: true,
       message: 'Charts of accounts retrieved successfully',

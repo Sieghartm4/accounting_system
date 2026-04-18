@@ -20,6 +20,7 @@ const { proformaEntriesRouter } = require('../routes/proforma_entries.routes')
 const { vatRouter } = require('../routes/vat.routes')
 const { withholdingTaxRouter } = require('../routes/withholding_tax.routes')
 const { adjustmentsRouter } = require('../routes/adjustments.routes')
+const { reportsRouter } = require('../routes/reports.routes')
 
 const initRoutes = (app) => {
   app.use('/credentials', credentialsRouter)
@@ -44,6 +45,7 @@ const initRoutes = (app) => {
   app.use('/vat', vatRouter)
   app.use('/withholding_tax', withholdingTaxRouter)
   app.use('/adjustments', adjustmentsRouter)
+  app.use('/reports', reportsRouter)
 
 }
 

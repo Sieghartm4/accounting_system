@@ -575,7 +575,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
   }, [isViewMode, salesData]);
 
   const addSalesItem = (isOther = false) => setSalesItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther }]);
-  const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0 }]);
+  const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removeSalesItem = (id) => setSalesItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
   const updateSalesItem = (id, field, value) => setSalesItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
@@ -1336,14 +1336,14 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                 <table className="w-full text-center" style={{ tableLayout: 'fixed', minWidth: 600 }}>
                   <colgroup>
                     <col style={{ width: '40%' }} />
+                    <col style={{ width: '16%' }} />
+                    <col style={{ width: '16%' }} />
                     <col style={{ width: '22%' }} />
-                    <col style={{ width: '16%' }} />
-                    <col style={{ width: '16%' }} />
                     <col style={{ width: '6%' }} />
                   </colgroup>
                   <thead>
                     <tr className="border-b border-gray-100">
-                      {['Charts of Account', 'Responsibility Center', 'Debit', 'Credit', ''].map((h, i) => (
+                      {['Charts of Account', 'Debit', 'Credit', 'Responsibility Center', ''].map((h, i) => (
                         <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
                       ))}
                     </tr>
@@ -1352,26 +1352,66 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                     {journalEntries.map((entry) => (
                       <tr key={entry.id}>
                         <td className="py-1.5 px-1">
-                          <SearchableDropdown disabled={isViewMode} placeholder="Search account..." value={entry.accountSearch} onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)} onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }} options={coaOptions} inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} emptyText="No accounts found" />
+                          <SearchableDropdown 
+                            disabled={isViewMode} 
+                            placeholder="Search account..." 
+                            value={entry.accountSearch} 
+                            onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)} 
+                            onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }} 
+                            options={coaOptions} 
+                            inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            emptyText="No accounts found" 
+                          />
                         </td>
-                        <td className="py-1.5 px-1"><input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Center..." value={entry.center} onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} /></td>
-                        <td className="py-1.5 px-1"><input disabled={isViewMode} className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.debit} onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} /></td>
-                        <td className="py-1.5 px-1"><input disabled={isViewMode} className={`${tableInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.credit} onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} /></td>
+                        <td className="py-1.5 px-1">
+                          <input 
+                            disabled={isViewMode || !entry.isManual} 
+                            className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            placeholder="0.00" 
+                            type="number" 
+                            value={entry.debit} 
+                            onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} 
+                            readOnly={isViewMode || !entry.isManual} 
+                          />
+                        </td>
+                        <td className="py-1.5 px-1">
+                          <input 
+                            disabled={isViewMode || !entry.isManual} 
+                            className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            placeholder="0.00" 
+                            type="number" 
+                            value={entry.credit} 
+                            onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} 
+                            readOnly={isViewMode || !entry.isManual} 
+                          />
+                        </td>
+                        <td className="py-1.5 px-1">
+                          <input 
+                            disabled={isViewMode} 
+                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            placeholder="Center..." 
+                            value={entry.center} 
+                            onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} 
+                          />
+                        </td>
                         <td className="py-1.5 text-center">
-                          {!isViewMode && (
+                          {!isViewMode && entry.isManual ? (
                             <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
                               <Trash2 size={15} className="mx-auto" />
                             </button>
+                          ) : (
+                            <span className="text-gray-300 text-[11px] italic">{isViewMode ? '' : 'Auto'}</span>
                           )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-gray-50/50">
-                      <td colSpan={2} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
+                    <tr className="bg-gray-50/50 border">
+                      <td colSpan={1} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
                       <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.debit) || 0), 0))}</td>
                       <td className="py-2 px-1 text-center text-[13px] font-black text-red-600">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0))}</td>
+                      <td />
                       <td />
                     </tr>
                   </tfoot>

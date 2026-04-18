@@ -410,7 +410,7 @@ const Accounting = {
       "discount",
       "discount_type",
       "vat",
-      "witholding_tax",
+      "withholding_tax",
       "responsibility_center"
     ],
   selectColumns: [
@@ -424,7 +424,7 @@ const Accounting = {
       "pi_discount",
       "pi_discount_type",
       "pi_vat",
-      "pi_witholding_tax",
+      "pi_withholding_tax",
       "pi_responsibility_center"
     ],
   selectOptionColumns: {
@@ -438,7 +438,7 @@ const Accounting = {
     discount: "pi_discount",
     discount_type: "pi_discount_type",
     vat: "pi_vat",
-    witholding_tax: "pi_witholding_tax",
+    withholding_tax: "pi_withholding_tax",
     responsibility_center: "pi_responsibility_center"
   },
   updateOptionColumns: {
@@ -452,7 +452,7 @@ const Accounting = {
     discount: "discount",
     discount_type: "discount_type",
     vat: "vat",
-    witholding_tax: "witholding_tax",
+    withholding_tax: "withholding_tax",
     responsibility_center: "responsibility_center"
   },
   selectDateFormatColumns: {
@@ -472,7 +472,7 @@ const Accounting = {
     discount: "DECIMAL",
     discount_type: "STRING",
     vat: "DECIMAL",
-    witholding_tax: "DECIMAL",
+    withholding_tax: "DECIMAL",
     responsibility_center: "STRING"
   }
 },
@@ -545,7 +545,7 @@ const Accounting = {
       "discount",
       "discount_type",
       "vat",
-      "witholding_tax",
+      "withholding_tax",
       "responsibility_center"
     ],
   selectColumns: [
@@ -559,7 +559,7 @@ const Accounting = {
       "cdi_discount",
       "cdi_discount_type",
       "cdi_vat",
-      "cdi_witholding_tax",
+      "cdi_withholding_tax",
       "cdi_responsibility_center"
     ],
   selectOptionColumns: {
@@ -573,7 +573,7 @@ const Accounting = {
     discount: "cdi_discount",
     discount_type: "cdi_discount_type",
     vat: "cdi_vat",
-    witholding_tax: "cdi_witholding_tax",
+    witholding_tax: "cdi_withholding_tax",
     responsibility_center: "cdi_responsibility_center"
   },
   updateOptionColumns: {
@@ -587,7 +587,7 @@ const Accounting = {
     discount: "discount",
     discount_type: "discount_type",
     vat: "vat",
-    witholding_tax: "witholding_tax",
+    witholding_tax: "withholding_tax",
     responsibility_center: "responsibility_center"
   },
   selectDateFormatColumns: {
@@ -625,7 +625,7 @@ const Accounting = {
       "discount",
       "discount_type",
       "vat",
-      "witholding_tax",
+      "withholding_tax",
       "responsibility_center"
     ],
   selectColumns: [
@@ -639,7 +639,7 @@ const Accounting = {
       "ri_discount",
       "ri_discount_type",
       "ri_vat",
-      "ri_witholding_tax",
+      "ri_withholding_tax",
       "ri_responsibility_center"
     ],
   selectOptionColumns: {
@@ -653,7 +653,7 @@ const Accounting = {
     discount: "ri_discount",
     discount_type: "ri_discount_type",
     vat: "ri_vat",
-    witholding_tax: "ri_witholding_tax",
+    withholding_tax: "ri_withholding_tax",
     responsibility_center: "ri_responsibility_center"
   },
   updateOptionColumns: {
@@ -667,7 +667,7 @@ const Accounting = {
     discount: "discount",
     discount_type: "discount_type",
     vat: "vat",
-    witholding_tax: "witholding_tax",
+    witholding_tax: "withholding_tax",
     responsibility_center: "responsibility_center"
   },
   selectDateFormatColumns: {
@@ -786,14 +786,14 @@ const Accounting = {
       "ci_collection_id",
       "ci_sales_id",
       "ci_amount",
-      "ci_witholding_tax"
+      "ci_withholding_tax"
     ],
   selectOptionColumns: {
     id: "ci_id",
     collection_id: "ci_collection_id",
     sales_id: "ci_sales_id",
     amount: "ci_amount",
-    witholding_tax: "ci_witholding_tax"
+    witholding_tax: "ci_withholding_tax"
   },
   updateOptionColumns: {
     id: "id",

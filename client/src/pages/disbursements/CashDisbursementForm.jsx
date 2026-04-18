@@ -323,6 +323,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
   const [bankName, setBankName] = useState('');
   const [checkNumber, setCheckNumber] = useState('');
   const [documentReference, setDocumentReference] = useState('');
+  const [paymentDate, setPaymentDate] = useState('');
   const [remarks, setRemarks] = useState('');
 
   const [attachments, setAttachments] = useState([]);
@@ -496,6 +497,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       setModeSearch(mainData?.mode || '');
       setBankName(mainData?.bank_name || '');
       setCheckNumber(mainData?.check_number || '');
+      setPaymentDate(mainData?.payment_date || '');
       setRemarks(mainData?.remarks || '');
 
       // Populate disbursement items
@@ -633,6 +635,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
     }
 
     disbursementItems.forEach((item) => {
+      console.log('Processing disbursement item:', item);
       const qty = parseFloat(item.qty) || 0;
       const price = parseFloat(item.price) || 0;
       const discountValue = parseFloat(item.discount) || 0;
@@ -765,6 +768,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       });
     }
 
+    console.log('Generated journal entries:', entries);
     setJournalEntries(entries);
   };
 
@@ -979,6 +983,8 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
               <legend className="text-[11px] font-black uppercase text-gray-100">Date</legend>
               <input
                 type="date"
+                value={paymentDate}
+                onChange={e => setPaymentDate(e.target.value)}
                 disabled={isViewMode}
                 className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
                   ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
@@ -1345,14 +1351,14 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                   <table className="w-full text-center" style={{ tableLayout: 'fixed', minWidth: 600 }}>
                     <colgroup>
                       <col style={{ width: '40%' }} />
+                      <col style={{ width: '16%' }} />
+                      <col style={{ width: '16%' }} />
                       <col style={{ width: '22%' }} />
-                      <col style={{ width: '16%' }} />
-                      <col style={{ width: '16%' }} />
                       <col style={{ width: '6%' }} />
                     </colgroup>
                     <thead>
                       <tr className="border-b border-gray-100">
-                        {['Charts of Account', 'Responsibility Center', 'Debit', 'Credit', ''].map((h, i) => (
+                        {['Charts of Account', 'Debit', 'Credit', 'Responsibility Center', ''].map((h, i) => (
                           <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
                         ))}
                       </tr>
@@ -1363,9 +1369,9 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                           <td className="py-1.5 px-1">
                             <SearchableDropdown disabled={isViewMode} placeholder="Search account..." value={entry.accountSearch} onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)} onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }} options={coaOptions} inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} emptyText="No accounts found" />
                           </td>
-                          <td className="py-1.5 px-1"><input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Center..." value={entry.center} onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} /></td>
                           <td className="py-1.5 px-1"><input disabled={isViewMode || !entry.isManual} className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.debit} onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} readOnly={isViewMode || !entry.isManual} /></td>
                           <td className="py-1.5 px-1"><input disabled={isViewMode || !entry.isManual} className={`${tableInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.credit} onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} readOnly={isViewMode || !entry.isManual} /></td>
+                          <td className="py-1.5 px-1"><input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Center..." value={entry.center} onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} /></td>
                           <td className="py-1.5 text-center">
                             {!isViewMode && entry.isManual ? (
                               <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
@@ -1379,10 +1385,11 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="bg-gray-50/50">
-                        <td colSpan={2} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
+                      <tr className="bg-gray-50/50 border">
+                        <td colSpan={1} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
                         <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.debit) || 0), 0))}</td>
                         <td className="py-2 px-1 text-center text-[13px] font-black text-red-600">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0))}</td>
+                        <td />
                         <td />
                       </tr>
                     </tfoot>

@@ -74,7 +74,7 @@ const getPurchasePayment = async (req, res, next) => {
     let purchases = await Query(query, ['APPROVED', 'UNPAID'], [Accounting.purchase.prefix_, Master.vendors.prefix_]);
     console.log("PURCHASES QUERY 1", query);
     console.log("PURCHASES QUERY 2", purchases);
-    
+
     res.status(200).json({
       success: true,
       message: 'Purchases retrieved successfully',
@@ -126,12 +126,23 @@ const getPurchaseItemsPayment = async (req, res, next) => {
       { col: Accounting.purchase_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
 
       { col: Accounting.purchase_items.selectOptionColumns.discount, as: 'discount' },
-      { col: Accounting.purchase_items.selectOptionColumns.vat, as: 'vat' },
-      { col: Accounting.purchase_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
+      { col: Accounting.purchase_items.selectOptionColumns.discount_type, as: 'discount_type' },
+      { col: Master.vat.selectOptionColumns.rate, as: 'vat' },
+      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'witholding_tax' },
 
       { col: Accounting.purchase_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
     ])
       .from(Accounting.purchase_items.tablename)
+      .innerJoin(
+        Master.vat.tablename,
+        Accounting.purchase_items.selectOptionColumns.vat,
+        Master.vat.selectOptionColumns.id
+      )
+      .innerJoin(
+        Master.withholding_tax.tablename,
+        Accounting.purchase_items.selectOptionColumns.withholding_tax,
+        Master.withholding_tax.selectOptionColumns.id
+      )
       .innerJoin(
         Accounting.purchase.tablename,
         Accounting.purchase_items.selectOptionColumns.purchase_id,
@@ -188,7 +199,7 @@ const getAllPayments = async (req, res, next) => {
   const { payment_id } = req.params;
   const paymentId = Number(payment_id);
   console.log('Converted payment_id:', paymentId, 'type:', typeof paymentId);
-  
+
   if (!payment_id || isNaN(paymentId)) {
     return res.status(400).json({
       success: false,
@@ -196,7 +207,7 @@ const getAllPayments = async (req, res, next) => {
       timestamp: new Date().toISOString(),
     });
   }
-  
+
   try {
     const payment_query = sql.select([
       { col: Accounting.payments.selectOptionColumns.id, as: 'id' },
@@ -221,14 +232,25 @@ const getAllPayments = async (req, res, next) => {
       { col: Accounting.purchase.selectOptionColumns.document_reference, as: 'invoice_ref' },
       { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
       { col: Accounting.purchase_items.selectOptionColumns.discount, as: 'discount' },
-      { col: Accounting.purchase_items.selectOptionColumns.vat, as: 'vat' },
+      { col: Accounting.purchase_items.selectOptionColumns.discount_type, as: 'discount_type' },
+      { col: Master.vat.selectOptionColumns.rate, as: 'vat' },
       { col: Accounting.payment_items.selectOptionColumns.amount, as: 'amount' },
-      { col: Accounting.payment_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
+      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'witholding_tax' },
       { col: Accounting.purchase_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
     ])
       .from(Accounting.payment_items.tablename)
       .innerJoin(Accounting.purchase.tablename, Accounting.purchase.selectOptionColumns.id, Accounting.payment_items.selectOptionColumns.purchase_id)
       .innerJoin(Accounting.purchase_items.tablename, Accounting.purchase_items.selectOptionColumns.purchase_id, Accounting.payment_items.selectOptionColumns.purchase_id)
+            .innerJoin(
+        Master.vat.tablename,
+        Accounting.purchase_items.selectOptionColumns.vat,
+        Master.vat.selectOptionColumns.id
+      )
+      .innerJoin(
+        Master.withholding_tax.tablename,
+        Accounting.purchase_items.selectOptionColumns.withholding_tax,
+        Master.withholding_tax.selectOptionColumns.id
+      )
       .innerJoin(Master.products_service.tablename, Master.products_service.selectOptionColumns.id, Accounting.purchase_items.selectOptionColumns.product_service)
       .where(Accounting.payment_items.selectOptionColumns.payment_id)
       .build();

@@ -146,6 +146,7 @@ class SQLQueryBuilder {
       whereNot: [],
       set: [],
       orderBy: [],
+      groupBy: [],
       prefix: null,
       isTransaction: false,
     }
@@ -183,6 +184,13 @@ class SQLQueryBuilder {
 
   orderByDesc(column) {
     return this.orderBy(column, 'DESC')
+  }
+
+  // --- GROUP BY OPERATIONS ---
+
+  groupBy(...columns) {
+    this.query.groupBy = this.query.groupBy.concat(columns)
+    return this
   }
 
   // INSERT operations
@@ -330,6 +338,11 @@ class SQLQueryBuilder {
 
     if (whereConditions.length > 0) {
       query += ` WHERE ${whereConditions.join(' AND ')}`
+    }
+
+    // NEW: Add GROUP BY
+    if (this.query.groupBy.length > 0) {
+      query += ` GROUP BY ${this.query.groupBy.join(', ')}`
     }
 
     // NEW: Add ORDER BY

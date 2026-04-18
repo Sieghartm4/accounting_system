@@ -71,7 +71,7 @@ const getSalesCollection = async (req, res, next) => {
       .andWhereNotExists(`SELECT 1 FROM ${Accounting.collection_items.tablename} WHERE ${Accounting.collection_items.selectOptionColumns.sales_id} = ${Accounting.sales.selectOptionColumns.id}`)
       .build();
     let sales = await Query(query, ['APPROVED', 'PAID'], [Accounting.sales.prefix_, Master.customers.prefix_]);
-    console.log("SALES QUERY",sales);
+    console.log("SALES QUERY", sales);
     res.status(200).json({
       success: true,
       message: 'Sales retrieved successfully',
@@ -123,12 +123,23 @@ const getSalesItemsCollection = async (req, res, next) => {
       { col: Accounting.sales_items.selectOptionColumns.sales_price, as: 'sales_price' },
 
       { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
-      { col: Accounting.sales_items.selectOptionColumns.vat, as: 'vat' },
-      { col: Accounting.sales_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
+      { col: Accounting.sales_items.selectOptionColumns.discount_type, as: 'discount_type' },
+      { col: Master.vat.selectOptionColumns.rate, as: 'vat' },
+      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'witholding_tax' },
 
       { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
     ])
       .from(Accounting.sales_items.tablename)
+      .innerJoin(
+        Master.vat.tablename,
+        Accounting.sales_items.selectOptionColumns.vat,
+        Master.vat.selectOptionColumns.id
+      )
+      .innerJoin(
+        Master.withholding_tax.tablename,
+        Accounting.sales_items.selectOptionColumns.witholding_tax,
+        Master.withholding_tax.selectOptionColumns.id
+      )
       .innerJoin(
         Accounting.sales.tablename,
         Accounting.sales_items.selectOptionColumns.sales_id,
@@ -183,9 +194,9 @@ const getSalesItemsCollection = async (req, res, next) => {
 
 const getAllCollections = async (req, res, next) => {
   const { collection_id } = req.params;
-  const collectionId = Number(4);
+  const collectionId = Number(collection_id);
   console.log('Converted collection_id:', collectionId, 'type:', typeof collectionId);
-  
+
   if (!collection_id || isNaN(collectionId)) {
     return res.status(400).json({
       success: false,
@@ -193,7 +204,7 @@ const getAllCollections = async (req, res, next) => {
       timestamp: new Date().toISOString(),
     });
   }
-  
+
   try {
     const collection_query = sql.select([
       { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id}`, as: 'id' },
@@ -218,14 +229,25 @@ const getAllCollections = async (req, res, next) => {
       { col: Accounting.sales.selectOptionColumns.document_reference, as: 'invoice_ref' },
       { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
       { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
-      { col: Accounting.sales_items.selectOptionColumns.vat, as: 'vat' },
+      { col: Accounting.sales_items.selectOptionColumns.discount_type, as: 'discount_type' },
+      { col: Master.vat.selectOptionColumns.rate, as: 'vat' },
       { col: Accounting.collection_items.selectOptionColumns.amount, as: 'amount' },
-      { col: Accounting.collection_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
+      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'witholding_tax' },
       { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
     ])
       .from(Accounting.collection_items.tablename)
       .innerJoin(Accounting.sales.tablename, Accounting.sales.selectOptionColumns.id, Accounting.collection_items.selectOptionColumns.sales_id)
       .innerJoin(Accounting.sales_items.tablename, Accounting.sales_items.selectOptionColumns.sales_id, Accounting.collection_items.selectOptionColumns.sales_id)
+      .innerJoin(
+        Master.vat.tablename,
+        Accounting.sales_items.selectOptionColumns.vat,
+        Master.vat.selectOptionColumns.id
+      )
+      .innerJoin(
+        Master.withholding_tax.tablename,
+        Accounting.sales_items.selectOptionColumns.witholding_tax,
+        Master.withholding_tax.selectOptionColumns.id
+      )
       .innerJoin(Master.products_service.tablename, Master.products_service.selectOptionColumns.id, Accounting.sales_items.selectOptionColumns.product_service)
       .where(Accounting.collection_items.selectOptionColumns.collection_id)
       .build();

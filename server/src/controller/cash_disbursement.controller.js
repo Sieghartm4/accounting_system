@@ -179,13 +179,6 @@ const createCashDisbursement = async (req, res, next) => {
       });
     }
 
-    if ((mode_of_payment === 'CHECK' || mode_of_payment === 'BANK_TRANSFER') && (!bank_name || !check_number)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bank name and check number are required for CHECK or BANK_TRANSFER payments'
-      });
-    }
-
     let connection;
     try {
       connection = await pool.getConnection();

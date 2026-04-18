@@ -166,9 +166,7 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
   const [postingDate,      setPostingDate]      = useState('');
   const [remarks,           setRemarks]           = useState('');
 
-  const [attachments, setAttachments] = useState([
-    { id: 1, fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }
-  ]);
+  const [attachments, setAttachments] = useState([]);
 
   const [toast, setToast] = useState(null);
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' });

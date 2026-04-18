@@ -132,9 +132,18 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
 //
 //  All other fields (gross, discAmt, vatAmt) are DERIVED for display only.
 // ─────────────────────────────────────────────────────────────────────────────
-function computeItemAmounts(qty, price, discPct, vatPct, whtPct) {
-  const gross      = qty * price;
-  const discAmt    = gross * (discPct / 100);
+function computeItemAmounts(qty, price, discountValue, discountType, vatPct, whtPct) {
+  const gross = qty * price;
+  
+  // Calculate discount amount based on discount type
+  let discAmt;
+  if (discountType === 'PERCENT') {
+    discAmt = gross * (discountValue / 100);
+  } else {
+    // FIXED amount - apply discount per unit, then multiply by quantity
+    discAmt = discountValue * qty;
+  }
+  
   const discounted = gross - discAmt;
   const vatAmt     = discounted * (vatPct / 100);
   const whtAmt     = discounted * (whtPct / 100);
@@ -374,13 +383,14 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
       //  We compute amounts here so the accountant sees the full breakdown.
       //  vat IS included — it is part of ci_amount (Discounted + VAT − WHT).
       const newItems = result.data.map(s => {
-        const qty     = parseFloat(s.quantity)       || 0;
-        const price   = parseFloat(s.sales_price) || 0;
-        const discPct = parseFloat(s.discount)       || 0;
-        const vatPct  = parseFloat(s.vat)            || 0; // ← MUST include VAT
-        const whtPct  = parseFloat(s.witholding_tax) || 0;
+        const qty          = parseFloat(s.quantity)       || 0;
+        const price        = parseFloat(s.sales_price) || 0;
+        const discountVal  = parseFloat(s.discount)       || 0;
+        const discountType = s.discount_type || 'PERCENT';
+        const vatPct       = parseFloat(s.vat)            || 0; // ← MUST include VAT
+        const whtPct       = parseFloat(s.witholding_tax) || 0;
 
-        const computed = computeItemAmounts(qty, price, discPct, vatPct, whtPct);
+        const computed = computeItemAmounts(qty, price, discountVal, discountType, vatPct, whtPct);
 
         return {
           id:                  Date.now() + Math.random(),
@@ -956,14 +966,14 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                 <table className="w-full text-center" style={{ tableLayout: 'fixed', minWidth: 600 }}>
                   <colgroup>
                     <col style={{ width: '40%' }} />
+                    <col style={{ width: '16%' }} />
+                    <col style={{ width: '16%' }} />
                     <col style={{ width: '22%' }} />
-                    <col style={{ width: '16%' }} />
-                    <col style={{ width: '16%' }} />
                     <col style={{ width: '6%'  }} />
                   </colgroup>
                   <thead>
                     <tr className="border-b border-gray-100">
-                      {['Charts of Account', 'Responsibility Center', 'Debit', 'Credit', ''].map((h, i) => (
+                      {['Charts of Account', 'Debit', 'Credit', 'Responsibility Center', ''].map((h, i) => (
                         <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
                       ))}
                     </tr>
@@ -991,15 +1001,6 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                         </td>
                         <td className="py-1.5 px-1">
                           <input 
-                            disabled={isViewMode}
-                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                            placeholder="Center..." 
-                            value={entry.center} 
-                            onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} 
-                          />
-                        </td>
-                        <td className="py-1.5 px-1">
-                          <input 
                             disabled={isViewMode || !entry.isManual} 
                             className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
                             placeholder="0.00" 
@@ -1020,6 +1021,15 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                             readOnly={!entry.isManual} 
                           />
                         </td>
+                        <td className="py-1.5 px-1">
+                          <input 
+                            disabled={isViewMode}
+                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            placeholder="Center..." 
+                            value={entry.center} 
+                            onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} 
+                          />
+                        </td>
                         <td className="py-1.5 text-center">
                           {!isViewMode && entry.isManual ? (
                             <button className="p-1 text-red-600 hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
@@ -1033,12 +1043,13 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-gray-50/50">
-                      <td colSpan={2} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
+                    <tr className="bg-gray-50/50 border">
+                      <td colSpan={1} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
                       <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(totalDebit)}</td>
                       <td className={`py-2 px-1 text-center text-[13px] font-black ${isBalanced ? 'text-green-600' : 'text-red-600'}`}>
                         {fmt(totalCredit)} <span className="text-[11px]">{isBalanced ? '✅' : '❌'}</span>
                       </td>
+                      <td />
                       <td />
                     </tr>
                   </tfoot>

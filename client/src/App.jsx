@@ -21,6 +21,10 @@ import Customer from './pages/customers/Customer'
 import Vat from './pages/vat/Vat'
 import WithholdingTax from './pages/withholding_tax/WithholdingTax'
 import Adjustments from './pages/adjustments/Adjustments'
+import TrialBalance from './pages/reports/TrialBalance'
+import IncomeStatement from './pages/reports/IncomeStatement'
+import GeneralLedger from './pages/reports/GeneralLedger'
+import BalanceSheet from './pages/reports/BalanceSheet'
 
 function App() {
   return (
@@ -116,6 +120,26 @@ function App() {
           <Route path="adjustments" element={
             <ProtectedRoute routeName="adjustments">
               <Adjustments />
+            </ProtectedRoute>
+          } />
+          <Route path="trial-balance" element={
+            <ProtectedRoute routeName="trial_balance">
+              <TrialBalance />
+            </ProtectedRoute>
+          } />
+          <Route path="income-statement" element={
+            <ProtectedRoute routeName="income_statement">
+              <IncomeStatement />
+            </ProtectedRoute>
+          } />
+          <Route path="general-ledger" element={
+            <ProtectedRoute routeName="general_ledger">
+              <GeneralLedger />
+            </ProtectedRoute>
+          } />
+          <Route path="balance-sheet" element={
+            <ProtectedRoute routeName="balance_sheet">
+              <BalanceSheet />
             </ProtectedRoute>
           } />
         </Route>

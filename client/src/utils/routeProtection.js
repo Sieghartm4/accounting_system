@@ -160,7 +160,11 @@ export const ROUTE_CONFIG = {
   collections: { name: 'collections', label: 'Collections', icon: 'HandCoins' },
   purchase: { name: 'purchase', label: 'Purchase', icon: 'ShoppingCart' },
   payments: { name: 'payments', label: 'Payments', icon: 'PaymentCard' },
-  adjustments: { name: 'adjustments', label: 'Adjustments', icon: 'FileSpreadsheet' }
+  adjustments: { name: 'adjustments', label: 'Adjustments', icon: 'FileSpreadsheet' },
+  trial_balance: { name: 'trial_balance', label: 'Trial Balance', icon: 'Scale' },
+  income_statement: { name: 'income_statement', label: 'Income Statement', icon: 'FileText' },
+  general_ledger: { name: 'general_ledger', label: 'General Ledger', icon: 'BookOpen' },
+  balance_sheet: { name: 'balance_sheet', label: 'Balance Sheet', icon: 'PieChart' }
 };
 
 /**
@@ -177,7 +181,8 @@ export const getSidebarItems = (user) => {
     receipts: [],
     sales: [],
     purchase: [],
-    adjustments: []
+    adjustments: [],
+    reports: []
   };
 
   // Main navigation
@@ -221,6 +226,14 @@ export const getSidebarItems = (user) => {
   if (hasRouteAccess('adjustments', user)) {
     items.adjustments.push(ROUTE_CONFIG.adjustments);
   }
+
+  // Reports section
+  const reportRoutes = ['trial_balance', 'income_statement', 'general_ledger', 'balance_sheet'];
+  reportRoutes.forEach(route => {
+    if (hasRouteAccess(route, user)) {
+      items.reports.push(ROUTE_CONFIG[route]);
+    }
+  });
 
   return items;
 };
