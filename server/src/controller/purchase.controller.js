@@ -171,7 +171,7 @@ const createPurchase = async (req, res, next) => {
       attachments
     } = req.body;
     console.log(req.body)
-    if (!vendor_id || !document_reference || !terms || !date_delivered || !date_due || !total_amount_due || !created_by) {
+    if (!vendor_id || !terms || !date_delivered || !date_due || !total_amount_due || !created_by) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
@@ -193,7 +193,7 @@ const createPurchase = async (req, res, next) => {
 
       const mainValues = [
         vendor_id || null,
-        document_reference || null,
+        document_reference || " ",
         terms || null,
         date_delivered || null,
         date_due || null,

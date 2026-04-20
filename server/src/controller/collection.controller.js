@@ -321,7 +321,7 @@ const createCollection = async (req, res, next) => {
       attachments
     } = req.body;
     console.log(req.body)
-    if (!customer_id || !document_reference || !mode_of_payment || !collection_date || !created_by) {
+    if (!customer_id || !mode_of_payment || !collection_date || !created_by) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: customer_id, document_reference, mode_of_payment, collection_date, created_by'
@@ -357,7 +357,7 @@ const createCollection = async (req, res, next) => {
 
       const mainValues = [
         customer_id || null,
-        document_reference || null,
+        document_reference || " ",
         mode_of_payment || null,
         bank_name || null,
         check_number || null,

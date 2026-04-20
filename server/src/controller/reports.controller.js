@@ -21,7 +21,7 @@ require('dotenv').config()
 const getTrialBalance = async (req, res, next) => {
   try {
     const { start_date, end_date } = req.query;
-    
+
     let dateFilter = '';
     if (start_date || end_date) {
       const conditions = [];
@@ -33,7 +33,7 @@ const getTrialBalance = async (req, res, next) => {
     const trial_balance_query = `SELECT ${Master.charts_of_accounts.selectOptionColumns.code} as 'Account Code', ${Master.charts_of_accounts.selectOptionColumns.name} as 'Account Name', SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as DEBIT, SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as CREDIT FROM ${Master.charts_of_accounts.tablename} LEFT JOIN ${Accounting.journal_entries.tablename} ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id} WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'${dateFilter} GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.code}, ${Master.charts_of_accounts.selectOptionColumns.name} ORDER BY ${Master.charts_of_accounts.selectOptionColumns.code}`
 
     const trialBalance = await Query(trial_balance_query);
-    
+
     res.status(200).json({
       success: true,
       message: 'Trial Balance retrieved successfully',
@@ -43,7 +43,7 @@ const getTrialBalance = async (req, res, next) => {
 
   } catch (error) {
     console.error('Error fetching trial balance:', error)
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
       message: 'Server error while fetching trial balance',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -235,12 +235,12 @@ const getGeneralLedger = async (req, res, next) => {
 
     // Label map for display
     const SECTION_LABELS = {
-      adjustments:        'JOURNAL VOUCHER / ADJUSTMENTS',
-      sales:              'SALES',
-      collections:        'COLLECTIONS',
-      receipts:           'CASH RECEIPTS',
-      purchase:           'PURCHASES',
-      payments:           'PAYMENTS',
+      adjustments: 'JOURNAL VOUCHER / ADJUSTMENTS',
+      sales: 'SALES',
+      collections: 'COLLECTIONS',
+      receipts: 'CASH RECEIPTS',
+      purchase: 'PURCHASES',
+      payments: 'PAYMENTS',
       cash_disbursements: 'CASH DISBURSEMENTS',
     };
 
@@ -251,19 +251,19 @@ const getGeneralLedger = async (req, res, next) => {
     ].filter(k => grouped[k]); // only sections that have data
 
     const sections = allSections.map(key => ({
-      section_key:   key,
+      section_key: key,
       section_label: SECTION_LABELS[key] || key.toUpperCase().replace(/_/g, ' '),
-      transactions:  grouped[key].map((row, i) => ({
-        trans_no:             `${key.slice(0, 2).toUpperCase()}${row.db_id}`,
-        posted_date:          row.posted_date,
-        doc_ref:              row.db_id,
+      transactions: grouped[key].map((row, i) => ({
+        trans_no: `${key.slice(0, 2).toUpperCase()}${row.db_id}`,
+        posted_date: row.posted_date,
+        doc_ref: row.db_id,
         responsibility_center: row.responsibility_center || '',
-        debit:                parseFloat(row.Debit  || 0),
-        credit:               parseFloat(row.Credit || 0),
+        debit: parseFloat(row.Debit || 0),
+        credit: parseFloat(row.Credit || 0),
       }))
     }));
 
-    const grandTotalDebit  = rows.reduce((s, r) => s + parseFloat(r.Debit  || 0), 0);
+    const grandTotalDebit = rows.reduce((s, r) => s + parseFloat(r.Debit || 0), 0);
     const grandTotalCredit = rows.reduce((s, r) => s + parseFloat(r.Credit || 0), 0);
 
     res.status(200).json({
@@ -294,7 +294,7 @@ const getGeneralLedger = async (req, res, next) => {
 const getBalanceSheet = async (req, res, next) => {
   try {
     const { start_date, end_date } = req.query;
-    
+
     let dateFilter = '';
     if (start_date || end_date) {
       const conditions = [];
@@ -306,16 +306,16 @@ const getBalanceSheet = async (req, res, next) => {
     const balance_sheet_query = `SELECT ${Master.charts_of_accounts.selectOptionColumns.code} as 'Account Code', ${Master.charts_of_accounts.selectOptionColumns.name} as 'Account Name', SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as Current FROM ${Master.charts_of_accounts.tablename} LEFT JOIN ${Accounting.journal_entries.tablename} ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id} WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE' AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('ASSETS', 'LIABILITIES', 'EQUITY')${dateFilter} GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.code}, ${Master.charts_of_accounts.selectOptionColumns.name}, ${Master.charts_of_accounts.selectOptionColumns.type} ORDER BY ${Master.charts_of_accounts.selectOptionColumns.type}, ${Master.charts_of_accounts.selectOptionColumns.code}`
 
     const balanceSheet = await Query(balance_sheet_query);
-    
+
     // Separate by type
     const assets = balanceSheet.filter(item => item['Account Code'].startsWith('100'))
     const liabilities = balanceSheet.filter(item => item['Account Code'].startsWith('200'))
     const equity = balanceSheet.filter(item => item['Account Code'].startsWith('300'))
-    
+
     const totalAssets = assets.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
     const totalLiabilities = liabilities.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
     const totalEquity = equity.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
-    
+
     res.status(200).json({
       success: true,
       message: 'Balance Sheet retrieved successfully',
@@ -333,7 +333,7 @@ const getBalanceSheet = async (req, res, next) => {
 
   } catch (error) {
     console.error('Error fetching balance sheet:', error)
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
       message: 'Server error while fetching balance sheet',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'

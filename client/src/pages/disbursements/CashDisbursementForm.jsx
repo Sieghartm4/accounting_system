@@ -258,6 +258,7 @@ function computeSummary(items) {
     } else if (whtPct > 0) {
       zeroRatedPurchases += discounted;
     } else {
+      // When both VAT and WHT are 0%, treat as regular purchases (not VAT-exempt)
       vatExemptPurchases += discounted;
     }
   });
@@ -753,7 +754,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       const vatAmount = discountedAmount * (vatPct / 100);
       const whtAmount = discountedAmount * (whtPct / 100);
 
-      return sum + (discountedAmount + vatAmount - whtAmount);
+      return sum + (discountedAmount - whtAmount);
     }, 0);
 
     if (paymentAccount && totalCashPaid > 0) {
@@ -800,10 +801,10 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
         }
       });
 
-      if (!hasValidItems) {
-        setToast({ type: 'warning', message: 'Please add at least one valid disbursement item' });
-        return;
-      }
+      // if (!hasValidItems) {
+      //   setToast({ type: 'warning', message: 'Please add at least one valid disbursement item' });
+      //   return;
+      // }
 
       const token = localStorage.getItem('token');
       if (!token) {

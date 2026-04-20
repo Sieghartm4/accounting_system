@@ -324,7 +324,7 @@ const createPayment = async (req, res, next) => {
       attachments
     } = req.body;
     console.log(req.body)
-    if (!vendor_id || !document_reference || !mode_of_payment || !payment_date || !created_by) {
+    if (!vendor_id || !mode_of_payment || !payment_date || !created_by) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: vendor_id, document_reference, mode_of_payment, payment_date, created_by'
@@ -360,7 +360,7 @@ const createPayment = async (req, res, next) => {
 
       const mainValues = [
         vendor_id || null,
-        document_reference || null,
+        document_reference || " ",
         mode_of_payment || null,
         bank_name || null,
         check_number || null,

@@ -172,7 +172,7 @@ const createCashDisbursement = async (req, res, next) => {
     } = req.body;
     console.log(req.body)
 
-    if (!vendor_id || !document_reference || !payment_date || !mode_of_payment || !total_amount_due || !created_by) {
+    if (!vendor_id || !payment_date || !mode_of_payment || !total_amount_due || !created_by) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
@@ -192,7 +192,7 @@ const createCashDisbursement = async (req, res, next) => {
 
       const mainValues = [
         vendor_id || null,
-        document_reference || null,
+        document_reference || "0",
         payment_date || null,
         mode_of_payment || null,
         bank_name || null,

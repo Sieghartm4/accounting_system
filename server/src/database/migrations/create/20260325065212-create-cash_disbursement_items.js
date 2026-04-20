@@ -31,7 +31,7 @@ module.exports = {
       },
       cdi_description: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: true
       },
       cdi_quantity: {
         type: Sequelize.INTEGER,

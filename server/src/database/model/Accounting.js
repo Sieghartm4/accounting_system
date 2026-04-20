@@ -410,7 +410,7 @@ const Accounting = {
       "discount",
       "discount_type",
       "vat",
-      "withholding_tax",
+      "witholding_tax",
       "responsibility_center"
     ],
   selectColumns: [
@@ -424,7 +424,7 @@ const Accounting = {
       "pi_discount",
       "pi_discount_type",
       "pi_vat",
-      "pi_withholding_tax",
+      "pi_witholding_tax",
       "pi_responsibility_center"
     ],
   selectOptionColumns: {
@@ -438,7 +438,7 @@ const Accounting = {
     discount: "pi_discount",
     discount_type: "pi_discount_type",
     vat: "pi_vat",
-    withholding_tax: "pi_withholding_tax",
+    withholding_tax: "pi_witholding_tax",
     responsibility_center: "pi_responsibility_center"
   },
   updateOptionColumns: {
@@ -452,7 +452,7 @@ const Accounting = {
     discount: "discount",
     discount_type: "discount_type",
     vat: "vat",
-    withholding_tax: "withholding_tax",
+    withholding_tax: "witholding_tax",
     responsibility_center: "responsibility_center"
   },
   selectDateFormatColumns: {

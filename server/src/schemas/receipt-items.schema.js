@@ -45,9 +45,9 @@ const ReceiptItemsSchema = Joi.object({
         'any.required': 'vat is required.',
         'string.empty': 'vat must be a valid decimal.',
       }),
- 	witholdingTax: Joi.string().trim().required().messages({
-        'any.required': 'witholdingTax is required.',
-        'string.empty': 'witholdingTax must be a valid decimal.',
+ 	withholdingTax: Joi.string().trim().required().messages({
+        'any.required': 'withholdingTax is required.',
+        'string.empty': 'withholdingTax must be a valid string.',
       }),
  	responsibilityCenter: Joi.string().trim().required().messages({
         'any.required': 'responsibilityCenter is required.',
@@ -68,9 +68,9 @@ const ReceiptItemsField = {
     Discount: 'discount',
     DiscountType: 'discount_type',
     Vat: 'vat',
-    WitholdingTax: 'witholding_tax',
+    WithholdingTax: 'withholding_tax',
     ResponsibilityCenter: 'responsibility_center',
-    All: ['id', 'receipts_id', 'product_service', 'charts_of_accounts', 'description', 'quantity', 'sales_price', 'discount', 'discount_type', 'vat', 'witholding_tax', 'responsibility_center'],
+    All: ['id', 'receipts_id', 'product_service', 'charts_of_accounts', 'description', 'quantity', 'sales_price', 'discount', 'discount_type', 'vat', 'withholding_tax', 'responsibility_center'],
 };
 
 
