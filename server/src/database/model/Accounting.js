@@ -545,7 +545,7 @@ const Accounting = {
       "discount",
       "discount_type",
       "vat",
-      "withholding_tax",
+      "witholding_tax",
       "responsibility_center"
     ],
   selectColumns: [
@@ -559,7 +559,7 @@ const Accounting = {
       "cdi_discount",
       "cdi_discount_type",
       "cdi_vat",
-      "cdi_withholding_tax",
+      "cdi_witholding_tax",
       "cdi_responsibility_center"
     ],
   selectOptionColumns: {
@@ -573,7 +573,7 @@ const Accounting = {
     discount: "cdi_discount",
     discount_type: "cdi_discount_type",
     vat: "cdi_vat",
-    witholding_tax: "cdi_withholding_tax",
+    witholding_tax: "cdi_witholding_tax",
     responsibility_center: "cdi_responsibility_center"
   },
   updateOptionColumns: {
@@ -587,7 +587,7 @@ const Accounting = {
     discount: "discount",
     discount_type: "discount_type",
     vat: "vat",
-    witholding_tax: "withholding_tax",
+    witholding_tax: "witholding_tax",
     responsibility_center: "responsibility_center"
   },
   selectDateFormatColumns: {
@@ -625,7 +625,7 @@ const Accounting = {
       "discount",
       "discount_type",
       "vat",
-      "withholding_tax",
+      "witholding_tax",
       "responsibility_center"
     ],
   selectColumns: [
@@ -639,7 +639,7 @@ const Accounting = {
       "ri_discount",
       "ri_discount_type",
       "ri_vat",
-      "ri_withholding_tax",
+      "ri_witholding_tax",
       "ri_responsibility_center"
     ],
   selectOptionColumns: {
@@ -653,7 +653,7 @@ const Accounting = {
     discount: "ri_discount",
     discount_type: "ri_discount_type",
     vat: "ri_vat",
-    withholding_tax: "ri_withholding_tax",
+    withholding_tax: "ri_witholding_tax",
     responsibility_center: "ri_responsibility_center"
   },
   updateOptionColumns: {
@@ -667,7 +667,7 @@ const Accounting = {
     discount: "discount",
     discount_type: "discount_type",
     vat: "vat",
-    witholding_tax: "withholding_tax",
+    witholding_tax: "witholding_tax",
     responsibility_center: "responsibility_center"
   },
   selectDateFormatColumns: {

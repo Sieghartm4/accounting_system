@@ -1056,8 +1056,8 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                             className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
                             placeholder="0.00" 
                             type="number"
-                            value={entry.debit} 
-                            onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} 
+                            value={entry.debit || ''} 
+                            onChange={e => updateJournalEntry(entry.id, 'debit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} 
                             readOnly={!entry.isManual} 
                           />
                         </td>
@@ -1067,8 +1067,8 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                             className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
                             placeholder="0.00" 
                             type="number"
-                            value={entry.credit} 
-                            onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} 
+                            value={entry.credit === null || entry.credit === undefined ? '' : entry.credit} 
+                            onChange={e => updateJournalEntry(entry.id, 'credit', e.target.value === '' ? null : parseFloat(e.target.value) || 0)} 
                             readOnly={!entry.isManual} 
                           />
                         </td>

@@ -1,4 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  BarChart3, 
+  Download, 
+  RefreshCcw, 
+  Calendar, 
+  ShieldCheck, 
+  ShieldAlert, 
+  PieChart,
+  Layers,
+  Briefcase,
+  TrendingUp
+} from 'lucide-react';
 
 export default function BalanceSheet() {
   const [data, setData] = useState(null);
@@ -21,6 +33,7 @@ export default function BalanceSheet() {
   const fetchBalanceSheet = async () => {
     try {
       setLoading(true);
+      setError('');
       const token = localStorage.getItem('token');
       
       const params = new URLSearchParams();
@@ -43,48 +56,33 @@ export default function BalanceSheet() {
         setError(result.message || 'Failed to fetch balance sheet');
       }
     } catch (err) {
-      setError('Error fetching balance sheet: ' + err.message);
+      setError('Connection Error: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-PH', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount || 0);
-  };
+  const fmt = (n) => new Intl.NumberFormat('en-PH', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  }).format(n || 0);
 
-  if (loading) {
+  if (loading && !data) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Balance Sheet</h1>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
-            <span className="ml-3 text-gray-600">Loading balance sheet...</span>
-          </div>
-        </div>
+      <div className="h-full w-full flex flex-col items-center justify-center gap-4 min-h-[400px]">
+        <div className="w-10 h-10 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-[10px] font-black uppercase tracking-[3px] text-gray-400">Recalculating Balance Sheet...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Balance Sheet</h1>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800 font-semibold">Error:</p>
-            <p className="text-red-700 mt-2">{error}</p>
-            <button 
-              onClick={fetchBalanceSheet}
-              className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Retry
-            </button>
-          </div>
+      <div className="p-10">
+        <div className="bg-red-50 border-l-4 border-red-600 p-6 rounded-r-xl shadow-sm">
+          <h3 className="text-red-800 font-bold uppercase text-sm">Error Loading Statement</h3>
+          <p className="text-red-600 text-[12px] mt-1 font-medium">{error}</p>
+          <button onClick={fetchBalanceSheet} className="mt-4 px-5 py-2 bg-red-600 text-white text-[10px] font-black rounded-lg uppercase tracking-widest hover:bg-red-700 transition-all">Retry Fetch</button>
         </div>
       </div>
     );
@@ -92,220 +90,181 @@ export default function BalanceSheet() {
 
   if (!data) return null;
 
+  const isBalanced = Math.abs(data.totalAssets - data.totalLiabilitiesAndEquity) < 0.01;
+
+  const Section = ({ title, icon: Icon, color, items, total, totalLabel }) => (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full custom-scrollbar">
+      <div className="flex items-center gap-2 px-5 py-3 bg-black">
+        <Icon size={14} className={color} />
+        <span className="text-[11px] font-black uppercase tracking-[3px] text-white">{title}</span>
+      </div>
+      
+      <div className="overflow-y-auto custom-scrollbar" style={{ maxHeight: '480px' }}>
+        <table className="w-full border-collapse">
+          <thead className="sticky top-0 bg-gray-50 z-10">
+            <tr className="border-b border-gray-100">
+              <th className="py-3 px-5 text-[11px] font-black uppercase text-gray-400 text-left">Code</th>
+              <th className="py-3 px-5 text-[11px] font-black uppercase text-gray-400 text-left">Account Name</th>
+              <th className="py-3 px-5 text-[11px] font-black uppercase text-gray-400 text-right">Balance</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {items?.map((item, i) => (
+              <tr key={i} className="hover:bg-gray-50/80 transition-colors">
+                <td className="py-3 px-5">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">{item['Account Code']}</p>
+                </td>
+                <td className="py-3 px-5">
+                  <p className="text-[13px] font-bold text-black">{item['Account Name']}</p>
+                </td>
+                <td className="py-3 px-5 text-right font-mono text-[15px] font-black text-black">
+                  {fmt(item.Current)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-auto bg-gray-50 border-t border-gray-100 px-5 py-3 flex justify-between items-center">
+        <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">{totalLabel}</span>
+        <span className={`text-lg font-black ${color}`}>÷ {fmt(total)}</span>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Balance Sheet</h1>
+    <div className="flex flex-col gap-5 bg-[#F3F4F6] min-h-full custom-scrollbar">
       
-      {/* Date Filter Section */}
-      <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            />
+      {/* HEADER SECTION */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center shadow-xl shadow-gray-200">
+            <BarChart3 size={24} className="text-orange-500" />
           </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setStartDate('');
-                setEndDate('');
-              }}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Clear
-            </button>
-            <button
-              onClick={() => {
-                const today = new Date().toISOString().split('T')[0];
-                setStartDate(today);
-                setEndDate(today);
-              }}
-              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-            >
-              Today
-            </button>
+          <div>
+            <h1 className="text-3xl font-black text-black tracking-tighter leading-none">
+              Balance <span className="text-orange-600 italic">Sheet</span>
+            </h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[3px] mt-1">Statement of Financial Position</p>
           </div>
         </div>
-        {(startDate || endDate) && (
-          <div className="mt-3 text-sm text-gray-600">
-            Filter: {startDate && `From ${startDate}`} {startDate && endDate && ' to '} {endDate && `To ${endDate}`}
-          </div>
-        )}
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Assets Section */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="bg-blue-50 px-6 py-4 border-b border-blue-200">
-            <h2 className="text-lg font-semibold text-blue-800">ASSETS</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <tbody className="divide-y divide-gray-200">
-                {data.assets?.map((item, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {item['Account Code']}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-gray-900">
-                      {item['Account Name']}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-right text-gray-900">
-                      {formatCurrency(item.Current)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-blue-50 font-semibold">
-                  <td colSpan="2" className="px-6 py-3 text-sm text-blue-800">
-                    Total Assets
-                  </td>
-                  <td className="px-6 py-3 text-sm text-right text-blue-800">
-                    {formatCurrency(data.totalAssets)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Liabilities Section */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="bg-yellow-50 px-6 py-4 border-b border-yellow-200">
-            <h2 className="text-lg font-semibold text-yellow-800">LIABILITIES</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <tbody className="divide-y divide-gray-200">
-                {data.liabilities?.map((item, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {item['Account Code']}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-gray-900">
-                      {item['Account Name']}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-right text-gray-900">
-                      {formatCurrency(item.Current)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-yellow-50 font-semibold">
-                  <td colSpan="2" className="px-6 py-3 text-sm text-yellow-800">
-                    Total Liabilities
-                  </td>
-                  <td className="px-6 py-3 text-sm text-right text-yellow-800">
-                    {formatCurrency(data.totalLiabilities)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Equity Section */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="bg-green-50 px-6 py-4 border-b border-green-200">
-            <h2 className="text-lg font-semibold text-green-800">EQUITY</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <tbody className="divide-y divide-gray-200">
-                {data.equity?.map((item, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {item['Account Code']}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-gray-900">
-                      {item['Account Name']}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-right text-gray-900">
-                      {formatCurrency(item.Current)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-green-50 font-semibold">
-                  <td colSpan="2" className="px-6 py-3 text-sm text-green-800">
-                    Total Equity
-                  </td>
-                  <td className="px-6 py-3 text-sm text-right text-green-800">
-                    {formatCurrency(data.totalEquity)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div className="flex gap-2">
+          <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-[11px] font-black text-black rounded-xl hover:bg-gray-50 uppercase tracking-widest shadow-sm transition-all active:scale-95">
+            <Download size={14} /> Export CSV
+          </button>
+          <button onClick={fetchBalanceSheet}
+            className="w-11 h-11 bg-orange-600 text-white rounded-xl hover:bg-orange-700 flex items-center justify-center transition-all shadow-lg shadow-orange-100 active:scale-95">
+            <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
+          </button>
         </div>
       </div>
 
-      {/* Balance Verification */}
-      <div className="mt-6 bg-white rounded-lg shadow overflow-hidden">
-        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800">BALANCE VERIFICATION</h2>
+      {/* TOOLBAR */}
+      <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap shadow-sm">
+        {/* Date filters */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">From</span>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-orange-500 focus:bg-white transition-all" />
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">To</span>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-orange-500 focus:bg-white transition-all" />
+        </div>
+
+        <div className="hidden md:block w-px h-7 bg-gray-100" />
+
+        <button onClick={() => { setStartDate(''); setEndDate(''); }}
+          className="px-4 py-2 border border-gray-900 rounded-xl text-[10px] font-black text-gray-900 uppercase tracking-widest hover:border-orange-500 hover:text-orange-600 transition-all bg-white cursor-pointer">
+          Reset
+        </button>
+        <button onClick={() => { const t = new Date().toISOString().split('T')[0]; setStartDate(t); setEndDate(t); }}
+          className="px-4 py-2 bg-black rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-orange-600 cursor-pointer">
+          Today
+        </button>
+      </div>
+
+      {/* CORE FINANCIALS GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+        <Section 
+          title="Assets" 
+          icon={Briefcase} 
+          color="text-blue-500" 
+          items={data.assets} 
+          total={data.totalAssets} 
+          totalLabel="Sum of Assets"
+        />
+        <Section 
+          title="Liabilities" 
+          icon={Layers} 
+          color="text-orange-500" 
+          items={data.liabilities} 
+          total={data.totalLiabilities} 
+          totalLabel="Sum of Liabilities"
+        />
+        <Section 
+          title="Equity" 
+          icon={PieChart} 
+          color="text-green-500" 
+          items={data.equity} 
+          total={data.totalEquity} 
+          totalLabel="Sum of Equity"
+        />
+      </div>
+
+      {/* BALANCE VERIFICATION */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="flex items-center gap-2 px-5 py-3 bg-black">
+          <BarChart3 size={14} className="text-orange-500" />
+          <span className="text-[11px] font-black uppercase tracking-[3px] text-white">Balance Verification</span>
         </div>
         <div className="p-6">
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-600">Total Assets:</span>
               <span className="text-lg font-semibold text-blue-600">
-                {formatCurrency(data.totalAssets)}
+                ÷ {fmt(data.totalAssets)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-600">Total Liabilities:</span>
-              <span className="text-lg font-semibold text-yellow-600">
-                {formatCurrency(data.totalLiabilities)}
+              <span className="text-lg font-semibold text-orange-600">
+                ÷ {fmt(data.totalLiabilities)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-600">Total Equity:</span>
               <span className="text-lg font-semibold text-green-600">
-                {formatCurrency(data.totalEquity)}
+                ÷ {fmt(data.totalEquity)}
               </span>
             </div>
             <div className="border-t border-gray-200 pt-4">
               <div className="flex justify-between items-center">
                 <span className="text-base font-semibold text-gray-900">Liabilities + Equity:</span>
                 <span className="text-xl font-bold text-gray-900">
-                  {formatCurrency(data.totalLiabilitiesAndEquity)}
+                  ÷ {fmt(data.totalLiabilitiesAndEquity)}
                 </span>
               </div>
             </div>
             <div className={`mt-4 p-4 rounded-lg ${
-              Math.abs(data.totalAssets - data.totalLiabilitiesAndEquity) < 0.01 
+              isBalanced 
                 ? 'bg-green-50 border border-green-200' 
                 : 'bg-red-50 border border-red-200'
             }`}>
               <div className="flex items-center">
                 <span className={`text-lg font-bold ${
-                  Math.abs(data.totalAssets - data.totalLiabilitiesAndEquity) < 0.01 
+                  isBalanced 
                     ? 'text-green-800' 
                     : 'text-red-800'
                 }`}>
-                  {Math.abs(data.totalAssets - data.totalLiabilitiesAndEquity) < 0.01 ? '✓ BALANCED' : '✗ OUT OF BALANCE'}
+                  {isBalanced ? '÷ BALANCED' : '÷ OUT OF BALANCE'}
                 </span>
                 <span className={`ml-3 text-sm ${
-                  Math.abs(data.totalAssets - data.totalLiabilitiesAndEquity) < 0.01 
+                  isBalanced 
                     ? 'text-green-700' 
                     : 'text-red-700'
                 }`}>
-                  Difference: {formatCurrency(Math.abs(data.totalAssets - data.totalLiabilitiesAndEquity))}
+                  Difference: ÷ {fmt(Math.abs(data.totalAssets - data.totalLiabilitiesAndEquity))}
                 </span>
               </div>
             </div>

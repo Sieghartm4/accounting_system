@@ -1202,8 +1202,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                               min="0"
                               className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
                               placeholder={item.isOther ? '' : '1'}
-                              value={item.isOther ? '' : item.qty}
-                              onChange={e => updateReceiptItem(item.id, 'qty', parseFloat(e.target.value) || 0)}
+                              value={item.isOther ? '' : (item.qty || '')}
+                              onChange={e => updateReceiptItem(item.id, 'qty', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
                             />
                           </td>
                           <td className="py-1 px-1">
@@ -1214,8 +1214,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                               min="0"
                               step="0.01"
                               placeholder="0.00"
-                              value={item.price}
-                              onChange={e => updateReceiptItem(item.id, 'price', parseFloat(e.target.value) || 0)}
+                              value={item.price || ''}
+                              onChange={e => updateReceiptItem(item.id, 'price', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
                             />
                           </td>
                           <td className="py-1 px-1">
@@ -1228,8 +1228,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                                 max={item.discountType === 'PERCENT' ? '100' : '999999'}
                                 step="0.01"
                                 placeholder="0"
-                                value={item.discount || 0}
-                                onChange={e => updateReceiptItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
+                                value={item.discount || ''}
+                                onChange={e => updateReceiptItem(item.id, 'discount', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
                               />
                               <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">
                                 {item.discountType === 'PERCENT' ? '%' : '₱'}
@@ -1381,8 +1381,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                               className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               placeholder="0.00"
                               type="number"
-                              value={entry.debit}
-                              onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)}
+                              value={entry.debit || ''}
+                              onChange={e => updateJournalEntry(entry.id, 'debit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
                               readOnly={!entry.isManual}
                             />
                           </td>
@@ -1392,8 +1392,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                               className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
                               placeholder="0.00"
                               type="number"
-                              value={entry.credit}
-                              onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)}
+                              value={entry.credit || ''}
+                              onChange={e => updateJournalEntry(entry.id, 'credit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
                               readOnly={!entry.isManual}
                             />
                           </td>

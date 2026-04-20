@@ -55,86 +55,240 @@ const getTrialBalance = async (req, res, next) => {
 const getIncomeStatement = async (req, res, next) => {
   try {
     const { start_date, end_date } = req.query;
-    
+
     let dateFilter = '';
     if (start_date || end_date) {
       const conditions = [];
-      if (start_date) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} >= '${start_date}'`);
-      if (end_date) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} <= '${end_date}'`);
+      if (start_date) conditions.push(
+        `${Accounting.journal_entries.selectOptionColumns.date} >= '${start_date}'`
+      );
+      if (end_date) conditions.push(
+        `${Accounting.journal_entries.selectOptionColumns.date} <= '${end_date}'`
+      );
       dateFilter = ` AND ${conditions.join(' AND ')}`;
     }
 
-    const income_statement_query = `SELECT ${Master.charts_of_accounts.selectOptionColumns.code} as 'Account Code', ${Master.charts_of_accounts.selectOptionColumns.name} as 'Account Name', SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as Current FROM ${Master.charts_of_accounts.tablename} LEFT JOIN ${Accounting.journal_entries.tablename} ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id} WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE' AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')${dateFilter} GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.code}, ${Master.charts_of_accounts.selectOptionColumns.name}, ${Master.charts_of_accounts.selectOptionColumns.type} ORDER BY ${Master.charts_of_accounts.selectOptionColumns.type}, ${Master.charts_of_accounts.selectOptionColumns.code}`
+    // KEY INSIGHT:
+    // Use CREDIT - DEBIT for ALL accounts.
+    //
+    // REVENUE accounts (normal balance = CREDIT):
+    //   Income from Trading: mostly CREDITs → positive ✓
+    //   Sales Discounts (contra-revenue, normal balance = DEBIT): mostly DEBITs → negative ✓ (reduces revenue)
+    //
+    // EXPENSES accounts (normal balance = DEBIT):
+    //   Regular expenses: mostly DEBITs → CREDIT - DEBIT = negative value
+    //   Purchase Discounts (contra-expense, normal balance = CREDIT): mostly CREDITs → positive value
+    //
+    // Then on the JS side:
+    //   totalRevenues = sum of revenue Current values (positives add, negatives reduce)
+    //   totalExpenses = sum of expense Current values but we SUM(DEBIT - CREDIT) for normal expenses
+    //
+    // ACTUALLY — simplest correct approach:
+    //   REVENUE  → Current = SUM(CREDIT) - SUM(DEBIT)  [positive = earned, negative = contra]
+    //   EXPENSES → Current = SUM(DEBIT) - SUM(CREDIT)  [positive = spent, negative = contra/discount]
+    //   totalExpenses will be net (regular expenses minus discounts like Purchase Discounts)
+
+    const income_statement_query = `
+      SELECT 
+        ${Master.charts_of_accounts.selectOptionColumns.code}   AS 'Account Code',
+        ${Master.charts_of_accounts.selectOptionColumns.name}   AS 'Account Name',
+        ${Master.charts_of_accounts.selectOptionColumns.type}   AS 'Account Type',
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' 
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalCredit,
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'  
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalDebit,
+        CASE
+          WHEN ${Master.charts_of_accounts.selectOptionColumns.type} = 'REVENUE'
+            THEN SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+               - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+          WHEN ${Master.charts_of_accounts.selectOptionColumns.type} = 'EXPENSES'
+            THEN SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+               - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+        END AS Current
+      FROM ${Master.charts_of_accounts.tablename}
+      LEFT JOIN ${Accounting.journal_entries.tablename}
+        ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+           ${dateFilter}
+      WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
+        AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
+      GROUP BY
+        ${Master.charts_of_accounts.selectOptionColumns.id},
+        ${Master.charts_of_accounts.selectOptionColumns.code},
+        ${Master.charts_of_accounts.selectOptionColumns.name},
+        ${Master.charts_of_accounts.selectOptionColumns.type}
+      ORDER BY
+        ${Master.charts_of_accounts.selectOptionColumns.type},
+        ${Master.charts_of_accounts.selectOptionColumns.code}
+    `;
 
     const incomeStatement = await Query(income_statement_query);
-    
-    const revenues = incomeStatement.filter(item => 
-      item['Account Code'].startsWith('400') || item['Account Code'].startsWith('500') && item['Account Code'] === '500-1200'
-    )
-    const expenses = incomeStatement.filter(item => 
-      item['Account Code'].startsWith('500') && item['Account Code'] !== '500-1200'
-    )
-    
-    const totalRevenues = revenues.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
-    const totalExpenses = expenses.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
-    const netIncome = totalRevenues - totalExpenses
-    console.log(expenses)
+
+    const revenues = incomeStatement.filter(item => item['Account Type'] === 'REVENUE');
+    const expenses = incomeStatement.filter(item => item['Account Type'] === 'EXPENSES');
+
+    // totalRevenues: income accounts are positive, contra-revenue (Sales Discounts) is negative
+    // They naturally net together correctly
+    const totalRevenues = revenues.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0);
+
+    // totalExpenses: regular expense accounts are positive, contra-expense (Purchase Discounts) is negative
+    // They naturally net together correctly
+    const totalExpenses = expenses.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0);
+
+    const netIncome = totalRevenues - totalExpenses;
+
     res.status(200).json({
       success: true,
       message: 'Income Statement retrieved successfully',
       data: {
-        revenues: revenues,
-        expenses: expenses,
-        totalRevenues: totalRevenues,
-        totalExpenses: totalExpenses,
-        netIncome: netIncome
+        revenues,
+        expenses,
+        totalRevenues,
+        totalExpenses,
+        netIncome
       },
       timestamp: new Date().toISOString()
-    })
+    });
 
   } catch (error) {
-    console.error('Error fetching income statement:', error)
-    return res.status(500).json({ 
+    console.error('Error fetching income statement:', error);
+    return res.status(500).json({
       success: false,
       message: 'Server error while fetching income statement',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    })
+    });
   }
-}
+};
 
 // GENERAL LEDGER
 const getGeneralLedger = async (req, res, next) => {
   try {
     const { start_date, end_date } = req.query;
-    
+
+    let startDate = start_date;
+    let endDate = end_date;
+
+    if (!start_date && !end_date) {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      startDate = firstDay.toISOString().split('T')[0];
+      endDate = lastDay.toISOString().split('T')[0];
+    }
+
     let dateFilter = '';
-    if (start_date || end_date) {
+    if (startDate || endDate) {
       const conditions = [];
-      if (start_date) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} >= '${start_date}'`);
-      if (end_date) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} <= '${end_date}'`);
+      if (startDate) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} >= '${startDate}'`);
+      if (endDate) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} <= '${endDate}'`);
       dateFilter = ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    const general_ledger_query = `SELECT ROW_NUMBER() OVER (ORDER BY ${Accounting.journal_entries.selectOptionColumns.date}) as 'Trans. No.', ${Accounting.journal_entries.selectOptionColumns.db_name} as 'Vendor / Customer', ${Accounting.journal_entries.selectOptionColumns.date} as 'Posted Date', ${Accounting.journal_entries.selectOptionColumns.db_id} as 'Doc Ref', SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as Debit, SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as Credit, ${Accounting.journal_entries.selectOptionColumns.responsibility_center} as 'Responsibility Center' FROM ${Accounting.journal_entries.tablename}${dateFilter} GROUP BY ${Accounting.journal_entries.selectOptionColumns.id}, ${Accounting.journal_entries.selectOptionColumns.db_name}, ${Accounting.journal_entries.selectOptionColumns.date}, ${Accounting.journal_entries.selectOptionColumns.db_id}, ${Accounting.journal_entries.selectOptionColumns.responsibility_center}, ${Accounting.journal_entries.selectOptionColumns.type} ORDER BY ${Accounting.journal_entries.selectOptionColumns.date}`
+    // Group by db_name + db_id (one row per transaction document),
+    // summing debit and credit across all line items of that document
+    const general_ledger_query = `
+      SELECT
+        ${Accounting.journal_entries.selectOptionColumns.db_name}            AS db_name,
+        ${Accounting.journal_entries.selectOptionColumns.db_id}              AS db_id,
+        ${Accounting.journal_entries.selectOptionColumns.date}               AS posted_date,
+        ${Accounting.journal_entries.selectOptionColumns.responsibility_center} AS responsibility_center,
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS Debit,
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS Credit
+      FROM ${Accounting.journal_entries.tablename}
+      ${dateFilter}
+      GROUP BY
+        ${Accounting.journal_entries.selectOptionColumns.db_name},
+        ${Accounting.journal_entries.selectOptionColumns.db_id},
+        ${Accounting.journal_entries.selectOptionColumns.date},
+        ${Accounting.journal_entries.selectOptionColumns.responsibility_center}
+      ORDER BY
+        ${Accounting.journal_entries.selectOptionColumns.db_name},
+        ${Accounting.journal_entries.selectOptionColumns.date},
+        ${Accounting.journal_entries.selectOptionColumns.db_id}
+    `;
 
-    const generalLedger = await Query(general_ledger_query);
-    
+    const rows = await Query(general_ledger_query);
+
+    // Group rows by db_name for the frontend section display
+    const grouped = {};
+    for (const row of rows) {
+      const section = row.db_name;
+      if (!grouped[section]) grouped[section] = [];
+      grouped[section].push(row);
+    }
+
+    // Build section array in a logical ledger order
+    const SECTION_ORDER = [
+      'adjustments',
+      'sales',
+      'collections',
+      'receipts',
+      'purchase',
+      'payments',
+      'cash_disbursements',
+    ];
+
+    // Label map for display
+    const SECTION_LABELS = {
+      adjustments:        'JOURNAL VOUCHER / ADJUSTMENTS',
+      sales:              'SALES',
+      collections:        'COLLECTIONS',
+      receipts:           'CASH RECEIPTS',
+      purchase:           'PURCHASES',
+      payments:           'PAYMENTS',
+      cash_disbursements: 'CASH DISBURSEMENTS',
+    };
+
+    // Any db_name not in the order list gets appended at the end
+    const allSections = [
+      ...SECTION_ORDER,
+      ...Object.keys(grouped).filter(k => !SECTION_ORDER.includes(k))
+    ].filter(k => grouped[k]); // only sections that have data
+
+    const sections = allSections.map(key => ({
+      section_key:   key,
+      section_label: SECTION_LABELS[key] || key.toUpperCase().replace(/_/g, ' '),
+      transactions:  grouped[key].map((row, i) => ({
+        trans_no:             `${key.slice(0, 2).toUpperCase()}${row.db_id}`,
+        posted_date:          row.posted_date,
+        doc_ref:              row.db_id,
+        responsibility_center: row.responsibility_center || '',
+        debit:                parseFloat(row.Debit  || 0),
+        credit:               parseFloat(row.Credit || 0),
+      }))
+    }));
+
+    const grandTotalDebit  = rows.reduce((s, r) => s + parseFloat(r.Debit  || 0), 0);
+    const grandTotalCredit = rows.reduce((s, r) => s + parseFloat(r.Credit || 0), 0);
+
     res.status(200).json({
       success: true,
       message: 'General Ledger retrieved successfully',
-      data: generalLedger,
+      data: {
+        sections,
+        grandTotalDebit,
+        grandTotalCredit,
+        netTotal: grandTotalDebit - grandTotalCredit,
+      },
+      startDate,
+      endDate,
       timestamp: new Date().toISOString()
-    })
+    });
 
   } catch (error) {
-    console.error('Error fetching general ledger:', error)
-    return res.status(500).json({ 
+    console.error('Error fetching general ledger:', error);
+    return res.status(500).json({
       success: false,
       message: 'Server error while fetching general ledger',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    })
+    });
   }
-}
+};
 
 // BALANCE SHEET
 const getBalanceSheet = async (req, res, next) => {

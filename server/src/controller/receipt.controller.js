@@ -97,7 +97,7 @@ const getAllReceipts = async (req, res, next) => {
     ])
       .from(Accounting.receipt_items.tablename)
       .innerJoin(Master.vat.tablename, Accounting.receipt_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
-      .innerJoin(Master.withholding_tax.tablename, Accounting.receipt_items.selectOptionColumns.witholding_tax, Master.withholding_tax.selectOptionColumns.id)
+      .innerJoin(Master.withholding_tax.tablename, Accounting.receipt_items.selectOptionColumns.withholding_tax, Master.withholding_tax.selectOptionColumns.id)
       .leftJoin(Master.products_service.tablename, Accounting.receipt_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
       .innerJoin(Master.charts_of_accounts.tablename, Accounting.receipt_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
       .where(Accounting.receipt_items.selectOptionColumns.receipts_id)

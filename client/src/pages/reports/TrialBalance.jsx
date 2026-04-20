@@ -67,7 +67,7 @@ export default function TrialBalance() {
   );
 
   return (
-    <div className="flex flex-col gap-2 bg-[#F3F4F6] min-h-full">
+    <div className="flex flex-col gap-5 bg-[#F3F4F6] min-h-full custom-scrollbar">
 
       {/* HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -151,17 +151,17 @@ export default function TrialBalance() {
         </div>
 
         <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }}
-          className="px-4 py-2 border border-gray-100 rounded-xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-all bg-white">
+          className="px-4 py-2 border border-gray-900 rounded-xl text-[10px] font-black text-gray-900 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-all bg-white cursor-pointer">
           Reset
         </button>
         <button onClick={() => { const t = new Date().toISOString().split('T')[0]; setStartDate(t); setEndDate(t); }}
-          className="px-4 py-2 bg-black rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-red-600 transition-all">
+          className="px-4 py-2 bg-black rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-red-600 transition-all cursor-pointer">
           Today
         </button>
       </div>
 
       {/* TABLE CARD */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col custom-scrollbar">
 
         {/* Table header bar */}
         <div className="flex items-center gap-2 px-5 py-3 bg-black flex-shrink-0">
@@ -177,7 +177,7 @@ export default function TrialBalance() {
         </div>
 
         {/* Scrollable body */}
-        <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: '490px' }}>
+        <div className="overflow-y-auto overflow-x-auto custom-scrollbar" style={{ maxHeight: '490px' }}>
           <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: '480px' }}>
             <colgroup>
               <col style={{ width: '12%' }} />

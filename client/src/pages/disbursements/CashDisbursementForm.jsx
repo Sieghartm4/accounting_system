@@ -1217,11 +1217,11 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                             <input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Details..." value={item.description} onChange={e => updateDisbursementItem(item.id, 'description', e.target.value)} />
                           </td>
                           <td className="py-1 px-1">
-                            <input disabled={isViewMode || item.isOther} type="number" min="0" className={`${tableInput} ${(isViewMode || item.isOther) ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : '1'} value={item.isOther ? '' : item.qty} onChange={e => updateDisbursementItem(item.id, 'qty', parseFloat(e.target.value) || 0)} />
+                            <input disabled={isViewMode || item.isOther} type="number" min="0" className={`${tableInput} ${(isViewMode || item.isOther) ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder={item.isOther ? '' : '1'} value={item.isOther ? '' : (item.qty || '')} onChange={e => updateDisbursementItem(item.id, 'qty', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
                           </td>
 
                           <td className="py-1 px-1">
-                            <input disabled={isViewMode} className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} type="number" min="0" step="0.01" placeholder="0.00" value={item.price} onChange={e => updateDisbursementItem(item.id, 'price', parseFloat(e.target.value) || 0)} />
+                            <input disabled={isViewMode} className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} type="number" min="0" step="0.01" placeholder="0.00" value={item.price || ''} onChange={e => updateDisbursementItem(item.id, 'price', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} />
                           </td>
                           {/* DISCOUNT % */}
                           <td className="py-1 px-1">
@@ -1234,8 +1234,8 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                                 max={item.discountType === 'PERCENT' ? '100' : '999999'} 
                                 step="0.01" 
                                 placeholder="0" 
-                                value={item.discount || 0} 
-                                onChange={e => updateDisbursementItem(item.id, 'discount', parseFloat(e.target.value) || 0)} 
+                                value={item.discount === null || item.discount === undefined ? '' : item.discount} 
+                                onChange={e => updateDisbursementItem(item.id, 'discount', e.target.value === '' ? null : parseFloat(e.target.value) || 0)} 
                               />
                               {item.discountType === 'PERCENT' && (
                                 <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">%</span>
@@ -1369,8 +1369,8 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                           <td className="py-1.5 px-1">
                             <SearchableDropdown disabled={isViewMode} placeholder="Search account..." value={entry.accountSearch} onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)} onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }} options={coaOptions} inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} emptyText="No accounts found" />
                           </td>
-                          <td className="py-1.5 px-1"><input disabled={isViewMode || !entry.isManual} className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.debit} onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} readOnly={isViewMode || !entry.isManual} /></td>
-                          <td className="py-1.5 px-1"><input disabled={isViewMode || !entry.isManual} className={`${tableInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.credit} onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} readOnly={isViewMode || !entry.isManual} /></td>
+                          <td className="py-1.5 px-1"><input disabled={isViewMode || !entry.isManual} className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.debit || ''} onChange={e => updateJournalEntry(entry.id, 'debit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} readOnly={isViewMode || !entry.isManual} /></td>
+                          <td className="py-1.5 px-1"><input disabled={isViewMode || !entry.isManual} className={`${tableInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.credit || ''} onChange={e => updateJournalEntry(entry.id, 'credit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} readOnly={isViewMode || !entry.isManual} /></td>
                           <td className="py-1.5 px-1"><input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Center..." value={entry.center} onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} /></td>
                           <td className="py-1.5 text-center">
                             {!isViewMode && entry.isManual ? (
