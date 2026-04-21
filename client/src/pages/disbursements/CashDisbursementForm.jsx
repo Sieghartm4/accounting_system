@@ -119,58 +119,34 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
   const anchorRef = useRef(null);
   const closeTimer = useRef(null);
   const filtered = options.filter(o => !value || o.label.toLowerCase().includes(value.toLowerCase()) || (o.sublabel || '').toLowerCase().includes(value.toLowerCase()));
-  
-  const handleBlur = () => {
-    if (disabled) return;
-    closeTimer.current = setTimeout(() => {
-      setOpen(false);
-      if (activeDropdownRef.current === anchorRef.current) {
-        activeDropdownRef.current = null;
-      }
-    }, 180);
+  const handleBlur = () => { closeTimer.current = setTimeout(() => setOpen(false), 180); };
+  const handleFocus = () => { 
+    if (!disabled) { 
+      clearTimeout(closeTimer.current); 
+      setOpen(true); 
+      if (onFocus) onFocus(); 
+    } 
   };
-  
-  const handleFocus = () => {
-    if (disabled) return;
-    clearTimeout(closeTimer.current);
-    
-    // Close any other open dropdown
-    if (activeDropdownRef.current && activeDropdownRef.current !== anchorRef.current) {
-      // Trigger blur on the other dropdown to close it
-      const otherInput = activeDropdownRef.current.querySelector('input');
-      if (otherInput) {
-        otherInput.blur();
-      }
-    }
-    
-    setOpen(true);
-    activeDropdownRef.current = anchorRef.current;
-    if (onFocus) onFocus();
-  };
-  
-  const handleSelect = (opt) => { 
-    clearTimeout(closeTimer.current); 
-    onSelect(opt); 
-    setOpen(false); 
-    activeDropdownRef.current = null;
-  };
+  const handleSelect = (opt) => { if (!disabled) { clearTimeout(closeTimer.current); onSelect(opt); setOpen(false); } };
+
+  if (disabled) {
+    return (
+      <div className="relative w-full">
+        <input
+          type="text"
+          placeholder={placeholder}
+          value={value}
+          readOnly
+          className={`${inputClassName} cursor-not-allowed text-black`}
+          autoComplete="off"
+        />
+      </div>
+    );
+  }
+
   return (
     <div ref={anchorRef} className="relative w-full">
-      <input
-        type="text"
-        disabled={disabled}
-        placeholder={placeholder}
-        value={value}
-        onChange={e => {
-          if (disabled) return;
-          onChange(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        className={`${inputClassName} ${disabled ? 'cursor-not-allowed' : ''}`}
-        autoComplete="off"
-      />
+      <input type="text" placeholder={placeholder} value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={handleFocus} onBlur={handleBlur} className={inputClassName} autoComplete="off" />
       <PortalDropdown anchorRef={anchorRef} open={open}>
         {filtered.length > 0 ? filtered.map((opt, i) => (
           <div key={opt.value ?? i} onMouseDown={e => { e.preventDefault(); handleSelect(opt); }} className="flex items-center justify-between gap-2 px-3 py-2 text-[12px] font-bold hover:bg-red-50 cursor-pointer transition-colors border-b border-gray-100 last:border-b-0 text-black">
@@ -283,9 +259,6 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-// Global dropdown state to ensure only one dropdown is open at a time
-const activeDropdownRef = React.createRef();
-
 export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = false, disbursementData = null }) {
 
   const [disbursementItems, setDisbursementItems] = useState([
@@ -460,22 +433,6 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
 
   useEffect(() => { fetchVendors(); fetchChartsOfAccounts(); fetchProducts(); }, []);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (activeDropdownRef.current && !activeDropdownRef.current.contains(event.target)) {
-        const input = activeDropdownRef.current.querySelector('input');
-        if (input) {
-          input.blur();
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
   // Populate form data when in view mode
   useEffect(() => {
     if (isViewMode && disbursementData) {
@@ -623,6 +580,13 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       paymentAccount = chartsOfAccounts.find(a =>
         (a.name || '').toLowerCase().includes('cash on hand')
       );
+
+      // Fallback: try 'petty cash' if 'cash on hand' not found
+      if (!paymentAccount) {
+        paymentAccount = chartsOfAccounts.find(a =>
+          (a.name || '').toLowerCase().includes('petty cash')
+        );
+      }
     } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
       paymentAccount = chartsOfAccounts.find(a =>
         (a.name || '').toLowerCase().includes(bankName.toLowerCase())
@@ -736,7 +700,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       const price = parseFloat(item.price) || 0;
       const discountValue = parseFloat(item.discount) || 0;
       const discountType = item.discountType || 'PERCENT';
-      const vatPct = parseFloat(item.vat) || 0;
+      const vatPct = parseFloat(item.vatRate) || 0;
       const whtPct = parseFloat(item.whtRate) || 0;
 
       const gross = qty * price;
@@ -754,7 +718,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       const vatAmount = discountedAmount * (vatPct / 100);
       const whtAmount = discountedAmount * (whtPct / 100);
 
-      return sum + (discountedAmount - whtAmount);
+      return sum + (discountedAmount + vatAmount - whtAmount);
     }, 0);
 
     if (paymentAccount && totalCashPaid > 0) {
@@ -809,6 +773,15 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       const token = localStorage.getItem('token');
       if (!token) {
         setToast({ type: 'error', message: 'No authorization token found. Please login again.' });
+        return;
+      }
+
+      // Check if journal entries are balanced
+      const totalDebit = journalEntries.reduce((sum, entry) => sum + (parseFloat(entry.debit) || 0), 0);
+      const totalCredit = journalEntries.reduce((sum, entry) => sum + (parseFloat(entry.credit) || 0), 0);
+      
+      if (Math.abs(totalDebit - totalCredit) > 0.01) { // Allow for small floating point differences
+        setToast({ type: 'warning', message: 'Journal entries must be balanced. Total debits must equal total credits.' });
         return;
       }
 

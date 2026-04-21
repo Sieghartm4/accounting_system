@@ -130,12 +130,12 @@ const getSalesItemsCollection = async (req, res, next) => {
       { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
     ])
       .from(Accounting.sales_items.tablename)
-      .innerJoin(
+      .leftJoin(
         Master.vat.tablename,
         Accounting.sales_items.selectOptionColumns.vat,
         Master.vat.selectOptionColumns.id
       )
-      .innerJoin(
+      .leftJoin(
         Master.withholding_tax.tablename,
         Accounting.sales_items.selectOptionColumns.witholding_tax,
         Master.withholding_tax.selectOptionColumns.id

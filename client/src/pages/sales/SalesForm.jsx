@@ -797,6 +797,15 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
         return;
       }
 
+      // Check if journal entries are balanced
+      const totalDebit = journalEntries.reduce((sum, entry) => sum + (parseFloat(entry.debit) || 0), 0);
+      const totalCredit = journalEntries.reduce((sum, entry) => sum + (parseFloat(entry.credit) || 0), 0);
+      
+      if (Math.abs(totalDebit - totalCredit) > 0.01) { // Allow for small floating point differences
+        setToast({ type: 'warning', message: 'Journal entries must be balanced. Total debits must equal total credits.' });
+        return;
+      }
+
       const preparedSalesItems = salesItems
         .map(item => ({
           product_id: item.isOther ? null : (item.productId || null),
@@ -882,6 +891,37 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
       generateJournalEntries();
     }
   }, [salesItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
+
+  // Auto-calculate date due based on terms and date delivered
+  useEffect(() => {
+    if (!isViewMode && dateDelivered && termsOption && termsNumber) {
+      const deliveredDate = new Date(dateDelivered);
+      const termsNum = parseInt(termsNumber) || 0;
+      
+      if (!isNaN(deliveredDate.getTime()) && termsNum > 0) {
+        let dueDate = new Date(deliveredDate);
+        
+        switch (termsOption) {
+          case 'DAYS':
+            dueDate.setDate(dueDate.getDate() + termsNum);
+            break;
+          case 'MONTHS':
+            dueDate.setMonth(dueDate.getMonth() + termsNum);
+            break;
+          case 'DURATION OF TIME':
+            // Default to days for duration of time
+            dueDate.setDate(dueDate.getDate() + termsNum);
+            break;
+          default:
+            dueDate.setDate(dueDate.getDate() + termsNum);
+        }
+        
+        // Format as YYYY-MM-DD for input field
+        const formattedDate = dueDate.toISOString().split('T')[0];
+        setDateDue(formattedDate);
+      }
+    }
+  }, [dateDelivered, termsOption, termsNumber, isViewMode]);
   return (
     <div className="h-full flex flex-col overflow-x-hidden bg-[#F3F4F6]">
       <style dangerouslySetInnerHTML={{

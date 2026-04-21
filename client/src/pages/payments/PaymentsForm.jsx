@@ -597,6 +597,15 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
       const token = localStorage.getItem('token');
       if (!token) { setToast({ type: 'error', message: 'No authorization token found. Please login again.' }); return; }
 
+      // Check if journal entries are balanced
+      const totalDebit = journalEntries.reduce((sum, entry) => sum + (parseFloat(entry.debit) || 0), 0);
+      const totalCredit = journalEntries.reduce((sum, entry) => sum + (parseFloat(entry.credit) || 0), 0);
+      
+      if (Math.abs(totalDebit - totalCredit) > 0.01) { // Allow for small floating point differences
+        setToast({ type: 'warning', message: 'Journal entries must be balanced. Total debits must equal total credits.' });
+        return;
+      }
+
       const userData  = JSON.parse(localStorage.getItem('user') || '{}');
       const createdBy = userData.mu_username || userData.username || 'Unknown User';
 

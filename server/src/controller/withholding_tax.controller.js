@@ -27,6 +27,7 @@ const getWithholdingTax = async (req, res, next) => {
       { col: Master.withholding_tax.selectOptionColumns.status, as: 'status' },
     ])
       .from(Master.withholding_tax.tablename)
+      .orderBy(Master.withholding_tax.selectOptionColumns.id)
       .build();
 
     let withholdingTax = await Query(query, [], [Master.withholding_tax.prefix_]);

@@ -28,6 +28,7 @@ const getVat = async (req, res, next) => {
       { col: Master.vat.selectOptionColumns.status, as: 'status' },
     ])
       .from(Master.vat.tablename)
+      .orderByDesc(Master.vat.selectOptionColumns.id)
       .build();
 
     let vat = await Query(query, [], [Master.vat.prefix_]);

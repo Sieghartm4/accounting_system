@@ -13,6 +13,14 @@ export default function Sidebar({ isCollapsed }) {
     const location = useLocation();
     const [user, setUser] = useState(null);
     const [sidebarItems, setSidebarItems] = useState({});
+    const [manualStates, setManualStates] = useState({
+        masters: null,
+        receipts: null,
+        sales: null,
+        purchase: null,
+        adjustments: null,
+        reports: null
+    });
 
     useEffect(() => {
         try {
@@ -28,6 +36,54 @@ export default function Sidebar({ isCollapsed }) {
             setSidebarItems({ main: [], masters: [], receipts: [], sales: [], purchase: [], adjustments: [] });
         }
     }, []);
+
+    // Auto-open collapsible based on current route
+    useEffect(() => {
+        const currentPath = location.pathname;
+        
+        // Check if user has manually set a state for this section
+        const checkAndSetState = (sectionKey, routes, setState) => {
+            const manualState = manualStates[sectionKey];
+            if (manualState !== null) {
+                // Use manual state if user has manually set it
+                setState(manualState);
+            } else {
+                // Auto-open if current path matches any route in this section
+                const shouldOpen = routes.some(route => currentPath === `/${route}`) || 
+                                 (sectionKey === 'reports' && routes.some(route => currentPath === `/${route.replace('_', '-')}`));
+                setState(shouldOpen);
+            }
+        };
+
+        if (sidebarItems.masters?.length > 0) {
+            checkAndSetState('masters', sidebarItems.masters.map(item => item.name), setIsMastersOpen);
+        }
+        if (sidebarItems.receipts?.length > 0) {
+            checkAndSetState('receipts', sidebarItems.receipts.map(item => item.name), setIsReceiptsOpen);
+        }
+        if (sidebarItems.sales?.length > 0) {
+            checkAndSetState('sales', sidebarItems.sales.map(item => item.name), setIsSalesOpen);
+        }
+        if (sidebarItems.purchase?.length > 0) {
+            checkAndSetState('purchase', sidebarItems.purchase.map(item => item.name), setIsPurchaseOpen);
+        }
+        if (sidebarItems.adjustments?.length > 0) {
+            checkAndSetState('adjustments', sidebarItems.adjustments.map(item => item.name), setIsAdjustmentsOpen);
+        }
+        if (sidebarItems.reports?.length > 0) {
+            checkAndSetState('reports', sidebarItems.reports.map(item => item.name), setIsReportsOpen);
+        }
+    }, [location.pathname, sidebarItems, manualStates]);
+
+    // Handle manual state changes
+    const handleManualToggle = (sectionKey, currentState, setState) => {
+        const newState = !currentState;
+        setState(newState);
+        setManualStates(prev => ({
+            ...prev,
+            [sectionKey]: newState
+        }));
+    };
 
     const NavLink = ({ to, icon: Icon, children }) => {
         const isActive = location.pathname === to;
@@ -88,7 +144,7 @@ export default function Sidebar({ isCollapsed }) {
                     <div className="pt-4">
                         {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Internal Systems</p>}
                         <button
-                            onClick={() => setIsMastersOpen(!isMastersOpen)}
+                            onClick={() => handleManualToggle('masters', isMastersOpen, setIsMastersOpen)}
                             className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isMastersOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
                         >
                             <div className="flex items-center gap-3">
@@ -135,7 +191,7 @@ export default function Sidebar({ isCollapsed }) {
                     <div className="pt-4">
                         {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Financial Operations</p>}
                         <button
-                            onClick={() => setIsReceiptsOpen(!isReceiptsOpen)}
+                            onClick={() => handleManualToggle('receipts', isReceiptsOpen, setIsReceiptsOpen)}
                             className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isReceiptsOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
                         >
                             <div className="flex items-center gap-3">
@@ -174,7 +230,7 @@ export default function Sidebar({ isCollapsed }) {
                     <div className="pt-4">
                         {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Revenue Management</p>}
                         <button
-                            onClick={() => setIsSalesOpen(!isSalesOpen)}
+                            onClick={() => handleManualToggle('sales', isSalesOpen, setIsSalesOpen)}
                             className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isSalesOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
                         >
                             <div className="flex items-center gap-3">
@@ -213,7 +269,7 @@ export default function Sidebar({ isCollapsed }) {
                     <div className="pt-4">
                         {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Procurement & Treasury</p>}
                         <button
-                            onClick={() => setIsPurchaseOpen(!isPurchaseOpen)}
+                            onClick={() => handleManualToggle('purchase', isPurchaseOpen, setIsPurchaseOpen)}
                             className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isPurchaseOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
                         >
                             <div className="flex items-center gap-3">
@@ -251,7 +307,7 @@ export default function Sidebar({ isCollapsed }) {
                     <div className="pt-4">
                         {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Adjustments</p>}
                         <button
-                            onClick={() => setIsAdjustmentsOpen(!isAdjustmentsOpen)}
+                            onClick={() => handleManualToggle('adjustments', isAdjustmentsOpen, setIsAdjustmentsOpen)}
                             className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isAdjustmentsOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
                         >
                             <div className="flex items-center gap-3">
@@ -289,7 +345,7 @@ export default function Sidebar({ isCollapsed }) {
                     <div className="pt-4">
                         {!isCollapsed && <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">Reports</p>}
                         <button
-                            onClick={() => setIsReportsOpen(!isReportsOpen)}
+                            onClick={() => handleManualToggle('reports', isReportsOpen, setIsReportsOpen)}
                             className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isReportsOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
                         >
                             <div className="flex items-center gap-3">

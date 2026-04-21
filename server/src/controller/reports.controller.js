@@ -187,8 +187,6 @@ const getGeneralLedger = async (req, res, next) => {
       dateFilter = ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    // Group by db_name + db_id (one row per transaction document),
-    // summing debit and credit across all line items of that document
     const general_ledger_query = `
       SELECT
         ${Accounting.journal_entries.selectOptionColumns.db_name}            AS db_name,
@@ -214,7 +212,6 @@ const getGeneralLedger = async (req, res, next) => {
 
     const rows = await Query(general_ledger_query);
 
-    // Group rows by db_name for the frontend section display
     const grouped = {};
     for (const row of rows) {
       const section = row.db_name;
@@ -222,7 +219,6 @@ const getGeneralLedger = async (req, res, next) => {
       grouped[section].push(row);
     }
 
-    // Build section array in a logical ledger order
     const SECTION_ORDER = [
       'adjustments',
       'sales',
@@ -233,7 +229,6 @@ const getGeneralLedger = async (req, res, next) => {
       'cash_disbursements',
     ];
 
-    // Label map for display
     const SECTION_LABELS = {
       adjustments: 'JOURNAL VOUCHER / ADJUSTMENTS',
       sales: 'SALES',
@@ -244,11 +239,10 @@ const getGeneralLedger = async (req, res, next) => {
       cash_disbursements: 'CASH DISBURSEMENTS',
     };
 
-    // Any db_name not in the order list gets appended at the end
     const allSections = [
       ...SECTION_ORDER,
       ...Object.keys(grouped).filter(k => !SECTION_ORDER.includes(k))
-    ].filter(k => grouped[k]); // only sections that have data
+    ].filter(k => grouped[k]);
 
     const sections = allSections.map(key => ({
       section_key: key,
@@ -307,14 +301,68 @@ const getBalanceSheet = async (req, res, next) => {
 
     const balanceSheet = await Query(balance_sheet_query);
 
+    // Get income statement data to calculate net income for reference
+    const income_statement_query = `
+      SELECT 
+        ${Master.charts_of_accounts.selectOptionColumns.type}   AS 'Account Type',
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' 
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalCredit,
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'  
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalDebit,
+        CASE
+          WHEN ${Master.charts_of_accounts.selectOptionColumns.type} = 'REVENUE'
+            THEN SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+               - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+          WHEN ${Master.charts_of_accounts.selectOptionColumns.type} = 'EXPENSES'
+            THEN SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+               - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+        END AS Current
+      FROM ${Master.charts_of_accounts.tablename}
+      LEFT JOIN ${Accounting.journal_entries.tablename}
+        ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+           ${dateFilter}
+      WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
+        AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
+      GROUP BY
+        ${Master.charts_of_accounts.selectOptionColumns.id},
+        ${Master.charts_of_accounts.selectOptionColumns.type}
+    `;
+
+    const incomeStatement = await Query(income_statement_query);
+
+    // Calculate net income for reference only
+    const revenues = incomeStatement.filter(item => item['Account Type'] === 'REVENUE');
+    const expenses = incomeStatement.filter(item => item['Account Type'] === 'EXPENSES');
+    
+    const totalRevenues = revenues.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0);
+    const totalExpenses = expenses.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0);
+    const netIncome = totalRevenues - totalExpenses;
+
     // Separate by type
     const assets = balanceSheet.filter(item => item['Account Code'].startsWith('100'))
     const liabilities = balanceSheet.filter(item => item['Account Code'].startsWith('200'))
     const equity = balanceSheet.filter(item => item['Account Code'].startsWith('300'))
 
+    // Add net income as separate line item in equity for display purposes
+    const updatedEquity = [...equity];
+    if (netIncome !== 0) {
+      // Add net income as a separate line item in equity
+      // NOTE: Since equity accounts are credit-normal, they show as negative values
+      // Net income increases equity (credit), so it should be negative to match the convention
+      updatedEquity.push({
+        'Account Code': '300999',
+        'Account Name': 'Current Period Net Income',
+        'Current': -netIncome // Negative to match credit-normal convention
+      });
+    }
+
     const totalAssets = assets.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
     const totalLiabilities = liabilities.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
-    const totalEquity = equity.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
+    const totalEquity = updatedEquity.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
 
     res.status(200).json({
       success: true,
@@ -322,11 +370,12 @@ const getBalanceSheet = async (req, res, next) => {
       data: {
         assets: assets,
         liabilities: liabilities,
-        equity: equity,
+        equity: updatedEquity, // Return equity with net income line item included
         totalAssets: totalAssets,
         totalLiabilities: totalLiabilities,
         totalEquity: totalEquity,
-        totalLiabilitiesAndEquity: totalLiabilities + totalEquity
+        totalLiabilitiesAndEquity: totalLiabilities + totalEquity,
+        netIncome: netIncome // Include net income for reference display
       },
       timestamp: new Date().toISOString()
     })

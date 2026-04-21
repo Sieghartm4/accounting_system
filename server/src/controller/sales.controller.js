@@ -96,8 +96,8 @@ const getAllSales = async (req, res, next) => {
       { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
     ])
       .from(Accounting.sales_items.tablename)
-      .innerJoin(Master.withholding_tax.tablename, Accounting.sales_items.selectOptionColumns.witholding_tax, Master.withholding_tax.selectOptionColumns.id)
-      .innerJoin(Master.vat.tablename, Accounting.sales_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
+      .leftJoin(Master.withholding_tax.tablename, Accounting.sales_items.selectOptionColumns.witholding_tax, Master.withholding_tax.selectOptionColumns.id)
+      .leftJoin(Master.vat.tablename, Accounting.sales_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
       .leftJoin(Master.products_service.tablename, Accounting.sales_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
       .innerJoin(Master.charts_of_accounts.tablename, Accounting.sales_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
       .where(Accounting.sales_items.selectOptionColumns.sales_id)
