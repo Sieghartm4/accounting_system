@@ -209,6 +209,47 @@ function PaymentsContent() {
                   });
                 }
               }
+            },
+            {
+              label: 'Edit',
+              onClick: async (row) => {
+                try {
+                  console.log('Editing payment:', row);
+                  
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/payments/${row.id}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      }
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to fetch payment details');
+                  }
+
+                  console.log('Payment details fetched for editing:', result);
+                  setViewingPayment(result);
+                  setIsAdding(true);
+
+                } catch (error) {
+                  console.error('Error fetching payment details for editing:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch payment details'
+                  });
+                }
+              }
             }
           ]}
           badgeColumns={[

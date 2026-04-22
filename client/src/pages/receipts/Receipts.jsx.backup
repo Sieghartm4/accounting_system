@@ -1,36 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Layers, CheckCircle, ShieldCheck, Wallet, ArrowRight, Download, Plus } from 'lucide-react';
+import { Receipt, FilePlus, ShieldCheck, CreditCard, ArrowRight, Download } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import DynamicToast from '../../components/DynamicToast';
 import RouteProtection from '../../components/RouteProtection';
 import ProtectedAction from '../../components/ProtectedAction';
-import useCollections from './useCollections';
-import CollectionsForm from './CollectionsForm';
-import { getAccessLevel } from '../../utils/routeProtection';
+import useReceipts from './useReceipts';
+import ReceiptsForm from './ReceiptsForm';
+import { hasRouteAccess, getAccessLevel } from '../../utils/routeProtection';
 
-export default function Collections() {
+export default function Receipts() {
   return (
-    <RouteProtection routeName="collections">
-      <CollectionsContent />
+    <RouteProtection routeName="receipts">
+      <ReceiptsContent />
     </RouteProtection>
   );
 }
 
-function CollectionsContent() {
-  const { collections, loading, error, refetchCollections } = useCollections();
+function ReceiptsContent() {
+  const { receipts, loading, error, refetchReceipts } = useReceipts();
   const [isAdding, setIsAdding] = useState(false);
-  const [isViewing, setIsViewing] = useState(false);
-  const [viewingCollection, setViewingCollection] = useState(null);
+  const [viewingReceipt, setViewingReceipt] = useState(null);
   const [toast, setToast] = useState(null);
 
   // Check if user has access to enable checkboxes
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const accessLevel = getAccessLevel('collections', user);
+  const accessLevel = getAccessLevel('receipts', user);
   const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Full Access';
 
   // Determine checkbox condition based on access level
-  const checkboxCondition = enableCheckboxes
+  const checkboxCondition = enableCheckboxes 
     ? accessLevel === 'Full Access' 
       ? { column: 'state', value: 'APPROVED', exclude: true } // Exclude APPROVED state for Full Access
       : { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
@@ -42,26 +41,23 @@ function CollectionsContent() {
   };
 
   if (isAdding) return (
-    <RouteProtection routeName="collections">
-      <CollectionsForm
+    <RouteProtection routeName="receipts">
+      <ReceiptsForm
         onBack={() => setIsAdding(false)}
         onSuccess={async (nextToast) => {
           if (nextToast) setToast(nextToast);
-          await refetchCollections();
+          await refetchReceipts();
         }}
       />
     </RouteProtection>
   );
 
-  if (isViewing) return (
-    <RouteProtection routeName="collections">
-      <CollectionsForm
+  if (viewingReceipt) return (
+    <RouteProtection routeName="receipts">
+      <ReceiptsForm
         isViewMode={true}
-        collectionData={viewingCollection}
-        onBack={() => {
-          setIsViewing(false);
-          setViewingCollection(null);
-        }}
+        receiptData={viewingReceipt}
+        onBack={() => setViewingReceipt(null)}
       />
     </RouteProtection>
   );
@@ -70,7 +66,7 @@ function CollectionsContent() {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Retrieving Collections...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Syncing Receipt Ledger...</p>
       </div>
     );
   }
@@ -96,16 +92,16 @@ function CollectionsContent() {
           onClose={() => setToast(null)}
         />
       )}
-
+      
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
         {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          <span>Treasury</span>
+          <span>Billing & Invoicing</span>
           <ArrowRight size={10} />
-          <span className="text-black">Account Collections</span>
+          <span className="text-black">Acknowledgement Receipts</span>
         </nav> */}
 
-        <motion.div
+        <motion.div 
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -114,26 +110,26 @@ function CollectionsContent() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
-                <Layers size={24} />
+                <Receipt size={24} />
               </div>
               <h1 className="text-4xl font-black text-black tracking-tighter">
-                <span className="text-red-600 italic">Collections</span>
+               Cash <span className="text-red-600 italic">Receipts</span>
               </h1>
             </div>
             {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
-              Manage incoming receivables and verify payment settlement cycles.
+              Track payment acknowledgements and transaction history for all entities.
             </p> */}
           </div>
 
           <div className="flex gap-3">
             <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
               <Download size={14} />
-              EXPORT LEDGER
+              EXPORT DATA
             </button>
-            <ProtectedAction routeName="collections">
+            <ProtectedAction routeName="receipts">
               <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
-                <CheckCircle size={14} />
-                Settle Account
+                <FilePlus size={14} />
+                New Receipt
               </button>
             </ProtectedAction>
           </div>
@@ -141,48 +137,60 @@ function CollectionsContent() {
 
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard
-            icon={<Wallet className="text-red-600" size={20} />}
-            label="Total Collected"
-            value={collections?.length || 0}
-            subText="Entries"
+          <SummaryCard 
+            icon={<Receipt className="text-red-600" size={20} />} 
+            label="Total Receipts" 
+            value={receipts?.length || 0} 
+            subText="Processed"
           />
-          <SummaryCard
-            icon={<CheckCircle className="text-black" size={20} />}
-            label="Verified"
-            value="Active"
-            subText="Compliance"
+          <SummaryCard 
+            icon={<CreditCard className="text-black" size={20} />} 
+            label="Transactions" 
+            value="Today" 
+            subText="Live Feed"
           />
-          <SummaryCard
-            icon={<ShieldCheck className="text-gray-400" size={20} />}
-            label="Integrity"
-            value="Valid"
-            subText="Audit Status"
+          <SummaryCard 
+            icon={<ShieldCheck className="text-gray-400" size={20} />} 
+            label="Status" 
+            value="Verified" 
+            subText="Audit Compliant"
           />
         </div>
       </div>
 
       {/* --- TABLE SECTION --- */}
-      <motion.div
+      <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
         className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
       >
         <DynamicTable
-          data={collections}
-          title="Collections Ledger"
+          data={receipts}
+          title="Receipt Ledger"
           enableAddButton={false}
           enableCheckbox={enableCheckboxes}
-          enableActionColumn={true}
           checkboxColumn="id"
           checkboxCondition={checkboxCondition}
+          enableActionColumn={true}
+          badgeColumns={[
+            {
+              column: 'state',
+              values: {
+                'PREPARED': 'yellow',
+                'CHECKED': 'blue',
+                'APPROVED': 'green',
+                'REJECTED': 'red',
+                'CANCELLED': 'orange'
+              }
+            }
+          ]}
           actionButtons={[
             {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  console.log('Viewing collection:', row);
+                  console.log('View receipt:', row);
                   
                   const token = localStorage.getItem('token');
                   if (!token) {
@@ -190,94 +198,34 @@ function CollectionsContent() {
                   }
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/collections/${row.id}`,
+                    `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(row.id)}`,
                     {
                       method: "GET",
                       headers: {
                         "Content-Type": "application/json",
                         Authorization: `Bearer ${token}`,
-                      }
+                      },
                     }
                   );
 
                   const result = await response.json();
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch collection details');
+                    throw new Error(result.message || 'Failed to fetch receipt details');
                   }
 
-                  console.log('Collection details fetched:', result);
-                  setViewingCollection(result);
-                  setIsViewing(true);
-
-                } catch (error) {
-                  console.error('Error fetching collection details:', error);
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch collection details'
-                  });
-                }
-              }
-            },
-            {
-              label: 'Edit',
-              onClick: async (row) => {
-                try {
-                  console.log('Editing collection:', row);
+                  console.log('Receipt details:', result);
                   
-                  const token = localStorage.getItem('token');
-                  if (!token) {
-                    throw new Error('No authentication token found');
-                  }
-
-                  const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/collections/${row.id}`,
-                    {
-                      method: "GET",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                      }
-                    }
-                  );
-
-                  const result = await response.json();
-
-                  if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch collection details');
-                  }
-
-                  console.log('Collection details fetched for editing:', result);
-                  setViewingCollection(result);
-                  setIsAdding(true);
+                  // Set receipt data for viewing
+                  setViewingReceipt(result);
 
                 } catch (error) {
-                  console.error('Error fetching collection details for editing:', error);
+                  console.error('Error fetching receipt details:', error);
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch collection details'
+                    message: error.message || 'Failed to fetch receipt details'
                   });
                 }
-              }
-            }
-          ]}
-          badgeColumns={[
-            {
-              column: 'status',
-              values: {
-                'COLLECTED': 'green',
-                'NOT COLLECTED': 'red',
-                'PARTIALLY COLLECTED': 'yellow'
-              }
-            },
-            {
-              column: 'state',
-              values: {
-                'PREPARED': 'orange',
-                'CHECKED': 'blue',
-                'APPROVED': 'green',
-                'REJECTED': 'red',
-                'CANCELLED': 'orange'
               }
             }
           ]}
@@ -286,8 +234,6 @@ function CollectionsContent() {
               label: 'Approve Selected',
               onClick: async (selectedRows) => {
                 try {
-                  console.log('Approving collections:', selectedRows);
-
                   const token = localStorage.getItem('token');
                   if (!token) {
                     throw new Error('No authentication token found');
@@ -299,7 +245,7 @@ function CollectionsContent() {
                   }));
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/collections/collection-state`,
+                    `${import.meta.env.VITE_SERVER_LINK}/receipt/receipt-state`,
                     {
                       method: "PUT",
                       headers: {
@@ -313,22 +259,22 @@ function CollectionsContent() {
                   const result = await response.json();
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to approve collections');
+                    throw new Error(result.message || 'Failed to approve receipts');
                   }
 
-                  // Refresh collections data
-                  await refetchCollections();
+                  // Refresh receipts data
+                  await refetchReceipts();
 
                   setToast({
                     type: 'success',
-                    message: result.message || `${selectedRows.length} collection(s) approved successfully`
+                    message: result.message || `${selectedRows.length} receipt(s) approved successfully`
                   });
 
                 } catch (error) {
-                  console.error('Error approving collections:', error);
+                  console.error('Error approving receipts:', error);
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to approve collections'
+                    message: error.message || 'Failed to approve receipts'
                   });
                 }
               }
@@ -340,7 +286,6 @@ function CollectionsContent() {
   );
 }
 
-// Reusable SummaryCard (Same as used in other pages)
 function SummaryCard({ icon, label, value, subText }) {
   return (
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">

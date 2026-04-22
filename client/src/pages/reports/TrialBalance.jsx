@@ -67,7 +67,7 @@ export default function TrialBalance() {
   );
 
   return (
-    <div className="flex flex-col gap-5 bg-[#F3F4F6] min-h-full custom-scrollbar">
+    <div className="flex flex-col gap-2 bg-[#F3F4F6] min-h-full custom-scrollbar">
 
       {/* HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-3">

@@ -240,6 +240,49 @@ function SalesContent() {
                 }
               }
             },
+            {
+              label: 'Edit',
+              onClick: async (row) => {
+                try {
+                  console.log('Editing sales:', row);
+
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/sales/${Number(row.id)}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to fetch sales details');
+                  }
+
+                  console.log('Sales details for editing:', result);
+
+                  // Set sales data for editing
+                  setEditingSales(result);
+                  setIsEditing(true);
+
+                } catch (error) {
+                  console.error('Error fetching sales details for editing:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch sales details'
+                  });
+                }
+              }
+            },
           ]}
           badgeColumns={[
             {

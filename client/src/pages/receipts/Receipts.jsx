@@ -21,6 +21,7 @@ function ReceiptsContent() {
   const { receipts, loading, error, refetchReceipts } = useReceipts();
   const [isAdding, setIsAdding] = useState(false);
   const [viewingReceipt, setViewingReceipt] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [toast, setToast] = useState(null);
 
   // Check if user has access to enable checkboxes
@@ -55,9 +56,17 @@ function ReceiptsContent() {
   if (viewingReceipt) return (
     <RouteProtection routeName="receipts">
       <ReceiptsForm
-        isViewMode={true}
+        isViewMode={!isEditMode}
+        isEditMode={isEditMode}
         receiptData={viewingReceipt}
-        onBack={() => setViewingReceipt(null)}
+        onBack={() => {
+          setViewingReceipt(null);
+          setIsEditMode(false);
+        }}
+        onSuccess={async (nextToast) => {
+          if (nextToast) setToast(nextToast);
+          await refetchReceipts();
+        }}
       />
     </RouteProtection>
   );
@@ -218,6 +227,50 @@ function ReceiptsContent() {
                   
                   // Set receipt data for viewing
                   setViewingReceipt(result);
+                  setIsEditMode(false);
+
+                } catch (error) {
+                  console.error('Error fetching receipt details:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch receipt details'
+                  });
+                }
+              }
+            },
+            {
+              label: 'Edit',
+              onClick: async (row) => {
+                try {
+                  console.log('Edit receipt:', row);
+                  
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(row.id)}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to fetch receipt details');
+                  }
+
+                  console.log('Receipt details for editing:', result);
+                  
+                  // Set receipt data for editing (edit mode)
+                  setViewingReceipt(result);
+                  setIsEditMode(true);
 
                 } catch (error) {
                   console.error('Error fetching receipt details:', error);

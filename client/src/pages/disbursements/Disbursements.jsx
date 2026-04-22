@@ -21,6 +21,7 @@ function DisbursementsContent() {
   const { disbursements, loading, error, refetchDisbursements } = useDisbursements();
   const [isAdding, setIsAdding] = useState(false);
   const [viewingDisbursement, setViewingDisbursement] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [toast, setToast] = useState(null);
 
   // Check if user has access to enable checkboxes
@@ -55,9 +56,17 @@ function DisbursementsContent() {
   if (viewingDisbursement) return (
     <RouteProtection routeName="disbursement">
       <CashDisbursementForm
-        isViewMode={true}
+        isViewMode={!isEditMode}
+        isEditMode={isEditMode}
         disbursementData={viewingDisbursement}
-        onBack={() => setViewingDisbursement(null)}
+        onBack={() => {
+          setViewingDisbursement(null);
+          setIsEditMode(false);
+        }}
+        onSuccess={async (nextToast) => {
+          if (nextToast) setToast(nextToast);
+          await refetchDisbursements();
+        }}
       />
     </RouteProtection>
   );
@@ -226,9 +235,53 @@ function DisbursementsContent() {
 
                   // Set disbursement data for viewing
                   setViewingDisbursement(result);
+                  setIsEditMode(false);
 
                 } catch (error) {
                   console.error('Error fetching disbursement details:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch disbursement details'
+                  });
+                }
+              }
+            },
+            {
+              label: 'Edit',
+              onClick: async (row) => {
+                try {
+                  console.log('Editing disbursement:', row);
+
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${Number(row.id)}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to fetch disbursement details');
+                  }
+
+                  console.log('Disbursement details for editing:', result);
+
+                  // Set disbursement data for editing (edit mode)
+                  setViewingDisbursement(result);
+                  setIsEditMode(true);
+
+                } catch (error) {
+                  console.error('Error fetching disbursement details for editing:', error);
                   setToast({
                     type: 'error',
                     message: error.message || 'Failed to fetch disbursement details'

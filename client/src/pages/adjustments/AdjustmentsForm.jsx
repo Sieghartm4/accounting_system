@@ -232,7 +232,7 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
   }, [isViewMode, adjustmentData]);
 
   // ── Journal entry helpers ─────────────────────────────────────────────────
-  const addJournalEntry    = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
+  const addJournalEntry    = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: '', credit: '', isManual: true }]);
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
   const updateJournalEntry = (id, field, value) => setJournalEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
 
@@ -346,8 +346,8 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
     (isViewMode ? "bg-gray-100 border border-gray-300 text-black cursor-not-allowed" : "bg-gray-50/50 focus:ring-1 focus:ring-red-400");
   const fadeInUp   = { hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
-  const totalDebit  = journalEntries.reduce((s, e) => s + (parseFloat(e.debit)  || 0), 0);
-  const totalCredit = journalEntries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0);
+  const totalDebit  = journalEntries.reduce((s, e) => s + (isNaN(parseFloat(e.debit)) ? 0 : parseFloat(e.debit)), 0);
+  const totalCredit = journalEntries.reduce((s, e) => s + (isNaN(parseFloat(e.credit)) ? 0 : parseFloat(e.credit)), 0);
   const isBalanced  = Math.abs(totalDebit - totalCredit) < 0.01;
   const totalEntries = journalEntries.length;
   const manualEntries = journalEntries.filter(e => e.isManual).length;
@@ -524,9 +524,6 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
                   <tbody className="divide-y divide-gray-50">
                     {journalEntries.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-6 text-[12px] text-gray-400 text-center">
-                          Journal entries auto-generate once items are added and mode of payment is selected.
-                        </td>
                       </tr>
                     ) : journalEntries.map(entry => (
                       <tr key={entry.id}>
@@ -558,7 +555,7 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
                             placeholder="0.00" 
                             type="number"
                             value={entry.debit} 
-                            onChange={e => updateJournalEntry(entry.id, 'debit', parseFloat(e.target.value) || 0)} 
+                            onChange={e => updateJournalEntry(entry.id, 'debit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} 
                             readOnly={!entry.isManual} 
                           />
                         </td>
@@ -569,7 +566,7 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
                             placeholder="0.00" 
                             type="number"
                             value={entry.credit} 
-                            onChange={e => updateJournalEntry(entry.id, 'credit', parseFloat(e.target.value) || 0)} 
+                            onChange={e => updateJournalEntry(entry.id, 'credit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} 
                             readOnly={!entry.isManual} 
                           />
                         </td>

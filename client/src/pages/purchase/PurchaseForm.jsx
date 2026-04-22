@@ -360,9 +360,7 @@ function SidebarInput({ label, placeholder, type = 'text', required, dark, value
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, purchaseData = null }) {
-  const [purchaseItems, setPurchaseItems] = useState([
-    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther: false }
-  ]);
+  const [purchaseItems, setPurchaseItems] = useState([]);
 
   const [journalEntries, setJournalEntries] = useState([
     { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 }
@@ -1411,13 +1409,7 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
                     <Plus size={14} /> ADD Product/Service
                   </button>
 
-                  <button
-                    onClick={() => addPurchaseItem(true)}
-                    className="flex-1 py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-black text-black transition-all duration-300 hover:bg-gray-100 hover:border-gray-600 border-gray-400 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/5 flex items-center justify-center gap-2"
-                  >
-                    <Plus size={14} /> ADD Others
-                  </button>
-                </div>
+                                  </div>
             )}
             </TableSection>
 

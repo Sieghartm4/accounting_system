@@ -289,6 +289,47 @@ function AdjustmentsContent() {
                   });
                 }
               }
+            },
+            {
+              label: 'Edit',
+              onClick: async (row) => {
+                try {
+                  console.log('Editing adjustment:', row);
+                  
+                  const token = localStorage.getItem('token');
+                  if (!token) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/adjustments/${row.id}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      }
+                    }
+                  );
+
+                  const result = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(result.message || 'Failed to fetch adjustment details');
+                  }
+
+                  console.log('Adjustment details fetched for editing:', result);
+                  setViewingAdjustment(result);
+                  setIsAdding(true);
+
+                } catch (error) {
+                  console.error('Error fetching adjustment details for editing:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch adjustment details'
+                  });
+                }
+              }
             }
           ]}
           badgeColumns={[

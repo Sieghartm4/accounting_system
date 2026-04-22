@@ -262,9 +262,7 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function SalesForm({ onBack, onSuccess, isViewMode = false, salesData = null }) {
-  const [salesItems, setSalesItems] = useState([
-    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther: false }
-  ]);
+  const [salesItems, setSalesItems] = useState([]);
 
   const [journalEntries, setJournalEntries] = useState([
     { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 }
@@ -1359,10 +1357,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                 <button onClick={() => addSalesItem(false)} className="flex-1 py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-2">
                   <Plus size={14} /> ADD Product/Service
                 </button>
-                <button onClick={() => addSalesItem(true)} className="flex-1 py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-black text-black transition-all duration-300 hover:bg-gray-100 hover:border-gray-600 border-gray-400 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/5 flex items-center justify-center gap-2">
-                  <Plus size={14} /> ADD Others
-                </button>
-              </div>
+                              </div>
             )}
             </TableSection>
 

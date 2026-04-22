@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, Filter, Columns, Plus, X, Maximize2 } from 'lucide-react';
+import { Search, Filter, Columns, Plus, X, Maximize2, Eye, Edit } from 'lucide-react';
 
 const DynamicTable = ({
   data,
@@ -512,11 +512,12 @@ const DynamicTable = ({
                               e.stopPropagation();
                               button.onClick(row);
                             }}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black rounded-lg transition-all uppercase tracking-widest border border-blue-500/50 cursor-pointer"
+                            className="flex items-center justify-center w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all border border-blue-500/50 cursor-pointer"
                             title={button.label}
                           >
-                            {button.icon && <span className="w-3 h-3">{button.icon}</span>}
-                            {button.label}
+                            {button.label.toLowerCase() === 'view' && <Eye size={16} />}
+                            {button.label.toLowerCase() === 'edit' && <Edit size={16} />}
+                            {button.label.toLowerCase() !== 'view' && button.label.toLowerCase() !== 'edit' && button.icon && <span className="w-3 h-3">{button.icon}</span>}
                           </button>
                         ))}
                       </div>

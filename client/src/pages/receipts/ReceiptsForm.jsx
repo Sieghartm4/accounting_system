@@ -262,20 +262,17 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, receiptData = null }) {
-  const [receiptItems, setReceiptItems] = useState([
-    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther: false }
-  ]);
+export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, isEditMode = false, receiptData = null }) {
+  const [receiptItems, setReceiptItems] = useState([]);
 
-  const [journalEntries, setJournalEntries] = useState([
-    { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: false }
-  ]);
+  const [journalEntries, setJournalEntries] = useState([]);
 
   const [customers, setCustomers] = useState([]);
   const [customerLoading, setCustomerLoading] = useState(false);
   const [customerError, setCustomerError] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
 
   const [vendors, setVendors] = useState([]);
   const [vendorLoading, setVendorLoading] = useState(false);
@@ -455,9 +452,9 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
 
   useEffect(() => { fetchCustomers(); fetchChartsOfAccounts(); fetchProducts(); }, []);
 
-  // Populate form with receipt data when in view mode
+  // Populate form with receipt data when in view or edit mode
   useEffect(() => {
-    if (isViewMode && receiptData) {
+    if ((isViewMode || isEditMode) && receiptData) {
       console.log('Populating form with receipt data:', receiptData);
 
       // Populate basic receipt info
@@ -465,6 +462,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
         const receipt = receiptData.data[0];
         setSelectedCustomer(receipt.customer);
         setCustomerSearch(receipt.customer);
+        setSelectedCustomerId(receipt.customer_id); // Store the actual customer ID
         setDocumentReference(receipt.doc_ref || '');
         setModeOfPayment(receipt.mode || '');
         setModeSearch(receipt.mode || '');
@@ -478,19 +476,19 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
       if (receiptData.items && receiptData.items.length > 0) {
         const items = receiptData.items.map(item => ({
           id: item.id,
-          productId: item.product_service_name,
+          productId: item.product_service_id, // Use actual ID
           productSearch: item.product_service_name,
-          coa: item.charts_of_accounts_name,
+          coa: item.charts_of_accounts_id, // Use actual ID
           coaSearch: item.charts_of_accounts_name,
           description: item.description || '',
           qty: item.quantity || 1,
           price: parseFloat(item.sales_price) || 0,
           discount: parseFloat(item.discount) || 0,
           discountType: item.discount_type || 'PERCENT',
-          vat: parseFloat(item.vat_code) || 0,
+          vat: parseFloat(item.vat_id) || 0, // Use actual ID
           vatSearch: `${item.vat_code || ''} - ${item.vat_name || ''}`,
           vatRate: parseFloat(item.vat_rate) || 0,
-          wht: parseFloat(item.withholding_tax_code) || 0,
+          wht: parseFloat(item.withholding_tax_id) || 0, // Use actual ID
           whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
           whtRate: parseFloat(item.withholding_tax_rate) || 0,
           responsibilityCenter: item.responsibility_center || '',
@@ -501,16 +499,22 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
 
       // Populate journal entries
       if (receiptData.journal && receiptData.journal.length > 0) {
+        console.log('Journal entries from API:', receiptData.journal);
         const journal = receiptData.journal.map(entry => ({
           id: entry.id,
-          account: entry.charts_of_accounts_name,
+          account: entry.coa_id, // Use actual ID
           accountSearch: entry.charts_of_accounts_name,
           center: entry.responsibility_center || '',
           debit: entry.type === 'DEBIT' ? parseFloat(entry.amount) || 0 : 0,
           credit: entry.type === 'CREDIT' ? parseFloat(entry.amount) || 0 : 0,
           isManual: false
         }));
+        console.log('Processed journal entries:', journal);
         setJournalEntries(journal);
+      } else {
+        console.log('No journal entries found or empty array');
+        // Set empty array if no journal entries from API
+        setJournalEntries([]);
       }
 
       // Populate attachments
@@ -518,10 +522,47 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
         console.log('Processing attachments:', receiptData.attachments);
         const attachments = receiptData.attachments.map(att => {
           console.log('Processing attachment:', att.id, att.name, 'File data type:', typeof att.file, 'File data length:', att.file ? att.file.length : 'null');
+          
+          // Check if base64 data is properly formatted
+          let fileData = att.file || null;
+          if (fileData && typeof fileData === 'string') {
+            console.log('Base64 data starts with:', fileData.substring(0, 50));
+            console.log('Base64 data ends with:', fileData.substring(fileData.length - 50));
+            
+            // Check if base64 data is complete
+            if (fileData.includes('...')) {
+              console.warn('Base64 data appears to be truncated:', att.name);
+            }
+            
+            // Test if the base64 data is valid by checking if it can be properly decoded
+            try {
+              const base64Content = fileData.split(',')[1]; // Remove the data:image/jpeg;base64, part
+              if (base64Content) {
+                // Check if the base64 content length is reasonable (should be divisible by 4)
+                if (base64Content.length % 4 !== 0) {
+                  console.warn('Base64 content length is not divisible by 4, may be truncated:', att.name);
+                }
+                console.log('Base64 content length:', base64Content.length, 'chars');
+                
+                // Test if the image can be loaded by creating a test image element
+                const testImg = new Image();
+                testImg.onload = () => {
+                  console.log('Test image loaded successfully:', att.name, 'Dimensions:', testImg.width + 'x' + testImg.height);
+                };
+                testImg.onerror = (e) => {
+                  console.error('Test image failed to load:', att.name, e);
+                };
+                testImg.src = fileData;
+              }
+            } catch (error) {
+              console.error('Error checking base64 data:', error);
+            }
+          }
+          
           return {
             id: att.id,
             fileName: att.name || '',
-            file: att.file || null, // Preserve base64 data from server for view mode
+            file: fileData, // Preserve base64 data from server for view mode
             remarks: att.remarks || '',
             uploadedBy: att.uploaded_by || 'Current User',
             date: att.uploaded_date || new Date().toLocaleDateString()
@@ -533,13 +574,13 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
     }
   }, [isViewMode, receiptData]);
 
-  const addReceiptItem = (isOther = false) => setReceiptItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther }]);
-  const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
+  const addReceiptItem = (isOther = false) => setReceiptItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther, isNew: true }]);
+  const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true, isNew: true }]);
   const removeReceiptItem = (id) => setReceiptItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
   const updateReceiptItem = (id, field, value) => setReceiptItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   const updateJournalEntry = (id, field, value) => setJournalEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
-  const addAttachment = () => setAttachments(prev => [...prev, { id: Date.now(), fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }]);
+  const addAttachment = () => setAttachments(prev => [...prev, { id: Date.now(), fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString(), isNew: true }]);
   const removeAttachment = (id) => setAttachments(prev => prev.filter(a => a.id !== id));
   const updateAttachment = (id, field, value) => setAttachments(prev => prev.map(att => att.id === id ? { ...att, [field]: value } : att));
   const handleFileChange = (id, file) => {
@@ -551,8 +592,82 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
 
   const summary = computeSummary(receiptItems);
 
+  // Helper function to check if there are new receipt items (for auto-generation in edit mode)
+  const hasNewReceiptItems = () => {
+    return receiptItems.some(item => item.isNew);
+  };
+
+  // Helper function to calculate journal entries balance
+  const calculateJournalBalance = () => {
+    const totalDebit = journalEntries.reduce((sum, entry) => sum + (parseFloat(entry.debit) || 0), 0);
+    const totalCredit = journalEntries.reduce((sum, entry) => sum + (parseFloat(entry.credit) || 0), 0);
+    return { totalDebit, totalCredit, isBalanced: Math.abs(totalDebit - totalCredit) < 0.01 };
+  };
+
+  // Helper function to check if a journal entry is auto-generated
+  const isAutoGeneratedEntry = (entry) => {
+    // Check if entry has isManual flag (false means auto-generated)
+    if (entry.isManual === false) return true;
+    
+    // Check if entry doesn't have isManual flag (existing entries from API)
+    if (entry.isManual === undefined) {
+      const entryAmount = parseFloat(entry.debit) || parseFloat(entry.credit) || 0;
+      
+      // Check if entry matches any receipt item (income entries)
+      const matchesReceiptItem = receiptItems.some(item => {
+        const itemAmount = parseFloat(item.price) || 0;
+        const itemCoaId = item.coa || item.account || item.charts_of_accounts_id;
+        return itemCoaId === entry.account && Math.abs(itemAmount - entryAmount) < 0.01;
+      });
+      
+      // Check if entry matches VAT from any receipt item
+      const matchesVat = receiptItems.some(item => {
+        const vatAmount = parseFloat(item.vat) || 0;
+        return vatAmount > 0 && Math.abs(vatAmount - entryAmount) < 0.01 && 
+               entry.account && entry.account.toString().toLowerCase().includes('vat');
+      });
+      
+      // Check if entry matches WHT from any receipt item
+      const matchesWht = receiptItems.some(item => {
+        const whtAmount = parseFloat(item.wht) || 0;
+        return whtAmount > 0 && Math.abs(whtAmount - entryAmount) < 0.01 && 
+               entry.account && entry.account.toString().toLowerCase().includes('wht');
+      });
+      
+      // Check if entry matches bank/cash total (payment entries)
+      const totalReceiptAmount = receiptItems.reduce((sum, item) => {
+        const qty = parseFloat(item.qty) || 0;
+        const price = parseFloat(item.price) || 0;
+        const discountValue = parseFloat(item.discount) || 0;
+        const discountType = item.discountType || 'PERCENT';
+        
+        const gross = qty * price;
+        const discAmt = discountType === 'PERCENT' ? gross * (discountValue / 100) : discountValue * qty;
+        return sum + (gross - discAmt);
+      }, 0);
+      
+      const isBankEntry = entry.account && (
+        entry.account.toString().toLowerCase().includes('cash') || 
+        entry.account.toString().toLowerCase().includes('bank')
+      ) && Math.abs(totalReceiptAmount - entryAmount) < 0.01;
+      
+      return matchesReceiptItem || matchesVat || matchesWht || isBankEntry;
+    }
+    
+    return false;
+  };
+
+  // Determine if fields should be disabled
+  const isDisabled = isViewMode && !isEditMode;
+
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
+      // Check if file is a valid File/Blob object
+      if (!file || typeof file !== 'object' || !(file instanceof File || file instanceof Blob)) {
+        resolve(null);
+        return;
+      }
+      
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result);
@@ -561,9 +676,9 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
   };
 
   const inputBase = "w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all " +
-    (isViewMode ? "bg-gray-100 border border-gray-300 text-black cursor-not-allowed" : "bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500 text-center");
+    (isDisabled ? "bg-gray-100 border border-gray-300 text-black cursor-not-allowed" : "bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500 text-center");
   const tableInput = "w-full rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none " +
-    (isViewMode ? "bg-gray-100 border border-gray-300 text-black! cursor-not-allowed" : "bg-gray-50/50 focus:ring-1 focus:ring-red-400");
+    (isDisabled ? "bg-gray-100 border border-gray-300 text-black! cursor-not-allowed" : "bg-gray-50/50 focus:ring-1 focus:ring-red-400");
   const pctInput = tableInput + " pr-1";
 
   const fadeInUp = { hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
@@ -739,6 +854,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
   };
 
   const handlePostTransaction = async () => {
+    // Get the receipt ID from receiptData if in edit mode
+    const receiptId = isEditMode && receiptData?.data?.[0]?.id;
     try {
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       const createdBy = userData.mu_username || userData.username || 'Unknown User';
@@ -791,6 +908,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
 
       const preparedReceiptItems = receiptItems
         .map(item => ({
+          // Only include ID if it's an existing record (not a new row)
+          id: item.id && !item.isNew ? item.id : null,
           product_id: item.isOther ? null : (item.productId || null),
           account_id: item.coa || item.accountId,
           description: item.description,
@@ -806,6 +925,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
       const preparedJournalEntries = journalEntries
         .filter(entry => !entry.isOther)
         .map(entry => ({
+          // Only include ID if it's an existing record (not a new row)
+          id: entry.id && !entry.isNew ? entry.id : null,
           account_id: entry.account || entry.accountId,
           responsibility_center: entry.center || '',
           debit: parseFloat(entry.debit) || 0,
@@ -813,17 +934,34 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
         }));
 
       const preparedAttachments = await Promise.all(
-        attachments.map(async att => ({
-          fileName: att.fileName,
-          file: att.file ? await fileToBase64(att.file) : null,
-          remarks: att.remarks,
-          uploadedBy: att.uploadedBy,
-          date: att.date
-        }))
+        attachments.map(async att => {
+          // Only include ID if it's an existing record (not a new row)
+          let fileData = null;
+          
+          if (att.file) {
+            // If file is already a base64 string (from API), use it directly
+            if (typeof att.file === 'string' && att.file.startsWith('data:')) {
+              fileData = att.file;
+            } 
+            // If file is a File object (newly uploaded), convert to base64
+            else if (att.file instanceof File || att.file instanceof Blob) {
+              fileData = await fileToBase64(att.file);
+            }
+          }
+          
+          return {
+            id: att.id && !att.isNew ? att.id : null,
+            fileName: att.fileName,
+            file: fileData,
+            remarks: att.remarks,
+            uploadedBy: att.uploadedBy,
+            date: att.date
+          };
+        })
       );
 
       const receiptData = {
-        customer_id: selectedCustomer,
+        customer_id: selectedCustomerId, // Use actual customer ID
         document_reference: documentReference,
         payment_date: collectionDate || new Date().toISOString().split("T")[0],
         collection_date: collectionDate || new Date().toISOString().split("T")[0],
@@ -838,13 +976,17 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
         attachments: preparedAttachments
       };
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/receipt`, {
-        method: 'POST',
+      const apiUrl = isEditMode 
+        ? `${import.meta.env.VITE_SERVER_LINK}/receipt/${receiptId}`
+        : `${import.meta.env.VITE_SERVER_LINK}/receipt`;
+      
+      const response = await fetch(apiUrl, {
+        method: isEditMode ? "PUT" : "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(receiptData)
+        body: JSON.stringify(receiptData),
       });
 
       if (!response.ok) {
@@ -856,12 +998,18 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
       const result = await response.json();
 
       if (result.success) {
-        const nextToast = { type: 'success', message: 'Receipt created successfully!' };
+        const nextToast = { 
+          type: 'success', 
+          message: isEditMode ? 'Receipt updated successfully!' : 'Receipt created successfully!' 
+        };
         setToast(nextToast);
         if (onSuccess) await onSuccess(nextToast);
         onBack();
       } else {
-        setToast({ type: 'error', message: result.message || 'Failed to create receipt' });
+        setToast({ 
+          type: 'error', 
+          message: result.message || (isEditMode ? 'Failed to update receipt' : 'Failed to create receipt') 
+        });
       }
 
     } catch (error) {
@@ -871,11 +1019,14 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
   };
 
   useEffect(() => {
-    // Only auto-generate journal entries in add/edit mode, not in view mode
-    if (!isViewMode) {
-      generateJournalEntries();
+    // Auto-generate journal entries in add mode or when receipt items change in edit mode
+    if (!isDisabled && (!isEditMode || !isViewMode)) {
+      // In edit mode, only auto-generate if there are new receipt items or if payment mode changed
+      if (!isEditMode || hasNewReceiptItems()) {
+        generateJournalEntries();
+      }
     }
-  }, [receiptItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
+  }, [receiptItems, modeOfPayment, bankName, chartsOfAccounts, isDisabled, isEditMode, isViewMode]);
   return (
     <div className="h-full flex flex-col overflow-x-hidden bg-[#F3F4F6]">
       <style dangerouslySetInnerHTML={{
@@ -902,13 +1053,13 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
       {/* TOP NAV */}
       <div className="flex items-center justify-between flex-shrink-0">
         <nav className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors" onClick={onBack}>
-          <ArrowLeft size={17} /><span className="text-black">{isViewMode ? 'Back to Receipts' : 'Back to Receipts'}</span>
+          <ArrowLeft size={17} /><span className="text-black">{isDisabled ? 'Back to Receipts' : isEditMode ? 'Edit Receipt' : 'New Receipt'}</span>
         </nav>
-        {!isViewMode && (
+        {!isDisabled && (
           <div className="flex gap-2">
             <button className="px-4 py-2 bg-white border border-gray-200 text-[12px] font-black text-gray-400 rounded-lg hover:bg-gray-50 transition-all uppercase">Save Draft</button>
             <button onClick={handlePostTransaction} className="px-6 py-2 bg-red-600 text-white text-[12px] font-black rounded-lg hover:bg-red-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-red-200">
-              <Save size={14} /> Post Transaction
+              <Save size={14} /> {isEditMode ? 'Update Receipt' : 'Post Transaction'}
             </button>
           </div>
         )}
@@ -926,7 +1077,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
             <div className="col-span-1">
               <fieldset>
                 <legend className="text-[11px] font-black uppercase text-gray-100">Customer <span className="text-red-600">*</span></legend>
-                {isViewMode ? (
+                {isDisabled ? (
                   <div className={inputBase + " text-black py-1.5"}>{customerSearch || 'No customer selected'}</div>
                 ) : customerLoading ? (
                   <div className={inputBase + " text-black py-1.5"}>Loading customers...</div>
@@ -943,8 +1094,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                   placeholder="Reference"
                   value={documentReference}
                   onChange={e => setDocumentReference(e.target.value)}
-                  disabled={isViewMode}
-                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                  disabled={isDisabled}
+                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isDisabled
                     ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
                     : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
                     }`}
@@ -953,7 +1104,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
             </div>
             <fieldset>
               <legend className="text-[11px] font-black uppercase text-gray-100">Mode of Payment</legend>
-              {isViewMode ? (
+              {isDisabled ? (
                 <div className={inputBase + " text-black py-1.5"}>{modeSearch || 'No mode selected'}</div>
               ) : (
                 <SearchableDropdown placeholder="Mode *" value={modeSearch} onChange={v => { setModeSearch(v); setModeOfPayment(''); }} onSelect={opt => { setModeOfPayment(opt.value); setModeSearch(opt.label); }} options={modeOfPaymentOptions.map(m => ({ label: m, value: m }))} inputClassName={inputBase} emptyText="No modes found" />
@@ -965,8 +1116,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                 type="date"
                 value={collectionDate}
                 onChange={e => setCollectionDate(e.target.value)}
-                disabled={isViewMode}
-                className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                disabled={isDisabled}
+                className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isDisabled
                   ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
                   : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
                   }`}
@@ -980,8 +1131,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                   placeholder="Bank Name"
                   value={bankName}
                   onChange={e => setBankName(e.target.value)}
-                  disabled={isViewMode}
-                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                  disabled={isDisabled}
+                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isDisabled
                     ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
                     : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
                     }`}
@@ -996,8 +1147,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                   placeholder="Check #"
                   value={checkNumber}
                   onChange={e => setCheckNumber(e.target.value)}
-                  disabled={isViewMode}
-                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
+                  disabled={isDisabled}
+                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isDisabled
                     ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
                     : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
                     }`}
@@ -1172,33 +1323,33 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                               </div>
                             ) : (
                               <SearchableDropdown
-                                disabled={isViewMode}
+                                disabled={isDisabled}
                                 placeholder="Search product..."
                                 value={item.productSearch}
                                 onChange={v => updateReceiptItem(item.id, 'productSearch', v)}
                                 onSelect={opt => { updateReceiptItem(item.id, 'productId', opt.value); updateReceiptItem(item.id, 'productSearch', opt.label); }}
                                 options={productOptions}
-                                inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                 emptyText={productError || 'No products found'}
                               />
                             )}
                           </td>
                           <td className="py-1 px-1">
                             <SearchableDropdown
-                              disabled={isViewMode}
+                              disabled={isDisabled}
                               placeholder="Search account..."
                               value={item.coaSearch}
                               onChange={v => updateReceiptItem(item.id, 'coaSearch', v)}
                               onSelect={opt => { updateReceiptItem(item.id, 'coa', opt.value); updateReceiptItem(item.id, 'coaSearch', opt.label); }}
                               options={coaOptions}
-                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               emptyText="No accounts found"
                             />
                           </td>
                           <td className="py-1 px-1">
                             <input
-                              disabled={isViewMode}
-                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              disabled={isDisabled}
+                              className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               placeholder="Details..."
                               value={item.description}
                               onChange={e => updateReceiptItem(item.id, 'description', e.target.value)}
@@ -1206,10 +1357,10 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                           </td>
                           <td className="py-1 px-1">
                             <input
-                              disabled={isViewMode || item.isOther}
+                              disabled={isDisabled || item.isOther}
                               type="number"
                               min="0"
-                              className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                              className={`${tableInput} ${isDisabled || item.isOther ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
                               placeholder={item.isOther ? '' : '1'}
                               value={item.isOther ? '' : (item.qty || '')}
                               onChange={e => updateReceiptItem(item.id, 'qty', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
@@ -1217,8 +1368,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                           </td>
                           <td className="py-1 px-1">
                             <input
-                              disabled={isViewMode}
-                              className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                              disabled={isDisabled}
+                              className={`${tableInput + ' font-black'} ${isDisabled ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
                               type="number"
                               min="0"
                               step="0.01"
@@ -1230,8 +1381,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                           <td className="py-1 px-1">
                             <div className="relative">
                               <input
-                                disabled={isViewMode}
-                                className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                disabled={isDisabled}
+                                className={`${pctInput + ' font-black'} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                 type="number"
                                 min="0"
                                 max={item.discountType === 'PERCENT' ? '100' : '999999'}
@@ -1246,7 +1397,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                             </div>
                           </td>
                           <td className="py-1 px-1">
-                            {isViewMode ? (
+                            {isDisabled ? (
                               <div className={`${tableInput} text-black py-1.5 text-center`}>
                                 {item.discountType === 'PERCENT' ? 'PERCENT' : 'FIXED'}
                               </div>
@@ -1262,7 +1413,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                             )}
                           </td>
                           <td className="py-1 px-1">
-                            {isViewMode ? (
+                            {isDisabled ? (
                               <div className={`${tableInput} text-black py-1.5 text-center`}>
                                 {item.vatSearch}
                               </div>
@@ -1285,7 +1436,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                             )}
                           </td>
                           <td className="py-1 px-1">
-                            {isViewMode ? (
+                            {isDisabled ? (
                               <div className={`${tableInput} text-black py-1.5 text-center`}>
                                 {item.whtSearch}
                               </div>
@@ -1309,15 +1460,15 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                           </td>
                           <td className="py-1 px-1">
                             <input
-                              disabled={isViewMode}
-                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              disabled={isDisabled}
+                              className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               placeholder="Select"
                               value={item.responsibilityCenter}
                               onChange={e => updateReceiptItem(item.id, 'responsibilityCenter', e.target.value)}
                             />
                           </td>
                           <td className="py-1 px-1 text-center">
-                            {!isViewMode && (
+                            {!isDisabled && (
                               <button onClick={() => removeReceiptItem(item.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors">
                                 <Trash2 size={15} />
                               </button>
@@ -1328,7 +1479,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                     </tbody>
                   </table>
                 </div>
-                {!isViewMode && (
+                {!isDisabled && (
                   <div className="flex gap-2 mt-3">
                     <button
                       onClick={() => addReceiptItem(false)}
@@ -1374,71 +1525,83 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                         <tr key={entry.id}>
                           <td className="py-1.5 px-1">
                             <SearchableDropdown
-                              disabled={isViewMode}
+                              disabled={isDisabled}
                               placeholder="Search account..."
                               value={entry.accountSearch}
                               onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)}
                               onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }}
                               options={coaOptions}
-                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               emptyText="No accounts found"
                             />
                           </td>
                           <td className="py-1.5 px-1">
                             <input
-                              disabled={isViewMode || !entry.isManual}
-                              className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              disabled={isDisabled}
+                              className={`${tableInput + ' font-black'} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               placeholder="0.00"
                               type="number"
                               value={entry.debit || ''}
                               onChange={e => updateJournalEntry(entry.id, 'debit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
-                              readOnly={!entry.isManual}
                             />
                           </td>
                           <td className="py-1.5 px-1">
                             <input
-                              disabled={isViewMode || !entry.isManual}
-                              className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                              disabled={isDisabled}
+                              className={`${tableInput + ' font-black text-red-600'} ${isDisabled ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
                               placeholder="0.00"
                               type="number"
                               value={entry.credit || ''}
                               onChange={e => updateJournalEntry(entry.id, 'credit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
-                              readOnly={!entry.isManual}
                             />
                           </td>
                           <td className="py-1.5 px-1">
                             <input
-                              disabled={isViewMode}
-                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              disabled={isDisabled}
+                              className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               placeholder="Center..."
                               value={entry.center}
                               onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)}
                             />
                           </td>
                           <td className="py-1.5 text-center">
-                            {!isViewMode && entry.isManual ? (
+                            {!isDisabled ? (
                               <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
                                 <Trash2 size={15} className="mx-auto" />
                               </button>
-                            ) : (
-                              <span className="text-gray-300 text-[11px] italic">{isViewMode ? '' : 'Auto'}</span>
+                            ) : null}
+                            {isDisabled ? null : (
+                              <span className="text-gray-300 text-[11px] italic">
+                                {isAutoGeneratedEntry(entry) ? 'Auto' : 'Manual'}
+                              </span>
                             )}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="bg-gray-50/50 border">
-                        <td colSpan={1} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
-                        <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.debit) || 0), 0))}</td>
-                        <td className="py-2 px-1 text-center text-[13px] font-black text-red-600">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0))}</td>
-                        <td />
-                        <td />
-                      </tr>
+                      {(() => {
+        const balance = calculateJournalBalance();
+        return (
+          <tr className="bg-gray-50/50 border">
+            <td colSpan={1} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">
+              Balance Check {balance.isBalanced ? 'Balanced' : 'Unbalanced'}
+            </td>
+            <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(balance.totalDebit)}</td>
+            <td className="py-2 px-1 text-center text-[13px] font-black text-red-600">{fmt(balance.totalCredit)}</td>
+            <td className="py-2 px-1 text-center text-[13px] font-bold">
+              <span className={balance.isBalanced ? 'text-green-600' : 'text-red-600'}>
+                {balance.isBalanced ? 'Balanced' : `Diff: ${fmt(Math.abs(balance.totalDebit - balance.totalCredit))}`}
+              </span>
+            </td>
+            <td />
+          </tr>
+        );
+      })()}
                     </tfoot>
                   </table>
                 </div>
-                {!isViewMode && (
+                {!isDisabled && (
                   <button
                     onClick={addJournalEntry}
                     className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1"
@@ -1472,37 +1635,69 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                           <tr key={file.id}>
                             <td className="py-2 px-1">
                               <input
-                                disabled={isViewMode}
-                                className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                disabled={isDisabled}
+                                className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                 placeholder="e.g. Invoice_Scan"
                                 value={file.fileName}
                                 onChange={(e) => updateAttachment(file.id, 'fileName', e.target.value)}
                               />
                             </td>
                             <td className="py-2 px-1">
-                              {isViewMode ? (
+                              {isDisabled ? (
                                 <div className={`${tableInput} text-black cursor-not-allowed flex items-center justify-center`}>
                                   {file.file && typeof file.file === 'string' && file.file.startsWith('data:image/') ? (
-                                    <img
-                                      src={file.file}
-                                      alt={file.fileName || 'Attachment'}
-                                      className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
-                                      onClick={() => setImageModal({ isOpen: true, imageSrc: file.file })}
-                                      title="Click to view full size"
-                                      onLoad={() => console.log('Image loaded successfully:', file.fileName)}
-                                      onError={(e) => {
-                                        console.error('Image failed to load:', file.fileName, e);
-                                        e.target.style.display = 'none';
-                                        const fallback = document.createElement('span');
-                                        fallback.className = 'text-red-600 text-[10px] font-bold';
-                                        fallback.textContent = 'Image error';
-                                        e.target.parentNode.appendChild(fallback);
-                                      }}
-                                    />
+                                    <>
+                                      <img
+                                        src={file.file}
+                                        alt={file.fileName || 'Attachment'}
+                                        className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={() => setImageModal({ isOpen: true, imageSrc: file.file })}
+                                        title="Click to view full size"
+                                        onLoad={() => console.log('Image loaded successfully:', file.fileName)}
+                                        onError={(e) => {
+                                          console.error('Image failed to load:', file.fileName, 'Error:', e);
+                                          console.error('Image src length:', file.file.length);
+                                          console.error('Image src preview:', file.file.substring(0, 100) + '...');
+                                          
+                                          // Try to fix common base64 issues
+                                          let fixedSrc = file.file;
+                                          
+                                          // Remove any whitespace
+                                          fixedSrc = fixedSrc.replace(/\s/g, '');
+                                          
+                                          // Ensure proper padding
+                                          const base64Content = fixedSrc.split(',')[1];
+                                          if (base64Content) {
+                                            const paddingNeeded = (4 - (base64Content.length % 4)) % 4;
+                                            if (paddingNeeded > 0) {
+                                              const paddedContent = base64Content + '='.repeat(paddingNeeded);
+                                              fixedSrc = fixedSrc.split(',')[0] + ',' + paddedContent;
+                                              console.log('Attempting to fix base64 padding');
+                                              
+                                              // Try loading with fixed base64
+                                              e.target.src = fixedSrc;
+                                              return;
+                                            }
+                                          }
+                                          
+                                          // If still fails, show error
+                                          e.target.style.display = 'none';
+                                          const fallback = document.createElement('span');
+                                          fallback.className = 'text-red-600 text-[10px] font-bold';
+                                          fallback.textContent = 'Image error';
+                                          e.target.parentNode.appendChild(fallback);
+                                        }}
+                                      />
+                                      <span className="text-[8px] text-gray-500 ml-2">
+                                        {Math.round(file.file.length / 1024)}KB
+                                      </span>
+                                    </>
                                   ) : file.file && typeof file.file === 'string' ? (
-                                    <span className="text-blue-600 text-[11px] font-bold" title={file.file.substring(0, 50) + '...'}>Non-image file</span>
+                                    <span className="text-blue-600 text-[11px] font-bold" title={`${file.file.substring(0, 50)}... (${file.file.length} chars)`}>
+                                      Non-image file ({Math.round(file.file.length / 1024)}KB)
+                                    </span>
                                   ) : file.file ? (
-                                    <span className="text-orange-600 text-[11px] font-bold">Invalid file data</span>
+                                    <span className="text-orange-600 text-[11px] font-bold">Invalid file data ({typeof file.file})</span>
                                   ) : (
                                     <span className="text-gray-400 text-[11px] italic">No file</span>
                                   )}
@@ -1517,8 +1712,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                             </td>
                             <td className="py-2 px-1">
                               <input
-                                disabled={isViewMode}
-                                className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                disabled={isDisabled}
+                                className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                 placeholder="Add note..."
                                 value={file.remarks}
                                 onChange={(e) => updateAttachment(file.id, 'remarks', e.target.value)}
@@ -1527,7 +1722,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                             <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">{file.uploadedBy}</td>
                             <td className="py-2 px-1 text-[12px] font-bold text-gray-600 tabular-nums">{file.date}</td>
                             <td className="py-2 text-center">
-                              {!isViewMode && (
+                              {!isDisabled && (
                                 <button onClick={() => removeAttachment(file.id)} className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"><Trash2 size={15} /></button>
                               )}
                             </td>
@@ -1536,7 +1731,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
                       </tbody>
                     </table>
                   </div>
-                  {!isViewMode && (
+                  {!isDisabled && (
                     <button
                       onClick={addAttachment}
                       className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1"
@@ -1548,8 +1743,8 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, re
 
                 <TableSection title="Remarks" icon={<FileText size={14} />}>
                   <textarea
-                    disabled={isViewMode}
-                    className={`w-full min-h-[100px] mt-4 p-4 rounded-xl text-[14px] font-bold outline-none ${isViewMode
+                    disabled={isDisabled}
+                    className={`w-full min-h-[100px] mt-4 p-4 rounded-xl text-[14px] font-bold outline-none ${isDisabled
                       ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed resize-none'
                       : 'bg-gray-50 border-none focus:ring-1 focus:ring-red-500'
                       }`}

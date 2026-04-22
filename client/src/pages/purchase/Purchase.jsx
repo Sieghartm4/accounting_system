@@ -208,36 +208,79 @@ function PurchaseContent() {
                 try {
                   console.log('View purchase:', row);
 
-                  const token = localStorage.getItem('token');
-                  if (!token) {
+                  const authToken = localStorage.getItem('token');
+                  if (!authToken) {
                     throw new Error('No authentication token found');
                   }
 
-                  const response = await fetch(
+                  const viewResponse = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/purchase/${Number(row.id)}`,
                     {
                       method: "GET",
                       headers: {
                         "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${authToken}`,
                       },
                     }
                   );
 
-                  const result = await response.json();
+                  const viewResult = await viewResponse.json();
 
-                  if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch purchase details');
+                  if (!viewResponse.ok) {
+                    throw new Error(viewResult.message || 'Failed to fetch purchase details');
                   }
 
-                  console.log('Purchase details:', result);
+                  console.log('Purchase details:', viewResult);
 
                   // Set purchase data for viewing
-                  setViewingPurchase(result);
+                  setViewingPurchase(viewResult);
                   setIsViewing(true);
 
                 } catch (error) {
                   console.error('Error fetching purchase details:', error);
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch purchase details'
+                  });
+                }
+              }
+            },
+            {
+              label: 'Edit',
+              onClick: async (row) => {
+                try {
+                  console.log('Editing purchase:', row);
+
+                  const authToken = localStorage.getItem('token');
+                  if (!authToken) {
+                    throw new Error('No authentication token found');
+                  }
+
+                  const editResponse = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/purchase/${Number(row.id)}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${authToken}`,
+                      },
+                    }
+                  );
+
+                  const editResult = await editResponse.json();
+
+                  if (!editResponse.ok) {
+                    throw new Error(editResult.message || 'Failed to fetch purchase details');
+                  }
+
+                  console.log('Purchase details for editing:', editResult);
+
+                  // Set purchase data for editing
+                  setEditingPurchase(editResult);
+                  setIsEditing(true);
+
+                } catch (error) {
+                  console.error('Error fetching purchase details for editing:', error);
                   setToast({
                     type: 'error',
                     message: error.message || 'Failed to fetch purchase details'
@@ -272,8 +315,8 @@ function PurchaseContent() {
                 try {
                   console.log('Approving purchases:', selectedRows);
 
-                  const token = localStorage.getItem('token');
-                  if (!token) {
+                  const approveToken = localStorage.getItem('token');
+                  if (!approveToken) {
                     throw new Error('No authentication token found');
                   }
 
@@ -282,22 +325,22 @@ function PurchaseContent() {
                     currentState: row.state
                   }));
 
-                  const response = await fetch(
+                  const approveResponse = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/purchase/purchase-state`,
                     {
                       method: "PUT",
                       headers: {
                         "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${approveToken}`,
                       },
                       body: JSON.stringify({ updates })
                     }
                   );
 
-                  const result = await response.json();
+                  const approveResult = await approveResponse.json();
 
-                  if (!response.ok) {
-                    throw new Error(result.message || 'Failed to approve purchases');
+                  if (!approveResponse.ok) {
+                    throw new Error(approveResult.message || 'Failed to approve purchases');
                   }
 
                   // Refresh purchases data
@@ -305,7 +348,7 @@ function PurchaseContent() {
 
                   setToast({
                     type: 'success',
-                    message: result.message || `${selectedRows.length} purchase(s) approved successfully`
+                    message: approveResult.message || `${selectedRows.length} purchase(s) approved successfully`
                   });
 
                 } catch (error) {

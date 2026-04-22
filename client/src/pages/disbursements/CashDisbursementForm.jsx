@@ -259,11 +259,9 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = false, disbursementData = null }) {
+export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = false, isEditMode = false, disbursementData = null }) {
 
-  const [disbursementItems, setDisbursementItems] = useState([
-    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther: false }
-  ]);
+  const [disbursementItems, setDisbursementItems] = useState([]);
 
   const [journalEntries, setJournalEntries] = useState([
     { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: false }
@@ -433,9 +431,9 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
 
   useEffect(() => { fetchVendors(); fetchChartsOfAccounts(); fetchProducts(); }, []);
 
-  // Populate form data when in view mode
+  // Populate form data when in view mode or edit mode
   useEffect(() => {
-    if (isViewMode && disbursementData) {
+    if ((isViewMode || isEditMode) && disbursementData) {
       console.log('Populating disbursement form with data:', disbursementData);
 
       // Handle the API response structure
@@ -445,8 +443,9 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       const attachmentsData = disbursementData.attachments || [];
 
       // Set vendor
-      if (mainData && mainData.vendor) {
-        setVendorSearch(mainData.vendor);
+      if (mainData && mainData.vendor_id) {
+        setSelectedVendor(mainData.vendor_id); // Use actual vendor ID
+        setVendorSearch(mainData.vendor); // Display vendor name
       }
 
       // Set basic details
@@ -463,19 +462,19 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
         console.log('Processing disbursement items:', itemsData);
         const items = itemsData.map(item => ({
           id: item.id,
-          productId: item.product_service_id,
+          productId: item.product_service_id, // Use actual ID
           productSearch: item.product_service_name,
-          coa: item.charts_of_accounts_id,
+          coa: item.charts_of_accounts_id, // Use actual ID
           coaSearch: item.charts_of_accounts_name,
           description: item.description,
           qty: item.quantity,
           price: item.purchase_price,
           discount: item.discount,
           discountType: item.discount_type || 'PERCENT',
-          vat: parseFloat(item.vat_code) || 0,
+          vat: parseFloat(item.vat_id) || 0, // Use actual ID
           vatSearch: `${item.vat_code || ''} - ${item.vat_name || ''}`,
           vatRate: parseFloat(item.vat_rate) || 0,
-          wht: parseFloat(item.withholding_tax_code) || 0,
+          wht: parseFloat(item.withholding_tax_id) || 0, // Use actual ID
           whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
           whtRate: parseFloat(item.withholding_tax_rate) || 0,
           responsibilityCenter: item.responsibility_center,
@@ -490,7 +489,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
         console.log('Processing journal entries:', journalData);
         const entries = journalData.map(entry => ({
           id: entry.id,
-          account: entry.charts_of_accounts_name,
+          account: entry.coa_id || entry.charts_of_accounts_id, // Use actual ID
           accountSearch: entry.charts_of_accounts_name,
           center: entry.responsibility_center || '',
           debit: entry.type === 'DEBIT' ? parseFloat(entry.amount) || 0 : 0,
@@ -530,7 +529,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
         setAttachments(attachments);
       }
     }
-  }, [isViewMode, disbursementData]);
+  }, [isViewMode, isEditMode, disbursementData]);
 
   const addDisbursementItem = (isOther = false) => setDisbursementItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
@@ -809,37 +808,56 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
         }));
 
       const preparedAttachments = await Promise.all(
-        attachments.map(async att => ({
-          fileName: att.fileName,
-          file: att.file ? await fileToBase64(att.file) : null,
-          remarks: att.remarks,
-          uploadedBy: att.uploadedBy,
-          date: att.date
-        }))
+        attachments
+          .filter(att => att.file || att.fileName) // Only process attachments with file or fileName
+          .map(async att => ({
+            id: att.id, // Include ID for existing attachments
+            fileName: att.fileName,
+            file: att.file ? (typeof att.file === 'string' ? att.file : await fileToBase64(att.file)) : null,
+            remarks: att.remarks,
+            uploadedBy: att.uploadedBy,
+            date: att.date
+          }))
       );
 
-      const disbursementData = {
+      const mainData = disbursementData?.data ? disbursementData.data[0] : disbursementData;
+      const disbursementId = mainData?.id;
+
+      const requestData = {
         vendor_id: selectedVendor,
         document_reference: documentReference,
-        payment_date: new Date().toISOString().split('T')[0],
+        payment_date: paymentDate || new Date().toISOString().split('T')[0],
         mode_of_payment: modeOfPayment,
         bank_name: bankName || '',
         check_number: checkNumber || '',
         remarks: remarks,
         total_amount_due: summary.totalAmountDue,
-        created_by: createdBy,
         disbursement_items: preparedDisbursementItems,
         journal_entries: preparedJournalEntries,
         attachments: preparedAttachments
       };
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/cash_disbursements`, {
-        method: 'POST',
+      // Add ID and updated_by for edit mode
+      if (isEditMode && disbursementId) {
+        requestData.id = disbursementId;
+        requestData.updated_by = createdBy;
+      } else {
+        requestData.created_by = createdBy;
+      }
+
+      const url = isEditMode && disbursementId 
+        ? `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${disbursementId}`
+        : `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements`;
+      
+      const method = isEditMode && disbursementId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(disbursementData)
+        body: JSON.stringify(requestData)
       });
 
       if (!response.ok) {
@@ -851,12 +869,14 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
       const result = await response.json();
 
       if (result.success) {
-        const nextToast = { type: 'success', message: 'Cash disbursement created successfully!' };
+        const action = isEditMode ? 'updated' : 'created';
+        const nextToast = { type: 'success', message: `Cash disbursement ${action} successfully!` };
         setToast(nextToast);
         if (onSuccess) await onSuccess(nextToast);
         onBack();
       } else {
-        setToast({ type: 'error', message: result.message || 'Failed to create cash disbursement' });
+        const action = isEditMode ? 'update' : 'create';
+        setToast({ type: 'error', message: result.message || `Failed to ${action} cash disbursement` });
       }
 
     } catch (error) {
@@ -866,11 +886,12 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
   };
 
   useEffect(() => {
-    // Only auto-generate journal entries in add/edit mode, not in view mode
-    if (!isViewMode) {
+    // Auto-generate journal entries only in add mode, not in view or edit mode
+    // In edit mode, we want to preserve the fetched journal entries
+    if (!isViewMode && !isEditMode) {
       generateJournalEntries();
     }
-  }, [disbursementItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
+  }, [disbursementItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode, isEditMode]);
 
   return (
     <div className="h-full flex flex-col overflow-x-hidden bg-[#F3F4F6]">
@@ -1343,16 +1364,40 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
                           <td className="py-1.5 px-1">
                             <SearchableDropdown disabled={isViewMode} placeholder="Search account..." value={entry.accountSearch} onChange={v => updateJournalEntry(entry.id, 'accountSearch', v)} onSelect={opt => { updateJournalEntry(entry.id, 'account', opt.value); updateJournalEntry(entry.id, 'accountSearch', opt.label); }} options={coaOptions} inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} emptyText="No accounts found" />
                           </td>
-                          <td className="py-1.5 px-1"><input disabled={isViewMode || !entry.isManual} className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.debit || ''} onChange={e => updateJournalEntry(entry.id, 'debit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} readOnly={isViewMode || !entry.isManual} /></td>
-                          <td className="py-1.5 px-1"><input disabled={isViewMode || !entry.isManual} className={`${tableInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent cursor-not-allowed' : ''}`} placeholder="0.00" type="number" value={entry.credit || ''} onChange={e => updateJournalEntry(entry.id, 'credit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} readOnly={isViewMode || !entry.isManual} /></td>
-                          <td className="py-1.5 px-1"><input disabled={isViewMode} className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} placeholder="Center..." value={entry.center} onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} /></td>
+                          <td className="py-1.5 px-1">
+                            <input
+                              disabled={isViewMode}
+                              className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              placeholder="0.00"
+                              type="number"
+                              value={entry.debit || ''}
+                              onChange={e => updateJournalEntry(entry.id, 'debit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+                          <td className="py-1.5 px-1">
+                            <input
+                              disabled={isViewMode}
+                              className={`${tableInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent cursor-not-allowed' : ''}`}
+                              placeholder="0.00"
+                              type="number"
+                              value={entry.credit || ''}
+                              onChange={e => updateJournalEntry(entry.id, 'credit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                            />
+                          </td>
+                          <td className="py-1.5 px-1">
+                            <input
+                              disabled={isViewMode}
+                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              placeholder="Center..."
+                              value={entry.center}
+                              onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)}
+                            />
+                          </td>
                           <td className="py-1.5 text-center">
-                            {!isViewMode && entry.isManual ? (
+                            {!isViewMode && (
                               <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
                                 <Trash2 size={15} className="mx-auto" />
                               </button>
-                            ) : (
-                              <span className="text-gray-300 text-[11px] italic">Auto</span>
                             )}
                           </td>
                         </tr>

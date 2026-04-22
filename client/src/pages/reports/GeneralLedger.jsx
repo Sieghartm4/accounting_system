@@ -117,7 +117,7 @@ export default function GeneralLedger() {
   const isBalanced = Math.abs(grandTotalDebit - grandTotalCredit) < 0.01;
 
   return (
-    <div className="flex flex-col gap-5 bg-[#F3F4F6] min-h-full custom-scrollbar">
+    <div className="flex flex-col gap-2 bg-[#F3F4F6] min-h-full custom-scrollbar">
 
       {/* HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -273,9 +273,9 @@ export default function GeneralLedger() {
                 <React.Fragment key={sec.section_key}>
 
                   {/* Section header row */}
-                  <tr id={`section-${sec.section_key}`} className="bg-gray-900">
+                  <tr id={`section-${sec.section_key}`} className="bg-gray-300">
                     <td colSpan={7} className="py-2 px-4">
-                      <span className="text-[10px] font-black uppercase tracking-[3px] text-white">
+                      <span className="text-[10px] font-black uppercase tracking-[3px] text-black">
                         {sec.section_label}
                       </span>
                     </td>

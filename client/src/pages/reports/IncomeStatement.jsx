@@ -9,7 +9,6 @@ export default function IncomeStatement() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   
-  // Calculate color class whenever data changes
   const netIncomeColorClass = data?.netIncome >= 0 ? 'text-green-600' : 'text-red-600';
 
   useEffect(() => { fetchIncomeStatement(); }, []);
@@ -62,7 +61,7 @@ export default function IncomeStatement() {
   );
 
   return (
-    <div className="flex flex-col gap-5 bg-[#F3F4F6] min-h-full custom-scrollbar">
+    <div className="flex flex-col gap-3 bg-[#F3F4F6] min-h-full custom-scrollbar">
 
       {/* HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-3">
