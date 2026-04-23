@@ -117,12 +117,49 @@ const useProforma = () => {
     }
   };
 
+  const updateProformaEntry = async (id, entryData) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        throw new Error("No authorization token found");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/proforma_entries/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ id, ...entryData })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        await fetchProforma();
+        return { success: true, data: result.data };
+      }
+
+      return { success: false, error: result.message || 'Failed to update proforma entry' };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
   useEffect(() => {
     fetchProforma();
     fetchChartsOfAccounts();
   }, []);
 
-  return { proforma, loading, error, chartsOfAccounts, coaLoading, createProformaEntry };
+  return { proforma, loading, error, chartsOfAccounts, coaLoading, createProformaEntry, updateProformaEntry };
 };
 
 export default useProforma;

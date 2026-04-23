@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Package, PlusSquare, ShieldCheck, Layers, ArrowRight, Download, Plus } from 'lucide-react';
+import { Package, PlusSquare, ShieldCheck, Layers, ArrowRight, Download, Plus, Edit2 } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import RightSideModal from '../../components/RightSideModal';
 import DynamicToast from '../../components/DynamicToast';
@@ -17,9 +17,10 @@ export default function ProductService() {
 }
 
 function ProductServiceContent() {
-  const { productService, loading, error, createProductService } = useProductService();
+  const { productService, loading, error, createProductService, updateProductService } = useProductService();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProductService, setEditingProductService] = useState(null);
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -37,6 +38,7 @@ function ProductServiceContent() {
   };
 
   const handleAddProductClick = () => {
+    setEditingProductService(null);
     setFormData({ 
       code: '', 
       name: '', 
@@ -49,8 +51,23 @@ function ProductServiceContent() {
     setIsModalOpen(true);
   };
 
+  const handleEditProductClick = (row) => {
+    setEditingProductService(row);
+    setFormData({
+      code: row.code || '',
+      name: row.name || '',
+      type: row.type ? String(row.type).toLowerCase() : '',
+      category: row.category || '',
+      sales_price: row.sales_price !== undefined && row.sales_price !== null ? row.sales_price : '',
+      purchase_price: row.purchase_price !== undefined && row.purchase_price !== null ? row.purchase_price : '',
+      unit: row.unit || ''
+    });
+    setIsModalOpen(true);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingProductService(null);
   };
 
   const handleToastClose = () => {
@@ -60,32 +77,44 @@ function ProductServiceContent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const result = await createProductService(
-        formData.code,
-        formData.name,
-        formData.type,
-        formData.category,
-        formData.sales_price,
-        formData.purchase_price,
-        formData.unit
-      );
+      const result = editingProductService
+        ? await updateProductService(
+            editingProductService.id,
+            formData.code,
+            formData.name,
+            formData.type,
+            formData.category,
+            formData.sales_price,
+            formData.purchase_price,
+            formData.unit
+          )
+        : await createProductService(
+            formData.code,
+            formData.name,
+            formData.type,
+            formData.category,
+            formData.sales_price,
+            formData.purchase_price,
+            formData.unit
+          );
       
       if (result.success) {
         setToast({
           type: 'success',
-          message: `Product/Service "${formData.name}" created successfully!`
+          message: `Product/Service "${formData.name}" ${editingProductService ? 'updated' : 'created'} successfully!`
         });
         setIsModalOpen(false);
+        setEditingProductService(null);
       } else {
         setToast({
           type: 'error',
-          message: result.message || 'Failed to create product/service'
+          message: result.message || `Failed to ${editingProductService ? 'update' : 'create'} product/service`
         });
       }
     } catch (error) {
       setToast({
         type: 'error',
-        message: 'Network error occurred while creating product/service'
+        message: `Network error occurred while ${editingProductService ? 'updating' : 'creating'} product/service`
       });
     }
   };
@@ -189,6 +218,14 @@ function ProductServiceContent() {
           data={productService}
           title="Catalog Ledger"
           enableAddButton={false}
+          enableActionColumn={true}
+          actionButtons={[
+            {
+              label: 'Edit',
+              onClick: (row) => handleEditProductClick(row),
+              icon: <Edit2 size={16} />
+            }
+          ]}
         />
       </motion.div>
       
@@ -196,7 +233,7 @@ function ProductServiceContent() {
       <RightSideModal 
         isOpen={isModalOpen} 
         onClose={handleCloseModal} 
-        title="Create New Product/Service"
+        title={editingProductService ? 'Edit Product/Service' : 'Create New Product/Service'}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">

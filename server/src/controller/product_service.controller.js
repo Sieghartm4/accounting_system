@@ -96,7 +96,59 @@ const createProductService = async (req, res, next) => {
     }
 }
 
+const updateProductService = async (req, res, next) => {
+  try {
+    const { id: idFromBody, code, name, type, category, sales_price, purchase_price, unit } = req.body;
+    const { id: idFromParams } = req.params;
+    const id = Number(idFromParams || idFromBody);
+
+    if (!id || !code || !name || !type || !category || sales_price === undefined || purchase_price === undefined || !unit) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required'
+      });
+    }
+
+    const updateQuery = sql.update(Master.products_service.tablename)
+      .set([
+        Master.products_service.selectOptionColumns.code,
+        Master.products_service.selectOptionColumns.name,
+        Master.products_service.selectOptionColumns.type,
+        Master.products_service.selectOptionColumns.category,
+        Master.products_service.selectOptionColumns.sales_price,
+        Master.products_service.selectOptionColumns.purchase_price,
+        Master.products_service.selectOptionColumns.unit,
+      ])
+      .where(Master.products_service.selectOptionColumns.id)
+      .build();
+
+    const queries = [
+      {
+        sql: updateQuery,
+        values: [code, name, type, category, sales_price, purchase_price, unit, id]
+      }
+    ];
+
+    await Transaction(queries);
+
+    res.status(200).json({
+      success: true,
+      message: 'Product/Service updated successfully',
+      data: { id, code, name, type, category, sales_price, purchase_price, unit },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error updating product/service:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating product/service',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+}
+
 module.exports = {
   getProductsService,
-  createProductService
+  createProductService,
+  updateProductService
 }

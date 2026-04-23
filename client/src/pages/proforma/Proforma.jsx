@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, ClipboardCheck, ShieldCheck, Clock, ArrowRight, Download, Plus, X } from 'lucide-react';
+import { FileText, ClipboardCheck, ShieldCheck, Clock, ArrowRight, Download, Plus, X, Edit2 } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import RouteProtection from '../../components/RouteProtection';
 import ProtectedAction from '../../components/ProtectedAction';
@@ -9,7 +9,7 @@ import DynamicToast from '../../components/DynamicToast';
 import useProforma from './useProforma';
 
 function ProformaContent() {
-  const { proforma, loading, error, chartsOfAccounts, coaLoading, createProformaEntry } = useProforma();
+  const { proforma, loading, error, chartsOfAccounts, coaLoading, createProformaEntry, updateProformaEntry } = useProforma();
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -17,6 +17,7 @@ function ProformaContent() {
   };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProforma, setEditingProforma] = useState(null);
   const [formData, setFormData] = useState({
     module: '',
     name: '',
@@ -41,24 +42,64 @@ function ProformaContent() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const result = await createProformaEntry(formData);
+    const result = editingProforma
+      ? await updateProformaEntry(editingProforma.id, formData)
+      : await createProformaEntry(formData);
     
     if (result.success) {
-      setToast({ type: 'success', message: 'Proforma entry created successfully!' });
+      setToast({ type: 'success', message: `Proforma entry ${editingProforma ? 'updated' : 'created'} successfully!` });
       setFormData({ module: '', name: '', coa_id: '', t_account: '' });
+      setCoaSearchTerm('');
       setIsModalOpen(false);
+      setEditingProforma(null);
     } else {
-      setToast({ type: 'error', message: result.error || 'Failed to create proforma entry' });
+      setToast({ type: 'error', message: result.error || `Failed to ${editingProforma ? 'update' : 'create'} proforma entry` });
     }
     
     setIsSubmitting(false);
   };
 
-  const openModal = () => {
-    setFormData({ module: '', name: '', coa_id: '', t_account: '' });
-    setCoaSearchTerm('');
+  const openModal = (proformaData = null) => {
+    if (proformaData) {
+      setEditingProforma(proformaData);
+      setFormData({
+        module: proformaData.module || '',
+        name: proformaData.name || proformaData.entry_name || '',
+        coa_id: proformaData.coa_id || proformaData.chart_of_accounts_id || '',
+        t_account: proformaData.t_account || ''
+      });
+      // Find and set COA search term for the selected COA
+      const coaId = proformaData.coa_id || proformaData.chart_of_accounts_id;
+      const coaName = proformaData.charts_of_accounts || proformaData.chart_of_accounts_name;
+      
+      // First try to match by ID
+      let selectedCoa = chartsOfAccounts.find(coa => String(coa.id) === String(coaId));
+      
+      // If ID match fails, try to match by name
+      if (!selectedCoa && coaName) {
+        selectedCoa = chartsOfAccounts.find(coa => coa.name === coaName);
+      }
+      
+      if (selectedCoa) {
+        setCoaSearchTerm(`${selectedCoa.code} - ${selectedCoa.name}`);
+        setFormData(prev => ({ ...prev, coa_id: selectedCoa.id }));
+      } else {
+        setCoaSearchTerm('');
+      }
+    } else {
+      setEditingProforma(null);
+      setFormData({ module: '', name: '', coa_id: '', t_account: '' });
+      setCoaSearchTerm('');
+    }
     setShowCoaDropdown(false);
     setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingProforma(null);
+    setFormData({ module: '', name: '', coa_id: '', t_account: '' });
+    setCoaSearchTerm('');
   };
 
   const handleCoaSearch = (e) => {
@@ -189,14 +230,22 @@ function ProformaContent() {
           data={proforma}
           title="Proforma Ledger"
           enableAddButton={false}
+          enableActionColumn={true}
+          actionButtons={[
+            {
+              label: 'Edit',
+              onClick: (row) => openModal(row),
+              icon: <Edit2 size={16} />
+            }
+          ]}
         />
       </motion.div>
 
-      {/* Right Side Modal for Creating New Entry */}
+      {/* Right Side Modal for Creating/Editing Entry */}
       <RightSideModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Create New Proforma Entry"
+        onClose={handleCloseModal}
+        title={editingProforma ? "Edit Proforma Entry" : "Create New Proforma Entry"}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -295,7 +344,7 @@ function ProformaContent() {
           <div className="flex gap-3 pt-4">
             <button
               type="button"
-              onClick={() => setIsModalOpen(false)}
+              onClick={handleCloseModal}
               className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-50 transition-colors"
             >
               CANCEL
@@ -305,7 +354,7 @@ function ProformaContent() {
               disabled={isSubmitting}
               className="flex-1 px-4 py-3 bg-black text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'CREATING...' : 'CREATE ENTRY'}
+              {isSubmitting ? (editingProforma ? 'UPDATING...' : 'CREATING...') : (editingProforma ? 'UPDATE ENTRY' : 'CREATE ENTRY')}
             </button>
           </div>
         </form>

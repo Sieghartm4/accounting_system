@@ -91,7 +91,57 @@ const createChartsOfAccount = async (req, res, next) => {
     }
 }
 
+const updateChartsOfAccount = async (req, res, next) => {
+  try {
+    const { id: idFromBody, code, name, type, description, status } = req.body;
+    const { id: idFromParams } = req.params;
+    const id = Number(idFromParams || idFromBody);
+
+    if (!id || !code || !name || !type || !description || !status) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required'
+      });
+    }
+
+    const updateQuery = sql.update(Master.charts_of_accounts.tablename)
+      .set([
+        Master.charts_of_accounts.selectOptionColumns.code,
+        Master.charts_of_accounts.selectOptionColumns.name,
+        Master.charts_of_accounts.selectOptionColumns.type,
+        Master.charts_of_accounts.selectOptionColumns.description,
+        Master.charts_of_accounts.selectOptionColumns.status,
+      ])
+      .where(Master.charts_of_accounts.selectOptionColumns.id)
+      .build();
+
+    const queries = [
+      {
+        sql: updateQuery,
+        values: [code, name, type, description, status, id]
+      }
+    ];
+
+    await Transaction(queries);
+
+    res.status(200).json({
+      success: true,
+      message: 'Charts of account updated successfully',
+      data: { id, code, name, type, description, status },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error updating charts of account:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating charts of account',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+}
+
 module.exports = {
   getChartsOfAccounts,
   createChartsOfAccount,
+  updateChartsOfAccount,
 }

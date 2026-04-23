@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, UserPlus, ShieldCheck, Search, ArrowRight, Download, X, Plus } from 'lucide-react';
+import { Users, UserPlus, ShieldCheck, Search, ArrowRight, Download, X, Plus, Edit2 } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import RightSideModal from '../../components/RightSideModal';
 import DynamicToast from '../../components/DynamicToast';
@@ -9,9 +9,10 @@ import ProtectedAction from '../../components/ProtectedAction';
 import useCustomer from './useCustomer';
 
 function CustomerContent() {
-  const { customers, loading, error, createCustomer } = useCustomer();
+  const { customers, loading, error, createCustomer, updateCustomer } = useCustomer();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -27,12 +28,26 @@ function CustomerContent() {
   };
 
   const handleAddCustomerClick = () => {
+    setEditingCustomer(null);
     setFormData({ code: '', name: '', category: '', type: '', status: 'active' });
+    setIsModalOpen(true);
+  };
+
+  const handleEditCustomerClick = (row) => {
+    setEditingCustomer(row);
+    setFormData({
+      code: row.code || '',
+      name: row.name || '',
+      category: row.category || '',
+      type: row.type || '',
+      status: row.status || 'active'
+    });
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingCustomer(null);
   };
 
   const handleToastClose = () => {
@@ -42,30 +57,40 @@ function CustomerContent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const result = await createCustomer(
-        formData.code,
-        formData.name,
-        formData.category,
-        formData.type,
-        formData.status
-      );
+      const result = editingCustomer
+        ? await updateCustomer(
+            editingCustomer.id,
+            formData.code,
+            formData.name,
+            formData.category,
+            formData.type,
+            formData.status
+          )
+        : await createCustomer(
+            formData.code,
+            formData.name,
+            formData.category,
+            formData.type,
+            formData.status
+          );
       
       if (result.success) {
         setToast({
           type: 'success',
-          message: `Customer "${formData.name}" created successfully!`
+          message: `Customer "${formData.name}" ${editingCustomer ? 'updated' : 'created'} successfully!`
         });
         setIsModalOpen(false);
+        setEditingCustomer(null);
       } else {
         setToast({
           type: 'error',
-          message: result.message || 'Failed to create customer'
+          message: result.message || `Failed to ${editingCustomer ? 'update' : 'create'} customer`
         });
       }
     } catch (error) {
       setToast({
         type: 'error',
-        message: 'Network error occurred while creating customer'
+        message: `Network error occurred while ${editingCustomer ? 'updating' : 'creating'} customer`
       });
     }
   };
@@ -91,7 +116,6 @@ function CustomerContent() {
   }
 
   return (
-    /* Changed min-h-screen to h-full and added overflow-hidden to prevent page-level scrolling */
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
       
       {/* --- HEADER SECTION (Fixed height) --- */}
@@ -167,6 +191,14 @@ function CustomerContent() {
           data={customers}
           title="Customers"
           enableAddButton={false}
+          enableActionColumn={true}
+          actionButtons={[
+            {
+              label: 'Edit',
+              onClick: (row) => handleEditCustomerClick(row),
+              icon: <Edit2 size={16} />
+            }
+          ]}
         />
       </motion.div>
 
@@ -174,7 +206,7 @@ function CustomerContent() {
       <RightSideModal 
         isOpen={isModalOpen} 
         onClose={handleCloseModal} 
-        title="Create New Customer"
+        title={editingCustomer ? 'Edit Customer' : 'Create New Customer'}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">

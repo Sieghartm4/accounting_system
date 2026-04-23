@@ -84,7 +84,45 @@ const useCustomer = () => {
     }
   };
 
-  return { customers, loading, error, createCustomer };
+  const updateCustomer = async (id, code, name, category, type, status) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        throw new Error("No authorization token found");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/customer/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ id, code, name, category, type, status })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        await fetchCustomers();
+        return { success: true, data: result.data };
+      }
+
+      return { success: false, message: result.message || "Failed to update customer" };
+    } catch (err) {
+      console.error('Error updating customer:', err.message);
+      return { success: false, message: err.message };
+    }
+  };
+
+  return { customers, loading, error, createCustomer, updateCustomer };
 };
 
 export default useCustomer;

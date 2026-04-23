@@ -92,7 +92,57 @@ const createCustomer = async (req, res, next) => {
     }
 }
 
+ const updateCustomer = async (req, res, next) => {
+   try {
+     const { id: idFromBody, code, name, category, type, status } = req.body;
+     const { id: idFromParams } = req.params;
+     const id = Number(idFromParams || idFromBody);
+
+     if (!id || !code || !name || !category || !type || !status) {
+       return res.status(400).json({
+         success: false,
+         message: 'All fields are required'
+       });
+     }
+
+     const updateQuery = sql.update(Master.customers.tablename)
+       .set([
+         Master.customers.selectOptionColumns.code,
+         Master.customers.selectOptionColumns.name,
+         Master.customers.selectOptionColumns.category,
+         Master.customers.selectOptionColumns.type,
+         Master.customers.selectOptionColumns.status,
+       ])
+       .where(Master.customers.selectOptionColumns.id)
+       .build();
+
+     const queries = [
+       {
+         sql: updateQuery,
+         values: [code, name, category, type, status, id]
+       }
+     ];
+
+     await Transaction(queries);
+
+     res.status(200).json({
+       success: true,
+       message: 'Customer updated successfully',
+       data: { id, code, name, category, type, status },
+       timestamp: new Date().toISOString()
+     });
+   } catch (error) {
+     console.error('Error updating customer:', error);
+     return res.status(500).json({
+       success: false,
+       message: 'Server error while updating customer',
+       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+     });
+   }
+ }
+
 module.exports = {
   getCustomers,
-  createCustomer
+  createCustomer,
+  updateCustomer
 }

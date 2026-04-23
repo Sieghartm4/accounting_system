@@ -90,7 +90,57 @@ const createVendor = async (req, res, next) => {
         });
     }
 }
+
+const updateVendor = async (req, res, next) => {
+  try {
+    const { id: idFromBody, code, name, category, type, status } = req.body;
+    const { id: idFromParams } = req.params;
+    const id = Number(idFromParams || idFromBody);
+
+    if (!id || !code || !name || !category || !type || !status) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required'
+      });
+    }
+
+    const updateQuery = sql.update(Master.vendors.tablename)
+      .set([
+        Master.vendors.selectOptionColumns.code,
+        Master.vendors.selectOptionColumns.name,
+        Master.vendors.selectOptionColumns.category,
+        Master.vendors.selectOptionColumns.type,
+        Master.vendors.selectOptionColumns.status,
+      ])
+      .where(Master.vendors.selectOptionColumns.id)
+      .build();
+
+    const queries = [
+      {
+        sql: updateQuery,
+        values: [code, name, category, type, status, id]
+      }
+    ];
+
+    await Transaction(queries);
+
+    res.status(200).json({
+      success: true,
+      message: 'Vendor updated successfully',
+      data: { id, code, name, category, type, status },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error updating vendor:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating vendor',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+}
 module.exports = {
   getVendors,
-  createVendor
+  createVendor,
+  updateVendor
 }

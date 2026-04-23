@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, FilePlus, ShieldCheck, PieChart, ArrowRight, Download, Plus } from 'lucide-react';
+import { BookOpen, FilePlus, ShieldCheck, PieChart, ArrowRight, Download, Plus, Edit2 } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import RightSideModal from '../../components/RightSideModal';
 import DynamicToast from '../../components/DynamicToast';
@@ -9,9 +9,10 @@ import ProtectedAction from '../../components/ProtectedAction';
 import useChartsOfAccounts from './useChartsOfAccounts';
 
 function ChartsOfAccountsContent() {
-  const { chartsOfAccounts, loading, error, createChartsOfAccount } = useChartsOfAccounts();
+  const { chartsOfAccounts, loading, error, createChartsOfAccount, updateChartsOfAccount } = useChartsOfAccounts();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingChart, setEditingChart] = useState(null);
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -26,13 +27,27 @@ function ChartsOfAccountsContent() {
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
   };
 
-  const handleAddAccountClick = () => {
-    setFormData({ code: '', name: '', type: '', description: '', status: 'active' });
+  const handleAddAccountClick = (chartData = null) => {
+    if (chartData) {
+      setEditingChart(chartData);
+      setFormData({
+        code: chartData.code || '',
+        name: chartData.name || '',
+        type: chartData.type || '',
+        description: chartData.description || '',
+        status: chartData.status || 'active'
+      });
+    } else {
+      setEditingChart(null);
+      setFormData({ code: '', name: '', type: '', description: '', status: 'active' });
+    }
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingChart(null);
+    setFormData({ code: '', name: '', type: '', description: '', status: 'active' });
   };
 
   const handleToastClose = () => {
@@ -42,30 +57,40 @@ function ChartsOfAccountsContent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const result = await createChartsOfAccount(
-        formData.code,
-        formData.name,
-        formData.type,
-        formData.description,
-        formData.status
-      );
+      const result = editingChart
+        ? await updateChartsOfAccount(
+            editingChart.id,
+            formData.code,
+            formData.name,
+            formData.type,
+            formData.description,
+            formData.status
+          )
+        : await createChartsOfAccount(
+            formData.code,
+            formData.name,
+            formData.type,
+            formData.description,
+            formData.status
+          );
       
       if (result.success) {
         setToast({
           type: 'success',
-          message: `Chart of Account "${formData.name}" created successfully!`
+          message: `Chart of Account "${formData.name}" ${editingChart ? 'updated' : 'created'} successfully!`
         });
         setIsModalOpen(false);
+        setEditingChart(null);
       } else {
         setToast({
           type: 'error',
-          message: result.message || 'Failed to create chart of account'
+          message: result.message || `Failed to ${editingChart ? 'update' : 'create'} chart of account`
         });
       }
     } catch (error) {
       setToast({
         type: 'error',
-        message: 'Network error occurred while creating chart of account'
+        message: `Network error occurred while ${editingChart ? 'updating' : 'creating'} chart of account`
       });
     }
   };
@@ -169,14 +194,22 @@ function ChartsOfAccountsContent() {
           data={chartsOfAccounts}
           title="Master Ledger"
           enableAddButton={false}
+          enableActionColumn={true}
+          actionButtons={[
+            {
+              label: 'Edit',
+              onClick: (row) => handleAddAccountClick(row),
+              icon: <Edit2 size={16} />
+            }
+          ]}
         />
       </motion.div>
       
-      {/* Add Chart of Account Modal */}
+      {/* Add/Edit Chart of Account Modal */}
       <RightSideModal 
         isOpen={isModalOpen} 
         onClose={handleCloseModal} 
-        title="Create New Chart of Account"
+        title={editingChart ? "Edit Chart of Account" : "Create New Chart of Account"}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
@@ -270,7 +303,7 @@ function ChartsOfAccountsContent() {
               className="flex-1 px-4 py-3 bg-black text-white text-xs font-black rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
             >
               <Plus size={14} />
-              Create Account
+              {editingChart ? 'Update Account' : 'Create Account'}
             </button>
           </div>
         </form>

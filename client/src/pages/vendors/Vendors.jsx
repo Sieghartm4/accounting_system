@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Truck, PackagePlus, ShieldCheck, Search, ArrowRight, Download, Plus } from 'lucide-react';
+import { Truck, PackagePlus, ShieldCheck, Search, ArrowRight, Download, Plus, Edit2 } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import RightSideModal from '../../components/RightSideModal';
 import DynamicToast from '../../components/DynamicToast';
@@ -9,9 +9,10 @@ import ProtectedAction from '../../components/ProtectedAction';
 import useVendors from './useVendors';
 
 function VendorsContent() {
-  const { vendors, loading, error, createVendor } = useVendors();
+  const { vendors, loading, error, createVendor, updateVendor } = useVendors();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingVendor, setEditingVendor] = useState(null);
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -27,12 +28,26 @@ function VendorsContent() {
   };
 
   const handleAddVendorClick = () => {
+    setEditingVendor(null);
     setFormData({ code: '', name: '', category: '', type: '', status: 'active' });
+    setIsModalOpen(true);
+  };
+
+  const handleEditVendorClick = (row) => {
+    setEditingVendor(row);
+    setFormData({
+      code: row.code || '',
+      name: row.name || '',
+      category: row.category || '',
+      type: row.type || '',
+      status: row.status || 'active'
+    });
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingVendor(null);
   };
 
   const handleToastClose = () => {
@@ -42,30 +57,40 @@ function VendorsContent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const result = await createVendor(
-        formData.code,
-        formData.name,
-        formData.category,
-        formData.type,
-        formData.status
-      );
+      const result = editingVendor
+        ? await updateVendor(
+            editingVendor.id,
+            formData.code,
+            formData.name,
+            formData.category,
+            formData.type,
+            formData.status
+          )
+        : await createVendor(
+            formData.code,
+            formData.name,
+            formData.category,
+            formData.type,
+            formData.status
+          );
 
       if (result.success) {
         setToast({
           type: 'success',
-          message: `Vendor "${formData.name}" created successfully!`
+          message: `Vendor "${formData.name}" ${editingVendor ? 'updated' : 'created'} successfully!`
         });
         setIsModalOpen(false);
+        setEditingVendor(null);
       } else {
         setToast({
           type: 'error',
-          message: result.message || 'Failed to create vendor'
+          message: result.message || `Failed to ${editingVendor ? 'update' : 'create'} vendor`
         });
       }
     } catch (error) {
       setToast({
         type: 'error',
-        message: 'Network error occurred while creating vendor'
+        message: `Network error occurred while ${editingVendor ? 'updating' : 'creating'} vendor`
       });
     }
   };
@@ -127,7 +152,7 @@ function VendorsContent() {
               EXPORT LIST
             </button>
             <ProtectedAction routeName="vendors">
-              <button onClick={handleAddVendorClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button onClick={handleAddVendorClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest">
                 <PackagePlus size={14} />
                 Add Vendor
               </button>
@@ -169,6 +194,14 @@ function VendorsContent() {
           data={vendors}
           title="Vendor table"
           enableAddButton={false}
+          enableActionColumn={true}
+          actionButtons={[
+            {
+              label: 'Edit',
+              onClick: (row) => handleEditVendorClick(row),
+              icon: <Edit2 size={16} />
+            }
+          ]}
           badgeColumns={[
             {
               column: 'status',
@@ -186,7 +219,7 @@ function VendorsContent() {
       <RightSideModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title="Create New Vendor"
+        title={editingVendor ? 'Edit Vendor' : 'Create New Vendor'}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">

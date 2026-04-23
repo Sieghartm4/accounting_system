@@ -196,7 +196,7 @@ function WithholdingTaxContent() {
           actionButtons={[
             {
               label: 'Edit',
-              onClick: (row) => openModal(row),
+              onClick: (row) => openModal(withholdingTax.find(item => item.id === row.id)),
               icon: <Edit2 size={16} />
             }
           ]}

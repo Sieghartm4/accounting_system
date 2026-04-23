@@ -84,7 +84,45 @@ const useProductService = () => {
     }
   };
 
-  return { productService, loading, error, createProductService };
+  const updateProductService = async (id, code, name, type, category, sales_price, purchase_price, unit) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        throw new Error("No authorization token found");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/product_service/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ id, code, name, type, category, sales_price, purchase_price, unit })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        await fetchProductService();
+        return { success: true, data: result.data };
+      }
+
+      return { success: false, message: result.message || "Failed to update product/service" };
+    } catch (err) {
+      console.error('Error updating product/service:', err.message);
+      return { success: false, message: err.message };
+    }
+  };
+
+  return { productService, loading, error, createProductService, updateProductService };
 };
 
 export default useProductService;

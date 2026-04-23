@@ -210,7 +210,7 @@ function VatContent() {
           actionButtons={[
             {
               label: 'Edit',
-              onClick: (row) => openModal(row),
+              onClick: (row) => openModal(vat.find(item => item.id === row.id)),
               icon: <Edit2 size={16} />
             }
           ]}
