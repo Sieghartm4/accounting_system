@@ -359,7 +359,7 @@ function SidebarInput({ label, placeholder, type = 'text', required, dark, value
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, purchaseData = null }) {
+export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, isEditMode = false, purchaseData = null }) {
   const [purchaseItems, setPurchaseItems] = useState([]);
 
   const [journalEntries, setJournalEntries] = useState([
@@ -558,9 +558,9 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
 
   useEffect(() => { fetchVendors(); fetchChartsOfAccounts(); fetchProducts(); }, []);
 
-  // Populate form data when in view mode
+  // Populate form data when in view or edit mode
   useEffect(() => {
-    if (isViewMode && purchaseData) {
+    if ((isViewMode || isEditMode) && purchaseData) {
       console.log('Populating purchase form with data:', purchaseData);
       
       // Handle the API response structure
@@ -570,7 +570,8 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
       const attachmentsData = purchaseData.attachments || [];
       
       // Set vendor
-      if (mainData && mainData.vendor) {
+      if (mainData && mainData.vendor_id) {
+        setSelectedVendor(mainData.vendor_id);
         setVendorSearch(mainData.vendor);
       }
       
@@ -610,10 +611,10 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
           price: item.purchase_price,
           discount: item.discount,
           discountType: item.discount_type || 'PERCENT',
-          vat: parseFloat(item.vat_code) || 0,
+          vat: parseInt(item.vat_id) || 0,
           vatSearch: `${item.vat_code || ''} - ${item.vat_name || ''}`,
           vatRate: parseFloat(item.vat_rate) || 0,
-          wht: parseFloat(item.withholding_tax_code) || 0,
+          wht: parseInt(item.witholding_tax_id) || 0,
           whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
           whtRate: parseFloat(item.withholding_tax_rate) || 0,
           responsibilityCenter: item.responsibility_center,
@@ -628,7 +629,7 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
         console.log('Processing journal entries:', journalData);
         const entries = journalData.map(entry => ({
           id: entry.id,
-          account: entry.charts_of_accounts_name,
+          account: entry.charts_of_accounts_id || entry.charts_of_accounts_name,
           accountSearch: entry.charts_of_accounts_name,
           center: entry.responsibility_center || '',
           debit: entry.type === 'DEBIT' ? parseFloat(entry.amount) || 0 : 0,
@@ -673,7 +674,7 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
         }]);
       }
     }
-  }, [isViewMode, purchaseData]);
+  }, [isViewMode, isEditMode, purchaseData]);
 
   const addPurchaseItem = (isOther = false) => setPurchaseItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
@@ -935,14 +936,30 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
         date_due: dateDue,
         remarks: remarks,
         total_amount_due: summary.totalAmountDue,
-        created_by: createdBy,
         purchase_items: preparedPurchaseItems,
         journal_entries: preparedJournalEntries,
         attachments: preparedAttachments
       };
+
+      // Add ID and updated_by for edit mode
+      if (isEditMode && purchaseData) {
+        const purchaseId = purchaseData.data?.[0]?.id || purchaseData.id;
+        if (purchaseId) {
+          purchaseDataPayload.id = purchaseId;
+          purchaseDataPayload.updated_by = createdBy;
+        }
+      } else {
+        purchaseDataPayload.created_by = createdBy;
+      }
+
+      const url = isEditMode && purchaseData?.data?.[0]?.id 
+        ? `${import.meta.env.VITE_SERVER_LINK}/purchase/${purchaseData.data[0].id}`
+        : `${import.meta.env.VITE_SERVER_LINK}/purchase`;
       
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/purchase`, {
-        method: 'POST',
+      const method = isEditMode && purchaseData?.data?.[0]?.id ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -959,12 +976,14 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
       const result = await response.json();
 
       if (result.success) {
-        const nextToast = { type: 'success', message: 'Purchase created successfully!' };
+        const action = isEditMode ? 'updated' : 'created';
+        const nextToast = { type: 'success', message: `Purchase ${action} successfully!` };
         setToast(nextToast);
         if (onSuccess) await onSuccess(nextToast);
         onBack();
       } else {
-        setToast({ type: 'error', message: result.message || 'Failed to create purchase' });
+        const action = isEditMode ? 'update' : 'create';
+        setToast({ type: 'error', message: result.message || `Failed to ${action} purchase` });
       }
 
     } catch (error) {
@@ -978,7 +997,7 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, pu
     if (!isViewMode) {
       generateJournalEntries();
     }
-  }, [purchaseItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
+  }, [purchaseItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode, isEditMode]);
 
   // Auto-calculate date due based on terms and date delivered
   useEffect(() => {

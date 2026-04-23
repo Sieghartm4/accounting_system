@@ -531,7 +531,7 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
     }
   }, [isViewMode, isEditMode, disbursementData]);
 
-  const addDisbursementItem = (isOther = false) => setDisbursementItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther }]);
+  const addDisbursementItem = (isOther = false) => setDisbursementItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther, isNew: true }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removeDisbursementItem = (id) => setDisbursementItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
@@ -548,6 +548,11 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
   };
 
   const summary = computeSummary(disbursementItems);
+
+  // Helper function to check if there are new disbursement items (for auto-generation in edit mode)
+  const hasNewDisbursementItems = () => {
+    return disbursementItems.some(item => item.isNew);
+  };
 
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
@@ -886,10 +891,12 @@ export default function CashDisbursementForm({ onBack, onSuccess, isViewMode = f
   };
 
   useEffect(() => {
-    // Auto-generate journal entries only in add mode, not in view or edit mode
-    // In edit mode, we want to preserve the fetched journal entries
-    if (!isViewMode && !isEditMode) {
-      generateJournalEntries();
+    // Auto-generate journal entries in add mode or when disbursement items change in edit mode
+    if (!isViewMode) {
+      // In edit mode, only auto-generate if there are new disbursement items
+      if (!isEditMode || hasNewDisbursementItems()) {
+        generateJournalEntries();
+      }
     }
   }, [disbursementItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode, isEditMode]);
 

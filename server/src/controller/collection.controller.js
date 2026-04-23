@@ -236,19 +236,19 @@ const getAllCollections = async (req, res, next) => {
       { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
     ])
       .from(Accounting.collection_items.tablename)
-      .innerJoin(Accounting.sales.tablename, Accounting.sales.selectOptionColumns.id, Accounting.collection_items.selectOptionColumns.sales_id)
-      .innerJoin(Accounting.sales_items.tablename, Accounting.sales_items.selectOptionColumns.sales_id, Accounting.collection_items.selectOptionColumns.sales_id)
-      .innerJoin(
+      .innerJoin(Accounting.sales_items.tablename, Accounting.sales_items.selectOptionColumns.id, Accounting.collection_items.selectOptionColumns.sales_id)
+      .innerJoin(Accounting.sales.tablename, Accounting.sales.selectOptionColumns.id, Accounting.sales_items.selectOptionColumns.sales_id)
+      .leftJoin(
         Master.vat.tablename,
         Accounting.sales_items.selectOptionColumns.vat,
         Master.vat.selectOptionColumns.id
       )
-      .innerJoin(
+      .leftJoin(
         Master.withholding_tax.tablename,
         Accounting.sales_items.selectOptionColumns.witholding_tax,
         Master.withholding_tax.selectOptionColumns.id
       )
-      .innerJoin(Master.products_service.tablename, Master.products_service.selectOptionColumns.id, Accounting.sales_items.selectOptionColumns.product_service)
+      .leftJoin(Master.products_service.tablename, Master.products_service.selectOptionColumns.id, Accounting.sales_items.selectOptionColumns.product_service)
       .where(Accounting.collection_items.selectOptionColumns.collection_id)
       .build();
 

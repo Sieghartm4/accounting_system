@@ -21,8 +21,8 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'sales',
-          key: 's_id'
+          model: 'sales_items',
+          key: 'si_id'
         }
       },
       ci_amount: {

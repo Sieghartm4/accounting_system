@@ -188,7 +188,7 @@ function SearchableDropdown({ placeholder, value, onChange, onSelect, options, i
 //
 //  totalAmountDue   = totalDiscounted + totalVAT − totalWHT
 //
-function computeSummary(items) {
+function computeSummary(items, journalEntries = []) {
   let totalSalesPrice = 0;
   let totalDiscount = 0;
   let totalDiscounted = 0;
@@ -241,6 +241,19 @@ function computeSummary(items) {
     }
   });
 
+  // Calculate total journal entries for balance check
+  let totalJournalDebit = 0;
+  let totalJournalCredit = 0;
+  
+  journalEntries.forEach(entry => {
+    const debit = parseFloat(entry.debit) || 0;
+    const credit = parseFloat(entry.credit) || 0;
+    totalJournalDebit += debit;
+    totalJournalCredit += credit;
+  });
+
+  const totalAmountDue = totalDiscounted + totalVAT - totalWHT;
+
   return {
     totalSalesPrice,
     totalDiscount,
@@ -252,7 +265,9 @@ function computeSummary(items) {
     totalNoVatDiscount,
     totalNetOfVat,
     totalWHT,
-    totalAmountDue: totalDiscounted + totalVAT - totalWHT,
+    totalAmountDue,
+    totalJournalDebit,
+    totalJournalCredit,
   };
 }
 
@@ -261,7 +276,7 @@ const fmt = (n) => n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximum
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function SalesForm({ onBack, onSuccess, isViewMode = false, salesData = null }) {
+export default function SalesForm({ onBack, onSuccess, isViewMode = false, isEditMode = false, salesData = null }) {
   const [salesItems, setSalesItems] = useState([]);
 
   const [journalEntries, setJournalEntries] = useState([
@@ -462,7 +477,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
 
   // Populate form data when in view mode
   useEffect(() => {
-    if (isViewMode && salesData) {
+    if ((isViewMode || isEditMode) && salesData) {
       console.log('Populating sales form with data:', salesData);
       
       // Handle the API response structure
@@ -474,6 +489,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
       // Set customer
       if (mainData && mainData.customer) {
         setCustomerSearch(mainData.customer);
+        setSelectedCustomer(mainData.customer_id || '');
       }
       
       // Set basic details
@@ -512,10 +528,10 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
           price: item.sales_price,
           discount: item.discount,
           discountType: item.discount_type || 'PERCENT',
-          vat: parseFloat(item.vat_code) || 0,
+          vat: parseInt(item.vat_id) || 0,
           vatSearch: `${item.vat_code || ''} - ${item.vat_name || ''}`,
           vatRate: parseFloat(item.vat_rate) || 0,
-          wht: parseFloat(item.withholding_tax_code) || 0,
+          wht: parseInt(item.witholding_tax_id) || 0,
           whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
           whtRate: parseFloat(item.withholding_tax_rate) || 0,
           responsibilityCenter: item.responsibility_center,
@@ -530,7 +546,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
         console.log('Processing journal entries:', journalData);
         const entries = journalData.map(entry => ({
           id: entry.id,
-          account: entry.charts_of_accounts_name,
+          account: entry.coa_id,
           accountSearch: entry.charts_of_accounts_name,
           center: entry.responsibility_center || '',
           debit: entry.type === 'DEBIT' ? parseFloat(entry.amount) || 0 : 0,
@@ -570,9 +586,9 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
         setAttachments(attachments);
       }
     }
-  }, [isViewMode, salesData]);
+  }, [isViewMode, isEditMode, salesData]);
 
-  const addSalesItem = (isOther = false) => setSalesItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther }]);
+  const addSalesItem = (isOther = false) => setSalesItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther, isNew: true }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removeSalesItem = (id) => setSalesItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
@@ -588,7 +604,12 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
     }
   };
 
-  const summary = computeSummary(salesItems);
+  const summary = computeSummary(salesItems, journalEntries);
+
+  // Helper function to check if there are new sales items (for auto-generation in edit mode)
+  const hasNewSalesItems = () => {
+    return salesItems.some(item => item.isNew);
+  };
 
   const salesItemsScrollRef = useDragToScroll();
 
@@ -610,7 +631,7 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
 
   const fadeInUp = { hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
-  const generateJournalEntries = () => {
+  const buildAutoJournalEntries = () => {
     const entries = [];
     let totalDebitAmount = 0;
     let totalCreditAmount = 0;
@@ -745,7 +766,13 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
       }
     }
 
-    setJournalEntries(entries);
+    return entries;
+  };
+
+  const regenerateJournalEntries = () => {
+    const manualEntries = journalEntries.filter(e => e.isManual);
+    const autoEntries = buildAutoJournalEntries();
+    setJournalEntries([...autoEntries, ...manualEntries]);
   };
 
   const handlePostTransaction = async () => {
@@ -796,16 +823,14 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
       }
 
       // Check if journal entries are balanced
-      const totalDebit = journalEntries.reduce((sum, entry) => sum + (parseFloat(entry.debit) || 0), 0);
-      const totalCredit = journalEntries.reduce((sum, entry) => sum + (parseFloat(entry.credit) || 0), 0);
-      
-      if (Math.abs(totalDebit - totalCredit) > 0.01) { // Allow for small floating point differences
+      if (Math.abs(summary.totalJournalDebit - summary.totalJournalCredit) > 0.01) { // Allow for small floating point differences
         setToast({ type: 'warning', message: 'Journal entries must be balanced. Total debits must equal total credits.' });
         return;
       }
 
       const preparedSalesItems = salesItems
         .map(item => ({
+          id: item.isNew ? undefined : item.id, // Include ID for existing items, undefined for new ones
           product_id: item.isOther ? null : (item.productId || null),
           account_id: item.coa || item.accountId,
           description: item.description,
@@ -813,8 +838,8 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
           price: parseFloat(item.price) || 0,
           discount: parseFloat(item.discount) || 0,
           discount_type: item.discountType || 'PERCENT',
-          vat: parseFloat(item.vat) || 0,
-          wtax: parseFloat(item.wht) || 0,
+          vat: parseInt(item.vat) || 0,
+          wtax: parseInt(item.wht) || 0,
           responsibility_center: item.responsibilityCenter || ''
         }));
 
@@ -828,16 +853,22 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
         }));
 
       const preparedAttachments = await Promise.all(
-        attachments.map(async att => ({
-          fileName: att.fileName,
-          file: att.file ? await fileToBase64(att.file) : null,
-          remarks: att.remarks,
-          uploadedBy: att.uploadedBy,
-          date: att.date
-        }))
+        attachments
+          .filter(att => att.file || att.fileName) // Only process attachments with file or fileName
+          .map(async att => ({
+            id: att.id, // Include ID for existing attachments
+            fileName: att.fileName,
+            file: att.file ? (typeof att.file === 'string' ? att.file : await fileToBase64(att.file)) : null,
+            remarks: att.remarks,
+            uploadedBy: att.uploadedBy,
+            date: att.date
+          }))
       );
 
-      const salesData = {
+      const mainData = salesData?.data ? salesData.data[0] : salesData;
+      const salesId = mainData?.id;
+
+      const requestData = {
         customer_id: selectedCustomer,
         document_reference: documentReference,
         terms: `${termsNumber} ${termsOption}`,
@@ -845,19 +876,32 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
         date_due: dateDue,
         remarks: remarks,
         total_amount_due: summary.totalAmountDue,
-        created_by: createdBy,
         sales_items: preparedSalesItems,
         journal_entries: preparedJournalEntries,
         attachments: preparedAttachments
       };
+
+      // Add ID and updated_by for edit mode
+      if (isEditMode && salesId) {
+        requestData.id = salesId;
+        requestData.updated_by = createdBy;
+      } else {
+        requestData.created_by = createdBy;
+      }
+
+      const url = isEditMode && salesId 
+        ? `${import.meta.env.VITE_SERVER_LINK}/sales/${salesId}`
+        : `${import.meta.env.VITE_SERVER_LINK}/sales`;
       
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/sales`, {
-        method: 'POST',
+      const method = isEditMode && salesId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(salesData)
+        body: JSON.stringify(requestData)
       });
 
       if (!response.ok) {
@@ -869,12 +913,14 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
       const result = await response.json();
 
       if (result.success) {
-        const nextToast = { type: 'success', message: 'Sales created successfully!' };
+        const action = isEditMode ? 'updated' : 'created';
+        const nextToast = { type: 'success', message: `Sales ${action} successfully!` };
         setToast(nextToast);
         if (onSuccess) await onSuccess(nextToast);
         onBack();
       } else {
-        setToast({ type: 'error', message: result.message || 'Failed to create sales' });
+        const action = isEditMode ? 'update' : 'create';
+        setToast({ type: 'error', message: result.message || `Failed to ${action} sales` });
       }
 
     } catch (error) {
@@ -884,11 +930,11 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
   };
 
   useEffect(() => {
-    // Only auto-generate journal entries in add/edit mode, not in view mode
+    // Auto-generate journal entries in add mode or when sales items change in edit mode
     if (!isViewMode) {
-      generateJournalEntries();
+      regenerateJournalEntries();
     }
-  }, [salesItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
+  }, [salesItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode, isEditMode]);
 
   // Auto-calculate date due based on terms and date delivered
   useEffect(() => {
@@ -1400,24 +1446,22 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                         </td>
                         <td className="py-1.5 px-1">
                           <input 
-                            disabled={isViewMode || !entry.isManual} 
-                            className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            disabled={isViewMode} 
+                            className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
                             placeholder="0.00" 
                             type="number" 
                             value={entry.debit || ''} 
                             onChange={e => updateJournalEntry(entry.id, 'debit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} 
-                            readOnly={isViewMode || !entry.isManual} 
                           />
                         </td>
                         <td className="py-1.5 px-1">
                           <input 
-                            disabled={isViewMode || !entry.isManual} 
-                            className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            disabled={isViewMode} 
+                            className={`${tableInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
                             placeholder="0.00" 
                             type="number" 
                             value={entry.credit || ''} 
                             onChange={e => updateJournalEntry(entry.id, 'credit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} 
-                            readOnly={isViewMode || !entry.isManual} 
                           />
                         </td>
                         <td className="py-1.5 px-1">
@@ -1430,13 +1474,11 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                           />
                         </td>
                         <td className="py-1.5 text-center">
-                          {!isViewMode && entry.isManual ? (
+                          {!isViewMode ? (
                             <button className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
                               <Trash2 size={15} className="mx-auto" />
                             </button>
-                          ) : (
-                            <span className="text-gray-300 text-[11px] italic">{isViewMode ? '' : 'Auto'}</span>
-                          )}
+                          ) : null}
                         </td>
                       </tr>
                     ))}
@@ -1444,8 +1486,8 @@ export default function SalesForm({ onBack, onSuccess, isViewMode = false, sales
                   <tfoot>
                     <tr className="bg-gray-50/50 border">
                       <td colSpan={1} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
-                      <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.debit) || 0), 0))}</td>
-                      <td className="py-2 px-1 text-center text-[13px] font-black text-red-600">{fmt(journalEntries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0))}</td>
+                      <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(summary.totalJournalDebit)}</td>
+                      <td className="py-2 px-1 text-center text-[13px] font-black text-red-600">{fmt(summary.totalJournalCredit)}</td>
                       <td />
                       <td />
                     </tr>

@@ -63,6 +63,7 @@ function PurchaseContent() {
     <RouteProtection routeName="purchase">
       <PurchaseForm
         isViewMode={false}
+        isEditMode={true}
         purchaseData={editingPurchase}
         onBack={() => setIsEditing(false)}
         onSuccess={async (nextToast) => {

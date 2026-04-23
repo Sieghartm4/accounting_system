@@ -184,7 +184,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
   // Each item shape (what lives in state):
   // {
   //   id                 : React key (frontend only)
-  //   salesItemId        : si_id from sales_items  → ci_sales_id (STORED)
+  //   salesItemId        : id from sales_items    → ci_sales_id (STORED)
   //   invoiceRef         : document_reference       (display only)
   //   description        : product name             (display only)
   //   responsibilityCenter                           (display only)
@@ -394,7 +394,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
 
         return {
           id:                  Date.now() + Math.random(),
-          salesItemId:         s.sales_id,                  // → ci_sales_id
+          salesItemId:         s.id,                       // → ci_sales_id (now using sales item ID)
           invoiceRef:          s.document_reference || '',  // display only
           description:         s.product_service_name || s.description || '', // display only
           responsibilityCenter: s.responsibility_center || '', // display only

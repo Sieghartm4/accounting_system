@@ -358,7 +358,7 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
           
           return {
             id: item.id,
-            purchaseItemId: item.purchase_id,
+            purchaseItemId: item.id,
             invoiceRef: item.invoice_ref || '',
             description: item.product_service_name || item.description || '',
             responsibilityCenter: item.responsibility_center || '',
@@ -448,7 +448,7 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
 
         return {
           id:                  Date.now() + Math.random(),
-          purchaseItemId:      s.id,                        // → ci_purchase_id
+          purchaseItemId:      s.id,                        // → ci_purchase_id (purchase item ID)
           invoiceRef:          s.document_reference || '',  // display only
           description:         s.product_service_name || s.description || '', // display only
           responsibilityCenter: s.responsibility_center || '', // display only

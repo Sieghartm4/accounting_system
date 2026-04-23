@@ -59,6 +59,7 @@ function SalesContent() {
     <RouteProtection routeName="sales">
       <SalesForm
         isViewMode={false}
+        isEditMode={true}
         salesData={editingSales}
         onBack={() => setIsEditing(false)}
         onSuccess={async (nextToast) => {

@@ -67,11 +67,11 @@ const getPurchasePayment = async (req, res, next) => {
       .from(Accounting.purchase.tablename)
       .innerJoin(Master.vendors.tablename, Accounting.purchase.selectOptionColumns.vendor_id, Master.vendors.selectOptionColumns.id)
       .leftJoin(Accounting.payment_items.tablename, Accounting.purchase.selectOptionColumns.id, Accounting.payment_items.selectOptionColumns.purchase_id)
+      .andWhereNot(Accounting.purchase.selectOptionColumns.status)
       .where(Accounting.purchase.selectOptionColumns.state)
-      .andWhere(Accounting.purchase.selectOptionColumns.status)
       .andWhereNotExists(`SELECT 1 FROM ${Accounting.payment_items.tablename} WHERE ${Accounting.payment_items.selectOptionColumns.purchase_id} = ${Accounting.purchase.selectOptionColumns.id}`)
       .build();
-    let purchases = await Query(query, ['APPROVED', 'UNPAID'], [Accounting.purchase.prefix_, Master.vendors.prefix_]);
+    let purchases = await Query(query, ['APPROVED', 'PAID'], [Accounting.purchase.prefix_, Master.vendors.prefix_]);
     console.log("PURCHASES QUERY 1", query);
     console.log("PURCHASES QUERY 2", purchases);
 
@@ -239,9 +239,9 @@ const getAllPayments = async (req, res, next) => {
       { col: Accounting.purchase_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
     ])
       .from(Accounting.payment_items.tablename)
-      .innerJoin(Accounting.purchase.tablename, Accounting.purchase.selectOptionColumns.id, Accounting.payment_items.selectOptionColumns.purchase_id)
-      .innerJoin(Accounting.purchase_items.tablename, Accounting.purchase_items.selectOptionColumns.purchase_id, Accounting.payment_items.selectOptionColumns.purchase_id)
-            .innerJoin(
+      .innerJoin(Accounting.purchase_items.tablename, Accounting.purchase_items.selectOptionColumns.id, Accounting.payment_items.selectOptionColumns.purchase_id)
+      .innerJoin(Accounting.purchase.tablename, Accounting.purchase.selectOptionColumns.id, Accounting.purchase_items.selectOptionColumns.purchase_id)
+      .innerJoin(
         Master.vat.tablename,
         Accounting.purchase_items.selectOptionColumns.vat,
         Master.vat.selectOptionColumns.id
@@ -256,6 +256,7 @@ const getAllPayments = async (req, res, next) => {
       .build();
 
     let payment_items = await Query(payment_items_query, [paymentId], [Accounting.payment_items.prefix_]);
+    console.log("PAYMENT ITEMS QUERY",payment_items_query)
     const payment_journal_query = sql.select([
       { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
       { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
