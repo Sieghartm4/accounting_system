@@ -360,7 +360,9 @@ function SidebarInput({ label, placeholder, type = 'text', required, dark, value
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, isEditMode = false, purchaseData = null }) {
-  const [purchaseItems, setPurchaseItems] = useState([]);
+  const [purchaseItems, setPurchaseItems] = useState([
+    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther: false, isNew: true }
+  ]);
 
   const [journalEntries, setJournalEntries] = useState([
     { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 }
@@ -611,14 +613,15 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, is
           price: item.purchase_price,
           discount: item.discount,
           discountType: item.discount_type || 'PERCENT',
-          vat: parseInt(item.vat_id) || 0,
-          vatSearch: `${item.vat_code || ''} - ${item.vat_name || ''}`,
+          vat: item.vat_id ?? item.vat,
+          vatSearch: item.vat_code || item.vat_name ? `${item.vat_code || ''}${item.vat_code && item.vat_name ? ' - ' : ''}${item.vat_name || ''}` : '',
           vatRate: parseFloat(item.vat_rate) || 0,
-          wht: parseInt(item.witholding_tax_id) || 0,
-          whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
+          wht: item.witholding_tax_id ?? item.witholding_tax ?? item.witholding_tax_id ?? item.witholding_tax_id,
+          whtSearch: item.withholding_tax_code ? `${item.withholding_tax_code}${item.withholding_tax_name ? ' - ' + item.withholding_tax_name : ''}` : (item.withholding_tax_name || ''),
           whtRate: parseFloat(item.withholding_tax_rate) || 0,
           responsibilityCenter: item.responsibility_center,
-          isOther: false
+          isOther: false,
+          isNew: false
         }));
         console.log('Final purchase items array:', items);
         setPurchaseItems(items);
@@ -676,7 +679,7 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, is
     }
   }, [isViewMode, isEditMode, purchaseData]);
 
-  const addPurchaseItem = (isOther = false) => setPurchaseItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther }]);
+  const addPurchaseItem = (isOther = false) => setPurchaseItems(prev => [...prev, { id: Date.now(), productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther, isNew: true }]);
   const addJournalEntry = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
   const removePurchaseItem = (id) => setPurchaseItems(prev => prev.filter(i => i.id !== id));
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
@@ -897,6 +900,7 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, is
       const preparedPurchaseItems = purchaseItems
         .filter(item => !item.isOther)
         .map(item => ({
+          id: item.isNew ? undefined : item.id,
           product_service: item.productId || null,
           charts_of_accounts: item.coa || item.accountId,
           description: item.description,
@@ -919,13 +923,16 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, is
         }));
 
       const preparedAttachments = await Promise.all(
-        attachments.map(async att => ({
-          name: att.fileName,
-          file: att.file ? await fileToBase64(att.file) : null,
-          remarks: att.remarks,
-          uploaded_by: att.uploadedBy,
-          uploaded_date: att.date
-        }))
+        attachments
+          .filter(att => att.file || att.fileName)
+          .map(async att => ({
+            id: att.id,
+            name: att.fileName,
+            file: att.file ? (typeof att.file === 'string' ? att.file : await fileToBase64(att.file)) : null,
+            remarks: att.remarks,
+            uploaded_by: att.uploadedBy,
+            uploaded_date: att.date
+          }))
       );
 
       const purchaseDataPayload = {

@@ -223,8 +223,8 @@ const getAllPurchase = async (req, res, next) => {
       { col: Accounting.purchase_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
     ])
       .from(Accounting.purchase_items.tablename)
-      .innerJoin(Master.withholding_tax.tablename, Accounting.purchase_items.selectOptionColumns.withholding_tax, Master.withholding_tax.selectOptionColumns.id)
-      .innerJoin(Master.vat.tablename, Accounting.purchase_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
+      .leftJoin(Master.withholding_tax.tablename, Accounting.purchase_items.selectOptionColumns.withholding_tax, Master.withholding_tax.selectOptionColumns.id)
+      .leftJoin(Master.vat.tablename, Accounting.purchase_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
       .leftJoin(Master.products_service.tablename, Accounting.purchase_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
       .innerJoin(Master.charts_of_accounts.tablename, Accounting.purchase_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
       .where(Accounting.purchase_items.selectOptionColumns.purchase_id)
@@ -449,7 +449,6 @@ const updatePurchaseState = async (req, res, next) => {
     const {
       updates
     } = req.body;
-    console.log("body", req.body);
 
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({
@@ -466,8 +465,15 @@ const updatePurchaseState = async (req, res, next) => {
       const updatePromises = updates.map(async (update) => {
         const { id, currentState } = update;
 
-        if (!id || !currentState) {
-          throw new Error('Each update requires id and currentState');
+        // Convert id to number if it's a string
+        const purchaseId = typeof id === 'string' ? parseInt(id, 10) : id;
+
+        if (!purchaseId || !currentState) {
+          throw new Error('Each update requires valid id and currentState');
+        }
+
+        if (isNaN(purchaseId)) {
+          throw new Error(`Invalid purchase ID: ${id} (converted to ${purchaseId})`);
         }
 
         let nextState;
@@ -483,7 +489,7 @@ const updatePurchaseState = async (req, res, next) => {
           .set([Accounting.purchase.selectOptionColumns.state])
           .where(Accounting.purchase.selectOptionColumns.id)
           .build();
-        const updateValues = [nextState, id];
+        const updateValues = [nextState, purchaseId];
         return connection.execute(updateQuery, updateValues);
 
       });

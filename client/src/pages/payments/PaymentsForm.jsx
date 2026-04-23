@@ -321,52 +321,29 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
       // Populate payment items
       if (paymentData.items && paymentData.items.length > 0) {
         const items = paymentData.items.map(item => {
-          // In view mode, the backend returns computed values
-          // item.discount is the discount value (percentage or fixed amount)
-          // item.vat and item.witholding_tax are the computed tax amounts
-          // item.amount is the final amount due
-          
-          // We need to compute the discount amount based on discount type
-          // Since we don't have the original price, we'll estimate it
-          const finalAmount = parseFloat(item.amount) || 0;
-          const vatAmount = parseFloat(item.vat) || 0;
-          const whtAmount = parseFloat(item.witholding_tax) || 0;
+          const qty = parseFloat(item.quantity) || 0;
+          const price = parseFloat(item.purchase_price) || 0;
           const discountValue = parseFloat(item.discount) || 0;
           const discountType = item.discount_type || 'PERCENT';
-          
-          // Reverse calculate the discount amount
-          // Formula: amount = discounted + vat - wht
-          // So: discounted = amount - vat + wht
-          const discountedAmount = finalAmount - vatAmount + whtAmount;
-          
-          let discAmt;
-          if (discountType === 'PERCENT') {
-            // For percentage, we need to estimate the original gross
-            // Formula: discounted = gross - (gross * discount/100)
-            // So: discounted = gross * (1 - discount/100)
-            // So: gross = discounted / (1 - discount/100)
-            if (discountValue < 100) {
-              const gross = discountedAmount / (1 - discountValue / 100);
-              discAmt = gross - discountedAmount;
-            } else {
-              discAmt = discountValue; // Fallback
-            }
-          } else {
-            // FIXED amount
-            discAmt = discountValue;
-          }
-          
+          const vatPct = parseFloat(item.vat_rate) || 0;
+          const whtPct = parseFloat(item.withholding_tax_rate) || 0;
+
+          const computed = computeItemAmounts(qty, price, discountValue, discountType, vatPct, whtPct);
+
+          const storedAmount = parseFloat(item.amount) || 0;
+          const storedWhtAmount = parseFloat(item.witholding_tax) || 0;
+
           return {
             id: item.id,
-            purchaseItemId: item.id,
+            purchaseItemId: item.purchase_item_id,
             invoiceRef: item.invoice_ref || '',
             description: item.product_service_name || item.description || '',
             responsibilityCenter: item.responsibility_center || '',
-            gross: parseFloat(item.gross) || 0,
-            discAmt: discAmt,
-            vatAmt: vatAmount,
-            whtAmount: whtAmount,
-            amount: finalAmount,
+            gross: computed.gross,
+            discAmt: computed.discAmt,
+            vatAmt: computed.vatAmt,
+            whtAmount: storedWhtAmount || computed.whtAmount,
+            amount: storedAmount || computed.amount,
             isOther: false
           };
         });

@@ -97,6 +97,7 @@ const getAdjustmentById = async (req, res, next) => {
         // Journal entries query
         const journal_entries_query = sql.select([
             { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+            { col: Accounting.journal_entries.selectOptionColumns.coa_id, as: 'coa_id' },
             { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'account_name' },
             { col: Accounting.journal_entries.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
             { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' },
@@ -337,9 +338,162 @@ const updateAdjustment = async (req, res, next) => {
   }
 }
 
+const updateAdjustmentData = async (req, res, next) => {
+  try {
+    const { adjustment_id } = req.params;
+    const {
+      document_reference,
+      posting_date,
+      remarks,
+      total_amount,
+      adjustment_attachments,
+      journal_entries
+    } = req.body;
+    
+    console.log('Updating adjustment data:', req.body);
+    
+    const adjustmentId = Number(adjustment_id);
+    if (!adjustment_id || isNaN(adjustmentId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid adjustment ID provided',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    if (!document_reference || !posting_date || !total_amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Required fields must be provided'
+      });
+    }
+    
+    let connection;
+    try {
+      connection = await pool.getConnection();
+      await connection.beginTransaction();
+      
+      // Update adjustment header
+      const updateHeaderQuery = sql.update(Accounting.adjustments.tablename)
+        .set([
+          Accounting.adjustments.selectOptionColumns.document_reference,
+          Accounting.adjustments.selectOptionColumns.posting_date,
+          Accounting.adjustments.selectOptionColumns.remarks,
+          Accounting.adjustments.selectOptionColumns.total_amount
+        ])
+        .where(Accounting.adjustments.selectOptionColumns.id)
+        .build();
+      
+      const headerValues = [
+        document_reference || null,
+        posting_date || null,
+        remarks || null,
+        total_amount || null,
+        adjustmentId
+      ];
+      
+      await connection.execute(updateHeaderQuery, headerValues);
+      
+      // Delete existing journal entries for this adjustment
+      const deleteJournalQuery = sql.delete(Accounting.journal_entries.tablename)
+        .where(Accounting.journal_entries.selectOptionColumns.db_name)
+        .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
+        .build();
+      
+      await connection.execute(deleteJournalQuery, ['adjustments', adjustmentId]);
+      
+      // Insert new journal entries
+      if (journal_entries && journal_entries.length > 0) {
+        for (const entry of journal_entries) {
+          const entryQuery = sql.insert(Accounting.journal_entries.tablename, {
+            columns: Accounting.journal_entries.insertColumns,
+            prefix: Accounting.journal_entries.prefix,
+            isTransaction: true
+          }).build();
+          
+          const type = entry.debit > 0 ? 'debit' : 'credit';
+          const amount = entry.debit > 0 ? entry.debit : entry.credit;
+          
+          const entryValues = [
+            "adjustments",
+            adjustmentId,
+            entry.account_id || null,
+            entry.responsibility_center || '',
+            type,
+            amount,
+            new Date().toISOString().split('T')[0]
+          ];
+          
+          await connection.execute(entryQuery, entryValues);
+        }
+      }
+      
+      // Delete existing attachments for this adjustment
+      const deleteAttachmentsQuery = sql.delete(Accounting.adjustment_attachments.tablename)
+        .where(Accounting.adjustment_attachments.selectOptionColumns.adjustment_id)
+        .build();
+      
+      await connection.execute(deleteAttachmentsQuery, [adjustmentId]);
+      
+      // Insert new attachments
+      if (adjustment_attachments && adjustment_attachments.length > 0) {
+        for (const attachment of adjustment_attachments) {
+          const attachmentQuery = sql.insert(Accounting.adjustment_attachments.tablename, {
+            columns: Accounting.adjustment_attachments.insertColumns,
+            prefix: Accounting.adjustment_attachments.prefix,
+            isTransaction: true
+          }).build();
+          
+          const attachmentValues = [
+            adjustmentId,
+            attachment.file || null,
+            attachment.name || null,
+            attachment.remarks || null,
+            attachment.uploaded_by || null,
+            attachment.uploaded_date || new Date().toLocaleDateString()
+          ];
+          
+          await connection.execute(attachmentQuery, attachmentValues);
+        }
+      }
+      
+      // Commit transaction
+      await connection.commit();
+      
+      res.status(200).json({
+        success: true,
+        message: 'Adjustment updated successfully',
+        data: { id: adjustmentId },
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      // Rollback transaction if error occurs
+      if (connection) {
+        await connection.rollback();
+      }
+      throw error;
+    } finally {
+      // Release connection
+      if (connection) {
+        connection.release();
+      }
+    }
+
+  } catch (error) {
+    console.error('Error updating adjustment data:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating adjustment data',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+}
+
 module.exports = {
     getAdjustments,
     getAdjustmentById,
     createAdjustment,
     updateAdjustment,
+    updateAdjustmentData,
 }

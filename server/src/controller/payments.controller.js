@@ -55,6 +55,7 @@ const getPayments = async (req, res, next) => {
 
 const getPurchasePayment = async (req, res, next) => {
   try {
+
     const query = sql.select([
       { col: Accounting.purchase.selectOptionColumns.id, as: 'id' },
       { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
@@ -66,10 +67,13 @@ const getPurchasePayment = async (req, res, next) => {
     ])
       .from(Accounting.purchase.tablename)
       .innerJoin(Master.vendors.tablename, Accounting.purchase.selectOptionColumns.vendor_id, Master.vendors.selectOptionColumns.id)
-      .leftJoin(Accounting.payment_items.tablename, Accounting.purchase.selectOptionColumns.id, Accounting.payment_items.selectOptionColumns.purchase_id)
-      .andWhereNot(Accounting.purchase.selectOptionColumns.status)
       .where(Accounting.purchase.selectOptionColumns.state)
-      .andWhereNotExists(`SELECT 1 FROM ${Accounting.payment_items.tablename} WHERE ${Accounting.payment_items.selectOptionColumns.purchase_id} = ${Accounting.purchase.selectOptionColumns.id}`)
+      .andWhereNotExists(
+        `SELECT 1 FROM ${Accounting.payment_items.tablename} pi_pay ` +
+        `INNER JOIN ${Accounting.purchase_items.tablename} pi_inv ON pi_inv.${Accounting.purchase_items.selectOptionColumns.id} = pi_pay.${Accounting.payment_items.selectOptionColumns.purchase_id} ` +
+        `WHERE pi_inv.${Accounting.purchase_items.selectOptionColumns.purchase_id} = ${Accounting.purchase.selectOptionColumns.id}`
+      )
+      .andWhereNot(Accounting.purchase.selectOptionColumns.status)
       .build();
     let purchases = await Query(query, ['APPROVED', 'PAID'], [Accounting.purchase.prefix_, Master.vendors.prefix_]);
     console.log("PURCHASES QUERY 1", query);
@@ -133,12 +137,12 @@ const getPurchaseItemsPayment = async (req, res, next) => {
       { col: Accounting.purchase_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
     ])
       .from(Accounting.purchase_items.tablename)
-      .innerJoin(
+      .leftJoin(
         Master.vat.tablename,
         Accounting.purchase_items.selectOptionColumns.vat,
         Master.vat.selectOptionColumns.id
       )
-      .innerJoin(
+      .leftJoin(
         Master.withholding_tax.tablename,
         Accounting.purchase_items.selectOptionColumns.withholding_tax,
         Master.withholding_tax.selectOptionColumns.id
@@ -148,7 +152,7 @@ const getPurchaseItemsPayment = async (req, res, next) => {
         Accounting.purchase_items.selectOptionColumns.purchase_id,
         Accounting.purchase.selectOptionColumns.id
       )
-      .innerJoin(
+      .leftJoin(
         Master.products_service.tablename,
         Accounting.purchase_items.selectOptionColumns.product_service,
         Master.products_service.selectOptionColumns.id
@@ -229,29 +233,34 @@ const getAllPayments = async (req, res, next) => {
 
     const payment_items_query = sql.select([
       { col: Accounting.payment_items.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.payment_items.selectOptionColumns.purchase_id, as: 'purchase_item_id' },
       { col: Accounting.purchase.selectOptionColumns.document_reference, as: 'invoice_ref' },
       { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
+      { col: Accounting.purchase_items.selectOptionColumns.description, as: 'description' },
+      { col: Accounting.purchase_items.selectOptionColumns.quantity, as: 'quantity' },
+      { col: Accounting.purchase_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
       { col: Accounting.purchase_items.selectOptionColumns.discount, as: 'discount' },
       { col: Accounting.purchase_items.selectOptionColumns.discount_type, as: 'discount_type' },
-      { col: Master.vat.selectOptionColumns.rate, as: 'vat' },
+      { col: Master.vat.selectOptionColumns.rate, as: 'vat_rate' },
       { col: Accounting.payment_items.selectOptionColumns.amount, as: 'amount' },
-      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'witholding_tax' },
+      { col: Accounting.payment_items.selectOptionColumns.witholding_tax, as: 'witholding_tax' },
+      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'withholding_tax_rate' },
       { col: Accounting.purchase_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
     ])
       .from(Accounting.payment_items.tablename)
       .innerJoin(Accounting.purchase_items.tablename, Accounting.purchase_items.selectOptionColumns.id, Accounting.payment_items.selectOptionColumns.purchase_id)
       .innerJoin(Accounting.purchase.tablename, Accounting.purchase.selectOptionColumns.id, Accounting.purchase_items.selectOptionColumns.purchase_id)
-      .innerJoin(
+      .leftJoin(
         Master.vat.tablename,
         Accounting.purchase_items.selectOptionColumns.vat,
         Master.vat.selectOptionColumns.id
       )
-      .innerJoin(
+      .leftJoin(
         Master.withholding_tax.tablename,
         Accounting.purchase_items.selectOptionColumns.withholding_tax,
         Master.withholding_tax.selectOptionColumns.id
       )
-      .innerJoin(Master.products_service.tablename, Master.products_service.selectOptionColumns.id, Accounting.purchase_items.selectOptionColumns.product_service)
+      .leftJoin(Master.products_service.tablename, Master.products_service.selectOptionColumns.id, Accounting.purchase_items.selectOptionColumns.product_service)
       .where(Accounting.payment_items.selectOptionColumns.payment_id)
       .build();
 

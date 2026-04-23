@@ -21,6 +21,7 @@ function AdjustmentsContent() {
   const { adjustments, loading, error, refetchAdjustments } = useAdjustments();
   const [isAdding, setIsAdding] = useState(false);
   const [isViewing, setIsViewing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [viewingAdjustment, setViewingAdjustment] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -112,6 +113,7 @@ function AdjustmentsContent() {
   const handleBack = () => {
     setIsAdding(false);
     setIsViewing(false);
+    setIsEditing(false);
     setViewingAdjustment(null);
   };
 
@@ -124,6 +126,8 @@ function AdjustmentsContent() {
   if (isAdding) return (
     <RouteProtection routeName="adjustments">
       <AdjustmentsForm
+        isEditMode={isEditing}
+        adjustmentData={isEditing ? viewingAdjustment : null}
         onBack={() => setIsAdding(false)}
         onSuccess={async (nextToast) => {
           if (nextToast) setToast(nextToast);
@@ -320,6 +324,7 @@ function AdjustmentsContent() {
 
                   console.log('Adjustment details fetched for editing:', result);
                   setViewingAdjustment(result);
+                  setIsEditing(true);
                   setIsAdding(true);
 
                 } catch (error) {

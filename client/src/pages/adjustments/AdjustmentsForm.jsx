@@ -154,7 +154,7 @@ function SummaryRow({ label, value, color = 'text-gray-800', formula }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false, adjustmentData = null }) {
+export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false, isEditMode = false, adjustmentData = null }) {
 
   const [journalEntries,  setJournalEntries]  = useState([]);
 
@@ -187,7 +187,7 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
 
   useEffect(() => { fetchChartsOfAccounts(); }, []);
   useEffect(() => {
-    if (isViewMode && adjustmentData) {
+    if ((isViewMode || isEditMode) && adjustmentData) {
       console.log('Populating form with adjustment data:', adjustmentData);
       
       // Populate basic adjustment info
@@ -202,12 +202,12 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
       if (adjustmentData.journal_entries && adjustmentData.journal_entries.length > 0) {
         const journal = adjustmentData.journal_entries.map(entry => ({
           id: entry.id,
-          account: entry.account_name,
-          accountSearch: entry.account_name, // Use account_name for search
+          account: entry.coa_id, // Use coa_id for the account field
+          accountSearch: entry.account_name, // Use account_name for search display
           center: entry.responsibility_center || '',
           debit: entry.type === 'DEBIT' ? parseFloat(entry.amount) || 0 : 0,
           credit: entry.type === 'CREDIT' ? parseFloat(entry.amount) || 0 : 0,
-          isManual: false
+          isManual: true // In edit mode, all entries should be editable
         }));
         setJournalEntries(journal);
       }
@@ -229,7 +229,7 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
         setAttachments(attachments);
       }
     }
-  }, [isViewMode, adjustmentData]);
+  }, [isViewMode, isEditMode, adjustmentData]);
 
   // ── Journal entry helpers ─────────────────────────────────────────────────
   const addJournalEntry    = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: '', credit: '', isManual: true }]);
@@ -306,11 +306,13 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
         journal_entries: preparedJournalEntries,
       };
 
-      const url = isViewMode && adjustmentData 
-        ? `${import.meta.env.VITE_SERVER_LINK}/adjustments/${adjustmentData.data[0].a_id}`
-        : `${import.meta.env.VITE_SERVER_LINK}/adjustments`;
+      const url = isEditMode && adjustmentData
+        ? `${import.meta.env.VITE_SERVER_LINK}/adjustments/${adjustmentData.data[0].id}`
+        : isViewMode && adjustmentData
+          ? `${import.meta.env.VITE_SERVER_LINK}/adjustments/${adjustmentData.data[0].id}`
+          : `${import.meta.env.VITE_SERVER_LINK}/adjustments`;
       
-      const method = isViewMode && adjustmentData ? 'PUT' : 'POST';
+      const method = (isEditMode || isViewMode) && adjustmentData ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
         method: method,
@@ -325,7 +327,7 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
 
       const result = await response.json();
       if (result.success) {
-        const nextToast = { type: 'success', message: isViewMode ? 'Adjustment updated successfully!' : 'Adjustment posted successfully!' };
+        const nextToast = { type: 'success', message: isEditMode ? 'Adjustment updated successfully!' : isViewMode ? 'Adjustment updated successfully!' : 'Adjustment posted successfully!' };
         setToast(nextToast);
         if (onSuccess) await onSuccess(nextToast);
         onBack();
@@ -385,7 +387,7 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
               onClick={handlePostTransaction}
               className="px-6 py-2 bg-red-600 text-white text-[12px] font-black rounded-lg hover:bg-red-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-red-200"
             >
-              <Save size={14} /> Post Adjustment
+              <Save size={14} /> {isEditMode ? 'Update Adjustment' : 'Post Adjustment'}
             </button>
           </div>
         )}
