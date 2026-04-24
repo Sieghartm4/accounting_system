@@ -59,6 +59,8 @@ function AccessContent() {
   const routeAccessOptions = [
     { value: 'Full Access', label: 'Full Access' },
     { value: 'No Access', label: 'No Access' },
+    { value: 'View Access', label: 'View Access' },
+    { value: 'Edit Access', label: 'Edit Access' },
     { value: 'Check Access', label: 'Check Access' },
     { value: 'Approve Access', label: 'Approve Access' }
   ];
@@ -69,7 +71,7 @@ function AccessContent() {
       // Prepare single update data
       const route_access_Data = {
         updates: [{
-          id: routeId,
+          id: row.id, // Use the actual row.id from the data
           access_id: selectedAccessId,
           status: newStatus
         }]
@@ -133,6 +135,8 @@ function AccessContent() {
       options: [
         { value: 'Full Access', label: 'Full Access' },
         { value: 'No Access', label: 'No Access' },
+        { value: 'View Access', label: 'View Access' },
+        { value: 'Edit Access', label: 'Edit Access' },
         { value: 'Check Access', label: 'Check Access' },
         { value: 'Approve Access', label: 'Approve Access' }
       ],
@@ -273,6 +277,7 @@ function AccessContent() {
             enableAddButton={false}
             returnColumn="access_id"
             onRowClick={handleAccessRowClick}
+            highlightRow={selectedAccessId ? { column: 'access_id', value: selectedAccessId } : null}
             badgeColumns={[
               {
                 column: 'status',
@@ -311,18 +316,6 @@ function AccessContent() {
                   enableCheckbox={true}
                   checkboxColumn="route_id"
                   checkboxActions={routeCheckboxActions}
-                  badgeColumns={[
-                    {
-                      column: 'status',
-                      values: {
-                        'FULL ACCESS': 'green',
-                        'READ ONLY': 'red',
-                        'NO ACCESS': 'yellow',
-                        'APPROVE ACCESS': 'blue',
-                        'CHECK ACCESS': 'purple'
-                      }
-                    }
-                  ]}
                 />
               </div>
             )

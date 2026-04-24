@@ -510,15 +510,15 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
               <div className="overflow-x-auto custom-table-scroller">
                 <table className="w-full text-center" style={{ tableLayout: 'fixed', minWidth: 600 }}>
                   <colgroup>
-                    <col style={{ width: '40%' }} />
-                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '32%' }} />
+                    <col style={{ width: '16%' }} />
                     <col style={{ width: '16%' }} />
                     <col style={{ width: '16%' }} />
                     <col style={{ width: '6%'  }} />
                   </colgroup>
                   <thead>
                     <tr className="border-b border-gray-100">
-                      {['Charts of Account', 'Responsibility Center', 'Debit', 'Credit', ''].map((h, i) => (
+                      {['Charts of Account', 'Debit', 'Credit', 'Responsibility Center', ''].map((h, i) => (
                         <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
                       ))}
                     </tr>
@@ -543,15 +543,6 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
                         </td>
                         <td className="py-1.5 px-1">
                           <input 
-                            disabled={isViewMode}
-                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                            placeholder="Center..." 
-                            value={entry.center} 
-                            onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} 
-                          />
-                        </td>
-                        <td className="py-1.5 px-1">
-                          <input 
                             disabled={isViewMode || !entry.isManual} 
                             className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
                             placeholder="0.00" 
@@ -572,6 +563,15 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
                             readOnly={!entry.isManual} 
                           />
                         </td>
+                        <td className="py-1.5 px-1">
+                          <input 
+                            disabled={isViewMode}
+                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            placeholder="Center..." 
+                            value={entry.center} 
+                            onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} 
+                          />
+                        </td>
                         <td className="py-1.5 text-center">
                           {!isViewMode && entry.isManual ? (
                             <button className="p-1 text-red-600 hover:bg-red-50 rounded" onClick={() => removeJournalEntry(entry.id)}>
@@ -586,11 +586,12 @@ export default function AdjustmentsForm({ onBack, onSuccess, isViewMode = false,
                   </tbody>
                   <tfoot>
                     <tr className="bg-gray-50/50">
-                      <td colSpan={2} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
+                      <td colSpan={1} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
                       <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(totalDebit)}</td>
                       <td className={`py-2 px-1 text-center text-[13px] font-black ${isBalanced ? 'text-green-600' : 'text-red-600'}`}>
                         {fmt(totalCredit)} <span className="text-[11px]">{isBalanced ? '✅' : '❌'}</span>
                       </td>
+                      <td />
                       <td />
                     </tr>
                   </tfoot>

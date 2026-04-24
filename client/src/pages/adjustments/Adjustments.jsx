@@ -28,13 +28,13 @@ function AdjustmentsContent() {
   // Check if user has access to enable checkboxes
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const accessLevel = getAccessLevel('adjustments', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Full Access';
+  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
 
   // Determine checkbox condition based on access level
   const checkboxCondition = enableCheckboxes
     ? accessLevel === 'Full Access' 
       ? { column: 'status', value: 'APPROVED', exclude: true } // Exclude APPROVED state for Full Access
-      : { column: 'status', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
+      : { column: 'status', value: accessLevel === 'Check Access' ? 'PREPARED' : accessLevel === 'Approve Access' ? 'CHECKED' : 'CHECKED' }
     : null;
 
   const fadeInUp = {
@@ -49,8 +49,7 @@ function AdjustmentsContent() {
       onClick: (adjustment) => {
         setViewingAdjustment(adjustment);
         setIsViewing(true);
-      },
-      color: 'text-blue-600 hover:bg-blue-50'
+      }
     },
     {
       label: 'Edit',
@@ -58,9 +57,7 @@ function AdjustmentsContent() {
       onClick: (adjustment) => {
         setViewingAdjustment(adjustment);
         setIsAdding(true);
-      },
-      color: 'text-green-600 hover:bg-green-50',
-      condition: accessLevel !== 'View Only'
+      }
     },
     {
       label: 'Delete',
@@ -68,9 +65,7 @@ function AdjustmentsContent() {
       onClick: (adjustment) => {
         // Handle delete
         setToast({ type: 'warning', message: 'Delete functionality not implemented yet' });
-      },
-      color: 'text-red-600 hover:bg-red-50',
-      condition: accessLevel === 'Full Access'
+      }
     }
   ];
 

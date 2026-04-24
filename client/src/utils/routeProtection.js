@@ -1,7 +1,7 @@
 // Route protection utility for checking user access
 
 /**
- * Check if user has access to a specific route (Full Access, Check Access, or Approve Access)
+ * Check if user has access to a specific route (Full Access, Edit Access, View Access, Check Access, or Approve Access)
  * @param {string} routeName - The route name to check
  * @param {Object} user - User object with route_access array
  * @returns {boolean} - Whether user has access
@@ -21,7 +21,7 @@ export const hasRouteAccess = (routeName, user) => {
       return false;
     }
     return route.name === routeName && 
-      (route.status === 'Full Access' || route.status === 'Check Access' || route.status === 'Approve Access');
+      (route.status === 'Full Access' || route.status === 'Edit Access' || route.status === 'View Access' || route.status === 'Check Access' || route.status === 'Approve Access');
   });
 };
 
@@ -98,13 +98,61 @@ export const hasApproveAccess = (routeName, user) => {
 };
 
 /**
+ * Check if user has edit access to a specific route (can view and edit)
+ * @param {string} routeName - The route name to check
+ * @param {Object} user - User object with route_access array
+ * @returns {boolean} - Whether user has edit access
+ */
+export const hasEditAccess = (routeName, user) => {
+  if (!user || !user.route_access || !routeName || typeof routeName !== 'string') {
+    return false;
+  }
+
+  return user.route_access.some(route => {
+    if (!route || typeof route !== 'object') {
+      console.warn('Invalid route object:', route);
+      return false;
+    }
+    if (!route.name || typeof route.name !== 'string') {
+      console.warn('Invalid route.name:', route.name);
+      return false;
+    }
+    return route.name.toLowerCase() === routeName.toLowerCase() && route.status === 'Edit Access';
+  });
+};
+
+/**
+ * Check if user has view access to a specific route (can only view)
+ * @param {string} routeName - The route name to check
+ * @param {Object} user - User object with route_access array
+ * @returns {boolean} - Whether user has view access
+ */
+export const hasViewAccess = (routeName, user) => {
+  if (!user || !user.route_access || !routeName || typeof routeName !== 'string') {
+    return false;
+  }
+
+  return user.route_access.some(route => {
+    if (!route || typeof route !== 'object') {
+      console.warn('Invalid route object:', route);
+      return false;
+    }
+    if (!route.name || typeof route.name !== 'string') {
+      console.warn('Invalid route.name:', route.name);
+      return false;
+    }
+    return route.name.toLowerCase() === routeName.toLowerCase() && route.status === 'View Access';
+  });
+};
+
+/**
  * Check if user can create/edit on a specific route
  * @param {string} routeName - The route name to check
  * @param {Object} user - User object with route_access array
  * @returns {boolean} - Whether user can create/edit
  */
 export const canCreateEdit = (routeName, user) => {
-  return hasFullAccess(routeName, user);
+  return hasFullAccess(routeName, user) || hasEditAccess(routeName, user);
 };
 
 /**
@@ -135,7 +183,7 @@ export const getAccessibleRoutes = (user) => {
   }
 
   return user.route_access
-    .filter(route => route && route.name && route.status && (route.status === 'Full Access' || route.status === 'Check Access' || route.status === 'Approve Access'))
+    .filter(route => route && route.name && route.status && (route.status === 'Full Access' || route.status === 'Edit Access' || route.status === 'View Access' || route.status === 'Check Access' || route.status === 'Approve Access'))
     .map(route => route.name);
 };
 

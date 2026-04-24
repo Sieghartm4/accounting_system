@@ -29,7 +29,7 @@ function SalesContent() {
   // Check if user has access to enable checkboxes
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const accessLevel = getAccessLevel('sales', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Full Access';
+  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
 
   // Determine checkbox condition based on access level
   const checkboxCondition = enableCheckboxes

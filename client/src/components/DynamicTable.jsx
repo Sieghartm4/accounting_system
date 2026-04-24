@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Search, Filter, Columns, Plus, X, Maximize2, Eye, Edit } from 'lucide-react';
+import { getAccessLevel } from '../utils/routeProtection';
 
 const DynamicTable = ({
   data,
@@ -25,6 +26,8 @@ const DynamicTable = ({
   actionButtons = [],            // array of { label, onClick(row), icon } buttons for each row
   // --- BADGE PROPS ---
   badgeColumns = [],             // array of { column: 'status', values: { 'PAID': 'green', 'UNPAID': 'red' } } for dynamic badges
+  // --- HIGHLIGHT PROPS ---
+  highlightRow = null,          // { column: 'id', value: 123 } - highlight row where column matches value
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterColumn, setFilterColumn] = useState('');
@@ -66,6 +69,41 @@ const DynamicTable = ({
       }
     }
     return true; // Default to true if no condition
+  };
+
+  // Check if row should be highlighted
+  const shouldHighlightRow = (row) => {
+    if (!highlightRow || !highlightRow.column || !highlightRow.value) return false;
+    const rowValue = String(row[highlightRow.column]);
+    const highlightValue = String(highlightRow.value);
+    return rowValue === highlightValue;
+  };
+
+  // Filter action buttons based on user access level
+  const getFilteredActionButtons = () => {
+    if (!actionButtons || actionButtons.length === 0) return actionButtons;
+    
+    // Get current user and access level for this route
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const routeName = window.location.pathname.split('/')[1]; // Extract route from URL
+    const accessLevel = getAccessLevel(routeName, user);
+    
+    return actionButtons.filter(button => {
+      const label = button.label.toLowerCase();
+      
+      // Show View button for Check Access, View Access, Edit Access, Approve Access, or Full Access
+      if (label === 'view') {
+        return accessLevel === 'Check Access' || accessLevel === 'View Access' || accessLevel === 'Edit Access' || accessLevel === 'Approve Access' || accessLevel === 'Full Access';
+      }
+      
+      // Show Edit button for Approve Access, Edit Access, or Full Access (but NOT for Check Access)
+      if (label === 'edit') {
+        return accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
+      }
+      
+      // For other custom buttons, show them for Approve Access, Edit Access, or Full Access
+      return accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
+    });
   };
 
   const handleRowClick = (row) => {
@@ -477,11 +515,12 @@ const DynamicTable = ({
             {filteredAndSortedData.map((row, idx) => {
               const rowKey = getRowKey(row, idx);
               const isChecked = selectedKeys.has(rowKey);
+              const isHighlighted = shouldHighlightRow(row);
               return (
                 <tr
                   key={idx}
                   onClick={() => handleRowClick(row)}
-                  className={`group ${enableRowClick ? 'cursor-pointer' : ''} ${isChecked ? 'bg-red-50/60' : 'hover:bg-red-50/30'} transition-colors`}
+                  className={`group ${enableRowClick ? 'cursor-pointer' : ''} ${isChecked ? 'bg-red-50/60' : isHighlighted ? 'bg-red-100 border-l-4 border-red-600 shadow-sm' : 'hover:bg-red-50/30'} transition-colors`}
                 >
                   {/* CHECKBOX ROW CELL */}
                   {enableCheckbox && (
@@ -505,7 +544,7 @@ const DynamicTable = ({
                   {enableActionColumn && (
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        {actionButtons.map((button, buttonIdx) => (
+                        {getFilteredActionButtons().map((button, buttonIdx) => (
                           <button
                             key={buttonIdx}
                             onClick={(e) => {
