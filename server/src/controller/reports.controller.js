@@ -17,7 +17,6 @@ const pool = mysql.createPool({
 })
 require('dotenv').config()
 
-// TRIAL BALANCE
 const getTrialBalance = async (req, res, next) => {
   try {
     const { start_date, end_date } = req.query;
@@ -51,7 +50,6 @@ const getTrialBalance = async (req, res, next) => {
   }
 }
 
-// INCOME STATEMENT
 const getIncomeStatement = async (req, res, next) => {
   try {
     const { start_date, end_date } = req.query;
@@ -163,7 +161,6 @@ const getIncomeStatement = async (req, res, next) => {
   }
 };
 
-// GENERAL LEDGER
 const getGeneralLedger = async (req, res, next) => {
   try {
     const { start_date, end_date } = req.query;
@@ -284,7 +281,6 @@ const getGeneralLedger = async (req, res, next) => {
   }
 };
 
-// BALANCE SHEET
 const getBalanceSheet = async (req, res, next) => {
   try {
     const { start_date, end_date } = req.query;
@@ -301,7 +297,6 @@ const getBalanceSheet = async (req, res, next) => {
 
     const balanceSheet = await Query(balance_sheet_query);
 
-    // Get income statement data to calculate net income for reference
     const income_statement_query = `
       SELECT 
         ${Master.charts_of_accounts.selectOptionColumns.type}   AS 'Account Type',
@@ -334,7 +329,6 @@ const getBalanceSheet = async (req, res, next) => {
 
     const incomeStatement = await Query(income_statement_query);
 
-    // Calculate net income for reference only
     const revenues = incomeStatement.filter(item => item['Account Type'] === 'REVENUE');
     const expenses = incomeStatement.filter(item => item['Account Type'] === 'EXPENSES');
     
@@ -342,21 +336,16 @@ const getBalanceSheet = async (req, res, next) => {
     const totalExpenses = expenses.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0);
     const netIncome = totalRevenues - totalExpenses;
 
-    // Separate by type
     const assets = balanceSheet.filter(item => item['Account Code'].startsWith('100'))
     const liabilities = balanceSheet.filter(item => item['Account Code'].startsWith('200'))
     const equity = balanceSheet.filter(item => item['Account Code'].startsWith('300'))
 
-    // Add net income as separate line item in equity for display purposes
     const updatedEquity = [...equity];
     if (netIncome !== 0) {
-      // Add net income as a separate line item in equity
-      // NOTE: Since equity accounts are credit-normal, they show as negative values
-      // Net income increases equity (credit), so it should be negative to match the convention
       updatedEquity.push({
         'Account Code': '300999',
         'Account Name': 'Current Period Net Income',
-        'Current': -netIncome // Negative to match credit-normal convention
+        'Current': -netIncome
       });
     }
 
@@ -370,12 +359,12 @@ const getBalanceSheet = async (req, res, next) => {
       data: {
         assets: assets,
         liabilities: liabilities,
-        equity: updatedEquity, // Return equity with net income line item included
+        equity: updatedEquity,
         totalAssets: totalAssets,
         totalLiabilities: totalLiabilities,
         totalEquity: totalEquity,
         totalLiabilitiesAndEquity: totalLiabilities + totalEquity,
-        netIncome: netIncome // Include net income for reference display
+        netIncome: netIncome
       },
       timestamp: new Date().toISOString()
     })
@@ -390,9 +379,184 @@ const getBalanceSheet = async (req, res, next) => {
   }
 }
 
+const getSearch = async (req, res, next) => {
+  const { startDate, endDate, search } = req.query;
+  
+  try {
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Start date and end date are required',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    if (!search || search.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Search term is required',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const searchTerm = `%${search.trim()}%`;
+    const results = [];
+
+    const salesQuery = `
+      SELECT 
+        'Sales' as document_type,
+        sal.${Accounting.sales.selectOptionColumns.id} as document_id,
+        sal.${Accounting.sales.selectOptionColumns.document_reference} as document_reference,
+        cust.${Master.customers.selectOptionColumns.name} as customer_name,
+        sal.${Accounting.sales.selectOptionColumns.date_delivered} as document_date,
+        sal.${Accounting.sales.selectOptionColumns.total_amount_due} as amount,
+        sal.${Accounting.sales.selectOptionColumns.remarks} as remarks
+      FROM ${Accounting.sales.tablename} sal
+      LEFT JOIN ${Master.customers.tablename} cust ON sal.${Accounting.sales.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id}
+      WHERE (sal.${Accounting.sales.selectOptionColumns.document_reference} LIKE ? OR cust.${Master.customers.selectOptionColumns.name} LIKE ?)
+        AND sal.${Accounting.sales.selectOptionColumns.date_delivered} BETWEEN ? AND ?
+    `;
+    
+    const salesResults = await Query(salesQuery, [searchTerm, searchTerm, startDate, endDate]);
+    results.push(...salesResults);
+
+    const collectionsQuery = `
+      SELECT 
+        'Collection' as document_type,
+        coll.${Accounting.collections.selectOptionColumns.id} as document_id,
+        coll.${Accounting.collections.selectOptionColumns.document_reference} as document_reference,
+        cust.${Master.customers.selectOptionColumns.name} as customer_name,
+        coll.${Accounting.collections.selectOptionColumns.collection_date} as document_date,
+        NULL as amount,
+        coll.${Accounting.collections.selectOptionColumns.remarks} as remarks
+      FROM ${Accounting.collections.tablename} coll
+      LEFT JOIN ${Master.customers.tablename} cust ON coll.${Accounting.collections.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id}
+      WHERE (coll.${Accounting.collections.selectOptionColumns.document_reference} LIKE ? OR cust.${Master.customers.selectOptionColumns.name} LIKE ?)
+        AND coll.${Accounting.collections.selectOptionColumns.collection_date} BETWEEN ? AND ?
+    `;
+    
+    const collectionsResults = await Query(collectionsQuery, [searchTerm, searchTerm, startDate, endDate]);
+    results.push(...collectionsResults);
+
+    const receiptsQuery = `
+      SELECT 
+        'Receipt' as document_type,
+        rec.${Accounting.receipts.selectOptionColumns.id} as document_id,
+        rec.${Accounting.receipts.selectOptionColumns.document_reference} as document_reference,
+        cust.${Master.customers.selectOptionColumns.name} as customer_name,
+        rec.${Accounting.receipts.selectOptionColumns.collection_date} as document_date,
+        rec.${Accounting.receipts.selectOptionColumns.total_amount_due} as amount,
+        rec.${Accounting.receipts.selectOptionColumns.remarks} as remarks
+      FROM ${Accounting.receipts.tablename} rec
+      LEFT JOIN ${Master.customers.tablename} cust ON rec.${Accounting.receipts.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id}
+      WHERE (rec.${Accounting.receipts.selectOptionColumns.document_reference} LIKE ? OR cust.${Master.customers.selectOptionColumns.name} LIKE ?)
+        AND rec.${Accounting.receipts.selectOptionColumns.collection_date} BETWEEN ? AND ?
+    `;
+    
+    const receiptsResults = await Query(receiptsQuery, [searchTerm, searchTerm, startDate, endDate]);
+    results.push(...receiptsResults);
+
+    const purchaseQuery = `
+      SELECT 
+        'Purchase' as document_type,
+        pur.${Accounting.purchase.selectOptionColumns.id} as document_id,
+        pur.${Accounting.purchase.selectOptionColumns.document_reference} as document_reference,
+        vend.${Master.vendors.selectOptionColumns.name} as vendor_name,
+        pur.${Accounting.purchase.selectOptionColumns.date_delivered} as document_date,
+        pur.${Accounting.purchase.selectOptionColumns.total_amount_due} as amount,
+        pur.${Accounting.purchase.selectOptionColumns.remarks} as remarks
+      FROM ${Accounting.purchase.tablename} pur
+      LEFT JOIN ${Master.vendors.tablename} vend ON pur.${Accounting.purchase.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id}
+      WHERE (pur.${Accounting.purchase.selectOptionColumns.document_reference} LIKE ? OR vend.${Master.vendors.selectOptionColumns.name} LIKE ?)
+        AND pur.${Accounting.purchase.selectOptionColumns.date_delivered} BETWEEN ? AND ?
+    `;
+    
+    const purchaseResults = await Query(purchaseQuery, [searchTerm, searchTerm, startDate, endDate]);
+    results.push(...purchaseResults);
+
+    const cashDisbursementsQuery = `
+      SELECT 
+        'Cash Disbursement' as document_type,
+        cd.${Accounting.cash_disbursements.selectOptionColumns.id} as document_id,
+        cd.${Accounting.cash_disbursements.selectOptionColumns.document_reference} as document_reference,
+        vend.${Master.vendors.selectOptionColumns.name} as vendor_name,
+        cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} as document_date,
+        cd.${Accounting.cash_disbursements.selectOptionColumns.total_amount_due} as amount,
+        cd.${Accounting.cash_disbursements.selectOptionColumns.remarks} as remarks
+      FROM ${Accounting.cash_disbursements.tablename} cd
+      LEFT JOIN ${Master.vendors.tablename} vend ON cd.${Accounting.cash_disbursements.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id}
+      WHERE (cd.${Accounting.cash_disbursements.selectOptionColumns.document_reference} LIKE ? OR vend.${Master.vendors.selectOptionColumns.name} LIKE ?)
+        AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} BETWEEN ? AND ?
+    `;
+    
+    const cashDisbursementsResults = await Query(cashDisbursementsQuery, [searchTerm, searchTerm, startDate, endDate]);
+    results.push(...cashDisbursementsResults);
+
+    const paymentsQuery = `
+      SELECT 
+        'Payment' as document_type,
+        pay.${Accounting.payments.selectOptionColumns.id} as document_id,
+        pay.${Accounting.payments.selectOptionColumns.document_reference} as document_reference,
+        vend.${Master.vendors.selectOptionColumns.name} as vendor_name,
+        pay.${Accounting.payments.selectOptionColumns.payment_date} as document_date,
+        NULL as amount,
+        pay.${Accounting.payments.selectOptionColumns.remarks} as remarks
+      FROM ${Accounting.payments.tablename} pay
+      LEFT JOIN ${Master.vendors.tablename} vend ON pay.${Accounting.payments.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id}
+      WHERE (pay.${Accounting.payments.selectOptionColumns.document_reference} LIKE ? OR vend.${Master.vendors.selectOptionColumns.name} LIKE ?)
+        AND pay.${Accounting.payments.selectOptionColumns.payment_date} BETWEEN ? AND ?
+    `;
+    
+    const paymentsResults = await Query(paymentsQuery, [searchTerm, searchTerm, startDate, endDate]);
+    results.push(...paymentsResults);
+
+    const adjustmentsQuery = `
+      SELECT 
+        'Adjustment' as document_type,
+        adj.${Accounting.adjustments.selectOptionColumns.id} as document_id,
+        adj.${Accounting.adjustments.selectOptionColumns.document_reference} as document_reference,
+        NULL as customer_name,
+        NULL as vendor_name,
+        adj.${Accounting.adjustments.selectOptionColumns.posting_date} as document_date,
+        adj.${Accounting.adjustments.selectOptionColumns.total_amount} as amount,
+        adj.${Accounting.adjustments.selectOptionColumns.remarks} as remarks
+      FROM ${Accounting.adjustments.tablename} adj
+      WHERE adj.${Accounting.adjustments.selectOptionColumns.document_reference} LIKE ?
+        AND adj.${Accounting.adjustments.selectOptionColumns.posting_date} BETWEEN ? AND ?
+    `;
+    
+    const adjustmentsResults = await Query(adjustmentsQuery, [searchTerm, startDate, endDate]);
+    results.push(...adjustmentsResults);
+
+    results.sort((a, b) => new Date(b.document_date) - new Date(a.document_date));
+
+    res.status(200).json({
+      success: true,
+      message: 'Search results retrieved successfully',
+      data: results,
+      count: results.length,
+      search_term: search,
+      date_range: {
+        start_date: startDate,
+        end_date: endDate
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error performing search:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while performing search',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+}
+
 module.exports = {
   getTrialBalance,
   getIncomeStatement,
   getGeneralLedger,
-  getBalanceSheet
+  getBalanceSheet,
+  getSearch
 }

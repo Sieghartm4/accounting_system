@@ -1,13 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Search, Bell, ChevronDown, LogOut, User, Building2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Menu, Search, Bell, ChevronDown, LogOut, User, Building2, Calendar, X, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Header({ isCollapsed, onToggleSidebar }) {
+    const navigate = useNavigate();
     const [showDropdown, setShowDropdown] = useState(false);
     const [user, setUser] = useState(null);
     const [companies, setCompanies] = useState([]);
     const [selectedCompany, setSelectedCompany] = useState(null);
     const dropdownRef = useRef(null);
+    
+    // Search states
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [showSearchResults, setShowSearchResults] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchStartDate, setSearchStartDate] = useState('');
+    const [searchEndDate, setSearchEndDate] = useState('');
+    const [showSearchModal, setShowSearchModal] = useState(false);
+    const searchRef = useRef(null);
 
     useEffect(() => {
         const userData = localStorage.getItem('user');
@@ -16,9 +28,21 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
 
         const handleClickOutside = (e) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowDropdown(false);
+            if (searchRef.current && !searchRef.current.contains(e.target)) {
+                setShowSearchResults(false);
+                setShowSearchModal(false);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Set default date range
+    useEffect(() => {
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        setSearchStartDate(firstDay.toISOString().split('T')[0]);
+        setSearchEndDate(today.toISOString().split('T')[0]);
     }, []);
 
     const fetchCompanies = async () => {
@@ -35,6 +59,76 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                 }
             }
         } catch (error) { console.error('Error:', error); }
+    };
+
+    const handleSearch = async () => {
+        if (!searchQuery.trim() || !searchStartDate || !searchEndDate) {
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const token = localStorage.getItem('token');
+            const params = new URLSearchParams({
+                startDate: searchStartDate,
+                endDate: searchEndDate,
+                search: searchQuery.trim()
+            });
+
+            const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/reports/search?${params}`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    setSearchResults(result.data);
+                    setShowSearchResults(true);
+                }
+            }
+        } catch (error) {
+            console.error('Search error:', error);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handleSearchInputChange = (e) => {
+        setSearchQuery(e.target.value);
+        if (e.target.value.trim().length > 2) {
+            setShowSearchModal(true);
+        } else {
+            setShowSearchModal(false);
+            setShowSearchResults(false);
+        }
+    };
+
+    const handleSearchSubmit = (e) => {
+        e.preventDefault();
+        if (searchQuery.trim().length > 0) {
+            handleSearch();
+        }
+    };
+
+    const handleSearchResultClick = (result) => {
+        // Map document types to routes
+        const routeMap = {
+            'Sales': 'sales',
+            'Collection': 'collections',
+            'Receipt': 'receipts',
+            'Purchase': 'purchase',
+            'Cash Disbursement': 'disbursement',
+            'Payment': 'payments',
+            'Adjustment': 'adjustments'
+        };
+
+        const route = routeMap[result.document_type];
+        if (route) {
+            // Navigate to the page with document reference as query parameter
+            navigate(`/${route}?search=${encodeURIComponent(result.document_reference)}`);
+            setShowSearchModal(false);
+            setShowSearchResults(false);
+        }
     };
 
     const handleLogout = () => {
@@ -72,13 +166,125 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
 
             <div className="flex-1" />
 
-            <div className="hidden md:flex items-center relative max-w-xs w-full">
+            <div className="hidden md:flex items-center relative max-w-xs w-full" ref={searchRef}>
                 <Search className="absolute left-3 text-gray-400" size={16} />
                 <input 
                     className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none transition-all" 
                     placeholder="Search ledgers, invoices..." 
                     type="text" 
+                    value={searchQuery}
+                    onChange={handleSearchInputChange}
+                    onFocus={() => searchQuery.trim().length > 2 && setShowSearchModal(true)}
                 />
+                
+                {/* Search Modal */}
+                <AnimatePresence>
+                    {showSearchModal && (
+                        <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            className="absolute top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border border-gray-100 p-4 z-50 w-96"
+                        >
+                            <form onSubmit={handleSearchSubmit} className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Date Range</label>
+                                    <div className="flex gap-2">
+                                        <div className="flex-1">
+                                            <input 
+                                                type="date" 
+                                                value={searchStartDate}
+                                                onChange={(e) => setSearchStartDate(e.target.value)}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none"
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <input 
+                                                type="date" 
+                                                value={searchEndDate}
+                                                onChange={(e) => setSearchEndDate(e.target.value)}
+                                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <button 
+                                    type="submit"
+                                    disabled={isSearching || !searchQuery.trim()}
+                                    className="w-full bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                                >
+                                    {isSearching ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            Searching...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Search size={16} />
+                                            Search Documents
+                                        </>
+                                    )}
+                                </button>
+                                {showSearchResults && (
+                                    <div className="mt-4 border-t border-gray-100 pt-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-xs font-semibold text-gray-700">
+                                                Results ({searchResults.length})
+                                            </h4>
+                                            <button 
+                                                type="button"
+                                                onClick={() => setShowSearchModal(false)}
+                                                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                                            >
+                                                <X size={14} className="text-gray-400" />
+                                            </button>
+                                        </div>
+                                        <div className="max-h-60 overflow-y-auto space-y-2">
+                                            {searchResults.length > 0 ? (
+                                                searchResults.map((result, index) => (
+                                                    <div 
+                                                        key={index}
+                                                        className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                                                        onClick={() => handleSearchResultClick(result)}
+                                                    >
+                                                        <div className="flex items-start gap-2">
+                                                            <FileText size={14} className="text-red-600 mt-0.5 flex-shrink-0" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <span className="text-xs font-semibold text-gray-900">
+                                                                        {result.document_type}
+                                                                    </span>
+                                                                    <span className="text-xs text-gray-500">
+                                                                        {result.document_date}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-xs text-gray-700 font-medium truncate">
+                                                                    {result.document_reference}
+                                                                </p>
+                                                                <p className="text-xs text-gray-500 truncate">
+                                                                    {result.customer_name || result.vendor_name}
+                                                                </p>
+                                                                {result.amount && (
+                                                                    <p className="text-xs font-semibold text-red-600">
+                                                                        ₱{parseFloat(result.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-xs text-gray-500 text-center py-4">
+                                                    No results found for "{searchQuery}"
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </form>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
             <div className="flex items-center gap-3">

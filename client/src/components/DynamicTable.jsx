@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, Columns, Plus, X, Maximize2, Eye, Edit } from 'lucide-react';
 import { getAccessLevel } from '../utils/routeProtection';
 
@@ -29,6 +30,7 @@ const DynamicTable = ({
   // --- HIGHLIGHT PROPS ---
   highlightRow = null,          // { column: 'id', value: 123 } - highlight row where column matches value
 }) => {
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterColumn, setFilterColumn] = useState('');
   const [filterValue, setFilterValue] = useState('');
@@ -42,6 +44,14 @@ const DynamicTable = ({
   // --- OPTION COLUMNS STATE: track changes to dropdown values ---
   const [optionData, setOptionData] = useState(new Map());
   const dropdownRef = useRef(null);
+
+  // Auto-fill search term from URL parameters on component mount
+  useEffect(() => {
+    const searchFromUrl = searchParams.get('search');
+    if (searchFromUrl) {
+      setSearchTerm(searchFromUrl);
+    }
+  }, [searchParams]);
 
   // --- CHECKBOX HELPERS ---
   // Derive the unique key for a row. Falls back to index if checkboxColumn not set.
