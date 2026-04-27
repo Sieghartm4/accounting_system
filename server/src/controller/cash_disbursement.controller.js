@@ -664,6 +664,7 @@ const updateCashDisbursement = async (req, res, next) => {
 
 const updateDisbursementState = async (req, res, next) => {
   try {
+    console.log("updateDisbursementState called");
     const {
       updates
     } = req.body;

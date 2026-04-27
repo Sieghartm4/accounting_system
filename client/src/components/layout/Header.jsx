@@ -124,8 +124,11 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
 
         const route = routeMap[result.document_type];
         if (route) {
-            // Navigate to the page with document reference as query parameter
-            navigate(`/${route}?search=${encodeURIComponent(result.document_reference)}`);
+            const id = result.id ?? result.document_id;
+            if (!id) return;
+
+            // Navigate to the page with record id so it opens view mode and fetches data
+            navigate(`/${route}?id=${encodeURIComponent(id)}`);
             setShowSearchModal(false);
             setShowSearchResults(false);
         }

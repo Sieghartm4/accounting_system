@@ -6,8 +6,8 @@ const cashDisbursementRouter = express.Router()
 cashDisbursementRouter.get('/', getCashDisbursements)
 cashDisbursementRouter.get('/:cash_disbursement_id', getAllCashDisbursements)
 cashDisbursementRouter.post('/', createCashDisbursement)
-cashDisbursementRouter.put('/:cash_disbursement_id', updateCashDisbursement)
 cashDisbursementRouter.put('/disbursement-state', updateDisbursementState)
+cashDisbursementRouter.put('/:cash_disbursement_id', updateCashDisbursement)
 
 module.exports = {
   cashDisbursementRouter,

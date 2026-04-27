@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Plus, Eye, Edit, Trash2, FileText, Download, CheckCircle, XCircle, Clock, AlertCircle, Layers, ShieldCheck, Wallet, ArrowRight } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
@@ -19,11 +20,50 @@ export default function Adjustments() {
 
 function AdjustmentsContent() {
   const { adjustments, loading, error, refetchAdjustments } = useAdjustments();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isAdding, setIsAdding] = useState(false);
   const [isViewing, setIsViewing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [viewingAdjustment, setViewingAdjustment] = useState(null);
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (!id) return;
+
+    const fetchAdjustment = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('No authentication token found');
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SERVER_LINK}/adjustments/${Number(id)}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Failed to fetch adjustment details');
+
+        setViewingAdjustment(result);
+        setIsViewing(true);
+        setSearchParams(prev => {
+          const next = new URLSearchParams(prev);
+          next.delete('id');
+          return next;
+        }, { replace: true });
+      } catch (err) {
+        setToast({ type: 'error', message: err.message || 'Failed to fetch adjustment details' });
+      }
+    };
+
+    fetchAdjustment();
+  }, [searchParams, setSearchParams]);
 
   // Check if user has access to enable checkboxes
   const user = JSON.parse(localStorage.getItem('user') || '{}');

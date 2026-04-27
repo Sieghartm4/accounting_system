@@ -380,7 +380,7 @@ const getBalanceSheet = async (req, res, next) => {
 }
 
 const getSearch = async (req, res, next) => {
-  const { startDate, endDate, search } = req.query;
+  const { startDate, endDate, search, searchFields } = req.query;
   
   try {
     if (!startDate || !endDate) {
@@ -402,130 +402,228 @@ const getSearch = async (req, res, next) => {
     const searchTerm = `%${search.trim()}%`;
     const results = [];
 
+    // Enhanced Sales Query - searches across multiple fields
     const salesQuery = `
       SELECT 
         'Sales' as document_type,
         sal.${Accounting.sales.selectOptionColumns.id} as document_id,
+        sal.${Accounting.sales.selectOptionColumns.id} as id,
         sal.${Accounting.sales.selectOptionColumns.document_reference} as document_reference,
         cust.${Master.customers.selectOptionColumns.name} as customer_name,
         sal.${Accounting.sales.selectOptionColumns.date_delivered} as document_date,
         sal.${Accounting.sales.selectOptionColumns.total_amount_due} as amount,
-        sal.${Accounting.sales.selectOptionColumns.remarks} as remarks
+        sal.${Accounting.sales.selectOptionColumns.remarks} as remarks,
+        sal.${Accounting.sales.selectOptionColumns.state} as state,
+        sal.${Accounting.sales.selectOptionColumns.created_by} as created_by
       FROM ${Accounting.sales.tablename} sal
       LEFT JOIN ${Master.customers.tablename} cust ON sal.${Accounting.sales.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id}
-      WHERE (sal.${Accounting.sales.selectOptionColumns.document_reference} LIKE ? OR cust.${Master.customers.selectOptionColumns.name} LIKE ?)
+      WHERE (
+        sal.${Accounting.sales.selectOptionColumns.document_reference} LIKE ? OR 
+        cust.${Master.customers.selectOptionColumns.name} LIKE ? OR
+        sal.${Accounting.sales.selectOptionColumns.remarks} LIKE ? OR
+        sal.${Accounting.sales.selectOptionColumns.created_by} LIKE ? OR
+        sal.${Accounting.sales.selectOptionColumns.state} LIKE ? OR
+        CAST(sal.${Accounting.sales.selectOptionColumns.total_amount_due} AS CHAR) LIKE ?
+      )
         AND sal.${Accounting.sales.selectOptionColumns.date_delivered} BETWEEN ? AND ?
     `;
     
-    const salesResults = await Query(salesQuery, [searchTerm, searchTerm, startDate, endDate]);
+    const salesResults = await Query(salesQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
     results.push(...salesResults);
 
+    // Enhanced Collections Query - searches across multiple fields
     const collectionsQuery = `
       SELECT 
         'Collection' as document_type,
         coll.${Accounting.collections.selectOptionColumns.id} as document_id,
+        coll.${Accounting.collections.selectOptionColumns.id} as id,
         coll.${Accounting.collections.selectOptionColumns.document_reference} as document_reference,
         cust.${Master.customers.selectOptionColumns.name} as customer_name,
         coll.${Accounting.collections.selectOptionColumns.collection_date} as document_date,
         NULL as amount,
-        coll.${Accounting.collections.selectOptionColumns.remarks} as remarks
+        coll.${Accounting.collections.selectOptionColumns.remarks} as remarks,
+        coll.${Accounting.collections.selectOptionColumns.state} as state,
+        coll.${Accounting.collections.selectOptionColumns.created_by} as created_by,
+        coll.${Accounting.collections.selectOptionColumns.mode_of_payment} as mode_of_payment,
+        coll.${Accounting.collections.selectOptionColumns.bank_name} as bank_name,
+        coll.${Accounting.collections.selectOptionColumns.check_number} as check_number
       FROM ${Accounting.collections.tablename} coll
       LEFT JOIN ${Master.customers.tablename} cust ON coll.${Accounting.collections.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id}
-      WHERE (coll.${Accounting.collections.selectOptionColumns.document_reference} LIKE ? OR cust.${Master.customers.selectOptionColumns.name} LIKE ?)
+      WHERE (
+        coll.${Accounting.collections.selectOptionColumns.document_reference} LIKE ? OR 
+        cust.${Master.customers.selectOptionColumns.name} LIKE ? OR
+        coll.${Accounting.collections.selectOptionColumns.remarks} LIKE ? OR
+        coll.${Accounting.collections.selectOptionColumns.created_by} LIKE ? OR
+        coll.${Accounting.collections.selectOptionColumns.state} LIKE ? OR
+        coll.${Accounting.collections.selectOptionColumns.mode_of_payment} LIKE ? OR
+        coll.${Accounting.collections.selectOptionColumns.bank_name} LIKE ? OR
+        coll.${Accounting.collections.selectOptionColumns.check_number} LIKE ?
+      )
         AND coll.${Accounting.collections.selectOptionColumns.collection_date} BETWEEN ? AND ?
     `;
     
-    const collectionsResults = await Query(collectionsQuery, [searchTerm, searchTerm, startDate, endDate]);
+    const collectionsResults = await Query(collectionsQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
     results.push(...collectionsResults);
 
+    // Enhanced Receipts Query - searches across multiple fields
     const receiptsQuery = `
       SELECT 
         'Receipt' as document_type,
         rec.${Accounting.receipts.selectOptionColumns.id} as document_id,
+        rec.${Accounting.receipts.selectOptionColumns.id} as id,
         rec.${Accounting.receipts.selectOptionColumns.document_reference} as document_reference,
         cust.${Master.customers.selectOptionColumns.name} as customer_name,
         rec.${Accounting.receipts.selectOptionColumns.collection_date} as document_date,
         rec.${Accounting.receipts.selectOptionColumns.total_amount_due} as amount,
-        rec.${Accounting.receipts.selectOptionColumns.remarks} as remarks
+        rec.${Accounting.receipts.selectOptionColumns.remarks} as remarks,
+        rec.${Accounting.receipts.selectOptionColumns.state} as state,
+        rec.${Accounting.receipts.selectOptionColumns.created_by} as created_by,
+        rec.${Accounting.receipts.selectOptionColumns.mode_of_payment} as mode_of_payment,
+        rec.${Accounting.receipts.selectOptionColumns.bank_name} as bank_name,
+        rec.${Accounting.receipts.selectOptionColumns.check_number} as check_number
       FROM ${Accounting.receipts.tablename} rec
       LEFT JOIN ${Master.customers.tablename} cust ON rec.${Accounting.receipts.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id}
-      WHERE (rec.${Accounting.receipts.selectOptionColumns.document_reference} LIKE ? OR cust.${Master.customers.selectOptionColumns.name} LIKE ?)
+      WHERE (
+        rec.${Accounting.receipts.selectOptionColumns.document_reference} LIKE ? OR 
+        cust.${Master.customers.selectOptionColumns.name} LIKE ? OR
+        rec.${Accounting.receipts.selectOptionColumns.remarks} LIKE ? OR
+        rec.${Accounting.receipts.selectOptionColumns.created_by} LIKE ? OR
+        rec.${Accounting.receipts.selectOptionColumns.state} LIKE ? OR
+        CAST(rec.${Accounting.receipts.selectOptionColumns.total_amount_due} AS CHAR) LIKE ? OR
+        rec.${Accounting.receipts.selectOptionColumns.mode_of_payment} LIKE ? OR
+        rec.${Accounting.receipts.selectOptionColumns.bank_name} LIKE ? OR
+        rec.${Accounting.receipts.selectOptionColumns.check_number} LIKE ?
+      )
         AND rec.${Accounting.receipts.selectOptionColumns.collection_date} BETWEEN ? AND ?
     `;
     
-    const receiptsResults = await Query(receiptsQuery, [searchTerm, searchTerm, startDate, endDate]);
+    const receiptsResults = await Query(receiptsQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
     results.push(...receiptsResults);
 
+    // Enhanced Purchase Query - searches across multiple fields
     const purchaseQuery = `
       SELECT 
         'Purchase' as document_type,
         pur.${Accounting.purchase.selectOptionColumns.id} as document_id,
+        pur.${Accounting.purchase.selectOptionColumns.id} as id,
         pur.${Accounting.purchase.selectOptionColumns.document_reference} as document_reference,
         vend.${Master.vendors.selectOptionColumns.name} as vendor_name,
         pur.${Accounting.purchase.selectOptionColumns.date_delivered} as document_date,
         pur.${Accounting.purchase.selectOptionColumns.total_amount_due} as amount,
-        pur.${Accounting.purchase.selectOptionColumns.remarks} as remarks
+        pur.${Accounting.purchase.selectOptionColumns.remarks} as remarks,
+        pur.${Accounting.purchase.selectOptionColumns.state} as state,
+        pur.${Accounting.purchase.selectOptionColumns.created_by} as created_by
       FROM ${Accounting.purchase.tablename} pur
       LEFT JOIN ${Master.vendors.tablename} vend ON pur.${Accounting.purchase.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id}
-      WHERE (pur.${Accounting.purchase.selectOptionColumns.document_reference} LIKE ? OR vend.${Master.vendors.selectOptionColumns.name} LIKE ?)
+      WHERE (
+        pur.${Accounting.purchase.selectOptionColumns.document_reference} LIKE ? OR 
+        vend.${Master.vendors.selectOptionColumns.name} LIKE ? OR
+        pur.${Accounting.purchase.selectOptionColumns.remarks} LIKE ? OR
+        pur.${Accounting.purchase.selectOptionColumns.created_by} LIKE ? OR
+        pur.${Accounting.purchase.selectOptionColumns.state} LIKE ? OR
+        CAST(pur.${Accounting.purchase.selectOptionColumns.total_amount_due} AS CHAR) LIKE ?
+      )
         AND pur.${Accounting.purchase.selectOptionColumns.date_delivered} BETWEEN ? AND ?
     `;
     
-    const purchaseResults = await Query(purchaseQuery, [searchTerm, searchTerm, startDate, endDate]);
+    const purchaseResults = await Query(purchaseQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
     results.push(...purchaseResults);
 
+    // Enhanced Cash Disbursements Query - searches across multiple fields
     const cashDisbursementsQuery = `
       SELECT 
         'Cash Disbursement' as document_type,
         cd.${Accounting.cash_disbursements.selectOptionColumns.id} as document_id,
+        cd.${Accounting.cash_disbursements.selectOptionColumns.id} as id,
         cd.${Accounting.cash_disbursements.selectOptionColumns.document_reference} as document_reference,
         vend.${Master.vendors.selectOptionColumns.name} as vendor_name,
         cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} as document_date,
         cd.${Accounting.cash_disbursements.selectOptionColumns.total_amount_due} as amount,
-        cd.${Accounting.cash_disbursements.selectOptionColumns.remarks} as remarks
+        cd.${Accounting.cash_disbursements.selectOptionColumns.remarks} as remarks,
+        cd.${Accounting.cash_disbursements.selectOptionColumns.state} as state,
+        cd.${Accounting.cash_disbursements.selectOptionColumns.created_by} as created_by,
+        cd.${Accounting.cash_disbursements.selectOptionColumns.mode_of_payment} as mode_of_payment,
+        cd.${Accounting.cash_disbursements.selectOptionColumns.bank_name} as bank_name,
+        cd.${Accounting.cash_disbursements.selectOptionColumns.check_number} as check_number
       FROM ${Accounting.cash_disbursements.tablename} cd
       LEFT JOIN ${Master.vendors.tablename} vend ON cd.${Accounting.cash_disbursements.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id}
-      WHERE (cd.${Accounting.cash_disbursements.selectOptionColumns.document_reference} LIKE ? OR vend.${Master.vendors.selectOptionColumns.name} LIKE ?)
+      WHERE (
+        cd.${Accounting.cash_disbursements.selectOptionColumns.document_reference} LIKE ? OR 
+        vend.${Master.vendors.selectOptionColumns.name} LIKE ? OR
+        cd.${Accounting.cash_disbursements.selectOptionColumns.remarks} LIKE ? OR
+        cd.${Accounting.cash_disbursements.selectOptionColumns.created_by} LIKE ? OR
+        cd.${Accounting.cash_disbursements.selectOptionColumns.state} LIKE ? OR
+        CAST(cd.${Accounting.cash_disbursements.selectOptionColumns.total_amount_due} AS CHAR) LIKE ? OR
+        cd.${Accounting.cash_disbursements.selectOptionColumns.mode_of_payment} LIKE ? OR
+        cd.${Accounting.cash_disbursements.selectOptionColumns.bank_name} LIKE ? OR
+        cd.${Accounting.cash_disbursements.selectOptionColumns.check_number} LIKE ?
+      )
         AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} BETWEEN ? AND ?
     `;
     
-    const cashDisbursementsResults = await Query(cashDisbursementsQuery, [searchTerm, searchTerm, startDate, endDate]);
+    const cashDisbursementsResults = await Query(cashDisbursementsQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
     results.push(...cashDisbursementsResults);
 
+    // Enhanced Payments Query - searches across multiple fields
     const paymentsQuery = `
       SELECT 
         'Payment' as document_type,
         pay.${Accounting.payments.selectOptionColumns.id} as document_id,
+        pay.${Accounting.payments.selectOptionColumns.id} as id,
         pay.${Accounting.payments.selectOptionColumns.document_reference} as document_reference,
         vend.${Master.vendors.selectOptionColumns.name} as vendor_name,
         pay.${Accounting.payments.selectOptionColumns.payment_date} as document_date,
         NULL as amount,
-        pay.${Accounting.payments.selectOptionColumns.remarks} as remarks
+        pay.${Accounting.payments.selectOptionColumns.remarks} as remarks,
+        pay.${Accounting.payments.selectOptionColumns.state} as state,
+        pay.${Accounting.payments.selectOptionColumns.created_by} as created_by,
+        pay.${Accounting.payments.selectOptionColumns.mode_of_payment} as mode_of_payment,
+        pay.${Accounting.payments.selectOptionColumns.bank_name} as bank_name,
+        pay.${Accounting.payments.selectOptionColumns.check_number} as check_number
       FROM ${Accounting.payments.tablename} pay
       LEFT JOIN ${Master.vendors.tablename} vend ON pay.${Accounting.payments.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id}
-      WHERE (pay.${Accounting.payments.selectOptionColumns.document_reference} LIKE ? OR vend.${Master.vendors.selectOptionColumns.name} LIKE ?)
+      WHERE (
+        pay.${Accounting.payments.selectOptionColumns.document_reference} LIKE ? OR 
+        vend.${Master.vendors.selectOptionColumns.name} LIKE ? OR
+        pay.${Accounting.payments.selectOptionColumns.remarks} LIKE ? OR
+        pay.${Accounting.payments.selectOptionColumns.created_by} LIKE ? OR
+        pay.${Accounting.payments.selectOptionColumns.state} LIKE ? OR
+        pay.${Accounting.payments.selectOptionColumns.mode_of_payment} LIKE ? OR
+        pay.${Accounting.payments.selectOptionColumns.bank_name} LIKE ? OR
+        pay.${Accounting.payments.selectOptionColumns.check_number} LIKE ?
+      )
         AND pay.${Accounting.payments.selectOptionColumns.payment_date} BETWEEN ? AND ?
     `;
     
-    const paymentsResults = await Query(paymentsQuery, [searchTerm, searchTerm, startDate, endDate]);
+    const paymentsResults = await Query(paymentsQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
     results.push(...paymentsResults);
 
+    // Enhanced Adjustments Query - searches across multiple fields
     const adjustmentsQuery = `
       SELECT 
         'Adjustment' as document_type,
         adj.${Accounting.adjustments.selectOptionColumns.id} as document_id,
+        adj.${Accounting.adjustments.selectOptionColumns.id} as id,
         adj.${Accounting.adjustments.selectOptionColumns.document_reference} as document_reference,
         NULL as customer_name,
         NULL as vendor_name,
         adj.${Accounting.adjustments.selectOptionColumns.posting_date} as document_date,
         adj.${Accounting.adjustments.selectOptionColumns.total_amount} as amount,
-        adj.${Accounting.adjustments.selectOptionColumns.remarks} as remarks
+        adj.${Accounting.adjustments.selectOptionColumns.remarks} as remarks,
+        adj.${Accounting.adjustments.selectOptionColumns.status} as state,
+        adj.${Accounting.adjustments.selectOptionColumns.created_by} as created_by
       FROM ${Accounting.adjustments.tablename} adj
-      WHERE adj.${Accounting.adjustments.selectOptionColumns.document_reference} LIKE ?
+      WHERE (
+        adj.${Accounting.adjustments.selectOptionColumns.document_reference} LIKE ? OR
+        adj.${Accounting.adjustments.selectOptionColumns.remarks} LIKE ? OR
+        adj.${Accounting.adjustments.selectOptionColumns.created_by} LIKE ? OR
+        adj.${Accounting.adjustments.selectOptionColumns.status} LIKE ? OR
+        CAST(adj.${Accounting.adjustments.selectOptionColumns.total_amount} AS CHAR) LIKE ?
+      )
         AND adj.${Accounting.adjustments.selectOptionColumns.posting_date} BETWEEN ? AND ?
     `;
     
-    const adjustmentsResults = await Query(adjustmentsQuery, [searchTerm, startDate, endDate]);
+    const adjustmentsResults = await Query(adjustmentsQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
     results.push(...adjustmentsResults);
 
     results.sort((a, b) => new Date(b.document_date) - new Date(a.document_date));
@@ -536,6 +634,17 @@ const getSearch = async (req, res, next) => {
       data: results,
       count: results.length,
       search_term: search,
+      searchable_fields: [
+        'Document Reference',
+        'Customer/Vendor Name', 
+        'Remarks',
+        'Created By',
+        'State',
+        'Total Amount',
+        'Mode of Payment',
+        'Bank Name',
+        'Check Number'
+      ],
       date_range: {
         start_date: startDate,
         end_date: endDate

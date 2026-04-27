@@ -19,7 +19,7 @@ module.exports = {
       },
       r_document_reference: {
         type: Sequelize.STRING(120),
-        allowNull: false
+        allowNull: true
       },
       r_collection_date: {
         type: Sequelize.STRING(20),

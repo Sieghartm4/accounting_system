@@ -5,8 +5,8 @@ const receiptRouter = express.Router()
 
 receiptRouter.get('/', getReceipts)
 receiptRouter.post('/', createReceipts)
-receiptRouter.put('/:receipt_id', updateReceipt)
 receiptRouter.put('/receipt-state', updateReceiptState)
+receiptRouter.put('/:receipt_id', updateReceipt)
 receiptRouter.get('/:receipt_id', getAllReceipts)
 
 module.exports = {

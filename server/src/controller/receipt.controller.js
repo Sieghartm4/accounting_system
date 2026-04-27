@@ -177,8 +177,8 @@ const createReceipts = async (req, res, next) => {
       journal_entries,
       attachments
     } = req.body;
-    console.log(req.body)
-    if (!customer_id || !document_reference || !payment_date || !mode_of_payment || !total_amount_due || !created_by) {
+    console.log("BODY",req.body)
+    if (!customer_id || !payment_date || !mode_of_payment || !total_amount_due || !created_by) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
@@ -628,6 +628,7 @@ const updateReceipt = async (req, res, next) => {
 
 const updateReceiptState = async (req, res, next) => {
   try {
+    console.log("updateReceiptState called");
     const {
       updates
     } = req.body;

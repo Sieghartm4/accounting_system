@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { TrendingUp, ShoppingBag, ShieldCheck, Zap, ArrowRight, Download } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
@@ -19,12 +20,51 @@ export default function Sales() {
 
 function SalesContent() {
   const { sales, loading, error, refetchSales } = useSales();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isAdding, setIsAdding] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingSales, setEditingSales] = useState(null);
   const [isViewing, setIsViewing] = useState(false);
   const [viewingSales, setViewingSales] = useState(null);
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (!id) return;
+
+    const fetchSales = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('No authentication token found');
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SERVER_LINK}/sales/${Number(id)}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Failed to fetch sales details');
+
+        setViewingSales(result);
+        setIsViewing(true);
+        setSearchParams(prev => {
+          const next = new URLSearchParams(prev);
+          next.delete('id');
+          return next;
+        }, { replace: true });
+      } catch (err) {
+        setToast({ type: 'error', message: err.message || 'Failed to fetch sales details' });
+      }
+    };
+
+    fetchSales();
+  }, [searchParams, setSearchParams]);
 
   // Check if user has access to enable checkboxes
   const user = JSON.parse(localStorage.getItem('user') || '{}');

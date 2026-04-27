@@ -854,7 +854,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, is
   };
 
   const handlePostTransaction = async () => {
-    // Get the receipt ID from receiptData if in edit mode
+    // Get the receipt ID from receiptData prop if in edit mode
     const receiptId = isEditMode && receiptData?.data?.[0]?.id;
     try {
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
@@ -960,21 +960,26 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, is
         })
       );
 
-      const receiptData = {
+      const requestData = {
         customer_id: selectedCustomerId, // Use actual customer ID
         document_reference: documentReference,
         payment_date: collectionDate || new Date().toISOString().split("T")[0],
-        collection_date: collectionDate || new Date().toISOString().split("T")[0],
         mode_of_payment: modeOfPayment,
         bank_name: bankName || "",
         check_number: checkNumber || "",
         remarks: remarks,
         total_amount_due: summary.totalAmountDue,
-        created_by: createdBy,
         receipt_items: preparedReceiptItems,
         journal_entries: preparedJournalEntries,
         attachments: preparedAttachments
       };
+
+      // Add created_by for create mode or updated_by for edit mode
+      if (isEditMode && receiptId) {
+        requestData.updated_by = createdBy;
+      } else {
+        requestData.created_by = createdBy;
+      }
 
       const apiUrl = isEditMode 
         ? `${import.meta.env.VITE_SERVER_LINK}/receipt/${receiptId}`
@@ -986,7 +991,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, is
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(receiptData),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
@@ -1082,7 +1087,7 @@ export default function ReceiptsForm({ onBack, onSuccess, isViewMode = false, is
                 ) : customerLoading ? (
                   <div className={inputBase + " text-black py-1.5"}>Loading customers...</div>
                 ) : (
-                  <SearchableDropdown placeholder="Customer *" value={customerSearch} onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); }} onSelect={opt => { setSelectedCustomer(opt.value); setCustomerSearch(opt.label); }} options={customerOptions} inputClassName={inputBase} emptyText={customerError || 'No customers found'} />
+                  <SearchableDropdown placeholder="Customer *" value={customerSearch} onChange={v => { setCustomerSearch(v); setSelectedCustomer(''); setSelectedCustomerId(''); }} onSelect={opt => { setSelectedCustomer(opt.label); setCustomerSearch(opt.label); setSelectedCustomerId(opt.value); }} options={customerOptions} inputClassName={inputBase} emptyText={customerError || 'No customers found'} />
                 )}
               </fieldset>
             </div>
