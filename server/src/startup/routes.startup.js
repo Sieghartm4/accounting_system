@@ -46,7 +46,6 @@ const initRoutes = (app) => {
   app.use('/withholding_tax', withholdingTaxRouter)
   app.use('/adjustments', adjustmentsRouter)
   app.use('/reports', reportsRouter)
-
 }
 
 module.exports = { initRoutes }
