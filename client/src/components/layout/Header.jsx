@@ -103,6 +103,15 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
         }
     };
 
+    const handleSearchInputKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (searchQuery.trim().length > 0) {
+                handleSearch();
+            }
+        }
+    };
+
     const handleSearchSubmit = (e) => {
         e.preventDefault();
         if (searchQuery.trim().length > 0) {
@@ -177,6 +186,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                     type="text" 
                     value={searchQuery}
                     onChange={handleSearchInputChange}
+                    onKeyDown={handleSearchInputKeyDown}
                     onFocus={() => searchQuery.trim().length > 2 && setShowSearchModal(true)}
                 />
                 
@@ -304,11 +314,10 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                         onClick={() => setShowDropdown(!showDropdown)}
                     >
                         <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center text-white text-xs font-bold shadow-lg shadow-black/10 border-b-2 border-red-600">
-                            {user?.mu_first_name?.charAt(0) || 'A'}
+                            {user?.username?.charAt(0)?.toUpperCase() || 'A'}
                         </div>
                         <div className="hidden sm:block text-left">
-                            <p className="text-xs font-bold text-gray-900 leading-none">{user?.mu_first_name} {user?.mu_last_name}</p>
-                            <p className="text-[10px] text-gray-400 uppercase tracking-tighter mt-1 font-semibold">Accounting Admin</p>
+                            <p className="text-xs font-bold text-gray-900 leading-none">{user?.username || 'User'}</p>
                         </div>
                         <ChevronDown size={14} className={`text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
                     </button>
@@ -323,6 +332,12 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                             >
                                 <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                                     <User size={16} className="text-gray-400" /> My Profile
+                                </button>
+                                <button 
+                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    onClick={() => navigate('/company')}
+                                >
+                                    <Building2 size={16} className="text-gray-400" /> Company
                                 </button>
                                 <div className="h-px bg-gray-100 my-1 mx-2"></div>
                                 <button 

@@ -1,20 +1,12 @@
 const os = require('os')
 const { checkConnection, SelectAll, Transaction, Query, Insert } = require('../database/util/queries.util')
 const { formatMemoryUsage, formatTime, DataModeling } = require('../util/helper.util')
-const { Accounting } = require('../database/model/Accounting')
 const { Master } = require('../database/model/Master')
+const { Accounting } = require('../database/model/Accounting')
 const { SQLQueryBuilder } = require('../util/helper.util')
+const { getTenantPool } = require('../database/util/tenantConnection.util')
 const sql = new SQLQueryBuilder()
-const mysql = require('mysql2/promise')
-const CONFIG = require('../database/config/config')
 
-const pool = mysql.createPool({
-  host: CONFIG[process.env.NODE_ENV].host,
-  user: CONFIG[process.env.NODE_ENV].username,
-  password: CONFIG[process.env.NODE_ENV].password,
-  database: CONFIG[process.env.NODE_ENV].database,
-  multipleStatements: CONFIG[process.env.NODE_ENV].dialectOptions.multipleStatements,
-})
 require('dotenv').config()
 
 const getCashDisbursements = async (req, res, next) => {
@@ -187,7 +179,7 @@ const createCashDisbursement = async (req, res, next) => {
 
     let connection;
     try {
-      connection = await pool.getConnection();
+      connection = await getTenantPool().getConnection();
       await connection.beginTransaction();
 
       const mainQuery = sql.insert(Accounting.cash_disbursements.tablename, {
@@ -350,7 +342,7 @@ const updateCashDisbursement = async (req, res, next) => {
 
     let connection;
     try {
-      connection = await pool.getConnection();
+      connection = await getTenantPool().getConnection();
       await connection.beginTransaction();
 
       const updateMainQuery = sql.update(Accounting.cash_disbursements.tablename)
@@ -679,7 +671,7 @@ const updateDisbursementState = async (req, res, next) => {
 
     let connection;
     try {
-      connection = await pool.getConnection();
+      connection = await getTenantPool().getConnection();
       await connection.beginTransaction();
 
       const updatePromises = updates.map(async (update) => {

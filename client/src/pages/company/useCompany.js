@@ -10,9 +10,13 @@ const useCompany = () => {
   const [logoPreview, setLogoPreview] = useState(null);
   const [status, setStatus] = useState('active');
   const [formData, setFormData] = useState({
-    name: '',
+    company_name: '',
     owner_name: '',
     address: '',
+    tin: '',
+    website: '',
+    email: '',
+    phone: '',
     status: 'active',
     logo: null
   });
@@ -59,7 +63,26 @@ const useCompany = () => {
   }, []);
 
   // Modal handlers
-  const handleAddClick = () => {
+  const handleAddClick = (companyData = null) => {
+    if (companyData) {
+      // Edit mode - populate form with existing data
+      setFormData({
+        company_name: companyData.mc_company_name || '',
+        owner_name: companyData.mc_owner_name || '',
+        address: companyData.mc_address || '',
+        tin: companyData.mc_tin || '',
+        website: companyData.mc_website || '',
+        email: companyData.mc_email || '',
+        phone: companyData.mc_phone || '',
+        status: companyData.mc_status || 'active',
+        logo: companyData.mc_logo || null
+      });
+      setLogoPreview(companyData.mc_logo || null);
+      setStatus(companyData.mc_status || 'active');
+    } else {
+      // Create mode - reset form
+      handleCloseModal();
+    }
     setIsModalOpen(true);
   };
 
@@ -67,9 +90,13 @@ const useCompany = () => {
     setIsModalOpen(false);
     // Reset form when closing
     setFormData({
-      name: '',
+      company_name: '',
       owner_name: '',
       address: '',
+      tin: '',
+      website: '',
+      email: '',
+      phone: '',
       status: 'active',
       logo: null
     });
@@ -103,8 +130,30 @@ const useCompany = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/company`, {
-        method: 'POST',
+      
+      // Check if we're in edit mode (form has company data)
+      const isEditMode = Object.keys(formData).some(key => 
+        key !== 'status' && formData[key] && formData[key] !== ''
+      );
+      
+      let url = `${import.meta.env.VITE_SERVER_LINK}/company`;
+      let method = 'POST';
+      
+      if (isEditMode) {
+        // Find the company ID from the current company data
+        const currentCompany = company.find(c => 
+          c.mc_company_name === formData.company_name || 
+          c.mc_owner_name === formData.owner_name
+        );
+        
+        if (currentCompany) {
+          url = `${import.meta.env.VITE_SERVER_LINK}/company/${currentCompany.mc_company_id}`;
+          method = 'PUT';
+        }
+      }
+      
+      const response = await fetch(url, {
+        method: method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
@@ -123,14 +172,14 @@ const useCompany = () => {
       if (result.success) {
         // Close modal and reset form
         handleCloseModal();
-        // Optionally refresh company data
+        // Refresh company data
         window.location.reload();
       } else {
-        alert(result.message || 'Failed to create company');
+        alert(result.message || `Failed to ${isEditMode ? 'update' : 'create'} company`);
       }
     } catch (err) {
       console.error('Submit error:', err);
-      alert(err.message || 'Error creating company');
+      alert(err.message || `Error ${isEditMode ? 'updating' : 'creating'} company`);
     }
   };
 

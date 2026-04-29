@@ -12,7 +12,8 @@ const useLogin = () => {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/credentials/login`, {
+      const subscriptionUrl = `http://${import.meta.env.VITE_SUBSCRIPTION_URL}:${import.meta.env.VITE_SUBSCRIPTION_PORT}`;
+      const response = await fetch(`${subscriptionUrl}/credentials/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

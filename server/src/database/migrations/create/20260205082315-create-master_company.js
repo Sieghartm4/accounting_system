@@ -18,10 +18,28 @@ module.exports = {
         allowNull: false
       },
       mc_logo: {
-        type: Sequelize.TEXT('long')
+        type: Sequelize.TEXT('long'),
+        allowNull: false
       },
       mc_address: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
+        allowNull: false
+      },
+      mc_tin: {
+        type: Sequelize.STRING(50),
+        allowNull: false
+      },
+      mc_website: {
+        type: Sequelize.STRING(255),
+        allowNull: true
+      },
+      mc_email: {
+        type: Sequelize.STRING(255),
+        allowNull: true
+      },
+      mc_phone: {
+        type: Sequelize.STRING(20),
+        allowNull: true
       },
       mc_status: {
         type: Sequelize.ENUM('active', 'inactive', 'delete'),

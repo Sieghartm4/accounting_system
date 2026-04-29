@@ -1,20 +1,11 @@
 const os = require('os')
-const { checkConnection, SelectAll, Transaction, Query, Insert } = require('../database/util/queries.util')
+const { checkConnection, SelectAll, Query, Transaction } = require('../database/util/queries.util')
 const { formatMemoryUsage, formatTime, DataModeling } = require('../util/helper.util')
+const { Master } = require('../database/model/Master')
 const { Accounting } = require('../database/model/Accounting')
 const { SQLQueryBuilder } = require('../util/helper.util')
+const { getTenantPool } = require('../database/util/tenantConnection.util')
 const sql = new SQLQueryBuilder()
-const mysql = require('mysql2/promise')
-const CONFIG = require('../database/config/config')
-const { Master } = require('../database/model/Master')
-
-const pool = mysql.createPool({
-  host: CONFIG[process.env.NODE_ENV].host,
-  user: CONFIG[process.env.NODE_ENV].username,
-  password: CONFIG[process.env.NODE_ENV].password,
-  database: CONFIG[process.env.NODE_ENV].database,
-  multipleStatements: CONFIG[process.env.NODE_ENV].dialectOptions.multipleStatements,
-})
 
 require('dotenv').config()
 
@@ -187,7 +178,7 @@ const createReceipts = async (req, res, next) => {
 
     let connection;
     try {
-      connection = await pool.getConnection();
+      connection = await getTenantPool().getConnection();
       await connection.beginTransaction();
 
       const mainQuery = sql.insert(Accounting.receipts.tablename, {
@@ -348,7 +339,7 @@ const updateReceipt = async (req, res, next) => {
 
     let connection;
     try {
-      connection = await pool.getConnection();
+      connection = await getTenantPool().getConnection();
       await connection.beginTransaction();
 
       const updateMainQuery = sql.update(Accounting.receipts.tablename)
@@ -643,7 +634,7 @@ const updateReceiptState = async (req, res, next) => {
 
     let connection;
     try {
-      connection = await pool.getConnection();
+      connection = await getTenantPool().getConnection();
       await connection.beginTransaction();
 
       const updatePromises = updates.map(async (update) => {

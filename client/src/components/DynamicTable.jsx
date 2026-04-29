@@ -339,12 +339,12 @@ const DynamicTable = ({
           <div className="flex items-center gap-3">
 
             {/* Column Filter */}
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg hover:bg-gray-50 transition-colors">
               <Filter size={14} className="text-gray-600" />
               <select
                 value={filterColumn}
                 onChange={(e) => { setFilterColumn(e.target.value); setFilterValue(''); }}
-                className="bg-transparent text-[10px] font-bold text-gray-700 uppercase tracking-widest outline-none cursor-pointer hover:text-black"
+                className="bg-transparent text-[10px] font-bold text-gray-700 uppercase tracking-widest outline-none cursor-pointer hover:text-black border-0"
               >
                 <option value="" className="bg-white text-gray-500">Filter By</option>
                 {headers.map(h => <option key={h} value={h} className="bg-white text-black">{h.toUpperCase()}</option>)}
@@ -356,7 +356,7 @@ const DynamicTable = ({
               <select
                 value={filterValue}
                 onChange={(e) => setFilterValue(e.target.value)}
-                className="px-3 py-1.5 bg-white border border-gray-300 text-[10px] font-bold text-gray-700 rounded-lg outline-none uppercase animate-in fade-in zoom-in-95"
+                className="px-3 py-1.5 bg-white text-[10px] font-bold text-gray-700 rounded-lg outline-none uppercase animate-in fade-in zoom-in-95 border-0"
               >
                 <option value="" className="bg-white">All Values</option>
                 {uniqueColumnValues.map(v => <option key={v} value={v} className="bg-white">{v}</option>)}

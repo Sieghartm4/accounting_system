@@ -35,12 +35,22 @@ const getAllCompanies = async (req, res, next) => {
 
 const createCompany = async (req, res, next) => {
     try {
-        const { name, owner_name, logo, address, status } = req.body;
+        const { 
+            company_name, 
+            owner_name, 
+            logo, 
+            address, 
+            tin, 
+            website, 
+            email, 
+            phone, 
+            status 
+        } = req.body;
 
-        if (!name || !owner_name || !logo || !address || !status) {
+        if (!company_name || !owner_name || !address || !status) {
             return res.status(400).json({
                 success: false,
-                message: 'Company name, owner name, logo, address and status are required'
+                message: 'Company name, owner name, address and status are required'
             });
         }
         let queries = []
@@ -52,10 +62,14 @@ const createCompany = async (req, res, next) => {
             })
                 .build(),
             values: [
-                name,
+                company_name,
                 owner_name || null,
                 logo || null,
                 address || null,
+                tin || null,
+                website || null,
+                email || null,
+                phone || null,
                 status || 'active'
             ]
         })
@@ -67,10 +81,15 @@ const createCompany = async (req, res, next) => {
             message: 'Company created successfully',
             data: {
                 id: result.insertId,
-                mc_company_name: name,
+                mc_company_id: result.insertId,
+                mc_company_name: company_name,
                 mc_owner_name: owner_name,
                 mc_logo: logo,
                 mc_address: address,
+                mc_tin: tin,
+                mc_website: website,
+                mc_email: email,
+                mc_phone: phone,
                 mc_status: status
             },
             timestamp: new Date().toISOString()
@@ -85,7 +104,91 @@ const createCompany = async (req, res, next) => {
         });
     }
 }
+
+const updateCompany = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { 
+            company_name, 
+            owner_name, 
+            logo, 
+            address, 
+            tin, 
+            website, 
+            email, 
+            phone, 
+            status 
+        } = req.body;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Company ID is required'
+            });
+        }
+
+        if (!company_name || !owner_name || !address || !status) {
+            return res.status(400).json({
+                success: false,
+                message: 'Company name, owner name, address and status are required'
+            });
+        }
+
+        // Build update query dynamically based on provided fields
+        const updateFields = {};
+        if (company_name !== undefined) updateFields.mc_company_name = company_name;
+        if (owner_name !== undefined) updateFields.mc_owner_name = owner_name;
+        if (logo !== undefined) updateFields.mc_logo = logo;
+        if (address !== undefined) updateFields.mc_address = address;
+        if (tin !== undefined) updateFields.mc_tin = tin;
+        if (website !== undefined) updateFields.mc_website = website;
+        if (email !== undefined) updateFields.mc_email = email;
+        if (phone !== undefined) updateFields.mc_phone = phone;
+        if (status !== undefined) updateFields.mc_status = status;
+
+        if (Object.keys(updateFields).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No fields to update'
+            });
+        }
+
+        const updateStatement = sql.update(Master.master_company.tablename)
+            .set(updateFields)
+            .where('mc_company_id', '=', id)
+            .build();
+
+        await Query(updateStatement, [], Master.master_company.prefix_);
+
+        res.status(200).json({
+            success: true,
+            message: 'Company updated successfully',
+            data: {
+                mc_company_id: parseInt(id),
+                mc_company_name: company_name,
+                mc_owner_name: owner_name,
+                mc_logo: logo,
+                mc_address: address,
+                mc_tin: tin,
+                mc_website: website,
+                mc_email: email,
+                mc_phone: phone,
+                mc_status: status
+            },
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('Error updating company:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Server error while updating company',
+            error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        });
+    }
+}
 module.exports = {
     getAllCompanies,
-    createCompany
+    createCompany,
+    updateCompany
 }

@@ -1,44 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, User, ArrowRight, Loader2, ShieldCheck, PieChart, FileText, Eye, EyeOff } from 'lucide-react';
-import useLogin from './useLogin';
+import { Lock, User, Building2, ArrowRight, Loader2, ShieldCheck, PieChart, FileText, Eye, EyeOff } from 'lucide-react';
+import useRegister from './useRegister';
 
-export default function Login() {
-  const [formData, setFormData] = useState({ username: '', password: '' });
-  const [rememberDevice, setRememberDevice] = useState(false);
+export default function Register() {
+  const [formData, setFormData] = useState({ username: '', password: '', company_name: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const { login, loading, error } = useLogin();
-
-  // Load remembered credentials on component mount
-  useEffect(() => {
-    const rememberedUser = localStorage.getItem('rememberedUser');
-    const rememberedPassword = localStorage.getItem('rememberedPassword');
-    
-    if (rememberedUser && rememberedPassword) {
-      setFormData({ username: rememberedUser, password: rememberedPassword });
-      setRememberDevice(true);
-    }
-  }, []);
-
-  // Save credentials when remember device is checked and form data changes
-  useEffect(() => {
-    if (rememberDevice && formData.username) {
-      localStorage.setItem('rememberedUser', formData.username);
-      localStorage.setItem('rememberedPassword', formData.password);
-    }
-  }, [rememberDevice, formData.username, formData.password]);
-
-  // Remove credentials only when user explicitly unchecks the box
-  const handleRememberDeviceChange = (e) => {
-    const isChecked = e.target.checked;
-    setRememberDevice(isChecked);
-    
-    // Only remove credentials if user explicitly unchecks
-    if (!isChecked) {
-      localStorage.removeItem('rememberedUser');
-      localStorage.removeItem('rememberedPassword');
-    }
-  };
+  const { register, loading, error } = useRegister();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -46,7 +14,7 @@ export default function Login() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    login(formData);
+    register(formData);
   };
 
   return (
@@ -104,7 +72,7 @@ export default function Login() {
         </div>
       </motion.div>
 
-      {/* --- Right Side: Secure Login Form --- */}
+      {/* --- Right Side: Secure Registration Form --- */}
       <div className="w-full lg:w-5/12 flex items-center justify-center p-8 bg-white">
         <motion.div 
           initial={{ opacity: 0, x: 30 }}
@@ -113,8 +81,8 @@ export default function Login() {
           className="w-full max-w-sm"
         >
           <div className="mb-10 text-center lg:text-left">
-            <h2 className="text-3xl font-bold text-black tracking-tight">Financial Portal</h2>
-            <p className="text-gray-500 mt-2">Sign in to manage supply and allied services.</p>
+            <h2 className="text-3xl font-bold text-black tracking-tight">Create Account</h2>
+            <p className="text-gray-500 mt-2">Register your company to manage supply and allied services.</p>
           </div>
 
           <AnimatePresence>
@@ -133,6 +101,24 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="relative group">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1 mb-2 block group-focus-within:text-red-600 transition-colors">Company Name</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-red-600 transition-colors">
+                  <Building2 size={18} />
+                </span>
+                <input 
+                  type="text"
+                  name="company_name"
+                  value={formData.company_name}
+                  onChange={handleChange}
+                  className="w-full pl-12 pr-4 py-3.5 border-b-2 border-gray-100 bg-gray-50/50 focus:bg-white focus:border-red-600 outline-none transition-all duration-300 rounded-t-lg" 
+                  placeholder="Enter company name"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="relative group">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1 mb-2 block group-focus-within:text-red-600 transition-colors">Username</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-red-600 transition-colors">
@@ -144,7 +130,7 @@ export default function Login() {
                   value={formData.username}
                   onChange={handleChange}
                   className="w-full pl-12 pr-4 py-3.5 border-b-2 border-gray-100 bg-gray-50/50 focus:bg-white focus:border-red-600 outline-none transition-all duration-300 rounded-t-lg" 
-                  placeholder="Enter employee ID"
+                  placeholder="Enter username"
                   required
                 />
               </div>
@@ -165,29 +151,14 @@ export default function Login() {
                   placeholder="••••••••"
                   required
                 />
-                {!rememberDevice && (
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-600 transition-colors"
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between py-2">
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  className="w-4 h-4 accent-red-600 rounded border-gray-300"
-                  checked={rememberDevice}
-                  onChange={handleRememberDeviceChange}
-                />
-                <span className="text-sm text-gray-500 group-hover:text-black transition-colors">Remember device</span>
-              </label>
-              <a href="#" className="text-sm font-semibold text-red-600 hover:text-black transition-colors">Forgot Access?</a>
             </div>
 
             <motion.button 
@@ -197,17 +168,17 @@ export default function Login() {
               disabled={loading}
               className="w-full bg-red-600 text-white py-4 rounded-lg font-bold shadow-xl shadow-red-900/10 flex items-center justify-center gap-2 transition-all disabled:bg-gray-400 disabled:shadow-none uppercase tracking-widest text-sm"
             >
-              {loading ? <Loader2 className="animate-spin" size={18} /> : "Authorize Access"}
+              {loading ? <Loader2 className="animate-spin" size={18} /> : "Create Account"}
               {!loading && <ArrowRight size={18} />}
             </motion.button>
           </form>
 
           <div className="mt-12 pt-8 border-t border-gray-100 text-center">
             <p className="text-sm text-gray-400">
-              Don't have an account?{' '}
-              <a href="/register" className="font-semibold text-red-600 hover:text-black transition-colors">Create Account</a>
+              Already have an account?{' '}
+              <a href="/login" className="font-semibold text-red-600 hover:text-black transition-colors">Sign In</a>
               <br />
-              <span className="font-semibold text-black"> 2026 5L Solutions Corp.</span>
+              <span className="font-semibold text-black">© 2026 5L Solutions Corp.</span>
             </p>
           </div>
         </motion.div>

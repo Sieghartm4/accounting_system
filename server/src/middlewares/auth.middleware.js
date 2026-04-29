@@ -3,6 +3,7 @@
 const jwt = require('jsonwebtoken')
 const { SQLQueryBuilder } = require('../util/helper.util')
 const { logger } = require('../util/logger.util')
+const CONFIG = require('../database/config/config')
 require('dotenv').config()
 
 const SQL = new SQLQueryBuilder()
@@ -21,9 +22,22 @@ const auth = async (req, res, next) => {
     }
 
     const decodedUser = jwt.verify(token, process.env._SECRET_KEY)
+    
+    console.log('🔍 Auth - JWT decoded user:', decodedUser)
 
     req.context = {
       ...decodedUser,
+    }
+
+    // ✅ Set tenant database from JWT for this request
+    if (decodedUser.dbName) {
+      console.log('🔍 Auth - Setting tenant DB from JWT:', decodedUser.dbName)
+      CONFIG.setTenantDb(decodedUser.dbName)
+    } else if (decodedUser.tenantDb) {
+      console.log('🔍 Auth - Setting tenant DB from JWT (legacy field):', decodedUser.tenantDb)
+      CONFIG.setTenantDb(decodedUser.tenantDb)
+    } else {
+      console.log('🔍 Auth - No tenant database found in JWT token')
     }
 
     return next()

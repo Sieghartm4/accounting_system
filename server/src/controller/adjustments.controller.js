@@ -1,20 +1,12 @@
 const os = require('os')
 const { checkConnection, SelectAll, Transaction, Query, Insert } = require('../database/util/queries.util')
 const { formatMemoryUsage, formatTime, DataModeling } = require('../util/helper.util')
-const { Accounting } = require('../database/model/Accounting')
 const { Master } = require('../database/model/Master')
+const { Accounting } = require('../database/model/Accounting')
 const { SQLQueryBuilder } = require('../util/helper.util')
+const { getTenantPool } = require('../database/util/tenantConnection.util')
 const sql = new SQLQueryBuilder()
-const mysql = require('mysql2/promise')
-const CONFIG = require('../database/config/config')
 
-const pool = mysql.createPool({
-  host: CONFIG[process.env.NODE_ENV].host,
-  user: CONFIG[process.env.NODE_ENV].username,
-  password: CONFIG[process.env.NODE_ENV].password,
-  database: CONFIG[process.env.NODE_ENV].database,
-  multipleStatements: CONFIG[process.env.NODE_ENV].dialectOptions.multipleStatements,
-})
 require('dotenv').config()
 
 const getAdjustments = async (req, res, next) => {
@@ -154,7 +146,7 @@ const createAdjustment = async (req, res, next) => {
         
         let connection;
         try {
-            connection = await pool.getConnection();
+            connection = await getTenantPool().getConnection();
             await connection.beginTransaction();
             
             const mainQuery = sql.insert(Accounting.adjustments.tablename, {
@@ -270,7 +262,7 @@ const updateAdjustment = async (req, res, next) => {
 
     let connection;
     try {
-      connection = await pool.getConnection();
+      connection = await getTenantPool().getConnection();
       await connection.beginTransaction();
 
       const updatePromises = updates.map(async (update) => {
@@ -370,7 +362,7 @@ const updateAdjustmentData = async (req, res, next) => {
     
     let connection;
     try {
-      connection = await pool.getConnection();
+      connection = await getTenantPool().getConnection();
       await connection.beginTransaction();
       
       // Update adjustment header

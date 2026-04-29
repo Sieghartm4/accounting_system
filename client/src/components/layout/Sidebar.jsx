@@ -166,7 +166,6 @@ export default function Sidebar({ isCollapsed }) {
                                         charts: BarChart,
                                         proforma_entries: FileText,
                                         product_service: Package,
-                                        company: Building,
                                         vat: Percent,
                                         withholding_tax: Receipt
                                     };

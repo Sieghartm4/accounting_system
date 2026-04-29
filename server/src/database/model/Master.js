@@ -92,6 +92,10 @@ const Master = {
       "owner_name",
       "logo",
       "address",
+      "tin",
+      "website",
+      "email",
+      "phone",
       "status"
     ],
   selectColumns: [
@@ -100,6 +104,10 @@ const Master = {
       "mc_owner_name",
       "mc_logo",
       "mc_address",
+      "mc_tin",
+      "mc_website",
+      "mc_email",
+      "mc_phone",
       "mc_status"
     ],
   selectOptionColumns: {
@@ -108,6 +116,10 @@ const Master = {
     owner_name: "mc_owner_name",
     logo: "mc_logo",
     address: "mc_address",
+    tin: "mc_tin",
+    website: "mc_website",
+    email: "mc_email",
+    phone: "mc_phone",
     status: "mc_status"
   },
   updateOptionColumns: {
@@ -116,6 +128,10 @@ const Master = {
     owner_name: "owner_name",
     logo: "logo",
     address: "address",
+    tin: "tin",
+    website: "website",
+    email: "email",
+    phone: "phone",
     status: "status"
   },
   selectDateFormatColumns: {
@@ -130,6 +146,10 @@ const Master = {
     owner_name: "STRING",
     logo: "TEXT",
     address: "TEXT",
+    tin: "STRING",
+    website: "STRING",
+    email: "STRING",
+    phone: "STRING",
     status: "ENUM"
   }
 },

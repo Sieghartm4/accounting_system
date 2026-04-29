@@ -2,17 +2,9 @@ const { checkConnection, SelectAll, Transaction, Query, Insert } = require('../d
 const { formatMemoryUsage, formatTime, DataModeling } = require('../util/helper.util')
 const { Master } = require('../database/model/Master')
 const { SQLQueryBuilder } = require('../util/helper.util')
+const { getTenantPool } = require('../database/util/tenantConnection.util')
 const sql = new SQLQueryBuilder()
-const mysql = require('mysql2/promise')
-const CONFIG = require('../database/config/config')
 
-const pool = mysql.createPool({
-  host: CONFIG[process.env.NODE_ENV].host,
-  user: CONFIG[process.env.NODE_ENV].username,
-  password: CONFIG[process.env.NODE_ENV].password,
-  database: CONFIG[process.env.NODE_ENV].database,
-  multipleStatements: CONFIG[process.env.NODE_ENV].dialectOptions.multipleStatements,
-})
 require('dotenv').config()
 
 const getWithholdingTax = async (req, res, next) => {
@@ -130,7 +122,7 @@ const updateWithholdingTax = async (req, res, next) => {
 
     let connection;
     try {
-      connection = await pool.getConnection();
+      connection = await getTenantPool().getConnection();
       await connection.beginTransaction();
 
       const updateQuery = sql.update(Master.withholding_tax.tablename)

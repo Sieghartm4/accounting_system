@@ -2,15 +2,7 @@ require('dotenv').config()
 const mysql = require('mysql2/promise')
 const { logger } = require('../../util/logger.util')
 const { DataModeling } = require('../../util/helper.util')
-const CONFIG = require('../config/config')
-
-const pool = mysql.createPool({
-  host: CONFIG[process.env.NODE_ENV].host,
-  user: CONFIG[process.env.NODE_ENV].username,
-  password: CONFIG[process.env.NODE_ENV].password,
-  database: CONFIG[process.env.NODE_ENV].database,
-  multipleStatements: CONFIG[process.env.NODE_ENV].dialectOptions.multipleStatements,
-})
+const { getTenantPool } = require('./tenantConnection.util')
 
 /**
  * @name checkConnection
@@ -21,6 +13,7 @@ exports.checkConnection = async () => {
   const startTime = process.hrtime()
 
   try {
+    const pool = getTenantPool()
     conn = await pool.getConnection()
     await conn.ping()
 
@@ -52,6 +45,7 @@ exports.checkConnection = async () => {
 //@ Specific Select ALL no params
 exports.SelectAll = async (tableName, prefix) => {
   try {
+    const pool = getTenantPool()
     const [result] = await pool.query(`SELECT * FROM ${tableName}`)
     if (prefix) {
       const data = DataModeling(result, prefix)
@@ -67,9 +61,10 @@ exports.SelectAll = async (tableName, prefix) => {
 }
 
 //@ can be used for universal query SELECT, INSERT, UPDATE, DELETE
-exports.Query = async (sql, params = [], prefixes) => {
+exports.Query = async (sql, params = [], prefixes, tenantPool) => {
   try {
-    const [result] = await pool.query(sql, params)
+    const activePool = tenantPool || getTenantPool()
+    const [result] = await activePool.query(sql, params)
     if (sql.trim().toUpperCase().startsWith('INSERT')) {
       return { ...result, insertId: result.insertId }
     }
@@ -89,6 +84,7 @@ exports.Query = async (sql, params = [], prefixes) => {
 exports.Transaction = async (queries) => {
   let connection
   try {
+    const pool = getTenantPool()
     connection = await pool.getConnection()
     await connection.beginTransaction()
 
@@ -118,6 +114,7 @@ exports.Transaction = async (queries) => {
 
 exports.Insert = async (query, data) => {
   try {
+    const pool = getTenantPool()
     const [result] = await pool.query(query, data)
 
     return {
@@ -131,6 +128,7 @@ exports.Insert = async (query, data) => {
 
 exports.Update = async (query, data) => {
   try {
+    const pool = getTenantPool()
     const [result] = await pool.query(query, data)
     return result.affectedRows
   } catch (err) {
@@ -140,6 +138,7 @@ exports.Update = async (query, data) => {
 
 exports.Delete = async (query, data) => {
   try {
+    const pool = getTenantPool()
     const [result] = await pool.query(query, data)
     return result.affectedRows
   } catch (err) {
@@ -149,6 +148,7 @@ exports.Delete = async (query, data) => {
 
 exports.SelectWithCondition = async (query, condition, prefix) => {
   try {
+    const pool = getTenantPool()
     const [result] = await pool.query(query, condition)
     if (prefix) {
       const data = DataModeling(result, prefix)
