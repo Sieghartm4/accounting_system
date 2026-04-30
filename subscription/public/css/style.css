@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech&family=Share+Tech+Mono&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 2.5rem;
+}
+
+body {
+  min-height: 100vh;
+  background-color: #000;
+  color: whitesmoke;
+  display: grid;
+  place-content: center;
+  padding: 1rem;
+}
+
+.title {
+  border-right: solid 3px white;
+
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+
+  animation: typing 2s steps(14) 1s forwards, blink 0.5s steps(1) infinite;
+}
+
+@keyframes typing {
+  to {
+    width: 14ch;
+  }
+}
+
+@keyframes blink {
+  from {
+    border-color: transparent;
+  }
+  50% {
+    border-color: white;
+  }
+  to {
+    border-color: transparent;
+  }
+}
+
+.error-text {
+  border-right: solid 3px white;
+
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+
+  animation: typing-error 2s steps(47) 0.5s forwards, blink-error 0.5s steps(1) infinite;
+}
+
+@keyframes typing-error {
+  to {
+    width: 47ch;
+  }
+}
+
+@keyframes blink-error {
+  from {
+    border-color: transparent;
+  }
+  50% {
+    border-color: white;
+  }
+  to {
+    border-color: transparent;
+  }
+}

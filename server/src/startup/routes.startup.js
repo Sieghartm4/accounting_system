@@ -25,7 +25,7 @@ const { reportsRouter } = require('../routes/reports.routes')
 const initRoutes = (app) => {
   app.use('/credentials', credentialsRouter)
   app.use('/health', healthRouter)
-  // app.use(auth)
+  app.use(auth)
   app.use('/users', usersRouter)
   app.use('/access', accessRouter)
   app.use('/route_access', routeAccessRouter)

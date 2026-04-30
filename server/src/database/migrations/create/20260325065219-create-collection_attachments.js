@@ -23,7 +23,7 @@ module.exports = {
       },
       ca_name: {
         type: Sequelize.TEXT('medium'),
-        allowNull: false
+        allowNull: true
       },
       ca_remarks: {
         type: Sequelize.TEXT('long'),

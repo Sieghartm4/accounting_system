@@ -143,7 +143,22 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
         }
     };
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (token) {
+                await fetch(`${import.meta.env.VITE_SERVER_LINK}/credentials/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Logout API error:', error);
+        }
+
         // Preserve remembered credentials before clearing
         const rememberedUser = localStorage.getItem('rememberedUser');
         const rememberedPassword = localStorage.getItem('rememberedPassword');

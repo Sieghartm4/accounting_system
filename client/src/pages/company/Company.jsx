@@ -1,374 +1,322 @@
-import React, { useState } from 'react';
-import { Building2, Mail, Phone, Globe, FileText, ShieldCheck, Edit2, Save, X } from 'lucide-react';
-import RightSideModal from '../../components/RightSideModal';
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Building2, Phone, Save, CheckCircle, Image, Globe, Mail, Hash, MapPin } from 'lucide-react';
 import RouteProtection from '../../components/RouteProtection';
 import ProtectedAction from '../../components/ProtectedAction';
 import useCompany from './useCompany';
 
 function CompanyContent() {
-    const { 
-        company, 
-        loading, 
+    const {
+        company,
+        loading,
         error,
-        isModalOpen,
         logoPreview,
         status,
         formData,
-        handleAddClick,
-        handleCloseModal,
         handleLogoChange,
         handleInputChange,
-        handleSubmit
+        handleSubmit,
     } = useCompany();
 
-    const [selectedCompany, setSelectedCompany] = useState(null);
+    const fadeInUp = {
+        hidden: { opacity: 0, y: 16 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+    };
 
     if (loading) {
         return (
-            <div className="p-5 flex items-center justify-center">
-                <div className="text-gray-600">Loading company...</div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="p-5 flex items-center justify-center">
-                <div className="text-red-600">Error: {error}</div>
+            <div className="h-full w-full flex flex-col items-center justify-center gap-4 bg-[#f4f5f7]">
+                <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-gray-500 font-medium">Synchronizing Company Data...</p>
             </div>
         );
     }
 
     return (
-        <div className="p-5 h-[100%]">
-            <ProtectedAction routeName="company" fallback={
-                <div className="flex flex-col gap-6">
-                    {/* Company Cards Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {company?.map((comp, index) => (
-                            <div 
-                                key={comp.mc_company_id || index}
-                                className={`bg-white rounded-xl shadow-lg border-2 transition-all duration-200 hover:shadow-xl cursor-pointer ${
-                                    selectedCompany?.mc_company_id === comp.mc_company_id 
-                                        ? 'border-red-500 shadow-red-100' 
-                                        : 'border-gray-200 hover:border-red-300'
-                                }`}
-                                onClick={() => setSelectedCompany(comp)}
-                            >
-                                {/* Company Header */}
-                                <div className="p-6 border-b border-gray-100">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex items-center gap-4">
-                                            {comp.mc_logo ? (
-                                                <img 
-                                                    src={comp.mc_logo} 
-                                                    alt={comp.mc_company_name}
-                                                    className="w-16 h-16 object-cover rounded-lg border-2 border-gray-200"
-                                                />
-                                            ) : (
-                                                <div className="w-16 h-16 bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center">
-                                                    <Building2 size={24} className="text-gray-400" />
-                                                </div>
-                                            )}
-                                            <div>
-                                                <h3 className="text-lg font-bold text-gray-900">{comp.mc_company_name}</h3>
-                                                <p className="text-sm text-gray-500">Owner: {comp.mc_owner_name}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-                                                comp.mc_status === 'active' 
-                                                    ? 'bg-green-100 text-green-800' 
-                                                    : 'bg-gray-100 text-gray-800'
-                                            }`}>
-                                                {comp.mc_status?.toUpperCase()}
-                                            </span>
-                                            <button 
-                                                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleAddClick(comp);
-                                                }}
-                                            >
-                                                <Edit2 size={16} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Company Details */}
-                                <div className="p-6 space-y-4">
-                                    {/* Address */}
-                                    {comp.mc_address && (
-                                        <div className="flex items-start gap-3">
-                                            <FileText size={16} className="text-gray-400 mt-1 flex-shrink-0" />
-                                            <div>
-                                                <p className="text-xs text-gray-500 uppercase tracking-wider">Address</p>
-                                                <p className="text-sm text-gray-700 line-clamp-2">{comp.mc_address}</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* TIN */}
-                                    {comp.mc_tin && (
-                                        <div className="flex items-start gap-3">
-                                            <ShieldCheck size={16} className="text-gray-400 mt-1 flex-shrink-0" />
-                                            <div>
-                                                <p className="text-xs text-gray-500 uppercase tracking-wider">Tax ID</p>
-                                                <p className="text-sm text-gray-700">{comp.mc_tin}</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Contact Info */}
-                                    <div className="space-y-3">
-                                        {comp.mc_email && (
-                                            <div className="flex items-start gap-3">
-                                                <Mail size={16} className="text-gray-400 mt-1 flex-shrink-0" />
-                                                <div>
-                                                    <p className="text-xs text-gray-500 uppercase tracking-wider">Email</p>
-                                                    <p className="text-sm text-gray-700">{comp.mc_email}</p>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {comp.mc_phone && (
-                                            <div className="flex items-start gap-3">
-                                                <Phone size={16} className="text-gray-400 mt-1 flex-shrink-0" />
-                                                <div>
-                                                    <p className="text-xs text-gray-500 uppercase tracking-wider">Phone</p>
-                                                    <p className="text-sm text-gray-700">{comp.mc_phone}</p>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {comp.mc_website && (
-                                            <div className="flex items-start gap-3">
-                                                <Globe size={16} className="text-gray-400 mt-1 flex-shrink-0" />
-                                                <div>
-                                                    <p className="text-xs text-gray-500 uppercase tracking-wider">Website</p>
-                                                    <a 
-                                                        href={comp.mc_website.startsWith('http') ? comp.mc_website : `https://${comp.mc_website}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                                                    >
-                                                        {comp.mc_website}
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+        <div className=" h-full flex flex-col gap-6 overflow-hidden bg-[#f4f5f7]">
+            <ProtectedAction
+                routeName="company"
+                fallback={
+                    <div className="flex flex-col items-center justify-center h-full text-center gap-3">
+                        <Building2 size={48} className="text-gray-300" />
+                        <h3 className="text-lg font-bold text-gray-500">Access Restricted</h3>
+                        <p className="text-sm text-gray-400">Please contact systems admin for Company Profile access.</p>
+                    </div>
+                }
+            >
+                <motion.div
+                    initial="hidden"
+                    animate="visible"
+                    variants={fadeInUp}
+                    className="flex flex-col gap-4 h-full overflow-hidden"
+                >
+                    {/* ── Page Header (Matches Image Style) ────────────────── */}
+                    <div className="flex items-center justify-between flex-shrink-0">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-white border border-gray-200 rounded-xl flex items-center justify-center shadow-sm">
+                                <Building2 size={24} className="text-red-600" />
+                            </div>
+                            <div>
+                                <h1 className="text-3xl font-black text-gray-900 leading-none tracking-tight">
+                                    Company <span className="text-red-600 italic">Information</span>
+                                </h1>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">System Configuration & Branding</p>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-
-                    {/* Add Company Button */}
-                    <button
-                        onClick={() => handleAddClick()}
-                        className="fixed bottom-8 right-8 bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 group"
-                    >
-                        <div className="flex items-center gap-2">
-                            <Building2 size={20} />
-                            <span className="font-bold">Add Company</span>
                         </div>
-                    </button>
-                </div>
-            }>
-                {/* Fallback content if no access */}
-                <div className="flex flex-col items-center justify-center h-64 text-center">
-                    <Building2 size={48} className="text-gray-300 mb-4" />
-                    <h3 className="text-xl font-bold text-gray-600 mb-2">No Access to Company Module</h3>
-                    <p className="text-gray-500">Please contact your administrator to get access to company management.</p>
-                </div>
-            </ProtectedAction>
-
-            {/* Edit Modal */}
-            <RightSideModal
-                isOpen={isModalOpen}
-                onClose={handleCloseModal}
-                title={selectedCompany ? "Edit Company" : "Add New Company"}
-            >
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Company Name
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.company_name}
-                            onChange={(e) => handleInputChange('company_name', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Enter company name"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Owner Name
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.owner_name}
-                            onChange={(e) => handleInputChange('owner_name', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Enter owner name"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Logo
-                        </label>
-                        <div className="relative">
-                            <input
-                                type="file"
-                                id="logo-input"
-                                className="absolute w-full h-full opacity-0 cursor-pointer"
-                                onChange={handleLogoChange}
-                            />
-                            <label
-                                htmlFor="logo-input"
-                                className="flex items-center justify-center cursor-pointer w-full px-3 py-12 border-2 border-dashed border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors duration-200 relative overflow-hidden"
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleSubmit}
+                                className="flex items-center gap-2 px-6 py-2.5 bg-black hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all duration-200 shadow-lg hover:shadow-red-900/20 uppercase tracking-widest"
                             >
-                                {logoPreview ? (
-                                    <img
-                                        src={logoPreview}
-                                        alt="Logo Preview"
-                                        className="absolute inset-0 w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="text-center">
-                                        <Building2 size={32} className="text-gray-400 mb-2" />
-                                        <p className="text-sm text-gray-500">Click to upload logo</p>
+                                <Save size={14} />
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* ── Summary Cards ────────────────────────────────────── */}
+                    <div className="grid grid-cols-3 gap-6 flex-shrink-0">
+                        <SummaryCard
+                            label="Entity Name"
+                            value={formData.company_name || 'NOT SET'}
+                            icon={<Building2 size={20} className="text-red-600" />}
+                            sub="Primary Legal Title"
+                        />
+                        <SummaryCard
+                            label="Contact Status"
+                            value={formData.phone || 'NO PHONE'}
+                            icon={<Phone size={20} className="text-blue-600" />}
+                            sub="Verified Representative"
+                        />
+                        <SummaryCard
+                            label="Profile Status"
+                            value={status === 'active' ? 'Active' : 'Inactive'}
+                            icon={<CheckCircle size={20} className={status === 'active' ? 'text-green-600' : 'text-gray-400'} />}
+                            sub="Audit Verified Ready"
+                        />
+                    </div>
+
+                    {/* ── Main Form Container ────────────────────────────────── */}
+                    <div className="flex-1 bg-white border border-gray-200 rounded-2xl shadow-xl flex flex-col overflow-hidden">
+                        {/* Dark Section Header (Matches Master Ledger Bar) */}
+                        <div className="bg-black h-12 flex items-center justify-between px-6 flex-shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="w-[4px] h-6 bg-red-600 rounded-full" />
+                                <span className="text-white text-sm font-bold uppercase tracking-[2px]">
+                                    Organization Profile
+                                </span>
+                            </div>
+                            <div className="text-gray-500 text-[10px] font-mono tracking-widest uppercase">
+                                ID: {formData.tin || 'PENDING'}
+                            </div>
+                        </div>
+
+                        {/* Scrollable Form Body */}
+                        <div className="flex-1 overflow-y-auto p-8">
+                            <div className="w-full grid grid-cols-12 gap-x-8 gap-y-10">
+
+                                {/* LEFT COLUMN: Identity & Registration */}
+                                <div className="col-span-4 flex flex-col gap-6">
+                                    <SectionHeader label="Identity & Registration" />
+
+                                    <Field label="Company Name">
+                                        <div className="relative">
+                                            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                            <input
+                                                type="text"
+                                                value={formData.company_name}
+                                                onChange={(e) => handleInputChange('company_name', e.target.value)}
+                                                placeholder="e.g. 5L Solutions Corp."
+                                                className={inputCls}
+                                            />
+                                        </div>
+                                    </Field>
+
+                                    <Field label="Authorized Owner">
+                                        <input
+                                            type="text"
+                                            value={formData.owner_name}
+                                            onChange={(e) => handleInputChange('owner_name', e.target.value)}
+                                            className={inputCls}
+                                        />
+                                    </Field>
+
+                                    <Field label="Tax Identification Number (TIN)">
+                                        <div className="relative">
+                                            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                            <input
+                                                type="text"
+                                                value={formData.tin}
+                                                onChange={(e) => handleInputChange('tin', e.target.value)}
+                                                placeholder="000-000-000-000"
+                                                className={inputCls}
+                                            />
+                                        </div>
+                                    </Field>
+                                </div>
+
+                                {/* CENTER COLUMN: Communication & Address */}
+                                <div className="col-span-4 flex flex-col gap-6">
+                                    <SectionHeader label="Communication" />
+
+                                    <Field label="Business Email">
+                                        <div className="relative">
+                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                            <input
+                                                type="email"
+                                                value={formData.email}
+                                                onChange={(e) => handleInputChange('email', e.target.value)}
+                                                className={inputCls}
+                                            />
+                                        </div>
+                                    </Field>
+
+                                    <div className="grid grid-cols-1 gap-6">
+                                        <Field label="Business Phone">
+                                            <div className="relative">
+                                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                                <input
+                                                    type="tel"
+                                                    value={formData.phone}
+                                                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                                                    className={inputCls}
+                                                />
+                                            </div>
+                                        </Field>
+
+                                        <Field label="Official Website">
+                                            <div className="relative">
+                                                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                                <input
+                                                    type="text"
+                                                    value={formData.website}
+                                                    onChange={(e) => handleInputChange('website', e.target.value)}
+                                                    placeholder="https://www.5lsolutions.com"
+                                                    className={inputCls}
+                                                />
+                                            </div>
+                                        </Field>
                                     </div>
-                                )}
-                            </label>
+
+                                    <SectionHeader label="Physical Headquarters" />
+                                    <Field label="Complete Business Address">
+                                        <div className="relative">
+                                            <MapPin className="absolute left-3 top-4 text-gray-400" size={16} />
+                                            <textarea
+                                                value={formData.address}
+                                                onChange={(e) => handleInputChange('address', e.target.value)}
+                                                rows={3}
+                                                className={inputCls + ' pl-10 pt-3 resize-none'}
+                                                placeholder="Bldg Number, Street, City, Province, Zip Code"
+                                            />
+                                        </div>
+                                    </Field>
+                                </div>
+
+                                {/* RIGHT COLUMN: Visual Branding & Status */}
+                                <div className="col-span-4 flex flex-col gap-6">
+                                    <SectionHeader label="Visual Branding" />
+
+                                    <div className="p-4 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center gap-4">
+                                        <div className="w-full aspect-video bg-white rounded-xl border border-gray-100 shadow-inner flex items-center justify-center overflow-hidden relative group">
+                                            {logoPreview ? (
+                                                <img src={logoPreview} alt="Company Logo" className="w-full h-full object-contain p-4" />
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-2 text-gray-300">
+                                                    <Image size={48} strokeWidth={1} />
+                                                    <span className="text-[10px] uppercase font-bold tracking-widest">No Logo Uploaded</span>
+                                                </div>
+                                            )}
+                                            <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                                                <input type="file" className="hidden" onChange={handleLogoChange} />
+                                                <span className="text-white text-xs font-bold uppercase tracking-tighter">Replace Logo</span>
+                                            </label>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 text-center leading-relaxed px-4">
+                                            PNG or SVG with transparent background (Max 2MB).
+                                        </p>
+                                    </div>
+
+                                    <SectionHeader label="Account Status" />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {['active', 'inactive'].map((val) => (
+                                            <button
+                                                key={val}
+                                                onClick={() => handleInputChange('status', val)}
+                                                className={`py-3 rounded-xl border-2 font-bold text-[10px] uppercase tracking-widest transition-all
+              ${status === val
+                                                        ? (val === 'active' ? 'bg-green-50 border-green-500 text-green-700 shadow-md shadow-green-100' : 'bg-gray-100 border-gray-500 text-gray-700')
+                                                        : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'
+                                                    }`}
+                                            >
+                                                {val}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        {/* Footer Status Bar */}
+                        <div className="bg-gray-50 border-t border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+                            <div className="flex items-center gap-4">
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                    Last Sync: <span className="text-gray-900 font-black">10:01 AM</span>
+                                </p>
+                                <div className="h-3 w-px bg-gray-300" />
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                                    Version: <span className="text-gray-900 font-black">V2.0.4 ALLIED SERVICES</span>
+                                </p>
+                            </div>
+                            <p className="text-[11px] font-black text-red-600 tracking-[2px] uppercase">5L Solutions Corp.</p>
                         </div>
                     </div>
+                </motion.div>
+            </ProtectedAction>
+        </div>
+    );
+}
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Address
-                        </label>
-                        <textarea
-                            value={formData.address}
-                            onChange={(e) => handleInputChange('address', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            rows={4}
-                            placeholder="Enter company address"
-                        />
-                    </div>
+// ── Refined Helpers ──────────────────────────────────────────────────────
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Tax ID (TIN)
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.tin}
-                            onChange={(e) => handleInputChange('tin', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Enter tax identification number"
-                        />
-                    </div>
+const inputCls =
+    'w-full pl-10 pr-4 py-3 text-sm border-2 border-gray-100 rounded-xl bg-gray-50 text-gray-900 placeholder-gray-300 focus:outline-none focus:border-red-600 focus:bg-white focus:ring-4 focus:ring-red-50 transition-all font-medium';
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Website
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.website}
-                            onChange={(e) => handleInputChange('website', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Enter company website"
-                        />
-                    </div>
+function SummaryCard({ label, value, icon, sub }) {
+    return (
+        <div className="bg-white border border-gray-200 rounded-2xl p-3 flex items-center gap-5 shadow-sm hover:shadow-md transition-shadow">
+            <div className="w-12 h-12 bg-[#f8f9fa] border border-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                {icon}
+            </div>
+            <div className="min-w-0">
+                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">{label}</p>
+                <p className="text-lg font-black text-gray-900 truncate tracking-tight">{value}</p>
+                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">{sub}</p>
+            </div>
+        </div>
+    );
+}
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Email
-                        </label>
-                        <input
-                            type="email"
-                            value={formData.email}
-                            onChange={(e) => handleInputChange('email', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Enter company email"
-                        />
-                    </div>
+function Field({ label, children, className = '' }) {
+    return (
+        <div className={className}>
+            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[1.5px] mb-2">
+                {label}
+            </label>
+            {children}
+        </div>
+    );
+}
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Phone
-                        </label>
-                        <input
-                            type="tel"
-                            value={formData.phone}
-                            onChange={(e) => handleInputChange('phone', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Enter company phone"
-                        />
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                        <label className="block text-sm font-medium text-gray-700">Status</label>
-                        <div className="flex gap-3 w-full">
-                            <label className="flex-1 cursor-pointer">
-                                <input 
-                                    type="radio" 
-                                    name="status" 
-                                    value="active" 
-                                    className="sr-only peer" 
-                                    checked={status === 'active'} 
-                                    onChange={(e) => {
-                                        handleInputChange('status', e.target.value);
-                                    }} 
-                                />
-                                <div className="relative px-4 py-4 bg-white border border-gray-300 rounded-lg transition-all duration-200 hover:border-gray-400">
-                                    <span className="block text-sm font-medium text-center text-gray-700">ACTIVE</span>
-                                    <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-[60%] h-[5px] bg-${status === 'active' ? 'green-500' : 'gray-300'}`}></div>
-                                </div>
-                            </label>
-                            <label className="flex-1 cursor-pointer">
-                                <input 
-                                    type="radio" 
-                                    name="status" 
-                                    value="inactive" 
-                                    className="sr-only peer" 
-                                    checked={status === 'inactive'} 
-                                    onChange={(e) => {
-                                        handleInputChange('status', e.target.value);
-                                    }} 
-                                />
-                                <div className="relative px-4 py-4 bg-white border border-gray-300 rounded-lg transition-all duration-200 hover:border-gray-400">
-                                    <span className="block text-sm font-medium text-center text-gray-700">INACTIVE</span>
-                                    <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-[60%] h-[5px] bg-${status === 'inactive' ? 'green-500' : 'gray-300'}`}></div>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="flex gap-3 pt-4">
-                        <button
-                            type="button"
-                            onClick={handleCloseModal}
-                            className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors duration-200"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="flex-1 px-4 py-2 text-white bg-emerald-600 hover:bg-emerald-500 rounded-md transition-colors duration-200"
-                        >
-                            <Save size={16} className="mr-2" />
-                            Save Company
-                        </button>
-                    </form>
-                </div>
-            </RightSideModal>
+function SectionHeader({ label }) {
+    return (
+        <div className="col-span-full flex items-center gap-4 mt-2">
+            <span className="text-[11px] font-black text-gray-900 uppercase tracking-[3px]">{label}</span>
+            <div className="flex-1 h-[2px] bg-gray-100 rounded-full" />
         </div>
     );
 }

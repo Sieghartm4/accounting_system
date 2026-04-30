@@ -152,6 +152,147 @@ const getAllReceipts = async (req, res, next) => {
   }
 }
 
+const getPrintReceipts = async (req, res, next) => {
+  const { receipt_id } = req.params;
+  // Parse comma-separated IDs into array
+  const receiptIds = receipt_id.split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
+  console.log('Converted receipt_ids:', receiptIds, 'type:', typeof receiptIds);
+  
+  if (receiptIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid receipt IDs provided',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  try {
+    // Fetch company data once
+    const company_query = sql.select([
+      { col: Master.master_company.selectOptionColumns.company_id, as: 'id' },
+      { col: Master.master_company.selectOptionColumns.company_name, as: 'company_name' },
+      { col: Master.master_company.selectOptionColumns.logo, as: 'logo' },
+      { col: Master.master_company.selectOptionColumns.address, as: 'address' },
+      { col: Master.master_company.selectOptionColumns.tin, as: 'tin' },
+      { col: Master.master_company.selectOptionColumns.website, as: 'website' },  
+      { col: Master.master_company.selectOptionColumns.email, as: 'email' },
+      { col: Master.master_company.selectOptionColumns.phone, as: 'phone' },
+      { col: Master.master_company.selectOptionColumns.status, as: 'status' }
+    ])
+      .from(Master.master_company.tablename)
+      .build() + ' LIMIT 1';
+
+    let company = await Query(company_query, [], [Master.master_company.prefix_]);
+    company = company && company.length > 0 ? company[0] : null;
+
+    // Build base queries
+    const receipts_query = sql.select([
+      { col: Accounting.receipts.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.receipts.selectOptionColumns.customer_id, as: 'customer_id' },
+      { col: Master.customers.selectOptionColumns.name, as: 'customer' },
+      { col: Accounting.receipts.selectOptionColumns.document_reference, as: 'doc_ref' },
+      { col: Accounting.receipts.selectOptionColumns.collection_date, as: 'collection_date' },
+      { col: Accounting.receipts.selectOptionColumns.mode_of_payment, as: 'mode' },
+      { col: Accounting.receipts.selectOptionColumns.bank_name, as: 'bank_name' },
+      { col: Accounting.receipts.selectOptionColumns.check_number, as: 'check_number' },
+      { col: Accounting.receipts.selectOptionColumns.remarks, as: 'remarks' },
+      { col: Accounting.receipts.selectOptionColumns.total_amount_due, as: 'amount_due' },
+      { col: Accounting.receipts.selectOptionColumns.state, as: 'state' }
+    ])
+      .from(Accounting.receipts.tablename)
+      .innerJoin(Master.customers.tablename, Accounting.receipts.selectOptionColumns.customer_id, Master.customers.selectOptionColumns.id)
+      .whereIn(Accounting.receipts.selectOptionColumns.id, receiptIds)
+      .build();
+
+    let receipts = await Query(receipts_query, [receiptIds], [Accounting.receipts.prefix_, Master.customers.prefix_]);
+
+    const receipts_items_query = sql.select([
+      { col: Accounting.receipt_items.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.receipt_items.selectOptionColumns.receipts_id, as: 'receipts_id' },
+      { col: Accounting.receipt_items.selectOptionColumns.product_service, as: 'product_service_id' },
+      { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
+      { col: Accounting.receipt_items.selectOptionColumns.charts_of_accounts, as: 'charts_of_accounts_id' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.receipt_items.selectOptionColumns.description, as: 'description' },
+      { col: Accounting.receipt_items.selectOptionColumns.quantity, as: 'quantity' },
+      { col: Accounting.receipt_items.selectOptionColumns.sales_price, as: 'sales_price' },
+      { col: Accounting.receipt_items.selectOptionColumns.discount, as: 'discount' },
+      { col: Accounting.receipt_items.selectOptionColumns.discount_type, as: 'discount_type' },
+      { col: Master.vat.selectOptionColumns.rate, as: 'vat_rate' },
+      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'withholding_tax_rate' },
+      { col: Accounting.receipt_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.receipt_items.tablename)
+      .innerJoin(Master.vat.tablename, Accounting.receipt_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
+      .innerJoin(Master.withholding_tax.tablename, Accounting.receipt_items.selectOptionColumns.withholding_tax, Master.withholding_tax.selectOptionColumns.id)
+      .leftJoin(Master.products_service.tablename, Accounting.receipt_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.receipt_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
+      .whereIn(Accounting.receipt_items.selectOptionColumns.receipts_id, receiptIds)
+      .build();
+
+    let receipts_items = await Query(receipts_items_query, [receiptIds], [Accounting.receipt_items.prefix_]);
+
+    const receipts_journal_query = sql.select([
+      { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.journal_entries.selectOptionColumns.db_id, as: 'db_id' },
+      { col: Accounting.journal_entries.selectOptionColumns.coa_id, as: 'coa_id' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' },
+      { col: Accounting.journal_entries.selectOptionColumns.amount, as: 'amount' },
+      { col: Accounting.journal_entries.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.journal_entries.tablename)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.journal_entries.selectOptionColumns.coa_id, Master.charts_of_accounts.selectOptionColumns.id)
+      .where(Accounting.journal_entries.selectOptionColumns.db_name)
+      .whereIn(Accounting.journal_entries.selectOptionColumns.db_id, receiptIds)
+      .build();
+
+    let receipts_journal = await Query(receipts_journal_query, ['receipts', receiptIds], [Accounting.journal_entries.prefix_]);
+
+    const receipts_attachments_query = sql.select([
+      { col: Accounting.receipt_attachments.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.receipt_attachments.selectOptionColumns.receipt_id, as: 'receipt_id' },
+      { col: Accounting.receipt_attachments.selectOptionColumns.file, as: 'file' },
+      { col: Accounting.receipt_attachments.selectOptionColumns.name, as: 'name' },
+      { col: Accounting.receipt_attachments.selectOptionColumns.remarks, as: 'remarks' },
+      { col: Accounting.receipt_attachments.selectOptionColumns.uploaded_by, as: 'uploaded_by' },
+      { col: Accounting.receipt_attachments.selectOptionColumns.uploaded_date, as: 'uploaded_date' }
+    ])
+      .from(Accounting.receipt_attachments.tablename)
+      .whereIn(Accounting.receipt_attachments.selectOptionColumns.receipt_id, receiptIds)
+      .build();
+
+    let receipts_attachments = await Query(receipts_attachments_query, [receiptIds], [Accounting.receipt_attachments.prefix_]);
+
+    // Group items, journal, and attachments by receipt ID
+    const groupedData = receipts.map(receipt => ({
+      ...receipt,
+      items: receipts_items.filter(item => item.receipts_id === receipt.id),
+      journal: receipts_journal.filter(entry => entry.db_id === receipt.id),
+      attachments: receipts_attachments.filter(att => att.receipt_id === receipt.id),
+      company: company
+    }));
+
+    console.log('Grouped receipts data:', groupedData);
+    res.status(200).json({
+      success: true,
+      message: 'Receipts retrieved successfully',
+      company: company,
+      data: groupedData,
+      count: groupedData.length,
+      timestamp: new Date().toISOString()
+    })
+
+  } catch (error) {
+    console.error('Error fetching receipts:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching receipts',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    })
+  }
+}
+
 const createReceipts = async (req, res, next) => {
   try {
     const {
@@ -168,7 +309,7 @@ const createReceipts = async (req, res, next) => {
       journal_entries,
       attachments
     } = req.body;
-    console.log("BODY",req.body)
+    console.log("BODY", req.body)
     if (!customer_id || !payment_date || !mode_of_payment || !total_amount_due || !created_by) {
       return res.status(400).json({
         success: false,
@@ -215,8 +356,8 @@ const createReceipts = async (req, res, next) => {
           const itemValues = [
             receiptId,
             item.product_id || null,
-            item.account_id ,
-            item.description ,
+            item.account_id,
+            item.description,
             item.qty || null,
             item.price || 0,
             item.discount || 0,
@@ -311,7 +452,7 @@ const updateReceipt = async (req, res, next) => {
   const { receipt_id } = req.params;
   const receiptId = Number(receipt_id);
   console.log('Updating receipt_id:', receiptId, 'type:', typeof receiptId);
-  
+
   try {
     const {
       customer_id,
@@ -327,7 +468,7 @@ const updateReceipt = async (req, res, next) => {
       journal_entries,
       attachments
     } = req.body;
-    
+
     console.log('Update data:', req.body);
 
     if (!customer_id || !document_reference || !payment_date || !mode_of_payment || !total_amount_due) {
@@ -377,11 +518,11 @@ const updateReceipt = async (req, res, next) => {
           .from(Accounting.receipt_items.tablename)
           .where(Accounting.receipt_items.selectOptionColumns.receipts_id)
           .build();
-        
+
         const existingItems = await Query(existingItemsQuery, [receiptId], [Accounting.receipt_items.prefix_]);
         const existingItemIds = existingItems.map(item => item.id);
         const payloadItemIds = receipt_items.filter(item => item.id).map(item => item.id);
-        
+
         const itemsToDelete = existingItemIds.filter(id => !payloadItemIds.includes(id));
         if (itemsToDelete.length > 0) {
           const deleteItemsQuery = sql.delete()
@@ -389,7 +530,7 @@ const updateReceipt = async (req, res, next) => {
             .where(Accounting.receipt_items.selectOptionColumns.id)
             .andWhere(Accounting.receipt_items.selectOptionColumns.receipts_id)
             .build();
-          
+
           for (const itemId of itemsToDelete) {
             await connection.execute(deleteItemsQuery, [itemId, receiptId]);
           }
@@ -457,7 +598,7 @@ const updateReceipt = async (req, res, next) => {
           .from(Accounting.receipt_items.tablename)
           .where(Accounting.receipt_items.selectOptionColumns.receipts_id)
           .build();
-        
+
         await connection.execute(deleteAllItemsQuery, [receiptId]);
       }
 
@@ -469,11 +610,11 @@ const updateReceipt = async (req, res, next) => {
           .where(Accounting.journal_entries.selectOptionColumns.db_name)
           .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
           .build();
-        
+
         const existingEntries = await Query(existingEntriesQuery, ['receipts', receiptId], [Accounting.journal_entries.prefix_]);
         const existingEntryIds = existingEntries.map(entry => entry.id);
         const payloadEntryIds = journal_entries.filter(entry => entry.id).map(entry => entry.id);
-        
+
         const entriesToDelete = existingEntryIds.filter(id => !payloadEntryIds.includes(id));
         if (entriesToDelete.length > 0) {
           const deleteEntriesQuery = sql.delete()
@@ -482,7 +623,7 @@ const updateReceipt = async (req, res, next) => {
             .andWhere(Accounting.journal_entries.selectOptionColumns.db_name)
             .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
             .build();
-          
+
           for (const entryId of entriesToDelete) {
             await connection.execute(deleteEntriesQuery, [entryId, 'receipts', receiptId]);
           }
@@ -538,7 +679,7 @@ const updateReceipt = async (req, res, next) => {
           .where(Accounting.journal_entries.selectOptionColumns.db_name)
           .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
           .build();
-        
+
         await connection.execute(deleteAllEntriesQuery, ['receipts', receiptId]);
       }
 
@@ -653,13 +794,13 @@ const updateReceiptState = async (req, res, next) => {
           throw new Error(`Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`);
         }
 
-          const updateQuery = sql.update(Accounting.receipts.tablename)
-            .set([Accounting.receipts.selectOptionColumns.state])
-            .where(Accounting.receipts.selectOptionColumns.id)
-            .build();
-          const updateValues = [nextState, id];
-          return connection.execute(updateQuery, updateValues);
-        
+        const updateQuery = sql.update(Accounting.receipts.tablename)
+          .set([Accounting.receipts.selectOptionColumns.state])
+          .where(Accounting.receipts.selectOptionColumns.id)
+          .build();
+        const updateValues = [nextState, id];
+        return connection.execute(updateQuery, updateValues);
+
       });
 
       const results = await Promise.all(updatePromises);
@@ -700,6 +841,7 @@ const updateReceiptState = async (req, res, next) => {
 module.exports = {
   getReceipts,
   getAllReceipts,
+  getPrintReceipts,
   createReceipts,
   updateReceipt,
   updateReceiptState

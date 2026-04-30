@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 
 const useCompany = () => {
-  const [company, setCompany] = useState([]);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Modal and form state
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Form state
   const [logoPreview, setLogoPreview] = useState(null);
   const [status, setStatus] = useState('active');
   const [formData, setFormData] = useState({
@@ -21,7 +20,7 @@ const useCompany = () => {
     logo: null
   });
 
-  // Fetch companies
+  // Fetch company
   useEffect(() => {
     const fetchCompany = async () => {
       try {
@@ -32,7 +31,7 @@ const useCompany = () => {
           throw new Error("No authorization token found");
         }
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/company`,
+          `${import.meta.env.VITE_SERVER_LINK}/company/single`,
           {
             method: "GET",
             headers: {
@@ -62,47 +61,24 @@ const useCompany = () => {
     fetchCompany();
   }, []);
 
-  // Modal handlers
-  const handleAddClick = (companyData = null) => {
-    if (companyData) {
-      // Edit mode - populate form with existing data
+  // Auto-populate form when company data is loaded
+  useEffect(() => {
+    if (company) {
       setFormData({
-        company_name: companyData.mc_company_name || '',
-        owner_name: companyData.mc_owner_name || '',
-        address: companyData.mc_address || '',
-        tin: companyData.mc_tin || '',
-        website: companyData.mc_website || '',
-        email: companyData.mc_email || '',
-        phone: companyData.mc_phone || '',
-        status: companyData.mc_status || 'active',
-        logo: companyData.mc_logo || null
+        company_name: company.company_name || '',
+        owner_name: company.owner_name || '',
+        address: company.address || '',
+        tin: company.tin || '',
+        website: company.website || '',
+        email: company.email || '',
+        phone: company.phone || '',
+        status: company.status || 'active',
+        logo: company.logo || null
       });
-      setLogoPreview(companyData.mc_logo || null);
-      setStatus(companyData.mc_status || 'active');
-    } else {
-      // Create mode - reset form
-      handleCloseModal();
+      setLogoPreview(company.logo || null);
+      setStatus(company.status || 'active');
     }
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    // Reset form when closing
-    setFormData({
-      company_name: '',
-      owner_name: '',
-      address: '',
-      tin: '',
-      website: '',
-      email: '',
-      phone: '',
-      status: 'active',
-      logo: null
-    });
-    setLogoPreview(null);
-    setStatus('active');
-  };
+  }, [company]);
 
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
@@ -118,7 +94,28 @@ const useCompany = () => {
   };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // Auto-format TIN to Philippines format: 123-456-789-000
+    if (field === 'tin') {
+      // Remove all non-digits
+      const digits = value.replace(/\D/g, '');
+      // Format as 123-456-789-000
+      let formatted = '';
+      if (digits.length > 0) {
+        formatted += digits.substring(0, 3);
+      }
+      if (digits.length > 3) {
+        formatted += '-' + digits.substring(3, 6);
+      }
+      if (digits.length > 6) {
+        formatted += '-' + digits.substring(6, 9);
+      }
+      if (digits.length > 9) {
+        formatted += '-' + digits.substring(9, 12);
+      }
+      setFormData(prev => ({ ...prev, [field]: formatted }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
     // Update status state if field is status
     if (field === 'status') {
       setStatus(value);
@@ -127,36 +124,27 @@ const useCompany = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       const token = localStorage.getItem('token');
-      
-      // Check if we're in edit mode (form has company data)
-      const isEditMode = Object.keys(formData).some(key => 
-        key !== 'status' && formData[key] && formData[key] !== ''
-      );
-      
+
+      // Check if we're in edit mode (company exists)
+      const isEditMode = company !== null;
+
       let url = `${import.meta.env.VITE_SERVER_LINK}/company`;
       let method = 'POST';
-      
+
       if (isEditMode) {
-        // Find the company ID from the current company data
-        const currentCompany = company.find(c => 
-          c.mc_company_name === formData.company_name || 
-          c.mc_owner_name === formData.owner_name
-        );
-        
-        if (currentCompany) {
-          url = `${import.meta.env.VITE_SERVER_LINK}/company/${currentCompany.mc_company_id}`;
-          method = 'PUT';
-        }
+        // Use the existing company ID for update
+        url = `${import.meta.env.VITE_SERVER_LINK}/company/${company.company_id}`;
+        method = 'PUT';
       }
-      
+
       const response = await fetch(url, {
         method: method,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(formData)
       });
@@ -168,10 +156,8 @@ const useCompany = () => {
       }
 
       const result = await response.json();
-      
+
       if (result.success) {
-        // Close modal and reset form
-        handleCloseModal();
         // Refresh company data
         window.location.reload();
       } else {
@@ -187,14 +173,11 @@ const useCompany = () => {
     company, 
     loading, 
     error,
-    // Modal and form state
-    isModalOpen,
+    // Form state
     logoPreview,
     status,
     formData,
-    // Modal and form handlers
-    handleAddClick,
-    handleCloseModal,
+    // Form handlers
     handleLogoChange,
     handleInputChange,
     handleSubmit

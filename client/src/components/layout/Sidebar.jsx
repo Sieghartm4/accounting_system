@@ -21,6 +21,7 @@ export default function Sidebar({ isCollapsed }) {
         adjustments: null,
         reports: null
     });
+    const [company, setCompany] = useState(null);
 
     useEffect(() => {
         try {
@@ -35,6 +36,38 @@ export default function Sidebar({ isCollapsed }) {
             console.error('Error loading sidebar items:', error);
             setSidebarItems({ main: [], masters: [], receipts: [], sales: [], purchase: [], adjustments: [] });
         }
+    }, []);
+
+    // Fetch company data for branding
+    useEffect(() => {
+        const fetchCompany = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+
+                const response = await fetch(
+                    `${import.meta.env.VITE_SERVER_LINK}/company/single`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                        },
+                    }
+                );
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        setCompany(result.data);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching company for sidebar:', error);
+            }
+        };
+
+        fetchCompany();
     }, []);
 
     // Auto-open collapsible based on current route
@@ -119,11 +152,31 @@ export default function Sidebar({ isCollapsed }) {
             `}} />
             {/* Branding Area */}
             <div className="flex items-center h-16 px-6 border-b-2 border-red-600 bg-black">
-                <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white font-black text-lg shadow-inner">5L</div>
+                {company?.logo ? (
+                    <img
+                        src={company.logo}
+                        alt="Company Logo"
+                        className="w-10 h-10 rounded-lg object-cover"
+                    />
+                ) : (
+                    <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-inner">
+                        {company?.company_name
+                            ? company.company_name
+                                .split(' ')
+                                .map(word => word.charAt(0).toUpperCase())
+                                .join('')
+                                .slice(0, 2)
+                            : '5L'}
+                    </div>
+                )}
                 {!isCollapsed && (
                     <div className="ml-3 overflow-hidden whitespace-nowrap">
-                        <span className="font-bold tracking-tight text-white block">5L SOLUTIONS</span>
-                        <span className="text-[10px] text-red-600 font-bold tracking-[0.2em] -mt-1 block">CORP.</span>
+                        <span className="font-bold tracking-tight text-white text-xl block">
+                            {company?.company_name || '5L SOLUTIONS'}
+                        </span>
+                        <span className="text-[10px] text-red-600 font-bold tracking-[0.2em] -mt-1 block">
+                            {company?.website || company?.email || 'CORP.'}
+                        </span>
                     </div>
                 )}
             </div>

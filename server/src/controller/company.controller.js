@@ -33,6 +33,32 @@ const getAllCompanies = async (req, res, next) => {
     }
 }
 
+const getCompany = async (req, res, next) => {
+    try {
+        const statement = sql.selectAll(Master.master_company.tablename)
+            .from(Master.master_company.tablename)
+            .build() + ' LIMIT 1';
+        const companies = await Query(statement, [], Master.master_company.prefix_)
+
+        const company = companies.length > 0 ? companies[0] : null;
+        console.log("company", company)
+        res.status(200).json({
+            success: true,
+            message: 'Company retrieved successfully',
+            data: company,
+            timestamp: new Date().toISOString()
+        })
+
+    } catch (error) {
+        console.error('Error fetching company:', error)
+        return res.status(500).json({
+            success: false,
+            message: 'Server error while fetching company',
+            error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        })
+    }
+}
+
 const createCompany = async (req, res, next) => {
     try {
         const { 
@@ -47,10 +73,10 @@ const createCompany = async (req, res, next) => {
             status 
         } = req.body;
 
-        if (!company_name || !owner_name || !address || !status) {
+        if (!company_name) {
             return res.status(400).json({
                 success: false,
-                message: 'Company name, owner name, address and status are required'
+                message: 'Company name is required'
             });
         }
         let queries = []
@@ -127,38 +153,68 @@ const updateCompany = async (req, res, next) => {
             });
         }
 
-        if (!company_name || !owner_name || !address || !status) {
+        if (!company_name) {
             return res.status(400).json({
                 success: false,
-                message: 'Company name, owner name, address and status are required'
+                message: 'Company name is required'
             });
         }
 
-        // Build update query dynamically based on provided fields
-        const updateFields = {};
-        if (company_name !== undefined) updateFields.mc_company_name = company_name;
-        if (owner_name !== undefined) updateFields.mc_owner_name = owner_name;
-        if (logo !== undefined) updateFields.mc_logo = logo;
-        if (address !== undefined) updateFields.mc_address = address;
-        if (tin !== undefined) updateFields.mc_tin = tin;
-        if (website !== undefined) updateFields.mc_website = website;
-        if (email !== undefined) updateFields.mc_email = email;
-        if (phone !== undefined) updateFields.mc_phone = phone;
-        if (status !== undefined) updateFields.mc_status = status;
+        const updateColumns = [];
+        const updateValues = [];
 
-        if (Object.keys(updateFields).length === 0) {
+        if (company_name !== undefined) {
+            updateColumns.push('company_name');
+            updateValues.push(company_name);
+        }
+        if (owner_name !== undefined) {
+            updateColumns.push('owner_name');
+            updateValues.push(owner_name);
+        }
+        if (logo !== undefined) {
+            updateColumns.push('logo');
+            updateValues.push(logo);
+        }
+        if (address !== undefined) {
+            updateColumns.push('address');
+            updateValues.push(address);
+        }
+        if (tin !== undefined) {
+            updateColumns.push('tin');
+            updateValues.push(tin);
+        }
+        if (website !== undefined) {
+            updateColumns.push('website');
+            updateValues.push(website);
+        }
+        if (email !== undefined) {
+            updateColumns.push('email');
+            updateValues.push(email);
+        }
+        if (phone !== undefined) {
+            updateColumns.push('phone');
+            updateValues.push(phone);
+        }
+        if (status !== undefined) {
+            updateColumns.push('status');
+            updateValues.push(status);
+        }
+
+        if (updateColumns.length === 0) {
             return res.status(400).json({
                 success: false,
                 message: 'No fields to update'
             });
         }
 
-        const updateStatement = sql.update(Master.master_company.tablename)
-            .set(updateFields)
+        const updateStatement = sql.update(Master.master_company.tablename, {
+            prefix: Master.master_company.prefix
+        })
+            .set(updateColumns)
             .where('mc_company_id', '=', id)
             .build();
 
-        await Query(updateStatement, [], Master.master_company.prefix_);
+        await Query(updateStatement, [...updateValues, id], Master.master_company.prefix_);
 
         res.status(200).json({
             success: true,
@@ -189,6 +245,7 @@ const updateCompany = async (req, res, next) => {
 }
 module.exports = {
     getAllCompanies,
+    getCompany,
     createCompany,
     updateCompany
 }

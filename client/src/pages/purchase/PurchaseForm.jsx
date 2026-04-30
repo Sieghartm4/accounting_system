@@ -360,9 +360,7 @@ function SidebarInput({ label, placeholder, type = 'text', required, dark, value
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, isEditMode = false, purchaseData = null }) {
-  const [purchaseItems, setPurchaseItems] = useState([
-    { id: 1, productId: '', productSearch: '', coa: '', coaSearch: '', description: '', qty: 1, price: 0, discount: 0, discountType: 'PERCENT', vat: 0, vatSearch: '', vatRate: 0, wht: 0, whtSearch: '', whtRate: 0, responsibilityCenter: '', isOther: false, isNew: true }
-  ]);
+  const [purchaseItems, setPurchaseItems] = useState([]);
 
   const [journalEntries, setJournalEntries] = useState([
     { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 }

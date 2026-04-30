@@ -9,6 +9,7 @@ import ProtectedAction from '../../components/ProtectedAction';
 import useReceipts from './useReceipts';
 import ReceiptsForm from './ReceiptsForm';
 import { hasRouteAccess, getAccessLevel } from '../../utils/routeProtection';
+import { generateReceiptPDF } from '../../utils/generateReceiptPDF'; // <-- import PDF util
 
 export default function Receipts() {
   return (
@@ -33,9 +34,7 @@ function ReceiptsContent() {
     const fetchReceipt = async () => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
+        if (!token) throw new Error('No authentication token found');
 
         const response = await fetch(
           `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(id)}`,
@@ -49,9 +48,7 @@ function ReceiptsContent() {
         );
 
         const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.message || 'Failed to fetch receipt details');
-        }
+        if (!response.ok) throw new Error(result.message || 'Failed to fetch receipt details');
 
         setViewingReceipt(result);
         setIsEditMode(false);
@@ -61,31 +58,68 @@ function ReceiptsContent() {
           return next;
         }, { replace: true });
       } catch (err) {
-        setToast({
-          type: 'error',
-          message: err.message || 'Failed to fetch receipt details'
-        });
+        setToast({ type: 'error', message: err.message || 'Failed to fetch receipt details' });
       }
     };
 
     fetchReceipt();
   }, [searchParams, setSearchParams]);
 
-  // Check if user has access to enable checkboxes
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const accessLevel = getAccessLevel('receipts', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
+  const enableCheckboxes =
+    accessLevel === 'Check Access'   ||
+    accessLevel === 'Approve Access' ||
+    accessLevel === 'Edit Access'    ||
+    accessLevel === 'Full Access';
 
-  // Determine checkbox condition based on access level
-  const checkboxCondition = enableCheckboxes 
-    ? accessLevel === 'Full Access' 
-      ? { column: 'state', value: 'APPROVED', exclude: true } // Exclude APPROVED state for Full Access
+  const checkboxCondition = enableCheckboxes
+    ? accessLevel === 'Full Access'
+      ? { column: 'state', value: 'APPROVED', exclude: true }
       : { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
     : null;
 
   const fadeInUp = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+    hidden:  { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  };
+
+  // ─── Helper: fetch full receipt data then download as PDF ─────────────────
+  const fetchAndDownloadPDF = async (selectedRows, copyType) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+
+      const receiptIds = selectedRows.map(row => row.id).join(',');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/receipt/print/${receiptIds}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Failed to fetch receipts for printing');
+
+      // result may be a single object or an array — normalise to array
+      const data = Array.isArray(result) ? result : [result];
+
+      // Generate & auto-download PDFs (one per receipt)
+      await generateReceiptPDF(data, copyType);
+
+      setToast({
+        type: 'success',
+        message: `${data.length} receipt PDF(s) downloaded (${copyType === 'vendor' ? 'Vendor' : 'Internal'} Copy)`,
+      });
+    } catch (error) {
+      console.error('Error generating receipt PDF:', error);
+      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' });
+    }
   };
 
   if (isAdding) return (
@@ -106,10 +140,7 @@ function ReceiptsContent() {
         isViewMode={!isEditMode}
         isEditMode={isEditMode}
         receiptData={viewingReceipt}
-        onBack={() => {
-          setViewingReceipt(null);
-          setIsEditMode(false);
-        }}
+        onBack={() => { setViewingReceipt(null); setIsEditMode(false); }}
         onSuccess={async (nextToast) => {
           if (nextToast) setToast(nextToast);
           await refetchReceipts();
@@ -148,16 +179,10 @@ function ReceiptsContent() {
           onClose={() => setToast(null)}
         />
       )}
-      
-      {/* --- HEADER SECTION --- */}
-      <div className="flex-shrink-0">
-        {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          <span>Billing & Invoicing</span>
-          <ArrowRight size={10} />
-          <span className="text-black">Acknowledgement Receipts</span>
-        </nav> */}
 
-        <motion.div 
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0">
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -169,12 +194,9 @@ function ReceiptsContent() {
                 <Receipt size={24} />
               </div>
               <h1 className="text-4xl font-black text-black tracking-tighter">
-               Cash <span className="text-red-600 italic">Receipts</span>
+                Cash <span className="text-red-600 italic">Receipts</span>
               </h1>
             </div>
-            {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
-              Track payment acknowledgements and transaction history for all entities.
-            </p> */}
           </div>
 
           <div className="flex gap-3">
@@ -183,7 +205,10 @@ function ReceiptsContent() {
               EXPORT DATA
             </button>
             <ProtectedAction routeName="receipts">
-              <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button
+                onClick={() => setIsAdding(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
                 <FilePlus size={14} />
                 New Receipt
               </button>
@@ -191,31 +216,31 @@ function ReceiptsContent() {
           </div>
         </motion.div>
 
-        {/* --- SUMMARY TILES --- */}
+        {/* ── SUMMARY TILES ──────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard 
-            icon={<Receipt className="text-red-600" size={20} />} 
-            label="Total Receipts" 
-            value={receipts?.length || 0} 
+          <SummaryCard
+            icon={<Receipt className="text-red-600" size={20} />}
+            label="Total Receipts"
+            value={receipts?.length || 0}
             subText="Processed"
           />
-          <SummaryCard 
-            icon={<CreditCard className="text-black" size={20} />} 
-            label="Transactions" 
-            value="Today" 
+          <SummaryCard
+            icon={<CreditCard className="text-black" size={20} />}
+            label="Transactions"
+            value="Today"
             subText="Live Feed"
           />
-          <SummaryCard 
-            icon={<ShieldCheck className="text-gray-400" size={20} />} 
-            label="Status" 
-            value="Verified" 
+          <SummaryCard
+            icon={<ShieldCheck className="text-gray-400" size={20} />}
+            label="Status"
+            value="Verified"
             subText="Audit Compliant"
           />
         </div>
       </div>
 
-      {/* --- TABLE SECTION --- */}
-      <motion.div 
+      {/* ── TABLE ──────────────────────────────────────────────────────────── */}
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -233,101 +258,71 @@ function ReceiptsContent() {
             {
               column: 'state',
               values: {
-                'PREPARED': 'yellow',
-                'CHECKED': 'blue',
-                'APPROVED': 'green',
-                'REJECTED': 'red',
-                'CANCELLED': 'orange'
-              }
-            }
+                'PREPARED':  'yellow',
+                'CHECKED':   'blue',
+                'APPROVED':  'green',
+                'REJECTED':  'red',
+                'CANCELLED': 'orange',
+              },
+            },
           ]}
           actionButtons={[
             {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  console.log('View receipt:', row);
-                  
                   const token = localStorage.getItem('token');
-                  if (!token) {
-                    throw new Error('No authentication token found');
-                  }
+                  if (!token) throw new Error('No authentication token found');
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(row.id)}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                       },
                     }
                   );
 
                   const result = await response.json();
+                  if (!response.ok) throw new Error(result.message || 'Failed to fetch receipt details');
 
-                  if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch receipt details');
-                  }
-
-                  console.log('Receipt details:', result);
-                  
-                  // Set receipt data for viewing
                   setViewingReceipt(result);
                   setIsEditMode(false);
-
                 } catch (error) {
-                  console.error('Error fetching receipt details:', error);
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch receipt details'
-                  });
+                  setToast({ type: 'error', message: error.message || 'Failed to fetch receipt details' });
                 }
-              }
+              },
             },
             {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  console.log('Edit receipt:', row);
-                  
                   const token = localStorage.getItem('token');
-                  if (!token) {
-                    throw new Error('No authentication token found');
-                  }
+                  if (!token) throw new Error('No authentication token found');
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(row.id)}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                       },
                     }
                   );
 
                   const result = await response.json();
+                  if (!response.ok) throw new Error(result.message || 'Failed to fetch receipt details');
 
-                  if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch receipt details');
-                  }
-
-                  console.log('Receipt details for editing:', result);
-                  
-                  // Set receipt data for editing (edit mode)
                   setViewingReceipt(result);
                   setIsEditMode(true);
-
                 } catch (error) {
-                  console.error('Error fetching receipt details:', error);
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch receipt details'
-                  });
+                  setToast({ type: 'error', message: error.message || 'Failed to fetch receipt details' });
                 }
-              }
-            }
+              },
+            },
           ]}
           checkboxActions={[
             {
@@ -335,50 +330,45 @@ function ReceiptsContent() {
               onClick: async (selectedRows) => {
                 try {
                   const token = localStorage.getItem('token');
-                  if (!token) {
-                    throw new Error('No authentication token found');
-                  }
+                  if (!token) throw new Error('No authentication token found');
 
-                  const updates = selectedRows.map(row => ({
-                    id: row.id,
-                    currentState: row.state
-                  }));
+                  const updates = selectedRows.map(row => ({ id: row.id, currentState: row.state }));
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/receipt/receipt-state`,
                     {
-                      method: "PUT",
+                      method: 'PUT',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                       },
-                      body: JSON.stringify({ updates })
+                      body: JSON.stringify({ updates }),
                     }
                   );
 
                   const result = await response.json();
+                  if (!response.ok) throw new Error(result.message || 'Failed to approve receipts');
 
-                  if (!response.ok) {
-                    throw new Error(result.message || 'Failed to approve receipts');
-                  }
-
-                  // Refresh receipts data
                   await refetchReceipts();
-
                   setToast({
                     type: 'success',
-                    message: result.message || `${selectedRows.length} receipt(s) approved successfully`
+                    message: result.message || `${selectedRows.length} receipt(s) approved successfully`,
                   });
-
                 } catch (error) {
-                  console.error('Error approving receipts:', error);
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to approve receipts'
-                  });
+                  setToast({ type: 'error', message: error.message || 'Failed to approve receipts' });
                 }
-              }
-            }
+              },
+            },
+            {
+              // ── Internal Copy → fetch data → generate + download PDF directly
+              label: 'Internal Copy',
+              onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
+            },
+            {
+              // ── Vendor Copy → same but labelled differently in PDF
+              label: 'Vendor Copy',
+              onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'vendor'),
+            },
           ]}
         />
       </motion.div>
