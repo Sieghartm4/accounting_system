@@ -6,7 +6,6 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
   const { jsPDF } = await import('jspdf');
   const { default: autoTable } = await import('jspdf-autotable');
 
-  // API returns an array of grouped receipt objects
   const receipts = Array.isArray(receiptData) ? receiptData : [receiptData];
 
   for (let idx = 0; idx < receipts.length; idx++) {
@@ -18,149 +17,207 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     const margin = 40;
     const contentW = pageW - margin * 2;
 
-    const RED   = [204, 0, 0];
-    const BLACK = [0, 0, 0];
-    const GRAY  = [240, 240, 240];
-    const DGRAY = [100, 100, 100];
-    const WHITE = [255, 255, 255];
-    const MGRAY = [160, 160, 160];
+    // ── COLOUR PALETTE ────────────────────────────────────────────────────────
+    const RED        = [204, 0, 0];
+    const BLACK      = [0, 0, 0];
+    const GRAY       = [240, 240, 240];
+    const DGRAY      = [100, 100, 100];
+    const WHITE      = [255, 255, 255];
+    const MGRAY      = [160, 160, 160];
+    const NEAR_BLACK = [30, 30, 30];
+
+    const copyLabel = copyType === 'vendor' ? 'Vendor Copy' : 'Internal Copy';
+    const company   = receipt.company || {};
 
     let y = margin;
 
     // ── LOGO ──────────────────────────────────────────────────────────────────
-    const company = receipt.company || {};
+    const LOGO_W = 52;
+    const LOGO_H = 40;
+    const logoX  = pageW - margin - LOGO_W;
+
     if (company.logo) {
       try {
         const fmt = company.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-        doc.addImage(company.logo, fmt, pageW - margin - 52, y - 4, 52, 40);
+        doc.addImage(company.logo, fmt, logoX, y - 4, LOGO_W, LOGO_H);
       } catch (e) {
         console.warn('[PDF] Logo render failed:', e.message);
       }
     }
 
-    // ── HEADER ────────────────────────────────────────────────────────────────
+    // ── HEADER TEXT ───────────────────────────────────────────────────────────
+    // Left – title
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
+    doc.setFontSize(17);
     doc.setTextColor(...RED);
     doc.text('CASH DISBURSEMENTS # ' + (receipt.id ?? ''), margin, y + 14);
 
+    // Left – copy label (italic, small)
     doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(...DGRAY);
-    const copyLabel = copyType === 'vendor' ? 'Vendor Copy' : 'Internal Copy';
     doc.text(copyLabel, margin, y + 26);
 
-    // Company text block (right side, left of logo)
-    const cBlockX = pageW - margin - 52 - 8;
+    // Right – company name (right-aligned, stopping 8pt before logo)
+    const cBlockRightX = logoX - 8;
+
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...BLACK);
-    doc.text(company.company_name || '', cBlockX, y + 10, { align: 'right' });
+    doc.text(company.company_name || '', cBlockRightX, y + 10, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(...DGRAY);
+
     const contactLine = [company.phone, company.email].filter(Boolean).join('  |  ');
-    if (contactLine) doc.text(contactLine, cBlockX, y + 20, { align: 'right' });
-    if (company.tin) doc.text('TIN: ' + company.tin, cBlockX, y + 29, { align: 'right' });
-    if (company.website) doc.text(company.website, cBlockX, y + 38, { align: 'right' });
+    if (contactLine) doc.text(contactLine, cBlockRightX, y + 21, { align: 'right' });
+
+    const tinWebLine = [
+      company.tin     ? 'TIN: ' + company.tin : null,
+      company.website ? company.website        : null,
+    ].filter(Boolean).join('  |  ');
+    if (tinWebLine) doc.text(tinWebLine, cBlockRightX, y + 31, { align: 'right' });
 
     // ── DIVIDER ───────────────────────────────────────────────────────────────
-    y += 50;
+    y += 48;
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.75);
     doc.line(margin, y, pageW - margin, y);
-    y += 12;
+    y += 13;
 
     // ── PARTY / DOC INFO ──────────────────────────────────────────────────────
+    // Left – customer name + TIN
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(...BLACK);
-    doc.text(receipt.customer || '\u2014', margin, y + 2);
+    doc.text(receipt.customer || '—', margin, y);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...DGRAY);
-    doc.text('000-000-000-00000', margin, y + 13);
+    doc.text('000-000-000-00000', margin, y + 12);
 
-    const rightColX = margin + contentW * 0.52;
-    const valueColX = rightColX + 90;
+    // Right – doc metadata (label + value two-column)
+    const INFO_LABEL_X = margin + contentW * 0.52;
+    const INFO_VALUE_X = INFO_LABEL_X + 92;
 
-    let collectionDate = '\u2014';
+    let collectionDate = '—';
     if (receipt.collection_date) {
       try {
         collectionDate = new Date(receipt.collection_date).toLocaleDateString('en-US', {
-          month: 'short', day: '2-digit', year: 'numeric'
+          month: 'short', day: '2-digit', year: 'numeric',
         });
       } catch (_) {}
     }
 
-    const modeDisplay = (receipt.mode === 'BANK' || receipt.bank_name)
-      ? 'ET : Bank/Electronic Transfer'
-      : receipt.mode ? ('ET : ' + receipt.mode) : '\u2014';
+    const modeDisplay =
+      receipt.mode === 'BANK' || receipt.bank_name
+        ? 'ET : Bank/Electronic Transfer'
+        : receipt.mode
+        ? 'ET : ' + receipt.mode
+        : '—';
 
     const infoRows = [
-      ['Doc Ref:', receipt.doc_ref || '\u2014'],
+      ['Doc Ref:',      receipt.doc_ref || '—'],
       ['Payment Date:', collectionDate],
-      ['Mode:', modeDisplay],
+      ['Mode:',         modeDisplay],
     ];
 
-    doc.setFontSize(8);
-    infoRows.forEach(function(row, i) {
-      const rowY = y + 2 + i * 11;
+    infoRows.forEach(([lbl, val], i) => {
+      const rowY = y + i * 12;
       doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
       doc.setTextColor(...BLACK);
-      doc.text(row[0], rightColX, rowY);
+      doc.text(lbl, INFO_LABEL_X, rowY);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...DGRAY);
-      doc.text(String(row[1]), valueColX, rowY);
+      doc.text(String(val), INFO_VALUE_X, rowY);
     });
 
-    y += 36;
+    y += 38;
     doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
     doc.line(margin, y, pageW - margin, y);
     y += 10;
+
+    // ── FORMAT HELPERS ────────────────────────────────────────────────────────
+    const fmt2 = (v) =>
+      parseFloat(v || 0).toLocaleString('en-PH', {
+        minimumFractionDigits: 2, maximumFractionDigits: 2,
+      });
+
+    const fmt1 = (v) =>
+      parseFloat(v || 0).toLocaleString('en-PH', {
+        minimumFractionDigits: 2, maximumFractionDigits: 2,
+      });
+
+    const fmtJ = (v) =>
+      v != null && v !== '' && parseFloat(v) !== 0
+        ? parseFloat(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '';
 
     // ── ITEMS TABLE ───────────────────────────────────────────────────────────
     const items = Array.isArray(receipt.items) ? receipt.items : [];
 
-    function fmt(v, d) {
-      return parseFloat(v || 0).toLocaleString('en-PH', {
-        minimumFractionDigits: d != null ? d : 2,
-        maximumFractionDigits: d != null ? d : 2,
-      });
-    }
-
-    const itemRows = items.map(function(item, i) {
-      const qty  = parseFloat(item.quantity || 1);
-      const pp   = parseFloat(item.purchase_price || 0);
-      const tp   = parseFloat(item.total_price || pp * qty);
+    const itemRows = items.map((item, i) => {
+      const qty  = parseFloat(item.quantity        || 1);
+      const pp   = parseFloat(item.purchase_price  || 0);
+      const tp   = parseFloat(item.total_price     || pp * qty);
       const disc = parseFloat(item.discount_amount || 0);
       const vatP = item.vat_percentage != null ? item.vat_percentage + '%' : '0%';
-      const vatA = parseFloat(item.vat_amount || 0);
+      const vatA = parseFloat(item.vat_amount      || 0);
       const whtP = item.wht_percentage != null ? item.wht_percentage + '%' : '0%';
-      const whtA = parseFloat(item.wht_amount || 0);
-      const due  = parseFloat(item.amount_due || tp);
-      return [i + 1, item.product_name || '\u2014', item.description || '\u2014',
-              item.unit || '\u2014', fmt(qty), fmt(pp), fmt(tp), fmt(disc),
-              vatP, fmt(vatA), whtP, fmt(whtA), fmt(due)];
+      const whtA = parseFloat(item.wht_amount      || 0);
+      const due  = parseFloat(item.amount_due      || tp);
+      return [
+        i + 1,
+        item.product_name || '—',
+        item.description  || '—',
+        item.unit         || '—',
+        fmt2(qty),
+        fmt2(pp),
+        fmt2(tp),
+        fmt2(disc),
+        vatP,
+        fmt2(vatA),
+        whtP,
+        fmt2(whtA),
+        fmt2(due),
+      ];
     });
 
     autoTable(doc, {
       startY: y,
       margin: { left: margin, right: margin },
-      head: [['#', 'Product or\nService', 'Description', 'Unit', 'Quantity',
-              'Purchase\nPrice', 'Total\nPrice', 'Discount\nAmount',
-              'VAT', 'VAT\nAmount', 'WHT', 'WHT\nAmount', 'Amount\nDue']],
+      head: [[
+        '#', 'Product or\nService', 'Description', 'Unit', 'Quantity',
+        'Purchase\nPrice', 'Total\nPrice', 'Discount\nAmount',
+        'VAT', 'VAT\nAmount', 'WHT', 'WHT\nAmount', 'Amount\nDue',
+      ]],
       body: itemRows.length > 0 ? itemRows : [Array(13).fill('')],
-      styles: { fontSize: 6.5, cellPadding: 3, textColor: BLACK,
-                lineColor: [210, 210, 210], lineWidth: 0.4, overflow: 'linebreak' },
-      headStyles: { fillColor: BLACK, textColor: WHITE, fontStyle: 'bold',
-                    fontSize: 6.5, halign: 'center', valign: 'middle', minCellHeight: 22 },
+      styles: {
+        fontSize: 6.5,
+        cellPadding: { top: 4, bottom: 4, left: 3, right: 3 },
+        textColor: BLACK,
+        lineColor: [210, 210, 210],
+        lineWidth: 0.4,
+        overflow: 'linebreak',
+        font: 'helvetica',
+      },
+      headStyles: {
+        fillColor: BLACK,
+        textColor: WHITE,
+        fontStyle: 'bold',
+        fontSize: 6.5,
+        halign: 'center',
+        valign: 'middle',
+        minCellHeight: 24,
+      },
       columnStyles: {
         0:  { halign: 'center', cellWidth: 16 },
-        1:  { cellWidth: 58 },
-        2:  { cellWidth: 55 },
+        1:  { halign: 'left',   cellWidth: 58 },
+        2:  { halign: 'left',   cellWidth: 55 },
         3:  { halign: 'center', cellWidth: 24 },
         4:  { halign: 'right',  cellWidth: 36 },
         5:  { halign: 'right',  cellWidth: 46 },
@@ -173,9 +230,11 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
         12: { halign: 'right',  cellWidth: 46 },
       },
       alternateRowStyles: { fillColor: [252, 252, 252] },
+      tableLineColor: [210, 210, 210],
+      tableLineWidth: 0.4,
     });
 
-    y = doc.lastAutoTable.finalY + 8;
+    y = doc.lastAutoTable.finalY + 10;
 
     // ── REMARKS ───────────────────────────────────────────────────────────────
     if (receipt.remarks) {
@@ -186,40 +245,39 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...DGRAY);
       const wrapped = doc.splitTextToSize(receipt.remarks, contentW * 0.5);
-      doc.text(wrapped, margin, y + 20);
-      y += 14 + wrapped.length * 10;
+      doc.text(wrapped, margin, y + 21);
+      y += 16 + wrapped.length * 10;
     } else {
       y += 6;
     }
 
     // ── TOTALS BLOCK ──────────────────────────────────────────────────────────
-    const totals = items.reduce(function(acc, item) {
-      const qty = parseFloat(item.quantity || 1);
-      acc.purchasePrice += parseFloat(item.purchase_price  || 0) * qty;
-      acc.totalDiscount += parseFloat(item.discount_amount || 0);
-      acc.totalVAT      += parseFloat(item.vat_amount      || 0);
-      acc.vatableSales  += parseFloat(item.vatable_sales   || 0);
-      acc.vatExempt     += parseFloat(item.vat_exempt_sales || 0);
-      acc.zeroRated     += parseFloat(item.zero_rated_sales || 0);
-      acc.totalWHT      += parseFloat(item.wht_amount      || 0);
-      return acc;
-    }, { purchasePrice: 0, totalDiscount: 0, totalVAT: 0,
-         vatableSales: 0, vatExempt: 0, zeroRated: 0, totalWHT: 0 });
+    const totals = items.reduce(
+      (acc, item) => {
+        const qty = parseFloat(item.quantity || 1);
+        acc.purchasePrice += parseFloat(item.purchase_price   || 0) * qty;
+        acc.totalDiscount += parseFloat(item.discount_amount  || 0);
+        acc.totalVAT      += parseFloat(item.vat_amount       || 0);
+        acc.vatableSales  += parseFloat(item.vatable_sales    || 0);
+        acc.vatExempt     += parseFloat(item.vat_exempt_sales || 0);
+        acc.zeroRated     += parseFloat(item.zero_rated_sales || 0);
+        acc.totalWHT      += parseFloat(item.wht_amount       || 0);
+        return acc;
+      },
+      { purchasePrice: 0, totalDiscount: 0, totalVAT: 0,
+        vatableSales: 0, vatExempt: 0, zeroRated: 0, totalWHT: 0 }
+    );
 
     const amtDueTotal      = parseFloat(receipt.amount_due || 0);
     const discountedAmount = totals.purchasePrice - totals.totalDiscount;
     const netOfVAT         = discountedAmount - totals.totalVAT;
 
-    function fmt1(v) {
-      return parseFloat(v || 0).toLocaleString('en-PH', {
-        minimumFractionDigits: 1, maximumFractionDigits: 1
-      });
-    }
+    const TOTALS_W = contentW * 0.46;
+    const TOTALS_X = margin + contentW - TOTALS_W;
+    const LABEL_X  = TOTALS_X + 6;
+    const VALUE_X  = TOTALS_X + TOTALS_W - 6;
+    const ROW_H    = 12;
 
-    const totalsBlockW = contentW * 0.46;
-    const totalsStartX = margin + contentW - totalsBlockW;
-    const labelX = totalsStartX + 6;
-    const valX   = totalsStartX + totalsBlockW - 6;
     let ty = y + 4;
 
     const totalsRows = [
@@ -238,46 +296,47 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     ];
 
     doc.setFontSize(7.5);
-    totalsRows.forEach(function(row) {
-      if (!row) { ty += 5; return; }
+    totalsRows.forEach((row) => {
+      if (!row) { ty += 6; return; }
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...DGRAY);
-      doc.text(row[0], labelX, ty);
+      doc.text(row[0], LABEL_X, ty);
       doc.setTextColor(...BLACK);
-      doc.text(row[1], valX, ty, { align: 'right' });
-      ty += 11;
+      doc.text(row[1], VALUE_X, ty, { align: 'right' });
+      ty += ROW_H;
     });
 
-    // Total Amount Due row
-    ty += 2;
+    // Total Amount Due highlighted row
+    ty += 3;
+    const DUE_ROW_H = 15;
     doc.setFillColor(...GRAY);
-    doc.rect(totalsStartX, ty - 9, totalsBlockW, 13, 'F');
+    doc.rect(TOTALS_X, ty - DUE_ROW_H + 4, TOTALS_W, DUE_ROW_H, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(...BLACK);
-    doc.text('Total Amount Due', labelX, ty);
+    doc.text('Total Amount Due', LABEL_X, ty);
     doc.setTextColor(...RED);
-    doc.text(fmt1(amtDueTotal), valX, ty, { align: 'right' });
+    doc.text(fmt1(amtDueTotal), VALUE_X, ty, { align: 'right' });
 
-    y = Math.max(ty + 18, y + 10);
+    y = Math.max(ty + 20, y + 12);
 
     // ── JOURNAL TABLE ─────────────────────────────────────────────────────────
     const journal = Array.isArray(receipt.journal) ? receipt.journal : [];
+    console.log('Journal data:', journal);
 
     if (journal.length > 0) {
-      function fmtJ(v) {
-        return v ? parseFloat(v).toLocaleString('en-PH', {
-          minimumFractionDigits: 2, maximumFractionDigits: 2
-        }) : '';
-      }
-
-      const journalRows = journal.map(function(j) {
-        return [j.account_name || '\u2014', j.responsibility_center || 'Unassigned',
-                fmtJ(j.debit), fmtJ(j.credit)];
+      const journalRows = journal.map((j) => {
+        console.log('Journal entry:', j);
+        return [
+          j.account_name          || '—',
+          j.responsibility_center || 'Unassigned',
+          fmtJ(j.debit),
+          fmtJ(j.credit),
+        ];
       });
 
-      const totalDebit  = journal.reduce(function(s, j) { return s + parseFloat(j.debit  || 0); }, 0);
-      const totalCredit = journal.reduce(function(s, j) { return s + parseFloat(j.credit || 0); }, 0);
+      const totalDebit  = journal.reduce((s, j) => s + parseFloat(j.debit  || 0), 0);
+      const totalCredit = journal.reduce((s, j) => s + parseFloat(j.credit || 0), 0);
       journalRows.push(['', '', fmtJ(totalDebit), fmtJ(totalCredit)]);
 
       const lastRowIdx = journalRows.length - 1;
@@ -287,35 +346,60 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
         margin: { left: margin, right: margin },
         head: [['Chart Of Accounts', 'Responsibility Center', 'Debit', 'Credit']],
         body: journalRows,
-        styles: { fontSize: 7.5, cellPadding: 4, textColor: BLACK,
-                  lineColor: [210, 210, 210], lineWidth: 0.4 },
-        headStyles: { fillColor: [30, 30, 30], textColor: WHITE,
-                      fontStyle: 'bold', fontSize: 7.5, halign: 'center' },
+        styles: {
+          fontSize: 7.5,
+          cellPadding: { top: 5, bottom: 5, left: 5, right: 5 },
+          textColor: BLACK,
+          lineColor: [210, 210, 210],
+          lineWidth: 0.4,
+          font: 'helvetica',
+        },
+        headStyles: {
+          fillColor: NEAR_BLACK,
+          textColor: WHITE,
+          fontStyle: 'bold',
+          fontSize: 7.5,
+          halign: 'center',
+          valign: 'middle',
+          minCellHeight: 20,
+        },
         columnStyles: {
-          0: { cellWidth: 'auto' },
-          1: { cellWidth: 150 },
-          2: { halign: 'right', cellWidth: 80 },
-          3: { halign: 'right', cellWidth: 80 },
+          0: { cellWidth: 'auto', halign: 'left' },
+          1: { cellWidth: 150,   halign: 'left' },
+          2: { cellWidth: 80,    halign: 'right' },
+          3: { cellWidth: 80,    halign: 'right' },
         },
         alternateRowStyles: { fillColor: [250, 250, 250] },
-        didParseCell: function(data) {
-          if (data.row.index === lastRowIdx) {
+        tableLineColor: [210, 210, 210],
+        tableLineWidth: 0.4,
+        didParseCell(data) {
+          if (data.section === 'body' && data.row.index === lastRowIdx) {
             data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.textColor = BLACK;
           }
         },
       });
+
+      y = doc.lastAutoTable.finalY + 8;
     }
 
     // ── FOOTER ────────────────────────────────────────────────────────────────
+    const footerY = pageH - 28;
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.5);
-    doc.line(margin, pageH - 30, pageW - margin, pageH - 30);
+    doc.line(margin, footerY, pageW - margin, footerY);
+
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(...MGRAY);
     doc.text(
-      'Generated on ' + new Date().toLocaleString('en-PH') + '  \u00b7  ' + copyLabel + '  \u00b7  Receipt #' + (receipt.id ?? ''),
-      pageW / 2, pageH - 18, { align: 'center' }
+      'Generated on ' +
+        new Date().toLocaleString('en-PH') +
+        '  ·  ' + copyLabel +
+        '  ·  Receipt #' + (receipt.id ?? ''),
+      pageW / 2,
+      footerY + 12,
+      { align: 'center' }
     );
 
     // ── SAVE ──────────────────────────────────────────────────────────────────

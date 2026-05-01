@@ -1,5 +1,5 @@
 require('dotenv').config()
-const { DecryptString } = require('../../util/cryptography.util')
+const { DecryptString, EncryptString } = require('../../util/cryptography.util')
 const { MongoClient } = require('mongodb')
 const mysql = require('mysql2/promise')
 const jwt = require('jsonwebtoken')
@@ -15,6 +15,9 @@ const getTenantDbOverride = () => {
   return _currentTenantDb
 }
 
+console.log("ENCRYPTER:", EncryptString("philippogi123"))
+console.log("DECRYPTER:", DecryptString("a2054377f71c268c40421ec0c3288a3c"))
+console.log("PASSWORD_ADMIN:", process.env._PASSWORD_ADMIN)
 const getTenantDatabase = async (username) => {
   try {
     console.log('🔍 MongoDB lookup for username:', username)

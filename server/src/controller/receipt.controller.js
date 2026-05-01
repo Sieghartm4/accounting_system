@@ -248,6 +248,7 @@ const getPrintReceipts = async (req, res, next) => {
       .build();
 
     let receipts_journal = await Query(receipts_journal_query, ['receipts', receiptIds], [Accounting.journal_entries.prefix_]);
+    console.log('Raw journal data:', receipts_journal);
 
     const receipts_attachments_query = sql.select([
       { col: Accounting.receipt_attachments.selectOptionColumns.id, as: 'id' },
@@ -265,13 +266,68 @@ const getPrintReceipts = async (req, res, next) => {
     let receipts_attachments = await Query(receipts_attachments_query, [receiptIds], [Accounting.receipt_attachments.prefix_]);
 
     // Group items, journal, and attachments by receipt ID
-    const groupedData = receipts.map(receipt => ({
-      ...receipt,
-      items: receipts_items.filter(item => item.receipts_id === receipt.id),
-      journal: receipts_journal.filter(entry => entry.db_id === receipt.id),
-      attachments: receipts_attachments.filter(att => att.receipt_id === receipt.id),
-      company: company
-    }));
+    const groupedData = receipts.map(receipt => {
+      const receiptItems = receipts_items.filter(item => item.receipts_id === receipt.id);
+      const receiptJournal = receipts_journal.filter(entry => entry.db_id === receipt.id);
+      
+      // Map items to PDF expected format
+      const mappedItems = receiptItems.map(item => {
+        const quantity = parseFloat(item.quantity || 1);
+        const salesPrice = parseFloat(item.sales_price || 0);
+        const discount = parseFloat(item.discount || 0);
+        const vatRate = parseFloat(item.vat_rate || 0);
+        const whtRate = parseFloat(item.withholding_tax_rate || 0);
+        
+        const totalPrice = salesPrice * quantity;
+        const discountAmount = totalPrice * (discount / 100);
+        const discountedPrice = totalPrice - discountAmount;
+        const vatAmount = discountedPrice * (vatRate / 100);
+        const whtAmount = discountedPrice * (whtRate / 100);
+        const amountDue = discountedPrice + vatAmount - whtAmount;
+        
+        return {
+          id: item.id,
+          product_name: item.product_service_name || '—',
+          description: item.description || '—',
+          unit: 'pcs', // Default unit since not in DB
+          quantity: quantity,
+          purchase_price: salesPrice,
+          total_price: totalPrice,
+          discount_amount: discountAmount,
+          vat_percentage: vatRate,
+          vat_amount: vatAmount,
+          wht_percentage: whtRate,
+          wht_amount: whtAmount,
+          amount_due: amountDue,
+          vatable_sales: vatRate > 0 ? discountedPrice : 0,
+          vat_exempt_sales: vatRate === 0 ? discountedPrice : 0,
+          zero_rated_sales: 0
+        };
+      });
+      
+      // Map journal to PDF expected format
+      const mappedJournal = receiptJournal.map(entry => {
+        const isDebit = entry.type === 'DEBIT';
+        console.log('Processing journal entry:', { type: entry.type, amount: entry.amount, isDebit });
+        const mapped = {
+          id: entry.id,
+          account_name: entry.charts_of_accounts_name || '—',
+          responsibility_center: entry.responsibility_center || 'Unassigned',
+          debit: isDebit ? parseFloat(entry.amount || 0) : 0,
+          credit: !isDebit ? parseFloat(entry.amount || 0) : 0
+        };
+        console.log('Mapped journal entry:', mapped);
+        return mapped;
+      });
+      
+      return {
+        ...receipt,
+        items: mappedItems,
+        journal: mappedJournal,
+        attachments: receipts_attachments.filter(att => att.receipt_id === receipt.id),
+        company: company
+      };
+    });
 
     console.log('Grouped receipts data:', groupedData);
     res.status(200).json({

@@ -10,7 +10,6 @@ const { httpLogger } = require('./src/middlewares/logger.middleware')
 const { checkConnection } = require('./src/database/util/queries.util')
 const { corsOptions } = require('./src/middlewares/corsOptions.middleware')
 const { logger } = require('./src/util/logger.util')
-const {DecryptString} = require('./src/util/cryptography.util')
 
 const app = express()
 
@@ -50,7 +49,6 @@ const serverStart = async () => {
         `Server listening on port http://${process.env._SERVER_URL}:${process.env._SERVER_PORT}`,
       )
     })
-console.log("DESCRYPTER:" , DecryptString("0956c4cb6f6ab654ae29193c9bb25262"))
     logger.info('Initializing WebSockets')
     initWebSocket(server)
     process.on('SIGINT', () => {
