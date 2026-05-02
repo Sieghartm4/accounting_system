@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Layers, CheckCircle, ShieldCheck, Wallet, ArrowRight, Download, Plus } from 'lucide-react';
+import { Layers, CheckCircle, ShieldCheck, Wallet, ArrowRight, Download, Plus, FileText, Building } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import DynamicToast from '../../components/DynamicToast';
 import RouteProtection from '../../components/RouteProtection';
@@ -9,6 +9,7 @@ import ProtectedAction from '../../components/ProtectedAction';
 import usePayments from './usePayments';
 import PaymentsForm from './PaymentsForm';
 import { getAccessLevel } from '../../utils/routeProtection';
+import { generatePaymentPDF } from '../../utils/generatePaymentPDF';
 
 export default function Payments() {
   return (
@@ -69,12 +70,120 @@ function PaymentsContent() {
   const accessLevel = getAccessLevel('payments', user);
   const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
 
-  // Determine checkbox condition based on access level
-  const checkboxCondition = enableCheckboxes
-    ? accessLevel === 'Full Access' 
-      ? { column: 'state', value: 'APPROVED', exclude: true } // Exclude APPROVED state for Full Access
-      : { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
-    : null;
+  const checkboxCondition = null; // Always show checkboxes (match other pages)
+
+  // ─── Helper: fetch full payment data then download as PDF ─────────────────
+  const fetchAndDownloadPDF = async (selectedRows, copyType) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+
+      const paymentIds = selectedRows.map(row => row.id).join(',');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/payments/print/${paymentIds}?copyType=${copyType}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Failed to fetch payments for printing');
+
+      const data = result.data || [];
+      console.log('PDF Data received:', data);
+      if (!Array.isArray(data)) throw new Error('Invalid data format received from server');
+
+      await generatePaymentPDF(data, copyType);
+
+      setToast({
+        type: 'success',
+        message: `${data.length} payment PDF(s) downloaded (${copyType === 'customer' ? 'Vendor' : 'Internal'} Copy)`,
+      });
+    } catch (error) {
+      console.error('Error generating payment PDF:', error);
+      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' });
+    }
+  };
+
+  // Function to filter checkbox actions based on selected rows
+  const getFilteredCheckboxActions = (selectedRows) => {
+    const allActions = [
+      {
+        label: 'Approve Selected',
+        onClick: async (selectedRows) => {
+          try {
+            console.log('Approving payments:', selectedRows);
+
+            const token = localStorage.getItem('token');
+            if (!token) {
+              throw new Error('No authentication token found');
+            }
+
+            const updates = selectedRows.map(row => ({
+              id: row.id,
+              currentState: row.state
+            }));
+
+            const response = await fetch(
+              `${import.meta.env.VITE_SERVER_LINK}/payments/payment-state`,
+              {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ updates })
+              }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+              throw new Error(result.message || 'Failed to approve payments');
+            }
+
+            await refetchPayments();
+
+            setToast({
+              type: 'success',
+              message: result.message || `${selectedRows.length} payment(s) approved successfully`
+            });
+
+          } catch (error) {
+            console.error('Error approving payments:', error);
+            setToast({
+              type: 'error',
+              message: error.message || 'Failed to approve payments'
+            });
+          }
+        }
+      },
+      {
+        label: 'Internal Copy',
+        icon: <FileText size={14} />,
+        onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
+        style: 'blue',
+      },
+      {
+        label: 'Vendor Copy',
+        icon: <Building size={14} />,
+        onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
+        style: 'orange',
+      },
+    ];
+
+    return allActions.filter(action => {
+      if (action.label === 'Approve Selected') {
+        return selectedRows.some(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+      }
+      return true;
+    });
+  };
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -312,59 +421,8 @@ function PaymentsContent() {
               }
             }
           ]}
-          checkboxActions={[
-            {
-              label: 'Approve Selected',
-              onClick: async (selectedRows) => {
-                try {
-                  console.log('Approving payments:', selectedRows);
-
-                  const token = localStorage.getItem('token');
-                  if (!token) {
-                    throw new Error('No authentication token found');
-                  }
-
-                  const updates = selectedRows.map(row => ({
-                    id: row.id,
-                    currentState: row.state
-                  }));
-
-                  const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/payments/payment-state`,
-                    {
-                      method: "PUT",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({ updates })
-                    }
-                  );
-
-                  const result = await response.json();
-
-                  if (!response.ok) {
-                    throw new Error(result.message || 'Failed to approve payments');
-                  }
-
-                  // Refresh payments data
-                  await refetchPayments();
-
-                  setToast({
-                    type: 'success',
-                    message: result.message || `${selectedRows.length} payment(s) approved successfully`
-                  });
-
-                } catch (error) {
-                  console.error('Error approving payments:', error);
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to approve payments'
-                  });
-                }
-              }
-            }
-          ]}
+          checkboxActions={getFilteredCheckboxActions([])}
+          checkboxActionsFilter={getFilteredCheckboxActions}
         />
       </motion.div>
     </div>

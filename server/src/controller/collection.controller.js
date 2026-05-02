@@ -570,11 +570,218 @@ const updateCollectionState = async (req, res, next) => {
   }
 }
 
+const getPrintCollections = async (req, res, next) => {
+  const { collection_id } = req.params;
+  const { copyType } = req.query;
+
+  const collectionIds = collection_id.split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
+  console.log('Converted collection_ids:', collectionIds, 'type:', typeof collectionIds);
+  console.log('Copy type:', copyType);
+
+  if (collectionIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid collection IDs provided',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  try {
+    // Fetch company data once
+    const company_query = sql.select([
+      { col: Master.master_company.selectOptionColumns.company_id, as: 'id' },
+      { col: Master.master_company.selectOptionColumns.company_name, as: 'company_name' },
+      { col: Master.master_company.selectOptionColumns.logo, as: 'logo' },
+      { col: Master.master_company.selectOptionColumns.address, as: 'address' },
+      { col: Master.master_company.selectOptionColumns.tin, as: 'tin' },
+      { col: Master.master_company.selectOptionColumns.website, as: 'website' },
+      { col: Master.master_company.selectOptionColumns.email, as: 'email' },
+      { col: Master.master_company.selectOptionColumns.phone, as: 'phone' },
+      { col: Master.master_company.selectOptionColumns.status, as: 'status' }
+    ])
+      .from(Master.master_company.tablename)
+      .build() + ' LIMIT 1';
+
+    let company = await Query(company_query, [], [Master.master_company.prefix_]);
+    company = company && company.length > 0 ? company[0] : null;
+
+    // Fetch collections with customer info
+    const collections_query = sql.select([
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id}`, as: 'id' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.customer_id}`, as: 'customer_id' },
+      { col: `${Master.customers.tablename}.${Master.customers.selectOptionColumns.name}`, as: 'customer' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.document_reference}`, as: 'doc_ref' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.collection_date}`, as: 'collection_date' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.mode_of_payment}`, as: 'mode' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.bank_name}`, as: 'bank_name' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.check_number}`, as: 'check_number' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.remarks}`, as: 'remarks' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.state}`, as: 'state' }
+    ])
+      .from(Accounting.collections.tablename)
+      .innerJoin(Master.customers.tablename, `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.customer_id}`, `${Master.customers.tablename}.${Master.customers.selectOptionColumns.id}`)
+      .whereIn(`${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id}`, collectionIds)
+      .build();
+
+    let collections = await Query(collections_query, [...collectionIds], [Accounting.collections.prefix_, Master.customers.prefix_]);
+
+    // Fetch collection items with sales info
+    const collection_items_query = sql.select([
+      { col: Accounting.collection_items.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.collection_items.selectOptionColumns.collection_id, as: 'collection_id' },
+      { col: Accounting.collection_items.selectOptionColumns.sales_id, as: 'sales_id' },
+      { col: Accounting.sales.selectOptionColumns.document_reference, as: 'invoice_ref' },
+      { col: Accounting.sales.selectOptionColumns.total_amount_due, as: 'invoice_amount' },
+      { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
+      { col: Accounting.sales_items.selectOptionColumns.description, as: 'description' },
+      { col: Accounting.sales_items.selectOptionColumns.quantity, as: 'quantity' },
+      { col: Accounting.sales_items.selectOptionColumns.sales_price, as: 'sales_price' },
+      { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
+      { col: Accounting.sales_items.selectOptionColumns.discount_type, as: 'discount_type' },
+      { col: Master.vat.selectOptionColumns.rate, as: 'vat_rate' },
+      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'withholding_tax_rate' },
+      { col: Accounting.collection_items.selectOptionColumns.amount, as: 'amount' },
+      { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.collection_items.tablename)
+      .innerJoin(Accounting.sales_items.tablename, Accounting.sales_items.selectOptionColumns.id, Accounting.collection_items.selectOptionColumns.sales_id)
+      .innerJoin(Accounting.sales.tablename, Accounting.sales.selectOptionColumns.id, Accounting.sales_items.selectOptionColumns.sales_id)
+      .leftJoin(Master.vat.tablename, Accounting.sales_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
+      .leftJoin(Master.withholding_tax.tablename, Accounting.sales_items.selectOptionColumns.witholding_tax, Master.withholding_tax.selectOptionColumns.id)
+      .leftJoin(Master.products_service.tablename, Accounting.sales_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
+      .whereIn(Accounting.collection_items.selectOptionColumns.collection_id, collectionIds)
+      .build();
+
+    let collection_items = await Query(collection_items_query, [...collectionIds], [Accounting.collection_items.prefix_, Accounting.sales.prefix_, Master.products_service.prefix_]);
+
+    // Fetch journal entries
+    const collection_journal_query = sql.select([
+      { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.journal_entries.selectOptionColumns.db_id, as: 'db_id' },
+      { col: Accounting.journal_entries.selectOptionColumns.coa_id, as: 'coa_id' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' },
+      { col: Accounting.journal_entries.selectOptionColumns.amount, as: 'amount' },
+      { col: Accounting.journal_entries.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.journal_entries.tablename)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.journal_entries.selectOptionColumns.coa_id, Master.charts_of_accounts.selectOptionColumns.id)
+      .where(Accounting.journal_entries.selectOptionColumns.db_name)
+      .whereIn(Accounting.journal_entries.selectOptionColumns.db_id, collectionIds)
+      .build();
+
+    let collection_journal = await Query(collection_journal_query, ['collections', ...collectionIds], [Accounting.journal_entries.prefix_]);
+    console.log('Raw journal data:', collection_journal);
+
+    // Fetch attachments
+    const collection_attachments_query = sql.select([
+      { col: Accounting.collection_attachments.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.collection_attachments.selectOptionColumns.collection_id, as: 'collection_id' },
+      { col: Accounting.collection_attachments.selectOptionColumns.file, as: 'file' },
+      { col: Accounting.collection_attachments.selectOptionColumns.name, as: 'name' },
+      { col: Accounting.collection_attachments.selectOptionColumns.remarks, as: 'remarks' },
+      { col: Accounting.collection_attachments.selectOptionColumns.uploaded_by, as: 'uploaded_by' },
+      { col: Accounting.collection_attachments.selectOptionColumns.uploaded_date, as: 'uploaded_date' }
+    ])
+      .from(Accounting.collection_attachments.tablename)
+      .whereIn(Accounting.collection_attachments.selectOptionColumns.collection_id, collectionIds)
+      .build();
+
+    let collection_attachments = await Query(collection_attachments_query, [...collectionIds], [Accounting.collection_attachments.prefix_]);
+
+    // Group items, journal, and attachments by collection ID
+    const groupedData = collections.map(collection => {
+      const items = collection_items.filter(item => item.collection_id === collection.id);
+
+      const collectionJournal = copyType === 'customer'
+        ? []
+        : collection_journal.filter(entry => entry.db_id === collection.id);
+
+      const mappedItems = items.map(item => {
+        const quantity = parseFloat(item.quantity || 1);
+        const salesPrice = parseFloat(item.sales_price || 0);
+        const discount = parseFloat(item.discount || 0);
+        const vatRate = parseFloat(item.vat_rate || 0);
+        const whtRate = parseFloat(item.withholding_tax_rate || 0);
+
+        const totalPrice = salesPrice * quantity;
+        const discountAmount = totalPrice * (discount / 100);
+        const discountedPrice = totalPrice - discountAmount;
+        const vatAmount = discountedPrice * (vatRate / 100);
+        const whtAmount = discountedPrice * (whtRate / 100);
+        const amountDue = discountedPrice + vatAmount - whtAmount;
+
+        return {
+          id: item.id,
+          sales_id: item.sales_id,
+          invoice_ref: item.invoice_ref || '—',
+          product_name: item.product_service_name || '—',
+          description: item.description || '—',
+          unit: 'pcs',
+          quantity: quantity,
+          purchase_price: salesPrice,
+          total_price: totalPrice,
+          discount_amount: discountAmount,
+          vat_percentage: vatRate,
+          vat_amount: vatAmount,
+          wht_percentage: whtRate,
+          wht_amount: whtAmount,
+          amount_due: amountDue,
+          vatable_sales: vatRate > 0 ? discountedPrice : 0,
+          vat_exempt_sales: vatRate === 0 ? discountedPrice : 0,
+          zero_rated_sales: 0
+        };
+      });
+
+      const mappedJournal = collectionJournal.map(entry => {
+        const isDebit = entry.type === 'DEBIT';
+        console.log('Processing journal entry:', { type: entry.type, amount: entry.amount, isDebit });
+        const mapped = {
+          id: entry.id,
+          account_name: entry.charts_of_accounts_name || '—',
+          responsibility_center: entry.responsibility_center || 'Unassigned',
+          debit: isDebit ? parseFloat(entry.amount || 0) : 0,
+          credit: !isDebit ? parseFloat(entry.amount || 0) : 0
+        };
+        console.log('Mapped journal entry:', mapped);
+        return mapped;
+      });
+
+      return {
+        ...collection,
+        items: mappedItems,
+        journal: mappedJournal,
+        attachments: collection_attachments.filter(att => att.collection_id === collection.id),
+        company: company
+      };
+    });
+
+    console.log('Grouped collections data:', groupedData);
+    res.status(200).json({
+      success: true,
+      message: 'Collections retrieved successfully',
+      company: company,
+      data: groupedData,
+      count: groupedData.length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error fetching collections:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching collections',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
 module.exports = {
   getCollections,
   getAllCollections,
   getSalesCollection,
   getSalesItemsCollection,
   createCollection,
-  updateCollectionState
+  updateCollectionState,
+  getPrintCollections
 }

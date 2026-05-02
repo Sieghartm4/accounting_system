@@ -154,9 +154,11 @@ const getAllReceipts = async (req, res, next) => {
 
 const getPrintReceipts = async (req, res, next) => {
   const { receipt_id } = req.params;
+  const { copyType } = req.query; // Get copyType from query parameters
   // Parse comma-separated IDs into array
   const receiptIds = receipt_id.split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
   console.log('Converted receipt_ids:', receiptIds, 'type:', typeof receiptIds);
+  console.log('Copy type:', copyType);
   
   if (receiptIds.length === 0) {
     return res.status(400).json({
@@ -204,7 +206,7 @@ const getPrintReceipts = async (req, res, next) => {
       .whereIn(Accounting.receipts.selectOptionColumns.id, receiptIds)
       .build();
 
-    let receipts = await Query(receipts_query, [receiptIds], [Accounting.receipts.prefix_, Master.customers.prefix_]);
+    let receipts = await Query(receipts_query, [...receiptIds], [Accounting.receipts.prefix_, Master.customers.prefix_]);
 
     const receipts_items_query = sql.select([
       { col: Accounting.receipt_items.selectOptionColumns.id, as: 'id' },
@@ -230,7 +232,7 @@ const getPrintReceipts = async (req, res, next) => {
       .whereIn(Accounting.receipt_items.selectOptionColumns.receipts_id, receiptIds)
       .build();
 
-    let receipts_items = await Query(receipts_items_query, [receiptIds], [Accounting.receipt_items.prefix_]);
+    let receipts_items = await Query(receipts_items_query, [...receiptIds], [Accounting.receipt_items.prefix_]);
 
     const receipts_journal_query = sql.select([
       { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
@@ -247,7 +249,7 @@ const getPrintReceipts = async (req, res, next) => {
       .whereIn(Accounting.journal_entries.selectOptionColumns.db_id, receiptIds)
       .build();
 
-    let receipts_journal = await Query(receipts_journal_query, ['receipts', receiptIds], [Accounting.journal_entries.prefix_]);
+    let receipts_journal = await Query(receipts_journal_query, ['receipts', ...receiptIds], [Accounting.journal_entries.prefix_]);
     console.log('Raw journal data:', receipts_journal);
 
     const receipts_attachments_query = sql.select([
@@ -263,12 +265,15 @@ const getPrintReceipts = async (req, res, next) => {
       .whereIn(Accounting.receipt_attachments.selectOptionColumns.receipt_id, receiptIds)
       .build();
 
-    let receipts_attachments = await Query(receipts_attachments_query, [receiptIds], [Accounting.receipt_attachments.prefix_]);
+    let receipts_attachments = await Query(receipts_attachments_query, [...receiptIds], [Accounting.receipt_attachments.prefix_]);
 
     // Group items, journal, and attachments by receipt ID
     const groupedData = receipts.map(receipt => {
       const receiptItems = receipts_items.filter(item => item.receipts_id === receipt.id);
-      const receiptJournal = receipts_journal.filter(entry => entry.db_id === receipt.id);
+      // Filter journal entries: exclude for customer copies, include for internal copies
+      const receiptJournal = copyType === 'customer' 
+        ? [] // No journal entries for customer copies
+        : receipts_journal.filter(entry => entry.db_id === receipt.id);
       
       // Map items to PDF expected format
       const mappedItems = receiptItems.map(item => {

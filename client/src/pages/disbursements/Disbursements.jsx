@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Wallet, Banknote, ShieldCheck, History, ArrowRight, Download, Plus } from 'lucide-react';
+import { Wallet, Banknote, ShieldCheck, History, ArrowRight, Download, Plus, Check, FileText, Building } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import DynamicToast from '../../components/DynamicToast';
 import RouteProtection from '../../components/RouteProtection';
@@ -9,6 +9,7 @@ import ProtectedAction from '../../components/ProtectedAction';
 import useDisbursements from './useDisbursements';
 import CashDisbursementForm from './CashDisbursementForm';
 import { getAccessLevel } from '../../utils/routeProtection';
+import { generateDisbursementPDF } from '../../utils/generateDisbursementPDF';
 
 export default function Disbursements() {
   return (
@@ -69,16 +70,125 @@ function DisbursementsContent() {
   const accessLevel = getAccessLevel('disbursement', user);
   const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
 
-  // Determine checkbox condition based on access level
-  const checkboxCondition = enableCheckboxes 
-    ? accessLevel === 'Full Access' 
-      ? { column: 'state', value: 'APPROVED', exclude: true } // Exclude APPROVED state for Full Access
-      : { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
-    : null;
+  const checkboxCondition = null; // Always show checkboxes
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+  };
+
+  // ─── Helper: fetch full disbursement data then download as PDF ─────────────────
+  const fetchAndDownloadPDF = async (selectedRows, copyType) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+
+      const disbursementIds = selectedRows.map(row => row.id).join(',');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/print/${disbursementIds}?copyType=${copyType}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Failed to fetch disbursements for printing');
+
+      // Extract the actual disbursement data from the response
+      const data = result.data || [];
+      console.log('PDF Data received:', data);
+      console.log('First disbursement items:', data[0]?.items);
+      console.log('First disbursement journal:', data[0]?.journal);
+      if (!Array.isArray(data)) throw new Error('Invalid data format received from server');
+
+      // Generate & auto-download PDFs (one per disbursement)
+      await generateDisbursementPDF(data, copyType);
+
+      setToast({
+        type: 'success',
+        message: `${data.length} disbursement PDF(s) downloaded (${copyType === 'vendor' ? 'Vendor' : 'Internal'} Copy)`,
+      });
+    } catch (error) {
+      console.error('Error generating disbursement PDF:', error);
+      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' });
+    }
+  };
+
+  // Function to filter checkbox actions based on selected rows' states
+  const getFilteredCheckboxActions = (selectedRows) => {
+    const allActions = [
+      {
+        label: 'Approve Selected',
+        icon: <Check size={14} />,
+        onClick: async (selectedRows) => {
+          try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No authentication token found');
+
+            // Filter to only include approvable rows (PREPARED or CHECKED)
+            const approvableRows = selectedRows.filter(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+            
+            if (approvableRows.length === 0) {
+              setToast({ type: 'error', message: 'No disbursements are eligible for approval' });
+              return;
+            }
+
+            const updates = approvableRows.map(row => ({ id: row.id, currentState: row.state }));
+
+            const response = await fetch(
+              `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/disbursement-state`,
+              {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ updates }),
+              }
+            );
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Failed to approve disbursements');
+
+            await refetchDisbursements();
+            setToast({
+              type: 'success',
+              message: result.message || `${approvableRows.length} disbursement(s) approved successfully`,
+            });
+          } catch (error) {
+            setToast({ type: 'error', message: error.message || 'Failed to approve disbursements' });
+          }
+        },
+      },
+      {
+        // ── Internal Copy → fetch data → generate + download PDF directly
+        label: 'Internal Copy',
+        icon: <FileText size={14} />,
+        onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
+        style: 'blue', // Blue color for internal copy
+      },
+      {
+        // ── Vendor Copy → same but labelled differently in PDF
+        label: 'Vendor Copy',
+        icon: <Building size={14} />,
+        onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'vendor'),
+        style: 'orange', // Orange color for vendor copy
+      },
+    ];
+
+    // Filter Approve Selected button - show if at least one selected row is PREPARED or CHECKED
+    return allActions.filter(action => {
+      if (action.label === 'Approve Selected') {
+        // Show approve button if at least one selected row has state PREPARED or CHECKED
+        return selectedRows.some(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+      }
+      return true; // Always show other actions
+    });
   };
 
   if (isAdding) return (
@@ -144,12 +254,6 @@ function DisbursementsContent() {
 
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
-        {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          <span>Treasury</span>
-          <ArrowRight size={10} />
-          <span className="text-black">Disbursement Vouchers</span>
-        </nav> */}
-
         <motion.div
           initial="hidden"
           animate="visible"
@@ -165,9 +269,6 @@ function DisbursementsContent() {
                 Cash <span className="text-red-600 italic">Disbursements</span>
               </h1>
             </div>
-            {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
-              Review and authorize outgoing fund transfers and vendor settlements.
-            </p> */}
           </div>
 
           <div className="flex gap-3">
@@ -330,58 +431,8 @@ function DisbursementsContent() {
               }
             }
           ]}
-          checkboxActions={[
-            {
-              label: 'Approve Selected',
-              onClick: async (selectedRows) => {
-                try {
-                  console.log('Approving disbursements:', selectedRows);
-
-                  const token = localStorage.getItem('token');
-                  if (!token) {
-                    throw new Error('No authentication token found');
-                  }
-
-                  const updates = selectedRows.map(row => ({
-                    id: row.id,
-                    currentState: row.state
-                  }));
-
-                  const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/disbursement-state`,
-                    {
-                      method: "PUT",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({ updates })
-                    }
-                  );
-
-                  const result = await response.json();
-
-                  if (!response.ok) {
-                    throw new Error(result.message || 'Failed to approve disbursements');
-                  }
-
-                  await refetchDisbursements();
-
-                  setToast({
-                    type: 'success',
-                    message: result.message || `${updates.length} disbursement(s) approved successfully`
-                  });
-
-                } catch (error) {
-                  console.error('Error approving disbursements:', error);
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to approve disbursements'
-                  });
-                }
-              }
-            }
-          ]}
+          checkboxActions={getFilteredCheckboxActions([])}
+          checkboxActionsFilter={getFilteredCheckboxActions}
         />
       </motion.div>
     </div>

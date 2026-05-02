@@ -733,10 +733,198 @@ const updateDisbursementState = async (req, res, next) => {
     });
   }
 }
+
+const getPrintDisbursements = async (req, res, next) => {
+  const { cash_disbursement_id } = req.params;
+  const { copyType } = req.query; // Get copyType from query parameters
+  // Parse comma-separated IDs into array
+  const disbursementIds = cash_disbursement_id.split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
+  console.log('Converted disbursement_ids:', disbursementIds, 'type:', typeof disbursementIds);
+  console.log('Copy type:', copyType);
+  
+  if (disbursementIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid disbursement IDs provided',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  try {
+    // Fetch company data once
+    const company_query = sql.select([
+      { col: Master.master_company.selectOptionColumns.company_id, as: 'id' },
+      { col: Master.master_company.selectOptionColumns.company_name, as: 'company_name' },
+      { col: Master.master_company.selectOptionColumns.logo, as: 'logo' },
+      { col: Master.master_company.selectOptionColumns.address, as: 'address' },
+      { col: Master.master_company.selectOptionColumns.tin, as: 'tin' },
+      { col: Master.master_company.selectOptionColumns.website, as: 'website' },  
+      { col: Master.master_company.selectOptionColumns.email, as: 'email' },
+      { col: Master.master_company.selectOptionColumns.phone, as: 'phone' },
+      { col: Master.master_company.selectOptionColumns.status, as: 'status' }
+    ])
+      .from(Master.master_company.tablename)
+      .build() + ' LIMIT 1';
+
+    let company = await Query(company_query, [], [Master.master_company.prefix_]);
+    company = company && company.length > 0 ? company[0] : null;
+
+    // Build base queries
+    const disbursements_query = sql.select([
+      { col: Accounting.cash_disbursements.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.vendor_id, as: 'vendor_id' },
+      { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.document_reference, as: 'doc_ref' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.payment_date, as: 'payment_date' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.mode_of_payment, as: 'mode' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.bank_name, as: 'bank_name' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.check_number, as: 'check_number' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.remarks, as: 'remarks' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.total_amount_due, as: 'amount_due' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.state, as: 'state' }
+    ])
+      .from(Accounting.cash_disbursements.tablename)
+      .innerJoin(Master.vendors.tablename, Accounting.cash_disbursements.selectOptionColumns.vendor_id, Master.vendors.selectOptionColumns.id)
+      .whereIn(Accounting.cash_disbursements.selectOptionColumns.id, disbursementIds)
+      .build();
+
+    let disbursements = await Query(disbursements_query, [...disbursementIds], [Accounting.cash_disbursements.prefix_, Master.vendors.prefix_]);
+
+    const disbursement_items_query = sql.select([
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.cash_disbursement_id, as: 'cash_disbursement_id' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.product_service, as: 'product_service_id' },
+      { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.charts_of_accounts, as: 'charts_of_accounts_id' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.description, as: 'description' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.quantity, as: 'quantity' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.purchase_price, as: 'purchase_price' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.discount, as: 'discount' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.discount_type, as: 'discount_type' },
+      { col: Master.vat.selectOptionColumns.rate, as: 'vat_rate' },
+      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'withholding_tax_rate' },
+      { col: Accounting.cash_disbursement_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.cash_disbursement_items.tablename)
+      .innerJoin(Master.withholding_tax.tablename, Accounting.cash_disbursement_items.selectOptionColumns.witholding_tax, Master.withholding_tax.selectOptionColumns.id)
+      .innerJoin(Master.vat.tablename, Accounting.cash_disbursement_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
+      .leftJoin(Master.products_service.tablename, Accounting.cash_disbursement_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.cash_disbursement_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
+      .whereIn(Accounting.cash_disbursement_items.selectOptionColumns.cash_disbursement_id, disbursementIds)
+      .build();
+
+    let disbursement_items = await Query(disbursement_items_query, [...disbursementIds], [Accounting.cash_disbursement_items.prefix_]);
+
+    const disbursement_journal_query = sql.select([
+      { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.journal_entries.selectOptionColumns.db_id, as: 'db_id' },
+      { col: Accounting.journal_entries.selectOptionColumns.coa_id, as: 'coa_id' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' },
+      { col: Accounting.journal_entries.selectOptionColumns.amount, as: 'amount' },
+      { col: Accounting.journal_entries.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.journal_entries.tablename)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.journal_entries.selectOptionColumns.coa_id, Master.charts_of_accounts.selectOptionColumns.id)
+      .where(Accounting.journal_entries.selectOptionColumns.db_name)
+      .whereIn(Accounting.journal_entries.selectOptionColumns.db_id, disbursementIds)
+      .build();
+
+    let disbursement_journal = await Query(disbursement_journal_query, ['cash_disbursements', ...disbursementIds], [Accounting.journal_entries.prefix_]);
+    console.log('Raw journal data:', disbursement_journal);
+
+    // Group items and journal by disbursement ID
+    const groupedData = disbursements.map(disbursement => {
+      const disbursementItems = disbursement_items.filter(item => item.cash_disbursement_id === disbursement.id);
+      // Filter journal entries: exclude for vendor copies, include for internal copies
+      const disbursementJournal = copyType === 'vendor' 
+        ? [] // No journal entries for vendor copies
+        : disbursement_journal.filter(entry => entry.db_id === disbursement.id);
+      
+      // Map items to PDF expected format
+      const mappedItems = disbursementItems.map(item => {
+        const quantity = parseFloat(item.quantity || 1);
+        const purchasePrice = parseFloat(item.purchase_price || 0);
+        const discount = parseFloat(item.discount || 0);
+        const vatRate = parseFloat(item.vat_rate || 0);
+        const whtRate = parseFloat(item.withholding_tax_rate || 0);
+        
+        const totalPrice = purchasePrice * quantity;
+        const discountAmount = item.discount_type === 'PERCENT' ? totalPrice * (discount / 100) : discount;
+        const discountedPrice = totalPrice - discountAmount;
+        const vatAmount = discountedPrice * (vatRate / 100);
+        const whtAmount = discountedPrice * (whtRate / 100);
+        const amountDue = discountedPrice + vatAmount - whtAmount;
+        
+        return {
+          id: item.id,
+          product_name: item.product_service_name || '—',
+          description: item.description || '—',
+          unit: 'pcs', // Default unit since not in DB
+          quantity: quantity,
+          purchase_price: purchasePrice,
+          total_price: totalPrice,
+          discount_amount: discountAmount,
+          vat_percentage: vatRate,
+          vat_amount: vatAmount,
+          wht_percentage: whtRate,
+          wht_amount: whtAmount,
+          amount_due: amountDue,
+          vatable_sales: vatRate > 0 ? discountedPrice : 0,
+          vat_exempt_sales: vatRate === 0 ? discountedPrice : 0,
+          zero_rated_sales: 0
+        };
+      });
+      
+      // Map journal to PDF expected format
+      const mappedJournal = disbursementJournal.map(entry => {
+        const isDebit = entry.type === 'DEBIT';
+        console.log('Processing journal entry:', { type: entry.type, amount: entry.amount, isDebit });
+        const mapped = {
+          id: entry.id,
+          account_name: entry.charts_of_accounts_name || '—',
+          responsibility_center: entry.responsibility_center || 'Unassigned',
+          debit: isDebit ? parseFloat(entry.amount || 0) : 0,
+          credit: !isDebit ? parseFloat(entry.amount || 0) : 0
+        };
+        console.log('Mapped journal entry:', mapped);
+        return mapped;
+      });
+      
+      return {
+        ...disbursement,
+        items: mappedItems,
+        journal: mappedJournal,
+        company: company
+      };
+    });
+
+    console.log('Grouped disbursements data:', groupedData);
+    res.status(200).json({
+      success: true,
+      message: 'Disbursements retrieved successfully for printing',
+      company: company,
+      data: groupedData,
+      count: groupedData.length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error fetching disbursements for printing:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching disbursements',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    })
+  }
+}
+
 module.exports = {
   getCashDisbursements,
   getAllCashDisbursements,
   createCashDisbursement,
   updateCashDisbursement,
-  updateDisbursementState
+  updateDisbursementState,
+  getPrintDisbursements
 }

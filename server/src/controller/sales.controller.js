@@ -935,10 +935,206 @@ const updateSale = async (req, res, next) => {
   }
 }
 
+const getPrintSales = async (req, res, next) => {
+  const { sales_id } = req.params;
+  const { copyType } = req.query;
+  const salesIds = sales_id.split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
+  console.log('Converted sales_ids:', salesIds, 'type:', typeof salesIds);
+  console.log('Copy type:', copyType);
+
+  if (salesIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid sales IDs provided',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  try {
+    const company_query = sql.select([
+      { col: Master.master_company.selectOptionColumns.company_id, as: 'id' },
+      { col: Master.master_company.selectOptionColumns.company_name, as: 'company_name' },
+      { col: Master.master_company.selectOptionColumns.logo, as: 'logo' },
+      { col: Master.master_company.selectOptionColumns.address, as: 'address' },
+      { col: Master.master_company.selectOptionColumns.tin, as: 'tin' },
+      { col: Master.master_company.selectOptionColumns.website, as: 'website' },
+      { col: Master.master_company.selectOptionColumns.email, as: 'email' },
+      { col: Master.master_company.selectOptionColumns.phone, as: 'phone' },
+      { col: Master.master_company.selectOptionColumns.status, as: 'status' }
+    ])
+      .from(Master.master_company.tablename)
+      .build() + ' LIMIT 1';
+
+    let company = await Query(company_query, [], [Master.master_company.prefix_]);
+    company = company && company.length > 0 ? company[0] : null;
+
+    const sales_query = sql.select([
+      { col: Accounting.sales.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.sales.selectOptionColumns.customer_id, as: 'customer_id' },
+      { col: Master.customers.selectOptionColumns.name, as: 'customer' },
+      { col: Accounting.sales.selectOptionColumns.document_reference, as: 'doc_ref' },
+      { col: Accounting.sales.selectOptionColumns.terms, as: 'terms' },
+      { col: Accounting.sales.selectOptionColumns.date_delivered, as: 'date_delivered' },
+      { col: Accounting.sales.selectOptionColumns.date_due, as: 'date_due' },
+      { col: Accounting.sales.selectOptionColumns.remarks, as: 'remarks' },
+      { col: Accounting.sales.selectOptionColumns.total_amount_due, as: 'amount_due' },
+      { col: Accounting.sales.selectOptionColumns.status, as: 'status' },
+      { col: Accounting.sales.selectOptionColumns.state, as: 'state' }
+    ])
+      .from(Accounting.sales.tablename)
+      .innerJoin(Master.customers.tablename, Accounting.sales.selectOptionColumns.customer_id, Master.customers.selectOptionColumns.id)
+      .whereIn(Accounting.sales.selectOptionColumns.id, salesIds)
+      .build();
+
+    let sales = await Query(sales_query, [...salesIds], [Accounting.sales.prefix_, Master.customers.prefix_]);
+
+    const sales_items_query = sql.select([
+      { col: Accounting.sales_items.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.sales_items.selectOptionColumns.sales_id, as: 'sales_id' },
+      { col: Accounting.sales_items.selectOptionColumns.product_service, as: 'product_service_id' },
+      { col: Master.products_service.selectOptionColumns.name, as: 'product_service_name' },
+      { col: Accounting.sales_items.selectOptionColumns.charts_of_accounts, as: 'charts_of_accounts_id' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.sales_items.selectOptionColumns.description, as: 'description' },
+      { col: Accounting.sales_items.selectOptionColumns.quantity, as: 'quantity' },
+      { col: Accounting.sales_items.selectOptionColumns.sales_price, as: 'sales_price' },
+      { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
+      { col: Accounting.sales_items.selectOptionColumns.discount_type, as: 'discount_type' },
+      { col: Master.vat.selectOptionColumns.rate, as: 'vat_rate' },
+      { col: Master.withholding_tax.selectOptionColumns.rate, as: 'withholding_tax_rate' },
+      { col: Accounting.sales_items.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.sales_items.tablename)
+      .innerJoin(Master.vat.tablename, Accounting.sales_items.selectOptionColumns.vat, Master.vat.selectOptionColumns.id)
+      .innerJoin(Master.withholding_tax.tablename, Accounting.sales_items.selectOptionColumns.witholding_tax, Master.withholding_tax.selectOptionColumns.id)
+      .leftJoin(Master.products_service.tablename, Accounting.sales_items.selectOptionColumns.product_service, Master.products_service.selectOptionColumns.id)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.sales_items.selectOptionColumns.charts_of_accounts, Master.charts_of_accounts.selectOptionColumns.id)
+      .whereIn(Accounting.sales_items.selectOptionColumns.sales_id, salesIds)
+      .build();
+
+    let sales_items = await Query(sales_items_query, [...salesIds], [Accounting.sales_items.prefix_]);
+
+    const sales_journal_query = sql.select([
+      { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.journal_entries.selectOptionColumns.db_id, as: 'db_id' },
+      { col: Accounting.journal_entries.selectOptionColumns.coa_id, as: 'coa_id' },
+      { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'charts_of_accounts_name' },
+      { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' },
+      { col: Accounting.journal_entries.selectOptionColumns.amount, as: 'amount' },
+      { col: Accounting.journal_entries.selectOptionColumns.responsibility_center, as: 'responsibility_center' }
+    ])
+      .from(Accounting.journal_entries.tablename)
+      .innerJoin(Master.charts_of_accounts.tablename, Accounting.journal_entries.selectOptionColumns.coa_id, Master.charts_of_accounts.selectOptionColumns.id)
+      .where(Accounting.journal_entries.selectOptionColumns.db_name)
+      .whereIn(Accounting.journal_entries.selectOptionColumns.db_id, salesIds)
+      .build();
+
+    let sales_journal = await Query(sales_journal_query, ['sales', ...salesIds], [Accounting.journal_entries.prefix_]);
+    console.log('Raw journal data:', sales_journal);
+
+    const sales_attachments_query = sql.select([
+      { col: Accounting.sales_attachments.selectOptionColumns.id, as: 'id' },
+      { col: Accounting.sales_attachments.selectOptionColumns.sales_id, as: 'sales_id' },
+      { col: Accounting.sales_attachments.selectOptionColumns.file, as: 'file' },
+      { col: Accounting.sales_attachments.selectOptionColumns.name, as: 'name' },
+      { col: Accounting.sales_attachments.selectOptionColumns.remarks, as: 'remarks' },
+      { col: Accounting.sales_attachments.selectOptionColumns.uploaded_by, as: 'uploaded_by' },
+      { col: Accounting.sales_attachments.selectOptionColumns.uploaded_date, as: 'uploaded_date' }
+    ])
+      .from(Accounting.sales_attachments.tablename)
+      .whereIn(Accounting.sales_attachments.selectOptionColumns.sales_id, salesIds)
+      .build();
+
+    let sales_attachments = await Query(sales_attachments_query, [...salesIds], [Accounting.sales_attachments.prefix_]);
+
+    const groupedData = sales.map(sale => {
+      const saleItems = sales_items.filter(item => item.sales_id === sale.id);
+      const saleJournal = copyType === 'customer'
+        ? []
+        : sales_journal.filter(entry => entry.db_id === sale.id);
+
+      const mappedItems = saleItems.map(item => {
+        const quantity = parseFloat(item.quantity || 1);
+        const salesPrice = parseFloat(item.sales_price || 0);
+        const discount = parseFloat(item.discount || 0);
+        const vatRate = parseFloat(item.vat_rate || 0);
+        const whtRate = parseFloat(item.withholding_tax_rate || 0);
+
+        const totalPrice = salesPrice * quantity;
+        const discountAmount = totalPrice * (discount / 100);
+        const discountedPrice = totalPrice - discountAmount;
+        const vatAmount = discountedPrice * (vatRate / 100);
+        const whtAmount = discountedPrice * (whtRate / 100);
+        const amountDue = discountedPrice + vatAmount - whtAmount;
+
+        return {
+          id: item.id,
+          product_name: item.product_service_name || '—',
+          description: item.description || '—',
+          unit: 'pcs',
+          quantity: quantity,
+          purchase_price: salesPrice,
+          total_price: totalPrice,
+          discount_amount: discountAmount,
+          vat_percentage: vatRate,
+          vat_amount: vatAmount,
+          wht_percentage: whtRate,
+          wht_amount: whtAmount,
+          amount_due: amountDue,
+          vatable_sales: vatRate > 0 ? discountedPrice : 0,
+          vat_exempt_sales: vatRate === 0 ? discountedPrice : 0,
+          zero_rated_sales: 0
+        };
+      });
+
+      const mappedJournal = saleJournal.map(entry => {
+        const isDebit = entry.type === 'DEBIT';
+        console.log('Processing journal entry:', { type: entry.type, amount: entry.amount, isDebit });
+        const mapped = {
+          id: entry.id,
+          account_name: entry.charts_of_accounts_name || '—',
+          responsibility_center: entry.responsibility_center || 'Unassigned',
+          debit: isDebit ? parseFloat(entry.amount || 0) : 0,
+          credit: !isDebit ? parseFloat(entry.amount || 0) : 0
+        };
+        console.log('Mapped journal entry:', mapped);
+        return mapped;
+      });
+
+      return {
+        ...sale,
+        items: mappedItems,
+        journal: mappedJournal,
+        attachments: sales_attachments.filter(att => att.sales_id === sale.id),
+        company: company
+      };
+    });
+
+    console.log('Grouped sales data:', groupedData);
+    res.status(200).json({
+      success: true,
+      message: 'Sales retrieved successfully',
+      company: company,
+      data: groupedData,
+      count: groupedData.length,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error fetching sales:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching sales',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};
+
 module.exports = {
   getSales,
   getAllSales,
   createSales,
   updateSale,
-  updateSalesState
+  updateSalesState,
+  getPrintSales
 }

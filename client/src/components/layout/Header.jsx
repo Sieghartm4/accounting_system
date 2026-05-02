@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Search, Bell, ChevronDown, LogOut, User, Building2, Calendar, X, FileText } from 'lucide-react';
+import { Menu, Search, Bell, ChevronDown, LogOut, User, Building2, Calendar, X, FileText, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { hasRouteAccess } from '../../utils/routeProtection';
 
 export default function Header({ isCollapsed, onToggleSidebar }) {
     const navigate = useNavigate();
@@ -9,6 +10,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     const [user, setUser] = useState(null);
     const [companies, setCompanies] = useState([]);
     const [selectedCompany, setSelectedCompany] = useState(null);
+    const [canAccessCompany, setCanAccessCompany] = useState(false);
     const dropdownRef = useRef(null);
     
     // Search states
@@ -23,7 +25,12 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
 
     useEffect(() => {
         const userData = localStorage.getItem('user');
-        if (userData) setUser(JSON.parse(userData));
+        if (userData) {
+            const parsedUser = JSON.parse(userData);
+            setUser(parsedUser);
+            // Check if user has access to company management
+            setCanAccessCompany(hasRouteAccess('company', parsedUser));
+        }
         fetchCompanies();
 
         const handleClickOutside = (e) => {
@@ -348,12 +355,14 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                                 <button className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                                     <User size={16} className="text-gray-400" /> My Profile
                                 </button>
-                                <button 
-                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    onClick={() => navigate('/company')}
-                                >
-                                    <Building2 size={16} className="text-gray-400" /> Company
-                                </button>
+                                {canAccessCompany && (
+                                    <button 
+                                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                        onClick={() => navigate('/company')}
+                                    >
+                                        <Building2 size={16} className="text-gray-400" /> Company
+                                    </button>
+                                )}
                                 <div className="h-px bg-gray-100 my-1 mx-2"></div>
                                 <button 
                                     className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors font-bold"

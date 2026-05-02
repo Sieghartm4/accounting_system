@@ -19,6 +19,7 @@ const DynamicTable = ({
   enableCheckbox = false,
   checkboxColumn = null,        // which column value to use as unique key (e.g. 'id', 'name')
   checkboxActions = [],         // array of { label, onClick(selectedRows) } buttons shown when rows are selected
+  checkboxActionsFilter = null, // function to filter actions based on selectedRows: (selectedRows) => filteredActions
   // --- CONDITIONAL CHECKBOX PROPS ---
   checkboxCondition = null,      // { column: 'status', value: 'prepared' } - only show checkboxes for rows with this column value
   checkboxConditionAll = false,   // if true, show checkboxes for all rows (overrides checkboxCondition)
@@ -421,7 +422,7 @@ const DynamicTable = ({
             {selectedKeys.size} Selected
           </span>
           <div className="w-px h-4 bg-red-200" />
-          {checkboxActions.map((action, i) => (
+          {(checkboxActionsFilter ? checkboxActionsFilter(selectedRows) : checkboxActions).map((action, i) => (
             action.type === 'dropdown' ? (
               <div key={i} className="flex items-center gap-1.5">
                 {action.icon && <span className="w-3 h-3">{action.icon}</span>}
@@ -448,7 +449,13 @@ const DynamicTable = ({
               <button
                 key={i}
                 onClick={() => action.onClick(selectedRows)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 border border-green-600 text-white text-[10px] font-black rounded-lg hover:bg-green-200 hover:text-green-700 hover:border-green-300 hover:cursor-pointer transition-all uppercase tracking-widest"
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black rounded-lg hover:cursor-pointer transition-all uppercase tracking-widest ${
+                  action.style === 'blue' 
+                    ? 'bg-blue-600 border border-blue-600 text-white hover:bg-blue-200 hover:text-blue-700 hover:border-blue-300'
+                    : action.style === 'orange'
+                    ? 'bg-orange-600 border border-orange-600 text-white hover:bg-orange-200 hover:text-orange-700 hover:border-orange-300'
+                    : 'bg-green-600 border border-green-600 text-white hover:bg-green-200 hover:text-green-700 hover:border-green-300'
+                }`}
               >
                 {action.icon && <span className="w-3 h-3">{action.icon}</span>}
                 {action.label}

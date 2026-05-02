@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, ShieldCheck, Users, Building, Warehouse, ChevronRight, BarChart, FileText, Package, DollarSign, CreditCard, TrendingUp, HandCoins, ShoppingCart, CreditCard as PaymentCard, Settings, FileSpreadsheet, Percent, Receipt, Scale, FileSearch, BookOpen, PieChart } from 'lucide-react';
+import { LayoutDashboard, Database, ShieldCheck, Users, Warehouse, ChevronRight, BarChart, FileText, Package, DollarSign, CreditCard, TrendingUp, HandCoins, ShoppingCart, CreditCard as PaymentCard, Settings, FileSpreadsheet, Percent, Receipt, Scale, FileSearch, BookOpen, PieChart } from 'lucide-react';
 import { getSidebarItems } from '../../utils/routeProtection';
 
 export default function Sidebar({ isCollapsed }) {
@@ -21,7 +21,6 @@ export default function Sidebar({ isCollapsed }) {
         adjustments: null,
         reports: null
     });
-    const [company, setCompany] = useState(null);
 
     useEffect(() => {
         try {
@@ -36,38 +35,6 @@ export default function Sidebar({ isCollapsed }) {
             console.error('Error loading sidebar items:', error);
             setSidebarItems({ main: [], masters: [], receipts: [], sales: [], purchase: [], adjustments: [] });
         }
-    }, []);
-
-    // Fetch company data for branding
-    useEffect(() => {
-        const fetchCompany = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                if (!token) return;
-
-                const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/company/single`,
-                    {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`,
-                        },
-                    }
-                );
-
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.success && result.data) {
-                        setCompany(result.data);
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching company for sidebar:', error);
-            }
-        };
-
-        fetchCompany();
     }, []);
 
     // Auto-open collapsible based on current route
@@ -152,30 +119,16 @@ export default function Sidebar({ isCollapsed }) {
             `}} />
             {/* Branding Area */}
             <div className="flex items-center h-16 px-6 border-b-2 border-red-600 bg-black">
-                {company?.logo ? (
-                    <img
-                        src={company.logo}
-                        alt="Company Logo"
-                        className="w-10 h-10 rounded-lg object-cover"
-                    />
-                ) : (
-                    <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-inner">
-                        {company?.company_name
-                            ? company.company_name
-                                .split(' ')
-                                .map(word => word.charAt(0).toUpperCase())
-                                .join('')
-                                .slice(0, 2)
-                            : '5L'}
-                    </div>
-                )}
+                <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-inner">
+                    5L
+                </div>
                 {!isCollapsed && (
                     <div className="ml-3 overflow-hidden whitespace-nowrap">
                         <span className="font-bold tracking-tight text-white text-xl block">
-                            {company?.company_name || '5L SOLUTIONS'}
+                            5L SOLUTIONS
                         </span>
                         <span className="text-[10px] text-red-600 font-bold tracking-[0.2em] -mt-1 block">
-                            {company?.website || company?.email || 'CORP.'}
+                            CORP.
                         </span>
                     </div>
                 )}
@@ -209,30 +162,32 @@ export default function Sidebar({ isCollapsed }) {
 
                         {isMastersOpen && !isCollapsed && (
                             <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
-                                {sidebarItems.masters?.map((item, index) => {
-                                    if (!item || !item.name) return null;
-                                    const iconMap = {
-                                        access: ShieldCheck,
-                                        users: Users,
-                                        customers: Users,
-                                        vendors: Warehouse,
-                                        charts: BarChart,
-                                        proforma_entries: FileText,
-                                        product_service: Package,
-                                        vat: Percent,
-                                        withholding_tax: Receipt
-                                    };
-                                    const Icon = iconMap[item.name] || Settings;
-                                    return (
-                                        <Link
-                                            key={item.name || index}
-                                            to={`/${item.name}`}
-                                            className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
-                                        >
-                                            <Icon size={14} /> {item.label || item.name}
-                                        </Link>
-                                    );
-                                })}
+                                {sidebarItems.masters
+                                    ?.filter(item => item?.name !== 'company')
+                                    ?.map((item, index) => {
+                                        if (!item || !item.name) return null;
+                                        const iconMap = {
+                                            access: ShieldCheck,
+                                            users: Users,
+                                            customers: Users,
+                                            vendors: Warehouse,
+                                            charts: BarChart,
+                                            proforma_entries: FileText,
+                                            product_service: Package,
+                                            vat: Percent,
+                                            withholding_tax: Receipt
+                                        };
+                                        const Icon = iconMap[item.name] || Settings;
+                                        return (
+                                            <Link
+                                                key={item.name || index}
+                                                to={`/${item.name}`}
+                                                className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                                            >
+                                                <Icon size={14} /> {item.label || item.name}
+                                            </Link>
+                                        );
+                                    })}
                             </div>
                         )}
                     </div>

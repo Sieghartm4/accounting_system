@@ -1,15 +1,15 @@
-// generateReceiptPDF.js
-// Place this in: src/utils/generateReceiptPDF.js
+// generatePurchasePDF.js
+// Place this in: src/utils/generatePurchasePDF.js
 // Install deps: npm install jspdf jspdf-autotable
 
-export async function generateReceiptPDF(receiptData, copyType = 'internal') {
+export async function generatePurchasePDF(purchaseData, copyType = 'internal') {
   const { jsPDF } = await import('jspdf');
   const { default: autoTable } = await import('jspdf-autotable');
 
-  const receipts = Array.isArray(receiptData) ? receiptData : [receiptData];
+  const purchases = Array.isArray(purchaseData) ? purchaseData : [purchaseData];
 
-  for (let idx = 0; idx < receipts.length; idx++) {
-    const receipt = receipts[idx];
+  for (let idx = 0; idx < purchases.length; idx++) {
+    const purchase = purchases[idx];
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
     const pageW = doc.internal.pageSize.getWidth();
@@ -26,8 +26,8 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     const MGRAY      = [160, 160, 160];
     const NEAR_BLACK = [30, 30, 30];
 
-    const copyLabel = copyType === 'customer' ? 'Customer Copy' : 'Internal Copy';
-    const company   = receipt.company || {};
+    const copyLabel = copyType === 'customer' ? 'Vendor Copy' : 'Internal Copy';
+    const company   = purchase.company || {};
 
     let y = margin;
 
@@ -50,7 +50,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(17);
     doc.setTextColor(...RED);
-    doc.text('CASH DISBURSEMENTS # ' + (receipt.id ?? ''), margin, y + 14);
+    doc.text('PURCHASE ORDER # ' + (purchase.id ?? ''), margin, y + 14);
 
     // Left – copy label (italic, small)
     doc.setFont('helvetica', 'italic');
@@ -87,11 +87,11 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     y += 13;
 
     // ── PARTY / DOC INFO ──────────────────────────────────────────────────────
-    // Left – customer name + TIN
+    // Left – vendor name + TIN
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(...BLACK);
-    doc.text(receipt.customer || '—', margin, y);
+    doc.text(purchase.vendor || '—', margin, y);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
@@ -102,26 +102,29 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     const INFO_LABEL_X = margin + contentW * 0.52;
     const INFO_VALUE_X = INFO_LABEL_X + 92;
 
-    let collectionDate = '—';
-    if (receipt.collection_date) {
+    let dateDelivered = '—';
+    if (purchase.date_delivered) {
       try {
-        collectionDate = new Date(receipt.collection_date).toLocaleDateString('en-US', {
+        dateDelivered = new Date(purchase.date_delivered).toLocaleDateString('en-US', {
           month: 'short', day: '2-digit', year: 'numeric',
         });
       } catch (_) {}
     }
 
-    const modeDisplay =
-      receipt.mode === 'BANK' || receipt.bank_name
-        ? 'ET : Bank/Electronic Transfer'
-        : receipt.mode
-        ? 'ET : ' + receipt.mode
-        : '—';
+    let dateDue = '—';
+    if (purchase.date_due) {
+      try {
+        dateDue = new Date(purchase.date_due).toLocaleDateString('en-US', {
+          month: 'short', day: '2-digit', year: 'numeric',
+        });
+      } catch (_) {}
+    }
 
     const infoRows = [
-      ['Doc Ref:',      receipt.doc_ref || '—'],
-      ['Payment Date:', collectionDate],
-      ['Mode:',         modeDisplay],
+      ['Doc Ref:',        purchase.doc_ref || '—'],
+      ['Terms:',          purchase.terms || '—'],
+      ['Date Delivered:', dateDelivered],
+      ['Date Due:',       dateDue],
     ];
 
     infoRows.forEach(([lbl, val], i) => {
@@ -135,7 +138,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
       doc.text(String(val), INFO_VALUE_X, rowY);
     });
 
-    y += 38;
+    y += 50;
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.5);
     doc.line(margin, y, pageW - margin, y);
@@ -158,7 +161,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
         : '';
 
     // ── ITEMS TABLE ───────────────────────────────────────────────────────────
-    const items = Array.isArray(receipt.items) ? receipt.items : [];
+    const items = Array.isArray(purchase.items) ? purchase.items : [];
 
     const itemRows = items.map((item, i) => {
       const qty  = parseFloat(item.quantity        || 1);
@@ -237,14 +240,14 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     y = doc.lastAutoTable.finalY + 10;
 
     // ── REMARKS ───────────────────────────────────────────────────────────────
-    if (receipt.remarks) {
+    if (purchase.remarks) {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(...BLACK);
       doc.text('Remarks:', margin, y + 10);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...DGRAY);
-      const wrapped = doc.splitTextToSize(receipt.remarks, contentW * 0.5);
+      const wrapped = doc.splitTextToSize(purchase.remarks, contentW * 0.5);
       doc.text(wrapped, margin, y + 21);
       y += 16 + wrapped.length * 10;
     } else {
@@ -268,7 +271,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
         vatableSales: 0, vatExempt: 0, zeroRated: 0, totalWHT: 0 }
     );
 
-    const amtDueTotal      = parseFloat(receipt.amount_due || 0);
+    const amtDueTotal      = parseFloat(purchase.amount_due || 0);
     const discountedAmount = totals.purchasePrice - totals.totalDiscount;
     const netOfVAT         = discountedAmount - totals.totalVAT;
 
@@ -321,7 +324,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     y = Math.max(ty + 20, y + 12);
 
     // ── JOURNAL TABLE ─────────────────────────────────────────────────────────
-    const journal = Array.isArray(receipt.journal) ? receipt.journal : [];
+    const journal = Array.isArray(purchase.journal) ? purchase.journal : [];
     console.log('Journal data:', journal);
 
     if (journal.length > 0) {
@@ -396,13 +399,13 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
       'Generated on ' +
         new Date().toLocaleString('en-PH') +
         '  ·  ' + copyLabel +
-        '  ·  Receipt #' + (receipt.id ?? ''),
+        '  ·  Purchase #' + (purchase.id ?? ''),
       pageW / 2,
       footerY + 12,
       { align: 'center' }
     );
 
     // ── SAVE ──────────────────────────────────────────────────────────────────
-    doc.save('cash_disbursement_' + (receipt.id ?? idx) + '_' + copyType + '.pdf');
+    doc.save('purchase_order_' + (purchase.id ?? idx) + '_' + copyType + '.pdf');
   }
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { TrendingUp, ShoppingBag, ShieldCheck, Zap, ArrowRight, Download } from 'lucide-react';
+import { TrendingUp, ShoppingBag, ShieldCheck, Zap, ArrowRight, Download, FileText, Building } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import DynamicToast from '../../components/DynamicToast';
 import RouteProtection from '../../components/RouteProtection';
@@ -9,6 +9,7 @@ import ProtectedAction from '../../components/ProtectedAction';
 import useSales from './useSales';
 import SalesForm from './SalesForm';
 import { getAccessLevel } from '../../utils/routeProtection';
+import { generateSalesPDF } from '../../utils/generateSalesPDF';
 
 export default function Sales() {
   return (
@@ -71,12 +72,120 @@ function SalesContent() {
   const accessLevel = getAccessLevel('sales', user);
   const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
 
-  // Determine checkbox condition based on access level
-  const checkboxCondition = enableCheckboxes
-    ? accessLevel === 'Full Access' 
-      ? { column: 'state', value: 'APPROVED', exclude: true } // Exclude APPROVED state for Full Access
-      : { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
-    : null;
+  const checkboxCondition = null; // Always show checkboxes (match Receipts behavior)
+
+  // ─── Helper: fetch full sales data then download as PDF ─────────────────
+  const fetchAndDownloadPDF = async (selectedRows, copyType) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+
+      const salesIds = selectedRows.map(row => row.id).join(',');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/sales/print/${salesIds}?copyType=${copyType}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Failed to fetch sales for printing');
+
+      const data = result.data || [];
+      console.log('PDF Data received:', data);
+      if (!Array.isArray(data)) throw new Error('Invalid data format received from server');
+
+      await generateSalesPDF(data, copyType);
+
+      setToast({
+        type: 'success',
+        message: `${data.length} sales PDF(s) downloaded (${copyType === 'customer' ? 'Customer' : 'Internal'} Copy)`,
+      });
+    } catch (error) {
+      console.error('Error generating sales PDF:', error);
+      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' });
+    }
+  };
+
+  // Function to filter checkbox actions based on selected rows
+  const getFilteredCheckboxActions = (selectedRows) => {
+    const allActions = [
+      {
+        label: 'Approve Selected',
+        onClick: async (selectedRows) => {
+          try {
+            console.log('Approving sales:', selectedRows);
+
+            const token = localStorage.getItem('token');
+            if (!token) {
+              throw new Error('No authentication token found');
+            }
+
+            const updates = selectedRows.map(row => ({
+              id: row.id,
+              currentState: row.state
+            }));
+
+            const response = await fetch(
+              `${import.meta.env.VITE_SERVER_LINK}/sales/sales-state`,
+              {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ updates })
+              }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+              throw new Error(result.message || 'Failed to approve sales');
+            }
+
+            await refetchSales();
+
+            setToast({
+              type: 'success',
+              message: result.message || `${selectedRows.length} sale(s) approved successfully`
+            });
+
+          } catch (error) {
+            console.error('Error approving sales:', error);
+            setToast({
+              type: 'error',
+              message: error.message || 'Failed to approve sales'
+            });
+          }
+        }
+      },
+      {
+        label: 'Internal Copy',
+        icon: <FileText size={14} />,
+        onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
+        style: 'blue',
+      },
+      {
+        label: 'Customer Copy',
+        icon: <Building size={14} />,
+        onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
+        style: 'orange',
+      },
+    ];
+
+    return allActions.filter(action => {
+      if (action.label === 'Approve Selected') {
+        return selectedRows.some(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+      }
+      return true;
+    });
+  };
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -345,59 +454,8 @@ function SalesContent() {
               }
             }
           ]}
-          checkboxActions={[
-            {
-              label: 'Approve Selected',
-              onClick: async (selectedRows) => {
-                try {
-                  console.log('Approving sales:', selectedRows);
-
-                  const token = localStorage.getItem('token');
-                  if (!token) {
-                    throw new Error('No authentication token found');
-                  }
-
-                  const updates = selectedRows.map(row => ({
-                    id: row.id,
-                    currentState: row.state
-                  }));
-
-                  const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/sales/sales-state`,
-                    {
-                      method: "PUT",
-                      headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({ updates })
-                    }
-                  );
-
-                  const result = await response.json();
-
-                  if (!response.ok) {
-                    throw new Error(result.message || 'Failed to approve sales');
-                  }
-
-                  // Refresh sales data
-                  await refetchSales();
-
-                  setToast({
-                    type: 'success',
-                    message: result.message || `${selectedRows.length} sale(s) approved successfully`
-                  });
-
-                } catch (error) {
-                  console.error('Error approving sales:', error);
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to approve sales'
-                  });
-                }
-              }
-            }
-          ]}
+          checkboxActions={getFilteredCheckboxActions([])}
+          checkboxActionsFilter={getFilteredCheckboxActions}
         />
       </motion.div>
     </div>

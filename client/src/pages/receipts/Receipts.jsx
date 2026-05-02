@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Receipt, FilePlus, ShieldCheck, CreditCard, ArrowRight, Download } from 'lucide-react';
+import { Receipt, FilePlus, ShieldCheck, CreditCard, ArrowRight, Download, Check, FileText, Building } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import DynamicToast from '../../components/DynamicToast';
 import RouteProtection from '../../components/RouteProtection';
@@ -73,11 +73,79 @@ function ReceiptsContent() {
     accessLevel === 'Edit Access'    ||
     accessLevel === 'Full Access';
 
-  const checkboxCondition = enableCheckboxes
-    ? accessLevel === 'Full Access'
-      ? { column: 'state', value: 'APPROVED', exclude: true }
-      : { column: 'state', value: accessLevel === 'Check Access' ? 'PREPARED' : 'CHECKED' }
-    : null;
+  const checkboxCondition = null; // Always show checkboxes
+
+  // Function to filter checkbox actions based on selected rows' states
+  const getFilteredCheckboxActions = (selectedRows) => {
+    const allActions = [
+      {
+        label: 'Approve Selected',
+        icon: <Check size={14} />,
+        onClick: async (selectedRows) => {
+          try {
+            const token = localStorage.getItem('token');
+            if (!token) throw new Error('No authentication token found');
+
+            // Filter to only include approvable rows (PREPARED or CHECKED)
+            const approvableRows = selectedRows.filter(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+            
+            if (approvableRows.length === 0) {
+              setToast({ type: 'error', message: 'No receipts are eligible for approval' });
+              return;
+            }
+
+            const updates = approvableRows.map(row => ({ id: row.id, currentState: row.state }));
+
+            const response = await fetch(
+              `${import.meta.env.VITE_SERVER_LINK}/receipt/receipt-state`,
+              {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ updates }),
+              }
+            );
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Failed to approve receipts');
+
+            await refetchReceipts();
+            setToast({
+              type: 'success',
+              message: result.message || `${approvableRows.length} receipt(s) approved successfully`,
+            });
+          } catch (error) {
+            setToast({ type: 'error', message: error.message || 'Failed to approve receipts' });
+          }
+        },
+      },
+      {
+        // ── Internal Copy → fetch data → generate + download PDF directly
+        label: 'Internal Copy',
+        icon: <FileText size={14} />,
+        onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
+        style: 'blue', // Blue color for internal copy
+      },
+      {
+        // ── Customer Copy → same but labelled differently in PDF
+        label: 'Customer Copy',
+        icon: <Building size={14} />,
+        onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
+        style: 'orange', // Orange color for customer copy
+      },
+    ];
+
+    // Filter Approve Selected button - show if at least one selected row is PREPARED or CHECKED
+    return allActions.filter(action => {
+      if (action.label === 'Approve Selected') {
+        // Show approve button if at least one selected row has state PREPARED or CHECKED
+        return selectedRows.some(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+      }
+      return true; // Always show other actions
+    });
+  };
 
   const fadeInUp = {
     hidden:  { opacity: 0, y: 20 },
@@ -93,7 +161,7 @@ function ReceiptsContent() {
       const receiptIds = selectedRows.map(row => row.id).join(',');
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/receipt/print/${receiptIds}`,
+        `${import.meta.env.VITE_SERVER_LINK}/receipt/print/${receiptIds}?copyType=${copyType}`,
         {
           method: 'GET',
           headers: {
@@ -118,7 +186,7 @@ function ReceiptsContent() {
 
       setToast({
         type: 'success',
-        message: `${data.length} receipt PDF(s) downloaded (${copyType === 'vendor' ? 'Vendor' : 'Internal'} Copy)`,
+        message: `${data.length} receipt PDF(s) downloaded (${copyType === 'customer' ? 'Customer' : 'Internal'} Copy)`,
       });
     } catch (error) {
       console.error('Error generating receipt PDF:', error);
@@ -328,52 +396,8 @@ function ReceiptsContent() {
               },
             },
           ]}
-          checkboxActions={[
-            {
-              label: 'Approve Selected',
-              onClick: async (selectedRows) => {
-                try {
-                  const token = localStorage.getItem('token');
-                  if (!token) throw new Error('No authentication token found');
-
-                  const updates = selectedRows.map(row => ({ id: row.id, currentState: row.state }));
-
-                  const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/receipt/receipt-state`,
-                    {
-                      method: 'PUT',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({ updates }),
-                    }
-                  );
-
-                  const result = await response.json();
-                  if (!response.ok) throw new Error(result.message || 'Failed to approve receipts');
-
-                  await refetchReceipts();
-                  setToast({
-                    type: 'success',
-                    message: result.message || `${selectedRows.length} receipt(s) approved successfully`,
-                  });
-                } catch (error) {
-                  setToast({ type: 'error', message: error.message || 'Failed to approve receipts' });
-                }
-              },
-            },
-            {
-              // ── Internal Copy → fetch data → generate + download PDF directly
-              label: 'Internal Copy',
-              onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
-            },
-            {
-              // ── Vendor Copy → same but labelled differently in PDF
-              label: 'Vendor Copy',
-              onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'vendor'),
-            },
-          ]}
+          checkboxActions={getFilteredCheckboxActions([])}
+          checkboxActionsFilter={getFilteredCheckboxActions}
         />
       </motion.div>
     </div>

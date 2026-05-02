@@ -1,15 +1,15 @@
-// generateReceiptPDF.js
-// Place this in: src/utils/generateReceiptPDF.js
+// generateCollectionPDF.js
+// Place this in: src/utils/generateCollectionPDF.js
 // Install deps: npm install jspdf jspdf-autotable
 
-export async function generateReceiptPDF(receiptData, copyType = 'internal') {
+export async function generateCollectionPDF(collectionData, copyType = 'internal') {
   const { jsPDF } = await import('jspdf');
   const { default: autoTable } = await import('jspdf-autotable');
 
-  const receipts = Array.isArray(receiptData) ? receiptData : [receiptData];
+  const collections = Array.isArray(collectionData) ? collectionData : [collectionData];
 
-  for (let idx = 0; idx < receipts.length; idx++) {
-    const receipt = receipts[idx];
+  for (let idx = 0; idx < collections.length; idx++) {
+    const collection = collections[idx];
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
     const pageW = doc.internal.pageSize.getWidth();
@@ -27,7 +27,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     const NEAR_BLACK = [30, 30, 30];
 
     const copyLabel = copyType === 'customer' ? 'Customer Copy' : 'Internal Copy';
-    const company   = receipt.company || {};
+    const company   = collection.company || {};
 
     let y = margin;
 
@@ -50,7 +50,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(17);
     doc.setTextColor(...RED);
-    doc.text('CASH DISBURSEMENTS # ' + (receipt.id ?? ''), margin, y + 14);
+    doc.text('COLLECTION # ' + (collection.id ?? ''), margin, y + 14);
 
     // Left – copy label (italic, small)
     doc.setFont('helvetica', 'italic');
@@ -91,7 +91,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(...BLACK);
-    doc.text(receipt.customer || '—', margin, y);
+    doc.text(collection.customer || '—', margin, y);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
@@ -103,25 +103,27 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     const INFO_VALUE_X = INFO_LABEL_X + 92;
 
     let collectionDate = '—';
-    if (receipt.collection_date) {
+    if (collection.collection_date) {
       try {
-        collectionDate = new Date(receipt.collection_date).toLocaleDateString('en-US', {
+        collectionDate = new Date(collection.collection_date).toLocaleDateString('en-US', {
           month: 'short', day: '2-digit', year: 'numeric',
         });
       } catch (_) {}
     }
 
     const modeDisplay =
-      receipt.mode === 'BANK' || receipt.bank_name
-        ? 'ET : Bank/Electronic Transfer'
-        : receipt.mode
-        ? 'ET : ' + receipt.mode
+      collection.mode === 'CHECK' && collection.bank_name
+        ? 'Check: ' + collection.bank_name + (collection.check_number ? ' #' + collection.check_number : '')
+        : collection.mode === 'BANK_TRANSFER' && collection.bank_name
+        ? 'Bank Transfer: ' + collection.bank_name
+        : collection.mode
+        ? collection.mode
         : '—';
 
     const infoRows = [
-      ['Doc Ref:',      receipt.doc_ref || '—'],
-      ['Payment Date:', collectionDate],
-      ['Mode:',         modeDisplay],
+      ['Doc Ref:',        collection.doc_ref || '—'],
+      ['Collection Date:', collectionDate],
+      ['Payment Mode:',   modeDisplay],
     ];
 
     infoRows.forEach(([lbl, val], i) => {
@@ -158,7 +160,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
         : '';
 
     // ── ITEMS TABLE ───────────────────────────────────────────────────────────
-    const items = Array.isArray(receipt.items) ? receipt.items : [];
+    const items = Array.isArray(collection.items) ? collection.items : [];
 
     const itemRows = items.map((item, i) => {
       const qty  = parseFloat(item.quantity        || 1);
@@ -172,6 +174,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
       const due  = parseFloat(item.amount_due      || tp);
       return [
         i + 1,
+        item.invoice_ref  || '—',
         item.product_name || '—',
         item.description  || '—',
         item.unit         || '—',
@@ -191,11 +194,11 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
       startY: y,
       margin: { left: margin, right: margin },
       head: [[
-        '#', 'Product or\nService', 'Description', 'Unit', 'Quantity',
-        'Purchase\nPrice', 'Total\nPrice', 'Discount\nAmount',
+        '#', 'Invoice Ref', 'Product or\nService', 'Description', 'Unit', 'Quantity',
+        'Sales\nPrice', 'Total\nPrice', 'Discount\nAmount',
         'VAT', 'VAT\nAmount', 'WHT', 'WHT\nAmount', 'Amount\nDue',
       ]],
-      body: itemRows.length > 0 ? itemRows : [Array(13).fill('')],
+      body: itemRows.length > 0 ? itemRows : [Array(14).fill('')],
       styles: {
         fontSize: 6.5,
         cellPadding: { top: 4, bottom: 4, left: 3, right: 3 },
@@ -215,19 +218,20 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
         minCellHeight: 24,
       },
       columnStyles: {
-        0:  { halign: 'center', cellWidth: 16 },
-        1:  { halign: 'left',   cellWidth: 58 },
-        2:  { halign: 'left',   cellWidth: 55 },
-        3:  { halign: 'center', cellWidth: 24 },
-        4:  { halign: 'right',  cellWidth: 36 },
-        5:  { halign: 'right',  cellWidth: 46 },
-        6:  { halign: 'right',  cellWidth: 44 },
+        0:  { halign: 'center', cellWidth: 14 },
+        1:  { halign: 'left',   cellWidth: 50 },
+        2:  { halign: 'left',   cellWidth: 50 },
+        3:  { halign: 'left',   cellWidth: 50 },
+        4:  { halign: 'center', cellWidth: 22 },
+        5:  { halign: 'right',  cellWidth: 32 },
+        6:  { halign: 'right',  cellWidth: 40 },
         7:  { halign: 'right',  cellWidth: 40 },
-        8:  { halign: 'center', cellWidth: 24 },
-        9:  { halign: 'right',  cellWidth: 40 },
-        10: { halign: 'center', cellWidth: 24 },
-        11: { halign: 'right',  cellWidth: 40 },
-        12: { halign: 'right',  cellWidth: 46 },
+        8:  { halign: 'right',  cellWidth: 36 },
+        9:  { halign: 'center', cellWidth: 22 },
+        10: { halign: 'right',  cellWidth: 36 },
+        11: { halign: 'center', cellWidth: 22 },
+        12: { halign: 'right',  cellWidth: 36 },
+        13: { halign: 'right',  cellWidth: 40 },
       },
       alternateRowStyles: { fillColor: [252, 252, 252] },
       tableLineColor: [210, 210, 210],
@@ -237,14 +241,14 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     y = doc.lastAutoTable.finalY + 10;
 
     // ── REMARKS ───────────────────────────────────────────────────────────────
-    if (receipt.remarks) {
+    if (collection.remarks) {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(...BLACK);
       doc.text('Remarks:', margin, y + 10);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...DGRAY);
-      const wrapped = doc.splitTextToSize(receipt.remarks, contentW * 0.5);
+      const wrapped = doc.splitTextToSize(collection.remarks, contentW * 0.5);
       doc.text(wrapped, margin, y + 21);
       y += 16 + wrapped.length * 10;
     } else {
@@ -268,7 +272,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
         vatableSales: 0, vatExempt: 0, zeroRated: 0, totalWHT: 0 }
     );
 
-    const amtDueTotal      = parseFloat(receipt.amount_due || 0);
+    const amtDueTotal      = parseFloat(collection.amount_due || 0);
     const discountedAmount = totals.purchasePrice - totals.totalDiscount;
     const netOfVAT         = discountedAmount - totals.totalVAT;
 
@@ -281,7 +285,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     let ty = y + 4;
 
     const totalsRows = [
-      ['Total Purchase Price',    fmt1(totals.purchasePrice)],
+      ['Total Sales Price',       fmt1(totals.purchasePrice)],
       ['Total Discount',          fmt1(totals.totalDiscount)],
       ['Total Discounted Amount', fmt1(discountedAmount)],
       ['Total VAT',               fmt1(totals.totalVAT)],
@@ -321,7 +325,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     y = Math.max(ty + 20, y + 12);
 
     // ── JOURNAL TABLE ─────────────────────────────────────────────────────────
-    const journal = Array.isArray(receipt.journal) ? receipt.journal : [];
+    const journal = Array.isArray(collection.journal) ? collection.journal : [];
     console.log('Journal data:', journal);
 
     if (journal.length > 0) {
@@ -396,13 +400,13 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
       'Generated on ' +
         new Date().toLocaleString('en-PH') +
         '  ·  ' + copyLabel +
-        '  ·  Receipt #' + (receipt.id ?? ''),
+        '  ·  Collection #' + (collection.id ?? ''),
       pageW / 2,
       footerY + 12,
       { align: 'center' }
     );
 
     // ── SAVE ──────────────────────────────────────────────────────────────────
-    doc.save('cash_disbursement_' + (receipt.id ?? idx) + '_' + copyType + '.pdf');
+    doc.save('collection_' + (collection.id ?? idx) + '_' + copyType + '.pdf');
   }
 }

@@ -1,6 +1,6 @@
 const express = require('express')
 const { auth } = require('../middlewares/auth.middleware')
-const { getSales, getAllSales, createSales, updateSalesState, updateSale } = require('../controller/sales.controller')
+const { getSales, getAllSales, createSales, updateSalesState, updateSale, getPrintSales } = require('../controller/sales.controller')
 
 const salesRouter = express.Router()
 
@@ -11,6 +11,7 @@ salesRouter.get('/:id', getAllSales)
 salesRouter.post('/', createSales)
 salesRouter.put('/sales-state', updateSalesState)
 salesRouter.put('/:sales_id', updateSale)
+salesRouter.get('/print/:sales_id', getPrintSales)
 
 
 module.exports = {
