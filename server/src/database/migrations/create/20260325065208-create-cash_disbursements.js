@@ -56,6 +56,14 @@ module.exports = {
       cd_created_by: {
         type: Sequelize.STRING(300),
         allowNull: false
+      },
+      cd_checked_by: {
+        type: Sequelize.STRING(300),
+        allowNull: true
+      },
+      cd_approved_by: {
+        type: Sequelize.STRING(300),
+        allowNull: true
       }
     });
   },

@@ -50,7 +50,7 @@ module.exports = {
         allowNull: false
       },
       r_state: {
-        type: Sequelize.ENUM('PREPARED','CHECKED','APPROVED','REJECTED','CANCELLED'),
+        type: Sequelize.ENUM('PREPARED', 'CHECKED', 'APPROVED', 'REJECTED', 'CANCELLED'),
         allowNull: false
       },
       r_created_date: {
@@ -60,6 +60,14 @@ module.exports = {
       r_created_by: {
         type: Sequelize.STRING(300),
         allowNull: false
+      },
+      r_checked_by: {
+        type: Sequelize.STRING(300),
+        allowNull: true
+      },
+      r_approved_by: {
+        type: Sequelize.STRING(300),
+        allowNull: true
       }
     });
   },

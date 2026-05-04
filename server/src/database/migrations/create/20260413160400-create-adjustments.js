@@ -36,6 +36,14 @@ module.exports = {
       a_created_by: {
         type: Sequelize.STRING(300),
         allowNull: true
+      },
+      a_checked_by: {
+        type: Sequelize.STRING(300),
+        allowNull: true
+      },
+      a_approved_by: {
+        type: Sequelize.STRING(300),
+        allowNull: true
       }
     });
   },

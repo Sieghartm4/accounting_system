@@ -1,5 +1,37 @@
 // API utility with automatic 401/token expired handling
 
+// Global fetch interceptor for auto-logout on token expiration
+const originalFetch = window.fetch;
+window.fetch = async function(...args) {
+  const response = await originalFetch.apply(this, args);
+  
+  // Handle 401 responses globally
+  if (response.status === 401) {
+    // Clone response to read body without consuming original
+    const clonedResponse = response.clone();
+    try {
+      const data = await clonedResponse.json();
+      
+      // If token expired, force logout
+      if (data.code === 'TOKEN_EXPIRED' || data.message === 'Token expired') {
+        console.log('Token expired, forcing logout');
+        handleLogout();
+        throw new Error('Session expired. Please login again.');
+      }
+    } catch (e) {
+      // If JSON parsing fails or it's not a token expired error, 
+      // still redirect to login on 401
+      if (e.message !== 'Session expired. Please login again.') {
+        handleLogout();
+        throw new Error('Authentication failed. Please login again.');
+      }
+      throw e;
+    }
+  }
+  
+  return response;
+};
+
 export async function fetchWithAuth(url, options = {}) {
   const token = localStorage.getItem('token');
   
@@ -16,24 +48,6 @@ export async function fetchWithAuth(url, options = {}) {
     ...options,
     headers,
   });
-
-  // Handle 401 responses
-  if (response.status === 401) {
-    try {
-      const data = await response.json();
-      
-      // If token expired, force logout
-      if (data.code === 'TOKEN_EXPIRED' || data.message === 'Token expired') {
-        console.log('Token expired, forcing logout');
-        handleLogout();
-        throw new Error('Session expired. Please login again.');
-      }
-    } catch (e) {
-      // If JSON parsing fails, still handle 401
-      handleLogout();
-      throw new Error('Authentication failed. Please login again.');
-    }
-  }
 
   return response;
 }

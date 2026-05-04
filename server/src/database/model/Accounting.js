@@ -14,7 +14,9 @@ const Accounting = {
       "total_amount_due",
       "state",
       "created_date",
-      "created_by"
+      "created_by",
+      "checked_by",
+      "approved_by"
     ],
     selectColumns: [
       "cd_id",
@@ -28,7 +30,9 @@ const Accounting = {
       "cd_total_amount_due",
       "cd_state",
       "cd_created_date",
-      "cd_created_by"
+      "cd_created_by",
+      "cd_checked_by",
+      "cd_approved_by"
     ],
     selectOptionColumns: {
       id: "cd_id",
@@ -42,7 +46,9 @@ const Accounting = {
       total_amount_due: "cd_total_amount_due",
       state: "cd_state",
       created_date: "cd_created_date",
-      created_by: "cd_created_by"
+      created_by: "cd_created_by",
+      checked_by: "cd_checked_by",
+      approved_by: "cd_approved_by"
     },
     updateOptionColumns: {
       id: "id",
@@ -56,36 +62,38 @@ const Accounting = {
       total_amount_due: "total_amount_due",
       state: "state",
       created_date: "created_date",
-      created_by: "created_by"
+      created_by: "created_by",
+      checked_by: "checked_by",
+      approved_by: "approved_by"
     },
     selectDateFormatColumns: {
 
     },
     selectMiscColumns: {
-  },
-  selectMiscColumns: {
 
+    },
+    columnDataTypes: {
+      id: "INTEGER",
+      vendor_id: "INTEGER",
+      document_reference: "STRING",
+      payment_date: "STRING",
+      mode_of_payment: "STRING",
+      bank_name: "STRING",
+      check_number: "STRING",
+      remarks: "TEXT",
+      total_amount_due: "DECIMAL",
+      state: "ENUM",
+      created_date: "STRING",
+      created_by: "STRING",
+      checked_by: "STRING",
+      approved_by: "STRING"
+    }
   },
-  columnDataTypes: {
-    id: "INTEGER",
-    vendor_id: "INTEGER",
-    document_reference: "STRING",
-    payment_date: "STRING",
-    mode_of_payment: "STRING",
-    bank_name: "STRING",
-    check_number: "STRING",
-    remarks: "TEXT",
-    total_amount_due: "DECIMAL",
-    state: "ENUM",
-    created_date: "STRING",
-    created_by: "STRING"
-  }
-},
-	receipts: {
-  tablename: "receipts",
-  prefix: "r",
-  prefix_: "r_",
-  insertColumns: [
+  receipts: {
+    tablename: "receipts",
+    prefix: "r",
+    prefix_: "r_",
+    insertColumns: [
       "customer_id",
       "document_reference",
       "collection_date",
@@ -96,7 +104,9 @@ const Accounting = {
       "total_amount_due",
       "state",
       "created_date",
-      "created_by"
+      "created_by",
+      "checked_by",
+      "approved_by"
     ],
   selectColumns: [
       "r_id",
@@ -110,7 +120,9 @@ const Accounting = {
       "r_total_amount_due",
       "r_state",
       "r_created_date",
-      "r_created_by"
+      "r_created_by",
+      "r_checked_by",
+      "r_approved_by"
     ],
   selectOptionColumns: {
     id: "r_id",
@@ -124,7 +136,9 @@ const Accounting = {
     total_amount_due: "r_total_amount_due",
     state: "r_state",
     created_date: "r_created_date",
-    created_by: "r_created_by"
+    created_by: "r_created_by",
+    checked_by: "r_checked_by",
+    approved_by: "r_approved_by"
   },
   updateOptionColumns: {
     id: "id",
@@ -138,7 +152,9 @@ const Accounting = {
     total_amount_due: "total_amount_due",
     state: "state",
     created_date: "created_date",
-    created_by: "created_by"
+    created_by: "created_by",
+    checked_by: "checked_by",
+    approved_by: "approved_by"
   },
   selectDateFormatColumns: {
 
@@ -158,7 +174,9 @@ const Accounting = {
     total_amount_due: "DECIMAL",
     state: "ENUM",
     created_date: "STRING",
-    created_by: "STRING"
+    created_by: "STRING",
+    checked_by: "STRING",
+    approved_by: "STRING"
   }
 },
 	sales: {
@@ -176,7 +194,9 @@ const Accounting = {
       "status",
       "state",
       "created_date",
-      "created_by"
+      "created_by",
+      "checked_by",
+      "approved_by"
     ],
   selectColumns: [
       "s_id",
@@ -190,7 +210,9 @@ const Accounting = {
       "s_status",
       "s_state",
       "s_created_date",
-      "s_created_by"
+      "s_created_by",
+      "s_checked_by",
+      "s_approved_by"
     ],
   selectOptionColumns: {
     id: "s_id",
@@ -204,7 +226,9 @@ const Accounting = {
     status: "s_status",
     state: "s_state",
     created_date: "s_created_date",
-    created_by: "s_created_by"
+    created_by: "s_created_by",
+    checked_by: "s_checked_by",
+    approved_by: "s_approved_by"
   },
   updateOptionColumns: {
     id: "id",
@@ -218,7 +242,9 @@ const Accounting = {
     status: "status",
     state: "state",
     created_date: "created_date",
-    created_by: "created_by"
+    created_by: "created_by",
+    checked_by: "checked_by",
+    approved_by: "approved_by"
   },
   selectDateFormatColumns: {
 
@@ -255,7 +281,9 @@ const Accounting = {
       "remarks",
       "state",
       "created_date",
-      "created_by"
+      "created_by",
+      "checked_by",
+      "approved_by"
     ],
   selectColumns: [
       "c_id",
@@ -268,7 +296,9 @@ const Accounting = {
       "c_remarks",
       "c_state",
       "c_created_date",
-      "c_created_by"
+      "c_created_by",
+      "c_checked_by",
+      "c_approved_by"
     ],
   selectOptionColumns: {
     id: "c_id",
@@ -281,7 +311,9 @@ const Accounting = {
     remarks: "c_remarks",
     state: "c_state",
     created_date: "c_created_date",
-    created_by: "c_created_by"
+    created_by: "c_created_by",
+    checked_by: "c_checked_by",
+    approved_by: "c_approved_by"
   },
   updateOptionColumns: {
     id: "id",
@@ -294,7 +326,9 @@ const Accounting = {
     remarks: "remarks",
     state: "state",
     created_date: "created_date",
-    created_by: "created_by"
+    created_by: "created_by",
+    checked_by: "checked_by",
+    approved_by: "approved_by"
   },
   selectDateFormatColumns: {
 
@@ -313,7 +347,9 @@ const Accounting = {
     remarks: "TEXT",
     state: "ENUM",
     created_date: "STRING",
-    created_by: "STRING"
+    created_by: "STRING",
+    checked_by: "STRING",
+    approved_by: "STRING"
   }
 },
 	purchase: {
@@ -331,7 +367,9 @@ const Accounting = {
       "status",
       "state",
       "created_date",
-      "created_by"
+      "created_by",
+      "checked_by",
+      "approved_by"
     ],
   selectColumns: [
       "p_id",
@@ -345,7 +383,9 @@ const Accounting = {
       "p_status",
       "p_state",
       "p_created_date",
-      "p_created_by"
+      "p_created_by",
+      "p_checked_by",
+      "p_approved_by"
     ],
   selectOptionColumns: {
     id: "p_id",
@@ -359,7 +399,9 @@ const Accounting = {
     status: "p_status",
     state: "p_state",
     created_date: "p_created_date",
-    created_by: "p_created_by"
+    created_by: "p_created_by",
+    checked_by: "p_checked_by",
+    approved_by: "p_approved_by"
   },
   updateOptionColumns: {
     id: "id",
@@ -373,7 +415,9 @@ const Accounting = {
     status: "status",
     state: "state",
     created_date: "created_date",
-    created_by: "created_by"
+    created_by: "created_by",
+    checked_by: "checked_by",
+    approved_by: "approved_by"
   },
   selectDateFormatColumns: {
 
@@ -393,7 +437,9 @@ const Accounting = {
     status: "ENUM",
     state: "ENUM",
     created_date: "STRING",
-    created_by: "STRING"
+    created_by: "STRING",
+    checked_by: "STRING",
+    approved_by: "STRING"
   }
 },
 	purchase_items: {
@@ -1110,7 +1156,9 @@ payments: {
     "remarks",
     "state",
     "created_date",
-    "created_by"
+    "created_by",
+    "checked_by",
+    "approved_by"
   ],
   selectColumns: [
     "c_id",
@@ -1123,7 +1171,9 @@ payments: {
     "c_remarks",
     "c_state",
     "c_created_date",
-    "c_created_by"
+    "c_created_by",
+    "c_checked_by",
+    "c_approved_by"
   ],
   selectOptionColumns: {
     id: "c_id",
@@ -1136,7 +1186,9 @@ payments: {
     remarks: "c_remarks",
     state: "c_state",
     created_date: "c_created_date",
-    created_by: "c_created_by"
+    created_by: "c_created_by",
+    checked_by: "c_checked_by",
+    approved_by: "c_approved_by"
   },
   updateOptionColumns: {
     id: "id",
@@ -1149,7 +1201,9 @@ payments: {
     remarks: "remarks",
     state: "state",
     created_date: "created_date",
-    created_by: "created_by"
+    created_by: "created_by",
+    checked_by: "checked_by",
+    approved_by: "approved_by"
   },
   selectDateFormatColumns: {
 
@@ -1168,7 +1222,9 @@ payments: {
     remarks: "TEXT",
     state: "ENUM",
     created_date: "STRING",
-    created_by: "STRING"
+    created_by: "STRING",
+    checked_by: "STRING",
+    approved_by: "STRING"
   }
 },
 payment_items: {
@@ -1279,7 +1335,9 @@ payment_attachments: {
       "status",
       "total_amount",
       "created_date",
-      "created_by"
+      "created_by",
+      "checked_by",
+      "approved_by"
     ],
     selectColumns: [
       "a_id",
@@ -1289,7 +1347,9 @@ payment_attachments: {
       "a_status",
       "a_total_amount",
       "a_created_date",
-      "a_created_by"
+      "a_created_by",
+      "a_checked_by",
+      "a_approved_by"
     ],
     selectOptionColumns: {
       id: "a_id",
@@ -1299,7 +1359,9 @@ payment_attachments: {
       status: "a_status",
       total_amount: "a_total_amount",
       created_date: "a_created_date",
-      created_by: "a_created_by"
+      created_by: "a_created_by",
+      checked_by: "a_checked_by",
+      approved_by: "a_approved_by"
     },
     updateOptionColumns: {
       id: "id",
@@ -1309,7 +1371,9 @@ payment_attachments: {
       status: "status",
       total_amount: "total_amount",
       created_date: "created_date",
-      created_by: "created_by"
+      created_by: "created_by",
+      checked_by: "checked_by",
+      approved_by: "approved_by"
     },
     selectDateFormatColumns: {
 
@@ -1325,7 +1389,9 @@ payment_attachments: {
       status: "ENUM",
       total_amount: "DECIMAL",
       created_date: "STRING",
-      created_by: "STRING"
+      created_by: "STRING",
+      checked_by: "STRING",
+      approved_by: "STRING"
     }
   },
   adjustment_attachments: {

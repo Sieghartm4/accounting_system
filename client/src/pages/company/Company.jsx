@@ -44,6 +44,7 @@ function CompanyContent() {
                     </div>
                 }
             >
+                
                 <motion.div
                     initial="hidden"
                     animate="visible"
@@ -115,7 +116,7 @@ function CompanyContent() {
                         </div>
 
                         {/* Scrollable Form Body */}
-                        <div className="flex-1 overflow-y-auto p-8">
+                        <div className="flex-1 overflow-y-auto p-5">
                             <div className="w-full grid grid-cols-12 gap-x-8 gap-y-10">
 
                                 {/* LEFT COLUMN: Identity & Registration */}
@@ -194,7 +195,7 @@ function CompanyContent() {
                                                     type="text"
                                                     value={formData.website}
                                                     onChange={(e) => handleInputChange('website', e.target.value)}
-                                                    placeholder="https://www.5lsolutions.com"
+                                                    placeholder="https://www.mywebsite.com"
                                                     className={inputCls}
                                                 />
                                             </div>

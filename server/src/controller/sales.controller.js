@@ -463,19 +463,27 @@ const updateSalesState = async (req, res, next) => {
         }
 
         let nextState;
+        let updateQuery;
+        let updateValues;
+
         if (currentState === 'PREPARED') {
           nextState = 'CHECKED';
+          updateQuery = sql.update(Accounting.sales.tablename)
+            .set([Accounting.sales.selectOptionColumns.state, Accounting.sales.selectOptionColumns.checked_by])
+            .where(Accounting.sales.selectOptionColumns.id)
+            .build();
+          updateValues = [nextState, req.context.username, id];
         } else if (currentState === 'CHECKED') {
           nextState = 'APPROVED';
+          updateQuery = sql.update(Accounting.sales.tablename)
+            .set([Accounting.sales.selectOptionColumns.state, Accounting.sales.selectOptionColumns.approved_by])
+            .where(Accounting.sales.selectOptionColumns.id)
+            .build();
+          updateValues = [nextState, req.context.username, id];
         } else {
           throw new Error(`Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`);
         }
 
-        const updateQuery = sql.update(Accounting.sales.tablename)
-          .set([Accounting.sales.selectOptionColumns.state])
-          .where(Accounting.sales.selectOptionColumns.id)
-          .build();
-        const updateValues = [nextState, id];
         return connection.execute(updateQuery, updateValues);
 
       });

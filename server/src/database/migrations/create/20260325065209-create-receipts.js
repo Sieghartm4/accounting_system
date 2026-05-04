@@ -60,6 +60,14 @@ module.exports = {
       r_created_by: {
         type: Sequelize.STRING(300),
         allowNull: false
+      },
+      r_checked_by: {
+        type: Sequelize.STRING(300),
+        allowNull: true
+      },
+      r_approved_by: {
+        type: Sequelize.STRING(300),
+        allowNull: true
       }
     });
   },

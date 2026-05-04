@@ -497,21 +497,25 @@ const updatePaymentState = async (req, res, next) => {
         }
 
         let nextState;
+        let updateQuery;
+        let updateValues;
+
         if (currentState === 'PREPARED') {
           nextState = 'CHECKED';
-        } else if (currentState === 'CHECKED') {
-          nextState = 'APPROVED';
-        } else {
-          throw new Error(`Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`);
-        }
-
-        if (nextState === 'APPROVED') {
-          const updateQuery = sql.update(Accounting.payments.tablename)
-            .set([Accounting.payments.selectOptionColumns.state])
+          updateQuery = sql.update(Accounting.payments.tablename)
+            .set([Accounting.payments.selectOptionColumns.state, Accounting.payments.selectOptionColumns.checked_by])
             .where(Accounting.payments.selectOptionColumns.id)
             .build();
-          const updateValues = [nextState, id];
+          updateValues = [nextState, req.context.username, id];
+        } else if (currentState === 'CHECKED') {
+          nextState = 'APPROVED';
+          updateQuery = sql.update(Accounting.payments.tablename)
+            .set([Accounting.payments.selectOptionColumns.state, Accounting.payments.selectOptionColumns.approved_by])
+            .where(Accounting.payments.selectOptionColumns.id)
+            .build();
+          updateValues = [nextState, req.context.username, id];
 
+          // Special logic for APPROVED state: update related purchase records to PAID
           const query = sql.select([
             { col: Accounting.payment_items.selectOptionColumns.purchase_id, as: 'purchase_id' },
           ])
@@ -538,13 +542,10 @@ const updatePaymentState = async (req, res, next) => {
 
           return connection.execute(updateQuery, updateValues);
         } else {
-          const updateQuery = sql.update(Accounting.payments.tablename)
-            .set([Accounting.payments.selectOptionColumns.state])
-            .where(Accounting.payments.selectOptionColumns.id)
-            .build();
-          const updateValues = [nextState, id];
-          return connection.execute(updateQuery, updateValues);
+          throw new Error(`Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`);
         }
+
+        return connection.execute(updateQuery, updateValues);
 
       });
 

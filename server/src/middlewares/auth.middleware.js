@@ -43,6 +43,15 @@ const auth = async (req, res, next) => {
     return next()
   } catch (err) {
     logger.error('Auth Middleware Error', err)
+    
+    // Check for JWT expiration specifically
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        code: 'TOKEN_EXPIRED',
+        message: 'Token expired' 
+      })
+    }
+    
     return res.status(401).json({ message: 'Authentication failed.' })
   }
 }
