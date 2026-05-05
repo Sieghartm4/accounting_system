@@ -84,6 +84,26 @@ const createVat = async (req, res, next) => {
       throw new Error('Failed to get VAT ID from insertion');
     }
 
+    // Audit trail for create
+    const now = new Date();
+    const auditQueries = [];
+    auditQueries.push({
+      sql: sql.insert(Master.audit_trail.tablename, {
+        columns: Master.audit_trail.insertColumns,
+        prefix: Master.audit_trail.prefix,
+        isTransaction: true
+      }).build(),
+      values: [
+        newVatId || null,
+        'VAT',
+        req.context?.username || null,
+        now.toISOString().split('T')[0],
+        now.toTimeString().split(' ')[0],
+        `CREATE: ID ${newVatId}`
+      ]
+    });
+    await Transaction(auditQueries);
+
     res.status(201).json({
       success: true,
       message: 'VAT entry created successfully',
@@ -123,6 +143,14 @@ const updateVat = async (req, res, next) => {
       });
     }
 
+    // Fetch existing VAT to compare changes
+    const existingQuery = sql.select([Master.vat.selectOptionColumns.code, Master.vat.selectOptionColumns.name, Master.vat.selectOptionColumns.rate, Master.vat.selectOptionColumns.type, Master.vat.selectOptionColumns.sub_type, Master.vat.selectOptionColumns.description, Master.vat.selectOptionColumns.status])
+      .from(Master.vat.tablename)
+      .where(Master.vat.selectOptionColumns.id)
+      .build();
+    const existingVats = await Query(existingQuery, [id], Master.vat.prefix_);
+    const old = existingVats[0] || {};
+
     let connection;
     try {
       connection = await getTenantPool().getConnection();
@@ -146,6 +174,37 @@ const updateVat = async (req, res, next) => {
       const result = await connection.execute(updateQuery, updateValues);
 
       await connection.commit();
+
+      // Build change description - only include changed columns with new values
+      const changes = [];
+      if (old.code !== code) changes.push(`code='${code}'`);
+      if (old.name !== name) changes.push(`name='${name}'`);
+      if (old.rate != rate) changes.push(`rate='${rate}'`);
+      if (old.type !== type) changes.push(`type='${type}'`);
+      if (old.sub_type !== sub_type) changes.push(`sub_type='${sub_type}'`);
+      if (old.description !== description) changes.push(`description='${description}'`);
+      if (old.status !== status) changes.push(`status='${status}'`);
+      const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes';
+
+      // Audit trail for update
+      const now = new Date();
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          id || null,
+          'VAT',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `UPDATE ID ${id}: ${changeDesc}`
+        ]
+      });
+      await Transaction(auditQueries);
 
       res.status(200).json({
         success: true,

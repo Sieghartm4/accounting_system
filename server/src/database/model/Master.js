@@ -672,6 +672,61 @@ const Master = {
       description: "TEXT",
       status: "ENUM"
     }
+  },
+  audit_trail: {
+    tablename: "audit_trail",
+    prefix: "at",
+    prefix_: "at_",
+    insertColumns: [
+      "transaction_id",
+      "module",
+      "performed_by",
+      "created_date",
+      "created_time",
+      "action"
+    ],
+    selectColumns: [
+      "at_id",
+      "at_transaction_id",
+      "at_module",
+      "at_performed_by",
+      "at_created_date",
+      "at_created_time",
+      "at_action"
+    ],
+    selectOptionColumns: {
+      id: "at_id",
+      transaction_id: "at_transaction_id",
+      module: "at_module",
+      performed_by: "at_performed_by",
+      created_date: "at_created_date",
+      created_time: "at_created_time",
+      action: "at_action"
+    },
+    updateOptionColumns: {
+      id: "id",
+      transaction_id: "transaction_id",
+      module: "module",
+      performed_by: "performed_by",
+      created_date: "created_date",
+      created_time: "created_time",
+      action: "action"
+    },
+    selectDateFormatColumns: {
+
+    },
+    selectMiscColumns: {
+
+    },
+    columnDataTypes: {
+      id: "INTEGER",
+      transaction_id: "STRING",
+      module: "STRING",
+      performed_by: "STRING",
+      created_date: "STRING",
+      created_time: "STRING",
+      action: "STRING"
+    }
   }
 };
 

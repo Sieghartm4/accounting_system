@@ -429,6 +429,26 @@ const createCollection = async (req, res, next) => {
 
       await connection.commit();
 
+      // Audit trail for create
+      const now = new Date();
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          collectionId || null,
+          'COLLECTION',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `CREATE: ID ${collectionId}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(201).json({
         success: true,
         message: 'Collection created successfully',
@@ -540,6 +560,27 @@ const updateCollectionState = async (req, res, next) => {
 
       await connection.commit();
 
+      // Audit trail for state update
+      const now = new Date();
+      const stateTransitions = updates.map(u => `ID ${u.id}: ${u.currentState} → ${u.currentState === 'PREPARED' ? 'CHECKED' : 'APPROVED'}`).join(', ');
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          null,
+          'COLLECTION_STATE',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `STATE UPDATE: ${results.length} record(s) - ${stateTransitions}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(200).json({
         success: true,
         message: `${results.length} collection(s) updated successfully`,
@@ -617,7 +658,10 @@ const getPrintCollections = async (req, res, next) => {
       { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.bank_name}`, as: 'bank_name' },
       { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.check_number}`, as: 'check_number' },
       { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.remarks}`, as: 'remarks' },
-      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.state}`, as: 'state' }
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.state}`, as: 'state' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.created_by}`, as: 'created_by' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.checked_by}`, as: 'checked_by' },
+      { col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.approved_by}`, as: 'approved_by' }
     ])
       .from(Accounting.collections.tablename)
       .innerJoin(Master.customers.tablename, `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.customer_id}`, `${Master.customers.tablename}.${Master.customers.selectOptionColumns.id}`)

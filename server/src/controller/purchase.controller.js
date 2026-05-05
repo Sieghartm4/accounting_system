@@ -407,6 +407,26 @@ const createPurchase = async (req, res, next) => {
 
       await connection.commit();
 
+      // Audit trail for create
+      const now = new Date();
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          purchaseId || null,
+          'PURCHASE',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `CREATE: ID ${purchaseId}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(201).json({
         success: true,
         message: 'Purchase created successfully',
@@ -497,6 +517,27 @@ const updatePurchaseState = async (req, res, next) => {
 
       await connection.commit();
 
+      // Audit trail for state update
+      const now = new Date();
+      const stateTransitions = updates.map(u => `ID ${u.id}: ${u.currentState} → ${u.currentState === 'PREPARED' ? 'CHECKED' : 'APPROVED'}`).join(', ');
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          null,
+          'PURCHASE_STATE',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `STATE UPDATE: ${results.length} record(s) - ${stateTransitions}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(200).json({
         success: true,
         message: `${results.length} purchase(s) updated successfully`,
@@ -556,6 +597,14 @@ const updatePurchase = async (req, res, next) => {
         message: 'All required fields must be provided'
       });
     }
+
+    // Fetch existing purchase to compare changes
+    const existingQuery = sql.select([Accounting.purchase.selectOptionColumns.vendor_id, Accounting.purchase.selectOptionColumns.document_reference, Accounting.purchase.selectOptionColumns.terms, Accounting.purchase.selectOptionColumns.date_delivered, Accounting.purchase.selectOptionColumns.date_due, Accounting.purchase.selectOptionColumns.remarks, Accounting.purchase.selectOptionColumns.total_amount_due])
+      .from(Accounting.purchase.tablename)
+      .where(Accounting.purchase.selectOptionColumns.id)
+      .build();
+    const existingPurchases = await Query(existingQuery, [purchaseId], Accounting.purchase.prefix_);
+    const old = existingPurchases[0] || {};
 
     let connection;
     try {
@@ -923,6 +972,40 @@ const updatePurchase = async (req, res, next) => {
 
       await connection.commit();
 
+      // Build change description - only include changed columns with new values
+      const changes = [];
+      if (old.vendor_id != vendor_id) changes.push(`vendor_id='${vendor_id}'`);
+      if (old.document_reference !== document_reference) changes.push(`document_reference='${document_reference}'`);
+      if (old.terms !== terms) changes.push(`terms='${terms}'`);
+      if (old.date_delivered !== date_delivered) changes.push(`date_delivered='${date_delivered}'`);
+      if (old.date_due !== date_due) changes.push(`date_due='${date_due}'`);
+      if (old.remarks !== remarks) changes.push(`remarks='${remarks}'`);
+      if (old.total_amount_due != total_amount_due) changes.push(`total_amount_due='${total_amount_due}'`);
+      if (purchase_items?.length > 0) changes.push(`items=modified`);
+      if (journal_entries?.length > 0) changes.push(`journal_entries=modified`);
+      if (attachments?.length > 0) changes.push(`attachments=modified`);
+      const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes';
+
+      // Audit trail for update
+      const now = new Date();
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          purchaseId || null,
+          'PURCHASE',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `UPDATE ID ${purchaseId}: ${changeDesc}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(200).json({
         success: true,
         message: 'Purchase updated successfully',
@@ -999,7 +1082,10 @@ const getPrintPurchases = async (req, res, next) => {
       { col: `${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.remarks}`, as: 'remarks' },
       { col: `${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.total_amount_due}`, as: 'amount_due' },
       { col: `${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.status}`, as: 'status' },
-      { col: `${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.state}`, as: 'state' }
+      { col: `${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.state}`, as: 'state' },
+      { col: `${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.created_by}`, as: 'created_by' },
+      { col: `${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.checked_by}`, as: 'checked_by' },
+      { col: `${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.approved_by}`, as: 'approved_by' }
     ])
       .from(Accounting.purchase.tablename)
       .innerJoin(Master.vendors.tablename, `${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.vendor_id}`, `${Master.vendors.tablename}.${Master.vendors.selectOptionColumns.id}`)

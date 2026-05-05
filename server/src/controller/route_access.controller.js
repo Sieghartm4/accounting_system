@@ -72,6 +72,26 @@ const updateRouteAccess = async (req, res, next) => {
       
       await connection.commit();
 
+      // Audit trail for update
+      const now = new Date();
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          null,
+          'ROUTE_ACCESS',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `UPDATE: ${results.length} route(s) modified`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(200).json({
         success: true,
         message: `${results.length} route access records updated successfully`,

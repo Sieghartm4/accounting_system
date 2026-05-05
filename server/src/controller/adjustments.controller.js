@@ -216,7 +216,27 @@ const createAdjustment = async (req, res, next) => {
             
             // Commit transaction
             await connection.commit();
-            
+
+            // Audit trail for create
+            const now = new Date();
+            const auditQueries = [];
+            auditQueries.push({
+                sql: sql.insert(Master.audit_trail.tablename, {
+                    columns: Master.audit_trail.insertColumns,
+                    prefix: Master.audit_trail.prefix,
+                    isTransaction: true
+                }).build(),
+                values: [
+                    adjustmentId || null,
+                    'ADJUSTMENT',
+                    req.context?.username || null,
+                    now.toISOString().split('T')[0],
+                    now.toTimeString().split(' ')[0],
+                    `CREATE: ID ${adjustmentId}`
+                ]
+            });
+            await Transaction(auditQueries);
+
             res.status(201).json({
                 success: true,
                 message: 'Adjustment created successfully',
@@ -306,6 +326,27 @@ const updateAdjustment = async (req, res, next) => {
 
       await connection.commit();
 
+      // Audit trail for state update
+      const now = new Date();
+      const stateTransitions = updates.map(u => `ID ${u.id}: ${u.currentState} → ${u.currentState === 'PREPARED' ? 'CHECKED' : 'APPROVED'}`).join(', ');
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          null,
+          'ADJUSTMENT_STATE',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `STATE UPDATE: ${results.length} record(s) - ${stateTransitions}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(200).json({
         success: true,
         message: `${results.length} adjustment(s) updated successfully`,
@@ -366,6 +407,14 @@ const updateAdjustmentData = async (req, res, next) => {
         message: 'Required fields must be provided'
       });
     }
+
+    // Fetch existing adjustment to compare changes
+    const existingQuery = sql.select([Accounting.adjustments.selectOptionColumns.document_reference, Accounting.adjustments.selectOptionColumns.posting_date, Accounting.adjustments.selectOptionColumns.remarks, Accounting.adjustments.selectOptionColumns.total_amount])
+      .from(Accounting.adjustments.tablename)
+      .where(Accounting.adjustments.selectOptionColumns.id)
+      .build();
+    const existingAdjustments = await Query(existingQuery, [adjustmentId], Accounting.adjustments.prefix_);
+    const old = existingAdjustments[0] || {};
     
     let connection;
     try {
@@ -458,7 +507,37 @@ const updateAdjustmentData = async (req, res, next) => {
       
       // Commit transaction
       await connection.commit();
-      
+
+      // Build change description - only include changed columns with new values
+      const changes = [];
+      if (old.document_reference !== document_reference) changes.push(`document_reference='${document_reference}'`);
+      if (old.posting_date !== posting_date) changes.push(`posting_date='${posting_date}'`);
+      if (old.remarks !== remarks) changes.push(`remarks='${remarks}'`);
+      if (old.total_amount != total_amount) changes.push(`total_amount='${total_amount}'`);
+      if (journal_entries?.length > 0) changes.push(`journal_entries=modified`);
+      if (adjustment_attachments?.length > 0) changes.push(`attachments=modified`);
+      const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes';
+
+      // Audit trail for update
+      const now = new Date();
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          adjustmentId || null,
+          'ADJUSTMENT',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `UPDATE ID ${adjustmentId}: ${changeDesc}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(200).json({
         success: true,
         message: 'Adjustment updated successfully',

@@ -70,6 +70,26 @@ const createProductService = async (req, res, next) => {
             throw new Error('Failed to get product/service ID from insertion');
         }
 
+        // Audit trail for create
+        const now = new Date();
+        const auditQueries = [];
+        auditQueries.push({
+            sql: sql.insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true
+            }).build(),
+            values: [
+                newProductId || null,
+                'PRODUCT_SERVICE',
+                req.context?.username || null,
+                now.toISOString().split('T')[0],
+                now.toTimeString().split(' ')[0],
+                `CREATE: ID ${newProductId}`
+            ]
+        });
+        await Transaction(auditQueries);
+
         res.status(201).json({
             success: true,
             message: 'Product/Service created successfully',
@@ -109,6 +129,14 @@ const updateProductService = async (req, res, next) => {
       });
     }
 
+    // Fetch existing product/service to compare changes
+    const existingQuery = sql.select([Master.products_service.selectOptionColumns.code, Master.products_service.selectOptionColumns.name, Master.products_service.selectOptionColumns.type, Master.products_service.selectOptionColumns.category, Master.products_service.selectOptionColumns.sales_price, Master.products_service.selectOptionColumns.purchase_price, Master.products_service.selectOptionColumns.unit])
+      .from(Master.products_service.tablename)
+      .where(Master.products_service.selectOptionColumns.id)
+      .build();
+    const existingProducts = await Query(existingQuery, [id], Master.products_service.prefix_);
+    const old = existingProducts[0] || {};
+
     const updateQuery = sql.update(Master.products_service.tablename)
       .set([
         Master.products_service.selectOptionColumns.code,
@@ -130,6 +158,37 @@ const updateProductService = async (req, res, next) => {
     ];
 
     await Transaction(queries);
+
+    // Build change description - only include changed columns with new values
+    const changes = [];
+    if (old.code !== code) changes.push(`code='${code}'`);
+    if (old.name !== name) changes.push(`name='${name}'`);
+    if (old.type !== type) changes.push(`type='${type}'`);
+    if (old.category !== category) changes.push(`category='${category}'`);
+    if (old.sales_price != sales_price) changes.push(`sales_price='${sales_price}'`);
+    if (old.purchase_price != purchase_price) changes.push(`purchase_price='${purchase_price}'`);
+    if (old.unit !== unit) changes.push(`unit='${unit}'`);
+    const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes';
+
+    // Audit trail for update
+    const now = new Date();
+    const auditQueries = [];
+    auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+            columns: Master.audit_trail.insertColumns,
+            prefix: Master.audit_trail.prefix,
+            isTransaction: true
+        }).build(),
+        values: [
+            id || null,
+            'PRODUCT_SERVICE',
+            req.context?.username || null,
+            now.toISOString().split('T')[0],
+            now.toTimeString().split(' ')[0],
+            `UPDATE ID ${id}: ${changeDesc}`
+        ]
+    });
+    await Transaction(auditQueries);
 
     res.status(200).json({
       success: true,

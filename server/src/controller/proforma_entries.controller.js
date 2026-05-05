@@ -79,6 +79,26 @@ const createProformaEntries = async (req, res, next) => {
             throw new Error('Failed to get proforma entry ID from insertion');
         }
 
+        // Audit trail for create
+        const now = new Date();
+        const auditQueries = [];
+        auditQueries.push({
+            sql: sql.insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true
+            }).build(),
+            values: [
+                newProductId || null,
+                'PROFORMA_ENTRIES',
+                req.context?.username || null,
+                now.toISOString().split('T')[0],
+                now.toTimeString().split(' ')[0],
+                `CREATE: ID ${newProductId}`
+            ]
+        });
+        await Transaction(auditQueries);
+
         res.status(201).json({
             success: true,
             message: 'Proforma entry created successfully',
@@ -115,6 +135,14 @@ const updateProformaEntries = async (req, res, next) => {
       });
     }
 
+    // Fetch existing proforma entry to compare changes
+    const existingQuery = sql.select([Master.proforma_entries.selectOptionColumns.module, Master.proforma_entries.selectOptionColumns.name, Master.proforma_entries.selectOptionColumns.coa_id, Master.proforma_entries.selectOptionColumns.t_account])
+      .from(Master.proforma_entries.tablename)
+      .where(Master.proforma_entries.selectOptionColumns.id)
+      .build();
+    const existingEntries = await Query(existingQuery, [id], Master.proforma_entries.prefix_);
+    const old = existingEntries[0] || {};
+
     const updateQuery = sql.update(Master.proforma_entries.tablename)
       .set([
         Master.proforma_entries.selectOptionColumns.module,
@@ -133,6 +161,34 @@ const updateProformaEntries = async (req, res, next) => {
     ];
 
     await Transaction(queries);
+
+    // Build change description - only include changed columns with new values
+    const changes = [];
+    if (old.module !== module) changes.push(`module='${module}'`);
+    if (old.name !== name) changes.push(`name='${name}'`);
+    if (old.coa_id !== coa_id) changes.push(`coa_id='${coa_id}'`);
+    if (old.t_account !== t_account) changes.push(`t_account='${t_account}'`);
+    const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes';
+
+    // Audit trail for update
+    const now = new Date();
+    const auditQueries = [];
+    auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+            columns: Master.audit_trail.insertColumns,
+            prefix: Master.audit_trail.prefix,
+            isTransaction: true
+        }).build(),
+        values: [
+            id || null,
+            'PROFORMA_ENTRIES',
+            req.context?.username || null,
+            now.toISOString().split('T')[0],
+            now.toTimeString().split(' ')[0],
+            `UPDATE ID ${id}: ${changeDesc}`
+        ]
+    });
+    await Transaction(auditQueries);
 
     res.status(200).json({
       success: true,

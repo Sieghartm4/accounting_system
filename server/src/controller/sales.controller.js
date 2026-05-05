@@ -323,6 +323,7 @@ const createSales = async (req, res, next) => {
         terms || null,
         date_delivered || null,
         date_due || null,
+        collection_date || null,
         remarks || null,
         total_amount_due || null,
         'UNPAID',
@@ -408,6 +409,26 @@ const createSales = async (req, res, next) => {
 
       await connection.commit();
 
+      // Audit trail for create
+      const now = new Date();
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          salesId || null,
+          'SALES',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `CREATE: ID ${salesId}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(201).json({
         success: true,
         message: 'Sales created successfully',
@@ -491,6 +512,27 @@ const updateSalesState = async (req, res, next) => {
       const results = await Promise.all(updatePromises);
 
       await connection.commit();
+
+      // Audit trail for state update
+      const now = new Date();
+      const stateTransitions = updates.map(u => `ID ${u.id}: ${u.currentState} → ${u.currentState === 'PREPARED' ? 'CHECKED' : 'APPROVED'}`).join(', ');
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          null,
+          'SALES_STATE',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `STATE UPDATE: ${results.length} record(s) - ${stateTransitions}`
+        ]
+      });
+      await Transaction(auditQueries);
 
       res.status(200).json({
         success: true,
@@ -987,7 +1029,10 @@ const getPrintSales = async (req, res, next) => {
       { col: Accounting.sales.selectOptionColumns.remarks, as: 'remarks' },
       { col: Accounting.sales.selectOptionColumns.total_amount_due, as: 'amount_due' },
       { col: Accounting.sales.selectOptionColumns.status, as: 'status' },
-      { col: Accounting.sales.selectOptionColumns.state, as: 'state' }
+      { col: Accounting.sales.selectOptionColumns.state, as: 'state' },
+      { col: Accounting.sales.selectOptionColumns.created_by, as: 'created_by' },
+      { col: Accounting.sales.selectOptionColumns.checked_by, as: 'checked_by' },
+      { col: Accounting.sales.selectOptionColumns.approved_by, as: 'approved_by' }
     ])
       .from(Accounting.sales.tablename)
       .innerJoin(Master.customers.tablename, Accounting.sales.selectOptionColumns.customer_id, Master.customers.selectOptionColumns.id)

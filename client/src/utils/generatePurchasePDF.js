@@ -386,23 +386,129 @@ export async function generatePurchasePDF(purchaseData, copyType = 'internal') {
       y = doc.lastAutoTable.finalY + 8;
     }
 
-    // ── FOOTER ────────────────────────────────────────────────────────────────
-    const footerY = pageH - 28;
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.5);
-    doc.line(margin, footerY, pageW - margin, footerY);
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── AUTHORIZATION / SIGNATURE SECTION ────────────────────────────────────
+    //    Positioned using `y` — flows right after the last content block.
+    //    No more fixed footerY. No more huge gap.
+    // ─────────────────────────────────────────────────────────────────────────
+    y += 16;
 
-    doc.setFont('helvetica', 'normal');
+    // "AUTHORIZATION" section label sits on the divider line
+    doc.setDrawColor(...MGRAY);
+    doc.setLineWidth(0.4);
+    doc.line(margin, y, pageW - margin, y);
+
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.5);
     doc.setTextColor(...MGRAY);
+    doc.text('AUTHORIZATION', margin, y - 3);
+
+    y += 8;
+
+    const SIG_HEADER_H = 16;   // height of the dark label bar
+    const SIG_BODY_H   = 60;   // height of the signature area below the bar
+    const SIG_TOTAL_H  = SIG_HEADER_H + SIG_BODY_H;
+    const colW         = contentW / 3;
+
+    const signFields = [
+      { label: 'SUBMITTED BY', value: purchase.created_by },
+      { label: 'CHECKED BY',   value: purchase.checked_by },
+      { label: 'APPROVED BY',  value: purchase.approved_by },
+    ];
+
+    // Single outer border wrapping all three columns
+    doc.setDrawColor(210, 210, 210);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentW, SIG_TOTAL_H, 'S');
+
+    signFields.forEach((field, i) => {
+      const sx = margin + i * colW;
+
+      // Dark header bar per column
+      doc.setFillColor(...NEAR_BLACK);
+      doc.rect(sx, y, colW, SIG_HEADER_H, 'F');
+
+      // Divider line between columns (header region, slightly lighter)
+      if (i > 0) {
+        doc.setDrawColor(55, 55, 55);
+        doc.setLineWidth(0.4);
+        doc.line(sx, y, sx, y + SIG_HEADER_H);
+      }
+
+      // Column label
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(...WHITE);
+      doc.text(field.label, sx + colW / 2, y + SIG_HEADER_H - 4, { align: 'center' });
+
+      // Divider line between columns (body region)
+      if (i > 0) {
+        doc.setDrawColor(210, 210, 210);
+        doc.setLineWidth(0.4);
+        doc.line(sx, y + SIG_HEADER_H, sx, y + SIG_TOTAL_H);
+      }
+
+      // Signature line — sits near the bottom of the body area
+      const lineY  = y + SIG_HEADER_H + SIG_BODY_H - 14;
+      const lineX1 = sx + 16;
+      const lineX2 = sx + colW - 16;
+
+      // Name printed above the line
+      if (field.value) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(...BLACK);
+        doc.text(field.value, sx + colW / 2, lineY - 5, { align: 'center' });
+      }
+
+      // The line itself
+      doc.setDrawColor(...MGRAY);
+      doc.setLineWidth(0.5);
+      doc.line(lineX1, lineY, lineX2, lineY);
+
+      // "Signature over Printed Name" label below the line
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(...MGRAY);
+      doc.text('Signature over Printed Name', sx + colW / 2, lineY + 9, { align: 'center' });
+    });
+
+    y += SIG_TOTAL_H;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── FOOTER BAR — always pinned to the very bottom of the page ────────────
+    // ─────────────────────────────────────────────────────────────────────────
+    const FOOTER_H   = 20;
+    const footerBarY = pageH - margin - FOOTER_H;
+
+    // Thin red rule directly above the bar
+    doc.setDrawColor(...RED);
+    doc.setLineWidth(1);
+    doc.line(margin, footerBarY - 3, pageW - margin, footerBarY - 3);
+
+    // Dark filled bar
+    doc.setFillColor(...NEAR_BLACK);
+    doc.rect(margin, footerBarY, contentW, FOOTER_H, 'F');
+
+    // Left — purchase reference + copy type
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...WHITE);
     doc.text(
-      'Generated on ' +
-        new Date().toLocaleString('en-PH') +
-        '  ·  ' + copyLabel +
-        '  ·  Purchase #' + (purchase.id ?? ''),
-      pageW / 2,
-      footerY + 12,
-      { align: 'center' }
+      'Purchase #' + (purchase.id ?? '') + '  ·  ' + copyLabel,
+      margin + 8,
+      footerBarY + FOOTER_H / 2 + 2.5
+    );
+
+    // Right — generated timestamp
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(150, 150, 150);
+    doc.text(
+      'Generated: ' + new Date().toLocaleString('en-PH'),
+      margin + contentW - 8,
+      footerBarY + FOOTER_H / 2 + 2.5,
+      { align: 'right' }
     );
 
     // ── SAVE ──────────────────────────────────────────────────────────────────

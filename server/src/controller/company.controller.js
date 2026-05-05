@@ -41,7 +41,7 @@ const getCompany = async (req, res, next) => {
         const companies = await Query(statement, [], Master.master_company.prefix_)
 
         const company = companies.length > 0 ? companies[0] : null;
-        console.log("company", company)
+
         res.status(200).json({
             success: true,
             message: 'Company retrieved successfully',
@@ -102,12 +102,34 @@ const createCompany = async (req, res, next) => {
 
         let result = await Transaction(queries)
 
+        const newCompanyId = result.insertId;
+
+        // Audit trail for create
+        const now = new Date();
+        const auditQueries = [];
+        auditQueries.push({
+            sql: sql.insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true
+            }).build(),
+            values: [
+                newCompanyId || null,
+                'COMPANY',
+                req.context?.username || null,
+                now.toISOString().split('T')[0],
+                now.toTimeString().split(' ')[0],
+                `CREATE: ID ${newCompanyId}`
+            ]
+        });
+        await Transaction(auditQueries);
+
         res.status(201).json({
             success: true,
             message: 'Company created successfully',
             data: {
-                id: result.insertId,
-                mc_company_id: result.insertId,
+                id: newCompanyId,
+                mc_company_id: newCompanyId,
                 mc_company_name: company_name,
                 mc_owner_name: owner_name,
                 mc_logo: logo,
@@ -160,44 +182,62 @@ const updateCompany = async (req, res, next) => {
             });
         }
 
+        // Fetch existing company to compare changes
+        const existingQuery = sql.select([Master.master_company.selectOptionColumns.company_name, Master.master_company.selectOptionColumns.owner_name, Master.master_company.selectOptionColumns.address, Master.master_company.selectOptionColumns.tin, Master.master_company.selectOptionColumns.website, Master.master_company.selectOptionColumns.email, Master.master_company.selectOptionColumns.phone, Master.master_company.selectOptionColumns.status])
+          .from(Master.master_company.tablename)
+          .where(Master.master_company.selectOptionColumns.id)
+          .build();
+        const existingCompanies = await Query(existingQuery, [id], Master.master_company.prefix_);
+        const old = existingCompanies[0] || {};
+
         const updateColumns = [];
         const updateValues = [];
+        const changes = [];
 
-        if (company_name !== undefined) {
+        if (company_name !== undefined && old.company_name !== company_name) {
             updateColumns.push('company_name');
             updateValues.push(company_name);
+            changes.push(`name='${company_name}'`);
         }
-        if (owner_name !== undefined) {
+        if (owner_name !== undefined && old.owner_name !== owner_name) {
             updateColumns.push('owner_name');
             updateValues.push(owner_name);
+            changes.push(`owner='${owner_name}'`);
         }
         if (logo !== undefined) {
             updateColumns.push('logo');
             updateValues.push(logo);
+            changes.push(`logo=updated`);
         }
-        if (address !== undefined) {
+        if (address !== undefined && old.address !== address) {
             updateColumns.push('address');
             updateValues.push(address);
+            changes.push(`address='${address}'`);
         }
-        if (tin !== undefined) {
+        if (tin !== undefined && old.tin !== tin) {
             updateColumns.push('tin');
             updateValues.push(tin);
+            changes.push(`tin='${tin}'`);
         }
-        if (website !== undefined) {
+        if (website !== undefined && old.website !== website) {
             updateColumns.push('website');
             updateValues.push(website);
+            changes.push(`website='${website}'`);
         }
-        if (email !== undefined) {
+        if (email !== undefined && old.email !== email) {
             updateColumns.push('email');
             updateValues.push(email);
+            changes.push(`email='${email}'`);
         }
-        if (phone !== undefined) {
+        if (phone !== undefined && old.phone !== phone) {
             updateColumns.push('phone');
             updateValues.push(phone);
+            changes.push(`phone='${phone}'`);
         }
-        if (status !== undefined) {
+        if (status !== undefined && old.status !== status) {
             updateColumns.push('status');
             updateValues.push(status);
+            changes.push(`status='${status}'`);
         }
 
         if (updateColumns.length === 0) {
@@ -215,6 +255,26 @@ const updateCompany = async (req, res, next) => {
             .build();
 
         await Query(updateStatement, [...updateValues, id], Master.master_company.prefix_);
+
+        // Audit trail for update
+        const now = new Date();
+        const auditQueries = [];
+        auditQueries.push({
+            sql: sql.insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true
+            }).build(),
+            values: [
+                id || null,
+                'COMPANY',
+                req.context?.username || null,
+                now.toISOString().split('T')[0],
+                now.toTimeString().split(' ')[0],
+                `UPDATE ID ${id}: ${changes.join(', ')}`
+            ]
+        });
+        await Transaction(auditQueries);
 
         res.status(200).json({
             success: true,

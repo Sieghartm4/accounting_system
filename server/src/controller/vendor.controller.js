@@ -67,6 +67,26 @@ const createVendor = async (req, res, next) => {
             throw new Error('Failed to get vendor ID from insertion');
         }
 
+        // Audit trail for create
+        const now = new Date();
+        const auditQueries = [];
+        auditQueries.push({
+            sql: sql.insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true
+            }).build(),
+            values: [
+                newVendorId || null,
+                'VENDOR',
+                req.context?.username || null,
+                now.toISOString().split('T')[0],
+                now.toTimeString().split(' ')[0],
+                `CREATE: ID ${newVendorId}`
+            ]
+        });
+        await Transaction(auditQueries);
+
         res.status(201).json({
             success: true,
             message: 'Vendor created successfully',
@@ -104,6 +124,14 @@ const updateVendor = async (req, res, next) => {
       });
     }
 
+    // Fetch existing vendor to compare changes
+    const existingQuery = sql.select([Master.vendors.selectOptionColumns.code, Master.vendors.selectOptionColumns.name, Master.vendors.selectOptionColumns.category, Master.vendors.selectOptionColumns.type, Master.vendors.selectOptionColumns.status])
+      .from(Master.vendors.tablename)
+      .where(Master.vendors.selectOptionColumns.id)
+      .build();
+    const existingVendors = await Query(existingQuery, [id], Master.vendors.prefix_);
+    const old = existingVendors[0] || {};
+
     const updateQuery = sql.update(Master.vendors.tablename)
       .set([
         Master.vendors.selectOptionColumns.code,
@@ -123,6 +151,35 @@ const updateVendor = async (req, res, next) => {
     ];
 
     await Transaction(queries);
+
+    // Build change description - only include changed columns with new values
+    const changes = [];
+    if (old.code !== code) changes.push(`code='${code}'`);
+    if (old.name !== name) changes.push(`name='${name}'`);
+    if (old.category !== category) changes.push(`category='${category}'`);
+    if (old.type !== type) changes.push(`type='${type}'`);
+    if (old.status !== status) changes.push(`status='${status}'`);
+    const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes';
+
+    // Audit trail for update
+    const now = new Date();
+    const auditQueries = [];
+    auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+            columns: Master.audit_trail.insertColumns,
+            prefix: Master.audit_trail.prefix,
+            isTransaction: true
+        }).build(),
+        values: [
+            id || null,
+            'VENDOR',
+            req.context?.username || null,
+            now.toISOString().split('T')[0],
+            now.toTimeString().split(' ')[0],
+            `UPDATE ID ${id}: ${changeDesc}`
+        ]
+    });
+    await Transaction(auditQueries);
 
     res.status(200).json({
       success: true,

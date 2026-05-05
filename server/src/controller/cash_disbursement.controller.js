@@ -280,6 +280,26 @@ const createCashDisbursement = async (req, res, next) => {
       // Commit transaction
       await connection.commit();
 
+      // Audit trail for create
+      const now = new Date();
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          cashDisbursementId || null,
+          'CASH_DISBURSEMENT',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `CREATE: ID ${cashDisbursementId}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(201).json({
         success: true,
         message: 'Cash disbursement created successfully',
@@ -710,6 +730,27 @@ const updateDisbursementState = async (req, res, next) => {
 
       await connection.commit();
 
+      // Audit trail for state update
+      const now = new Date();
+      const stateTransitions = updates.map(u => `ID ${u.id}: ${u.currentState} → ${u.currentState === 'PREPARED' ? 'CHECKED' : 'APPROVED'}`).join(', ');
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          null,
+          'CASH_DISBURSEMENT_STATE',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `STATE UPDATE: ${results.length} record(s) - ${stateTransitions}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(200).json({
         success: true,
         message: `${results.length} receipt(s) updated successfully`,
@@ -743,8 +784,7 @@ const updateDisbursementState = async (req, res, next) => {
 
 const getPrintDisbursements = async (req, res, next) => {
   const { cash_disbursement_id } = req.params;
-  const { copyType } = req.query; // Get copyType from query parameters
-  // Parse comma-separated IDs into array
+  const { copyType } = req.query;
   const disbursementIds = cash_disbursement_id.split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
   console.log('Converted disbursement_ids:', disbursementIds, 'type:', typeof disbursementIds);
   console.log('Copy type:', copyType);
@@ -758,7 +798,6 @@ const getPrintDisbursements = async (req, res, next) => {
   }
 
   try {
-    // Fetch company data once
     const company_query = sql.select([
       { col: Master.master_company.selectOptionColumns.company_id, as: 'id' },
       { col: Master.master_company.selectOptionColumns.company_name, as: 'company_name' },
@@ -776,7 +815,6 @@ const getPrintDisbursements = async (req, res, next) => {
     let company = await Query(company_query, [], [Master.master_company.prefix_]);
     company = company && company.length > 0 ? company[0] : null;
 
-    // Build base queries
     const disbursements_query = sql.select([
       { col: Accounting.cash_disbursements.selectOptionColumns.id, as: 'id' },
       { col: Accounting.cash_disbursements.selectOptionColumns.vendor_id, as: 'vendor_id' },
@@ -788,7 +826,10 @@ const getPrintDisbursements = async (req, res, next) => {
       { col: Accounting.cash_disbursements.selectOptionColumns.check_number, as: 'check_number' },
       { col: Accounting.cash_disbursements.selectOptionColumns.remarks, as: 'remarks' },
       { col: Accounting.cash_disbursements.selectOptionColumns.total_amount_due, as: 'amount_due' },
-      { col: Accounting.cash_disbursements.selectOptionColumns.state, as: 'state' }
+      { col: Accounting.cash_disbursements.selectOptionColumns.state, as: 'state' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.created_by, as: 'created_by' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.checked_by, as: 'checked_by' },
+      { col: Accounting.cash_disbursements.selectOptionColumns.approved_by, as: 'approved_by' }
     ])
       .from(Accounting.cash_disbursements.tablename)
       .innerJoin(Master.vendors.tablename, Accounting.cash_disbursements.selectOptionColumns.vendor_id, Master.vendors.selectOptionColumns.id)

@@ -68,6 +68,26 @@ const createCustomer = async (req, res, next) => {
             throw new Error('Failed to get customer ID from insertion');
         }
 
+        // Audit trail for create
+        const now = new Date();
+        const auditQueries = [];
+        auditQueries.push({
+            sql: sql.insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true
+            }).build(),
+            values: [
+                newCustomerId || null,
+                'CUSTOMER',
+                req.context?.username || null,
+                now.toISOString().split('T')[0],
+                now.toTimeString().split(' ')[0],
+                `CREATE: ID ${newCustomerId}`
+            ]
+        });
+        await Transaction(auditQueries);
+
         res.status(201).json({
             success: true,
             message: 'Customer created successfully',
@@ -105,6 +125,14 @@ const createCustomer = async (req, res, next) => {
        });
      }
 
+     // Fetch existing customer to compare changes
+     const existingQuery = sql.select([Master.customers.selectOptionColumns.code, Master.customers.selectOptionColumns.name, Master.customers.selectOptionColumns.category, Master.customers.selectOptionColumns.type, Master.customers.selectOptionColumns.status])
+       .from(Master.customers.tablename)
+       .where(Master.customers.selectOptionColumns.id)
+       .build();
+     const existingCustomers = await Query(existingQuery, [id], Master.customers.prefix_);
+     const old = existingCustomers[0] || {};
+
      const updateQuery = sql.update(Master.customers.tablename)
        .set([
          Master.customers.selectOptionColumns.code,
@@ -124,6 +152,35 @@ const createCustomer = async (req, res, next) => {
      ];
 
      await Transaction(queries);
+
+     // Build change description - only include changed columns with new values
+     const changes = [];
+     if (old.code !== code) changes.push(`code='${code}'`);
+     if (old.name !== name) changes.push(`name='${name}'`);
+     if (old.category !== category) changes.push(`category='${category}'`);
+     if (old.type !== type) changes.push(`type='${type}'`);
+     if (old.status !== status) changes.push(`status='${status}'`);
+     const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes';
+
+     // Audit trail for update
+     const now = new Date();
+     const auditQueries = [];
+     auditQueries.push({
+         sql: sql.insert(Master.audit_trail.tablename, {
+             columns: Master.audit_trail.insertColumns,
+             prefix: Master.audit_trail.prefix,
+             isTransaction: true
+         }).build(),
+         values: [
+             id || null,
+             'CUSTOMER',
+             req.context?.username || null,
+             now.toISOString().split('T')[0],
+             now.toTimeString().split(' ')[0],
+             `UPDATE ID ${id}: ${changeDesc}`
+         ]
+     });
+     await Transaction(auditQueries);
 
      res.status(200).json({
        success: true,

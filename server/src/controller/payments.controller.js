@@ -442,6 +442,26 @@ const createPayment = async (req, res, next) => {
 
       await connection.commit();
 
+      // Audit trail for create
+      const now = new Date();
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          paymentId || null,
+          'PAYMENT',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `CREATE: ID ${paymentId}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(201).json({
         success: true,
         message: 'Payment created successfully',
@@ -553,6 +573,27 @@ const updatePaymentState = async (req, res, next) => {
 
       await connection.commit();
 
+      // Audit trail for state update
+      const now = new Date();
+      const stateTransitions = updates.map(u => `ID ${u.id}: ${u.currentState} → ${u.currentState === 'PREPARED' ? 'CHECKED' : 'APPROVED'}`).join(', ');
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          null,
+          'PAYMENT_STATE',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `STATE UPDATE: ${results.length} record(s) - ${stateTransitions}`
+        ]
+      });
+      await Transaction(auditQueries);
+
       res.status(200).json({
         success: true,
         message: `${results.length} payment(s) updated successfully`,
@@ -601,7 +642,6 @@ const getPrintPayments = async (req, res, next) => {
   }
 
   try {
-    // Fetch company data once
     const company_query = sql.select([
       { col: Master.master_company.selectOptionColumns.company_id, as: 'id' },
       { col: Master.master_company.selectOptionColumns.company_name, as: 'company_name' },
@@ -619,7 +659,6 @@ const getPrintPayments = async (req, res, next) => {
     let company = await Query(company_query, [], [Master.master_company.prefix_]);
     company = company && company.length > 0 ? company[0] : null;
 
-    // Fetch payments with vendor info
     const payments_query = sql.select([
       { col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.id}`, as: 'id' },
       { col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.vendor_id}`, as: 'vendor_id' },
@@ -630,7 +669,10 @@ const getPrintPayments = async (req, res, next) => {
       { col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.check_number}`, as: 'check_number' },
       { col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.payment_date}`, as: 'payment_date' },
       { col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.remarks}`, as: 'remarks' },
-      { col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.state}`, as: 'state' }
+      { col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.state}`, as: 'state' },
+      { col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.created_by}`, as: 'created_by' },
+      { col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.checked_by}`, as: 'checked_by' },
+      { col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.approved_by}`, as: 'approved_by' }
     ])
       .from(Accounting.payments.tablename)
       .innerJoin(Master.vendors.tablename, `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.vendor_id}`, `${Master.vendors.tablename}.${Master.vendors.selectOptionColumns.id}`)

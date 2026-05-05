@@ -154,8 +154,7 @@ const getAllReceipts = async (req, res, next) => {
 
 const getPrintReceipts = async (req, res, next) => {
   const { receipt_id } = req.params;
-  const { copyType } = req.query; // Get copyType from query parameters
-  // Parse comma-separated IDs into array
+  const { copyType } = req.query;
   const receiptIds = receipt_id.split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
   console.log('Converted receipt_ids:', receiptIds, 'type:', typeof receiptIds);
   console.log('Copy type:', copyType);
@@ -169,7 +168,6 @@ const getPrintReceipts = async (req, res, next) => {
   }
 
   try {
-    // Fetch company data once
     const company_query = sql.select([
       { col: Master.master_company.selectOptionColumns.company_id, as: 'id' },
       { col: Master.master_company.selectOptionColumns.company_name, as: 'company_name' },
@@ -187,7 +185,6 @@ const getPrintReceipts = async (req, res, next) => {
     let company = await Query(company_query, [], [Master.master_company.prefix_]);
     company = company && company.length > 0 ? company[0] : null;
 
-    // Build base queries
     const receipts_query = sql.select([
       { col: Accounting.receipts.selectOptionColumns.id, as: 'id' },
       { col: Accounting.receipts.selectOptionColumns.customer_id, as: 'customer_id' },
@@ -199,7 +196,10 @@ const getPrintReceipts = async (req, res, next) => {
       { col: Accounting.receipts.selectOptionColumns.check_number, as: 'check_number' },
       { col: Accounting.receipts.selectOptionColumns.remarks, as: 'remarks' },
       { col: Accounting.receipts.selectOptionColumns.total_amount_due, as: 'amount_due' },
-      { col: Accounting.receipts.selectOptionColumns.state, as: 'state' }
+      { col: Accounting.receipts.selectOptionColumns.state, as: 'state' },
+      { col: Accounting.receipts.selectOptionColumns.created_by, as: 'created_by' },
+      { col: Accounting.receipts.selectOptionColumns.checked_by, as: 'checked_by' },
+      { col: Accounting.receipts.selectOptionColumns.approved_by, as: 'approved_by' },
     ])
       .from(Accounting.receipts.tablename)
       .innerJoin(Master.customers.tablename, Accounting.receipts.selectOptionColumns.customer_id, Master.customers.selectOptionColumns.id)
@@ -480,6 +480,26 @@ const createReceipts = async (req, res, next) => {
       // Allow submission without attachments - attachments are optional
 
       await connection.commit();
+
+      // Audit trail for create
+      const now = new Date();
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          receiptId || null,
+          'RECEIPT',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `CREATE: ID ${receiptId}`
+        ]
+      });
+      await Transaction(auditQueries);
 
       res.status(201).json({
         success: true,
@@ -875,6 +895,27 @@ const updateReceiptState = async (req, res, next) => {
       const results = await Promise.all(updatePromises);
 
       await connection.commit();
+
+      // Audit trail for state update
+      const now = new Date();
+      const stateTransitions = updates.map(u => `ID ${u.id}: ${u.currentState} → ${u.currentState === 'PREPARED' ? 'CHECKED' : 'APPROVED'}`).join(', ');
+      const auditQueries = [];
+      auditQueries.push({
+        sql: sql.insert(Master.audit_trail.tablename, {
+          columns: Master.audit_trail.insertColumns,
+          prefix: Master.audit_trail.prefix,
+          isTransaction: true
+        }).build(),
+        values: [
+          null,
+          'RECEIPT_STATE',
+          req.context?.username || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `STATE UPDATE: ${results.length} record(s) - ${stateTransitions}`
+        ]
+      });
+      await Transaction(auditQueries);
 
       res.status(200).json({
         success: true,
