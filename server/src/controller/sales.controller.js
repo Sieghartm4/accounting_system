@@ -586,6 +586,10 @@ const createSales = async (req, res, next) => {
 
       created_by,
 
+      checked_by,
+
+      approved_by,
+
       sales_items,
 
       journal_entries,
@@ -648,8 +652,6 @@ const createSales = async (req, res, next) => {
 
         date_due || null,
 
-        collection_date || null,
-
         remarks || null,
 
         total_amount_due || null,
@@ -660,7 +662,11 @@ const createSales = async (req, res, next) => {
 
         new Date().toISOString().split('T')[0],
 
-        created_by || null
+        created_by || null,
+
+        checked_by || null,
+
+        approved_by || null
 
       ];
 

@@ -662,6 +662,14 @@ const createCashDisbursement = async (req, res, next) => {
 
 
 
+      checked_by,
+
+
+
+      approved_by,
+
+
+
       disbursement_items,
 
 
@@ -802,7 +810,15 @@ const createCashDisbursement = async (req, res, next) => {
 
 
 
-        created_by || null
+        created_by || null,
+
+
+
+        checked_by || null,
+
+
+
+        approved_by || null
 
 
 
@@ -2482,7 +2498,7 @@ const updateCashDisbursement = async (req, res, next) => {
       
       // Helper function to normalize values for comparison
       const normalizeValue = (val) => val === null || val === undefined ? '' : String(val).trim();
-      const normalizeNumber = (val) => val === null || val === undefined ? 0 : parseFloat(val);
+      const normalizeNumber = (val) => val === null || val === undefined ? 0 : parseFloat(parseFloat(val).toFixed(2));
       
       console.log('DEBUG: Current disbursement data:', currentDisbursementData);
       console.log('DEBUG: Request body data:', { document_reference, remarks, vendor_id, payment_date, mode_of_payment, bank_name, check_number, total_amount_due });

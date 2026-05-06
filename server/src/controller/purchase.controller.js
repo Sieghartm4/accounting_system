@@ -586,6 +586,10 @@ const createPurchase = async (req, res, next) => {
 
       created_by,
 
+      checked_by,
+
+      approved_by,
+
       purchase_items,
 
       journal_entries,
@@ -658,7 +662,11 @@ const createPurchase = async (req, res, next) => {
 
         new Date().toISOString().split('T')[0],
 
-        created_by || null
+        created_by || null,
+
+        checked_by || null,
+
+        approved_by || null
 
       ];
 

@@ -734,6 +734,10 @@ const createReceipts = async (req, res, next) => {
 
       created_by,
 
+      checked_by,
+
+      approved_by,
+
       receipt_items,
 
       journal_entries,
@@ -802,7 +806,11 @@ const createReceipts = async (req, res, next) => {
 
         new Date().toISOString().split('T')[0],
 
-        created_by || null
+        created_by || null,
+
+        checked_by || null,
+
+        approved_by || null
 
       ];
 
