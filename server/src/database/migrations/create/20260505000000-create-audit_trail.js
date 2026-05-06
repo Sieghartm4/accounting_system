@@ -30,7 +30,7 @@ module.exports = {
         allowNull: true
       },
       at_action: {
-        type: Sequelize.STRING(300),
+        type: Sequelize.TEXT('long'),
         allowNull: true
       }
     });

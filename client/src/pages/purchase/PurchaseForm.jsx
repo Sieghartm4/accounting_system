@@ -645,17 +645,23 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, is
       if (attachmentsData && attachmentsData.length > 0) {
         console.log('Processing attachments:', attachmentsData);
         const attachments = attachmentsData.map(att => {
-          const attFile = typeof att.file === 'string' ? att.file : '';
-          const attName = typeof att.name === 'string' ? att.name : '';
+          console.log('Processing attachment:', att.id, att.name, 'File data type:', typeof att.file, 'File data length:', att.file ? att.file.length : 'null');
 
-          // API response: file contains base64 data, name contains the filename
-          const base64 = attFile.startsWith('data:image/') ? attFile : null;
-          const fileName = attName || attFile.split('/').pop() || '';
+          // Check if base64 data is properly formatted
+          let fileData = att.file || null;
+          if (fileData && typeof fileData === 'string') {
+            console.log('Base64 data starts with:', fileData.substring(0, 50));
+
+            // Check if base64 data is complete
+            if (fileData.includes('...')) {
+              console.warn('Base64 data appears to be truncated:', att.name);
+            }
+          }
 
           return {
             id: att.id,
-            fileName: fileName,
-            file: base64 || attFile, // Preserve base64 data from server for view mode
+            fileName: att.name || '',
+            file: fileData, // Preserve base64 data from server for view mode
             remarks: att.remarks || '',
             uploadedBy: att.uploaded_by || 'Current User',
             date: att.uploaded_date || new Date().toLocaleDateString()
@@ -663,17 +669,8 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, is
         });
         console.log('Final attachments array:', attachments);
         setAttachments(attachments);
-      } else {
-        // Ensure there's always at least one empty attachment row
-        setAttachments([{
-          id: 1,
-          fileName: '',
-          file: null,
-          remarks: '',
-          uploadedBy: 'Current User',
-          date: new Date().toLocaleDateString()
-        }]);
       }
+      // Note: Don't create empty attachment row - let user add manually
     }
   }, [isViewMode, isEditMode, purchaseData]);
 
@@ -683,7 +680,7 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, is
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
   const updatePurchaseItem = (id, field, value) => setPurchaseItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   const updateJournalEntry = (id, field, value) => setJournalEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
-  const addAttachment = () => setAttachments(prev => [...prev, { id: Date.now(), fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }]);
+  const addAttachment = () => setAttachments(prev => [...prev, { id: Date.now(), fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString(), isNew: true }]);
   const removeAttachment = (id) => setAttachments(prev => prev.filter(a => a.id !== id));
   const updateAttachment = (id, field, value) => setAttachments(prev => prev.map(att => att.id === id ? { ...att, [field]: value } : att));
   const handleFileChange = (id, file) => {
@@ -921,16 +918,30 @@ export default function PurchaseForm({ onBack, onSuccess, isViewMode = false, is
         }));
 
       const preparedAttachments = await Promise.all(
-        attachments
-          .filter(att => att.file || att.fileName)
-          .map(async att => ({
-            id: att.id,
+        attachments.map(async att => {
+          // Only include ID if it's an existing record (not a new row)
+          let fileData = null;
+
+          if (att.file) {
+            // If file is already a base64 string (from API), use it directly
+            if (typeof att.file === 'string' && att.file.startsWith('data:')) {
+              fileData = att.file;
+            }
+            // If file is a File object (newly uploaded), convert to base64
+            else if (att.file instanceof File || att.file instanceof Blob) {
+              fileData = await fileToBase64(att.file);
+            }
+          }
+
+          return {
+            id: att.id && !att.isNew ? att.id : null,
             name: att.fileName,
-            file: att.file ? (typeof att.file === 'string' ? att.file : await fileToBase64(att.file)) : null,
+            file: fileData,
             remarks: att.remarks,
             uploaded_by: att.uploadedBy,
             uploaded_date: att.date
-          }))
+          };
+        })
       );
 
       const purchaseDataPayload = {
