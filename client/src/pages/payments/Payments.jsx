@@ -24,6 +24,7 @@ function PaymentsContent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isAdding, setIsAdding] = useState(false);
   const [isViewing, setIsViewing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [viewingPayment, setViewingPayment] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -190,10 +191,18 @@ function PaymentsContent() {
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
   };
 
-  if (isAdding) return (
+  if (isAdding || isEditing) return (
     <RouteProtection routeName="payments">
       <PaymentsForm
-        onBack={() => setIsAdding(false)}
+        isEditMode={isEditing}
+        isViewMode={isViewing}
+        paymentData={viewingPayment}
+        onBack={() => {
+          setIsAdding(false);
+          setIsEditing(false);
+          setIsViewing(false);
+          setViewingPayment(null);
+        }}
         onSuccess={async (nextToast) => {
           if (nextToast) setToast(nextToast);
           await refetchPayments();
@@ -389,7 +398,7 @@ function PaymentsContent() {
 
                   console.log('Payment details fetched for editing:', result);
                   setViewingPayment(result);
-                  setIsAdding(true);
+                  setIsEditing(true);
 
                 } catch (error) {
                   console.error('Error fetching payment details for editing:', error);

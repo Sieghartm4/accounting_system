@@ -48,6 +48,12 @@ const CollectionsSchema = Joi.object({
  	createdBy: Joi.string().trim().required().messages({
         'any.required': 'createdBy is required.',
         'string.empty': 'createdBy must be a valid string.',
+      }),
+	checkedBy: Joi.string().trim().allow(null, '').optional().messages({
+        'string.base': 'checkedBy must be a valid string.',
+      }),
+	approvedBy: Joi.string().trim().allow(null, '').optional().messages({
+        'string.base': 'approvedBy must be a valid string.',
       })
 });
 
@@ -65,7 +71,9 @@ const CollectionsField = {
     State: 'state',
     CreatedDate: 'created_date',
     CreatedBy: 'created_by',
-    All: ['id', 'customer_id', 'document_reference', 'mode_of_payment', 'bank_name', 'check_number', 'collection_date', 'remarks', 'state', 'created_date', 'created_by'],
+    CheckedBy: 'checked_by',
+    ApprovedBy: 'approved_by',
+    All: ['id', 'customer_id', 'document_reference', 'mode_of_payment', 'bank_name', 'check_number', 'collection_date', 'remarks', 'state', 'created_date', 'created_by', 'checked_by', 'approved_by'],
 };
 
 

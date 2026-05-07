@@ -178,7 +178,7 @@ const fmt = (n = 0) => Number(n).toLocaleString('en-PH', { minimumFractionDigits
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CollectionsForm({ onBack, onSuccess, isViewMode = false, collectionData = null }) {
+export default function CollectionsForm({ onBack, onSuccess, isViewMode = false, isEditMode = false, collectionData = null }) {
 
   // ── Collection items ──────────────────────────────────────────────────────
   // Each item shape (what lives in state):
@@ -282,16 +282,43 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
     if (isModalOpen) { fetchSalesData(); setSelectedSales([]); }
   }, [isModalOpen]);
 
-  // Populate form with collection data when in view mode
+  // Populate form with collection data when in view or edit mode
   useEffect(() => {
-    if (isViewMode && collectionData) {
+    if ((isViewMode || isEditMode) && collectionData) {
       console.log('Populating form with collection data:', collectionData);
+      console.log('collectionData structure:', Object.keys(collectionData));
       
-      // Populate basic collection info
+      // Populate basic collection info - handle different data structures
+      let collection = null;
       if (collectionData.data && collectionData.data.length > 0) {
-        const collection = collectionData.data[0];
-        setSelectedCustomer(collection.customer);
-        setCustomerSearch(collection.customer);
+        collection = collectionData.data[0];
+        console.log('Using collectionData.data[0]:', collection);
+      } else if (collectionData.data && collectionData.data.id) {
+        collection = collectionData.data;
+        console.log('Using collectionData.data directly:', collection);
+      } else if (collectionData.id) {
+        collection = collectionData;
+        console.log('Using collectionData directly:', collection);
+      } else if (typeof collectionData === 'object' && collectionData !== null) {
+        collection = collectionData;
+        console.log('Using collectionData as direct object:', collection);
+      }
+      
+      if (collection) {
+        console.log('Setting collection fields:', {
+          customer: collection.customer,
+          doc_ref: collection.doc_ref,
+          mode_of_payment: collection.mode_of_payment,
+          bank_name: collection.bank_name,
+          check_number: collection.check_number,
+          collection_date: collection.collection_date,
+          remarks: collection.remarks,
+          id: collection.id
+        });
+        
+        // Based on the API response, use 'customer' for both ID and search
+        setSelectedCustomer(collection.customer || '');
+        setCustomerSearch(collection.customer || '');
         setDocumentReference(collection.doc_ref || '');
         setModeOfPayment(collection.mode_of_payment || '');
         setModeSearch(collection.mode_of_payment || '');
@@ -299,10 +326,13 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
         setCheckNumber(collection.check_number || '');
         setCollectionDate(collection.collection_date || '');
         setRemarks(collection.remarks || '');
+      } else {
+        console.warn('No collection data found in expected structure');
       }
 
       // Populate collection items
       if (collectionData.items && collectionData.items.length > 0) {
+        console.log('Populating collection items:', collectionData.items);
         const items = collectionData.items.map(item => ({
           id: item.id,
           salesItemId: item.sales_id,
@@ -316,11 +346,15 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
           amount: parseFloat(item.amount) || 0,
           isOther: false
         }));
+        console.log('Setting collection items:', items);
         setCollectionItems(items);
+      } else {
+        console.log('No collection items found or empty array');
       }
 
       // Populate journal entries
       if (collectionData.journal && collectionData.journal.length > 0) {
+        console.log('Populating journal entries:', collectionData.journal);
         const journal = collectionData.journal.map(entry => ({
           id: entry.id,
           account: entry.charts_of_accounts_name,
@@ -330,7 +364,10 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
           credit: entry.type === 'CREDIT' ? parseFloat(entry.amount) || 0 : 0,
           isManual: false
         }));
+        console.log('Setting journal entries:', journal);
         setJournalEntries(journal);
+      } else {
+        console.log('No journal entries found or empty array');
       }
 
       // Populate attachments
@@ -340,8 +377,8 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
           console.log('Processing attachment:', att.id, att.name, 'File data type:', typeof att.file, 'File data length:', att.file ? att.file.length : 'null');
           return {
             id: att.id,
-            fileName: att.name || '',
-            file: att.file || null, // Preserve base64 data from server for view mode
+            fileName: att.name || '', // Server now correctly sends name as filename
+            file: att.file || null,   // Server now correctly sends file as base64 string
             remarks: att.remarks || '',
             uploadedBy: att.uploaded_by || 'Current User',
             date: att.uploaded_date || new Date().toLocaleDateString()
@@ -349,9 +386,18 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
         });
         console.log('Final attachments array:', attachments);
         setAttachments(attachments);
+      } else {
+        console.log('No attachments found or empty array');
       }
+    } else {
+      console.log('Not populating data - conditions not met:', {
+        isViewMode,
+        isEditMode,
+        hasCollectionData: !!collectionData,
+        collectionDataKeys: collectionData ? Object.keys(collectionData) : 'null'
+      });
     }
-  }, [isViewMode, collectionData]);
+  }, [isViewMode, isEditMode, collectionData]);
 
   // ── Item helpers ──────────────────────────────────────────────────────────
   const removeCollectionItem = (id) => setCollectionItems(prev => prev.filter(i => i.id !== id));
@@ -431,9 +477,12 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
   const removeAttachment = (id) => setAttachments(prev => prev.filter(a => a.id !== id));
   const updateAttachment = (id, field, value) => setAttachments(prev => prev.map(att => att.id === id ? { ...att, [field]: value } : att));
   const handleFileChange = (id, file) => {
-    if (file) {
+    if (file && file instanceof File) {
       updateAttachment(id, 'fileName', file.name);
       updateAttachment(id, 'file', file);
+    } else if (file) {
+      console.error('Invalid file object provided to handleFileChange:', file);
+      setToast({ type: 'error', message: 'Invalid file selected. Please choose a valid file.' });
     }
   };
 
@@ -517,11 +566,17 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
     if (!isViewMode) {
       generateJournalEntries(); 
     }
-  }, [collectionItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
+  }, [collectionItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode, isEditMode]);
 
   // ── Post Transaction ──────────────────────────────────────────────────────
   const fileToBase64 = (file) =>
     new Promise((resolve, reject) => {
+      // Validate that file is a Blob/File object
+      if (!file || !(file instanceof Blob)) {
+        reject(new Error('Invalid file: parameter is not a Blob or File object'));
+        return;
+      }
+      
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload  = () => resolve(reader.result);
@@ -574,19 +629,40 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
       }));
 
       const preparedAttachments = await Promise.all(
-        attachments.map(async att => ({
-          fileName:   att.fileName,
-          file:       att.file ? await fileToBase64(att.file) : null,
-          remarks:    att.remarks,
-          uploadedBy: att.uploadedBy,
-          date:       att.date,
-        }))
+        attachments.map(async att => {
+          try {
+            let fileData = null;
+            
+            // Only convert to base64 if it's a File object (new attachment)
+            if (att.file && att.file instanceof File) {
+              fileData = await fileToBase64(att.file);
+            } else if (att.file && typeof att.file === 'string' && att.file.startsWith('data:')) {
+              // Already a base64 string (existing attachment), use as-is
+              fileData = att.file;
+            }
+            
+            return {
+              // Map client structure to server structure
+              // Server expects: file (base64 string), name (filename)
+              file:       fileData,
+              name:       att.fileName || '',
+              remarks:    att.remarks || '',
+              uploadedBy: att.uploadedBy || 'Current User',
+              uploaded_date: att.date || new Date().toLocaleDateString(),
+              // Include ID for update operations
+              id: att.id || null
+            };
+          } catch (error) {
+            console.error('Error processing attachment:', att.fileName, error);
+            throw new Error(`Failed to process attachment "${att.fileName}": ${error.message}`);
+          }
+        })
       );
 
       // ── collections header payload — matches DB columns exactly ──
       // c_customer_id, c_document_reference, c_mode_of_payment,
       // c_bank_name, c_check_number, c_collection_date, c_remarks, c_created_by
-      const collectionData = {
+      const requestPayload = {
         customer_id:        selectedCustomer,
         document_reference: documentReference,
         mode_of_payment:    modeOfPayment,
@@ -595,16 +671,33 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
         collection_date:    collectionDate || new Date().toISOString().split('T')[0],
         remarks,
         total_amount_due:   summary.totalCashCollected,
-        created_by:         createdBy,
         collection_items:   preparedItems,
         journal_entries:    preparedJournalEntries,
         attachments:        preparedAttachments,
       };
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/collections`, {
-        method:  'POST',
+      // Add ID and updated_by for edit mode
+      let collectionId = null;
+      if (isEditMode && collectionData) {
+        collectionId = collectionData.data?.[0]?.id || collectionData.id;
+        if (collectionId) {
+          requestPayload.id = collectionId;
+          requestPayload.updated_by = createdBy;
+        }
+      } else {
+        requestPayload.created_by = createdBy;
+      }
+
+      const url = isEditMode && collectionId 
+        ? `${import.meta.env.VITE_SERVER_LINK}/collections/${collectionId}`
+        : `${import.meta.env.VITE_SERVER_LINK}/collections`;
+      
+      const method = isEditMode && collectionId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method:  method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body:    JSON.stringify(collectionData),
+        body:    JSON.stringify(requestPayload),
       });
 
       if (!response.ok) {
@@ -614,12 +707,14 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
 
       const result = await response.json();
       if (result.success) {
-        const nextToast = { type: 'success', message: 'Collection posted successfully!' };
+        const action = isEditMode ? 'updated' : 'posted';
+        const nextToast = { type: 'success', message: `Collection ${action} successfully!` };
         setToast(nextToast);
         if (onSuccess) await onSuccess(nextToast);
         onBack();
       } else {
-        setToast({ type: 'error', message: result.message || 'Failed to post collection' });
+        const action = isEditMode ? 'update' : 'post';
+        setToast({ type: 'error', message: result.message || `Failed to ${action} collection` });
       }
 
     } catch (error) {
@@ -914,7 +1009,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                             {item.responsibilityCenter || '---'}
                           </td>
                           <td className="py-2 px-1 text-center">
-                            {!isViewMode && (
+                            {!isViewMode && !isEditMode && (
                               <button onClick={() => removeCollectionItem(item.id)} className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors">
                                 <Trash2 size={14} />
                               </button>
@@ -938,7 +1033,7 @@ export default function CollectionsForm({ onBack, onSuccess, isViewMode = false,
                 </div>
               )}
 
-              {!isViewMode && (
+              {!isViewMode && !isEditMode && (
                 <div className="mt-3">
                   <button
                     onClick={() => setIsModalOpen(true)}

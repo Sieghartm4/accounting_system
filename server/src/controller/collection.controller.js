@@ -524,9 +524,9 @@ const getAllCollections = async (req, res, next) => {
 
       { col: Accounting.collection_attachments.selectOptionColumns.id, as: 'id' },
 
-      { col: Accounting.collection_attachments.selectOptionColumns.file, as: 'name' },
+      { col: Accounting.collection_attachments.selectOptionColumns.name, as: 'name' },
 
-      { col: Accounting.collection_attachments.selectOptionColumns.name, as: 'file' },
+      { col: Accounting.collection_attachments.selectOptionColumns.file, as: 'file' },
 
       { col: Accounting.collection_attachments.selectOptionColumns.remarks, as: 'remarks' },
 
@@ -714,7 +714,11 @@ const createCollection = async (req, res, next) => {
 
         new Date().toISOString().split('T')[0],
 
-        created_by || null
+        created_by || null,
+
+        null, // checked_by
+
+        null  // approved_by
 
       ];
 
@@ -730,15 +734,16 @@ const createCollection = async (req, res, next) => {
 
         for (const item of collection_items) {
 
-          const itemQuery = sql.insert(Accounting.collection_items.tablename, {
+          // Validate that sales_id is provided for collection items
+          if (!item.sales_id) {
+            await connection.rollback();
+            return res.status(400).json({
+              success: false,
+              message: 'Collection items must have a sales_id. Each collection item must be linked to a sales record.'
+            });
+          }
 
-            columns: Accounting.collection_items.insertColumns,
-
-            prefix: Accounting.collection_items.prefix,
-
-            isTransaction: true
-
-          }).build();
+          const itemQuery = `INSERT INTO ${Accounting.collection_items.tablename} (ci_collection_id, ci_sales_id, ci_amount, ci_witholding_tax) VALUES (?, ?, ?, ?)`;
 
 
 
@@ -746,7 +751,7 @@ const createCollection = async (req, res, next) => {
 
             collectionId,
 
-            item.sales_id || null,
+            item.sales_id,
 
             item.amount || 0,
 
@@ -834,15 +839,15 @@ const createCollection = async (req, res, next) => {
 
             collectionId,
 
-            attachment.file || null,
+            attachment.file || null,  // Base64 file data
 
-            attachment.fileName || null,
+            attachment.name || attachment.fileName || null,  // Filename
 
             attachment.remarks || null,
 
-            attachment.uploadedBy || null,
+            attachment.uploadedBy || attachment.uploaded_by || 'Current User',
 
-            attachment.date || new Date().toLocaleDateString()
+            attachment.uploaded_date || attachment.date || new Date().toLocaleDateString()
 
           ];
 
@@ -1644,6 +1649,930 @@ const getPrintCollections = async (req, res, next) => {
 
 
 
+const updateCollection = async (req, res, next) => {
+
+  const { collection_id } = req.params;
+
+  const collectionId = Number(collection_id);
+
+  console.log('Updating collection_id:', collectionId, 'type:', typeof collectionId);
+
+  
+
+  try {
+
+    const {
+
+      customer_id,
+
+      document_reference,
+
+      mode_of_payment,
+
+      bank_name,
+
+      check_number,
+
+      collection_date,
+
+      remarks,
+
+      total_amount_due,
+
+      updated_by,
+
+      collection_items,
+
+      journal_entries,
+
+      attachments
+
+    } = req.body;
+
+    
+
+    console.log('Update data:', req.body);
+
+    // Convert customer name to customer ID if needed
+    let actualCustomerId = customer_id;
+    if (customer_id && isNaN(Number(customer_id))) {
+      // customer_id is a name, need to find the actual ID
+      console.log('Looking up customer by name:', customer_id);
+      
+      const customerQuery = sql.select([
+        { col: Master.customers.selectOptionColumns.id, as: 'id' },
+        { col: Master.customers.selectOptionColumns.name, as: 'name' }
+      ])
+        .from(Master.customers.tablename)
+        .where(Master.customers.selectOptionColumns.name)
+        .build();
+      
+      console.log('Customer query SQL:', customerQuery);
+      const [customerResult] = await Query(customerQuery, [customer_id], [Master.customers.prefix_]);
+      console.log('Customer lookup result:', customerResult);
+      
+      if (customerResult && customerResult.length > 0) {
+        actualCustomerId = customerResult[0].id;
+        console.log('Converted customer name to ID:', customer_id, '→', actualCustomerId);
+      } else {
+        // Customer was found but the result structure is different
+        // Check if customerResult itself contains the customer data
+        if (customerResult && customerResult.id) {
+          actualCustomerId = customerResult.id;
+          console.log('Found customer in result object:', customer_id, '→', actualCustomerId);
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid customer name provided: "${customer_id}"`
+          });
+        }
+      }
+    }
+
+    if (!actualCustomerId || !document_reference || !mode_of_payment || !collection_date || !total_amount_due) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message: 'All required fields must be provided'
+
+      });
+
+    }
+
+
+
+    let connection;
+
+    try {
+
+      connection = await getTenantPool().getConnection();
+
+      await connection.beginTransaction();
+
+      // Fetch current data for audit trail BEFORE making any updates
+
+      const currentCollectionQuery = sql.select([
+
+        { col: Accounting.collections.selectOptionColumns.customer_id, as: 'customer_id' },
+
+        { col: Accounting.collections.selectOptionColumns.document_reference, as: 'document_reference' },
+
+        { col: Accounting.collections.selectOptionColumns.mode_of_payment, as: 'mode_of_payment' },
+
+        { col: Accounting.collections.selectOptionColumns.bank_name, as: 'bank_name' },
+
+        { col: Accounting.collections.selectOptionColumns.check_number, as: 'check_number' },
+
+        { col: Accounting.collections.selectOptionColumns.collection_date, as: 'collection_date' },
+
+        { col: Accounting.collections.selectOptionColumns.remarks, as: 'remarks' },
+
+        { col: Accounting.collections.selectOptionColumns.state, as: 'state' }
+
+      ])
+
+        .from(Accounting.collections.tablename)
+
+        .where(Accounting.collections.selectOptionColumns.id)
+
+        .build();
+
+      const [currentCollectionData] = await connection.execute(currentCollectionQuery, [collectionId]);
+
+      // Fetch current collection items BEFORE updates
+
+      let currentItemsData = [];
+
+      if (collection_items && collection_items.length > 0) {
+
+        const currentItemsQuery = sql.select([
+
+          { col: Accounting.collection_items.selectOptionColumns.id, as: 'id' },
+
+          { col: Accounting.collection_items.selectOptionColumns.sales_id, as: 'sales_id' },
+
+          { col: Accounting.collection_items.selectOptionColumns.amount, as: 'amount' }
+
+        ])
+
+          .from(Accounting.collection_items.tablename)
+
+          .where(Accounting.collection_items.selectOptionColumns.collection_id)
+
+          .build();
+
+        currentItemsData = await connection.execute(currentItemsQuery, [collectionId]);
+
+      }
+
+      // Fetch current journal entries BEFORE updates
+
+      let currentJournalData = [];
+
+      if (journal_entries && journal_entries.length > 0) {
+
+        const currentJournalQuery = sql.select([
+
+          { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+
+          { col: Accounting.journal_entries.selectOptionColumns.coa_id, as: 'account_id' },
+
+          { col: Accounting.journal_entries.selectOptionColumns.responsibility_center, as: 'responsibility_center' },
+
+          { col: Accounting.journal_entries.selectOptionColumns.amount, as: 'amount' },
+
+          { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' }
+
+        ])
+
+          .from(Accounting.journal_entries.tablename)
+
+          .where(Accounting.journal_entries.selectOptionColumns.db_name)
+
+          .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
+
+          .build();
+
+        currentJournalData = await connection.execute(currentJournalQuery, ['collections', collectionId]);
+
+      }
+
+      // Fetch current attachments BEFORE updates
+
+      let currentAttachmentsData = [];
+
+      const currentAttachmentsQuery = sql.select([
+
+        { col: Accounting.collection_attachments.selectOptionColumns.id, as: 'id' },
+
+        { col: Accounting.collection_attachments.selectOptionColumns.name, as: 'name' },
+
+        { col: Accounting.collection_attachments.selectOptionColumns.remarks, as: 'remarks' }
+
+      ])
+
+        .from(Accounting.collection_attachments.tablename)
+
+        .where(Accounting.collection_attachments.selectOptionColumns.collection_id)
+
+        .build();
+
+      currentAttachmentsData = await connection.execute(currentAttachmentsQuery, [collectionId]);
+
+      const updateMainQuery = sql.update(Accounting.collections.tablename)
+
+        .set([
+
+          Accounting.collections.selectOptionColumns.customer_id,
+
+          Accounting.collections.selectOptionColumns.document_reference,
+
+          Accounting.collections.selectOptionColumns.mode_of_payment,
+
+          Accounting.collections.selectOptionColumns.bank_name,
+
+          Accounting.collections.selectOptionColumns.check_number,
+
+          Accounting.collections.selectOptionColumns.collection_date,
+
+          Accounting.collections.selectOptionColumns.remarks
+
+        ])
+
+        .where(Accounting.collections.selectOptionColumns.id)
+
+        .build();
+
+
+
+      const updateMainValues = [
+
+        actualCustomerId || null,
+
+        document_reference || null,
+
+        mode_of_payment || null,
+
+        bank_name || null,
+
+        check_number || null,
+
+        collection_date || null,
+
+        remarks || null,
+
+        collectionId
+
+      ];
+
+
+
+      await connection.execute(updateMainQuery, updateMainValues);
+
+
+
+      // Skip collection items updates during edit mode
+      // Collection items should not be modifiable after collection is created
+      console.log('Skipping collection items updates - not allowed in edit mode');
+
+
+
+      if (journal_entries && journal_entries.length > 0) {
+
+        const existingEntriesQuery = sql.select([
+
+          Accounting.journal_entries.selectOptionColumns.id
+
+        ])
+
+          .from(Accounting.journal_entries.tablename)
+
+          .where(Accounting.journal_entries.selectOptionColumns.db_name)
+
+          .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
+
+          .build();
+
+        
+
+        const existingEntries = await Query(existingEntriesQuery, ['collections', collectionId], [Accounting.journal_entries.prefix_]);
+
+        const existingEntryIds = existingEntries.map(entry => entry.id);
+
+        const payloadEntryIds = journal_entries.filter(entry => entry.id).map(entry => entry.id);
+
+        
+
+        const entriesToDelete = existingEntryIds.filter(id => !payloadEntryIds.includes(id));
+
+        if (entriesToDelete.length > 0) {
+
+          const deleteEntriesQuery = sql.delete()
+
+            .from(Accounting.journal_entries.tablename)
+
+            .where(Accounting.journal_entries.selectOptionColumns.id)
+
+            .andWhere(Accounting.journal_entries.selectOptionColumns.db_name)
+
+            .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
+
+            .build();
+
+          
+
+          for (const entryId of entriesToDelete) {
+
+            await connection.execute(deleteEntriesQuery, [entryId, 'collections', collectionId]);
+
+          }
+
+        }
+
+
+
+        for (const entry of journal_entries) {
+
+          const type = entry.debit > 0 ? 'debit' : 'credit';
+
+          const amount = entry.debit > 0 ? entry.debit : entry.credit;
+
+
+
+          if (entry.id) {
+
+            const updateEntryQuery = sql.update(Accounting.journal_entries.tablename)
+
+              .set([
+
+                Accounting.journal_entries.selectOptionColumns.coa_id,
+
+                Accounting.journal_entries.selectOptionColumns.responsibility_center,
+
+                Accounting.journal_entries.selectOptionColumns.type,
+
+                Accounting.journal_entries.selectOptionColumns.amount
+
+              ])
+
+              .where(Accounting.journal_entries.selectOptionColumns.id)
+
+              .build();
+
+
+
+            const updateEntryValues = [
+
+              entry.account_id || null,
+
+              entry.responsibility_center || '',
+
+              type,
+
+              amount,
+
+              entry.id
+
+            ];
+
+
+
+            await connection.execute(updateEntryQuery, updateEntryValues);
+
+          } else {
+
+            const entryQuery = sql.insert(Accounting.journal_entries.tablename, {
+
+              columns: Accounting.journal_entries.insertColumns,
+
+              prefix: Accounting.journal_entries.prefix,
+
+              isTransaction: true
+
+            }).build();
+
+
+
+            const entryValues = [
+
+              "collections",
+
+              collectionId,
+
+              entry.account_id || null,
+
+              entry.responsibility_center || '',
+
+              type,
+
+              amount,
+
+              new Date().toISOString().split('T')[0]
+
+            ];
+
+
+
+            await connection.execute(entryQuery, entryValues);
+
+          }
+
+        }
+
+      } else {
+
+        const deleteAllEntriesQuery = sql.delete()
+
+          .from(Accounting.journal_entries.tablename)
+
+          .where(Accounting.journal_entries.selectOptionColumns.db_name)
+
+          .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
+
+          .build();
+
+        
+
+        await connection.execute(deleteAllEntriesQuery, ['collections', collectionId]);
+
+      }
+
+
+
+      if (attachments && attachments.length > 0) {
+
+        const existingAttachmentsQuery = sql.select([
+
+          Accounting.collection_attachments.selectOptionColumns.id
+
+        ])
+
+          .from(Accounting.collection_attachments.tablename)
+
+          .where(Accounting.collection_attachments.selectOptionColumns.collection_id)
+
+          .build();
+
+        
+
+        const existingAttachments = await Query(existingAttachmentsQuery, [collectionId], [Accounting.collection_attachments.prefix_]);
+
+        const existingAttachmentIds = existingAttachments.map(att => att.id);
+
+        const payloadAttachmentIds = attachments.filter(att => att.id).map(att => att.id);
+
+        
+
+        const attachmentsToDelete = existingAttachmentIds.filter(id => !payloadAttachmentIds.includes(id));
+
+        if (attachmentsToDelete.length > 0) {
+
+          const deleteAttachmentsQuery = sql.delete()
+
+            .from(Accounting.collection_attachments.tablename)
+
+            .where(Accounting.collection_attachments.selectOptionColumns.id)
+
+            .andWhere(Accounting.collection_attachments.selectOptionColumns.collection_id)
+
+            .build();
+
+          
+
+          for (const attachmentId of attachmentsToDelete) {
+
+            await connection.execute(deleteAttachmentsQuery, [attachmentId, collectionId]);
+
+          }
+
+        }
+
+
+
+        for (const attachment of attachments) {
+
+          // Check if this attachment ID exists in the database
+
+          const isExistingAttachment = existingAttachmentIds.includes(attachment.id);
+
+          
+
+          if (attachment.id && isExistingAttachment) {
+
+            const updateAttachmentQuery = sql.update(Accounting.collection_attachments.tablename)
+
+              .set([
+
+                Accounting.collection_attachments.selectOptionColumns.file,
+
+                Accounting.collection_attachments.selectOptionColumns.name,
+
+                Accounting.collection_attachments.selectOptionColumns.remarks,
+
+                Accounting.collection_attachments.selectOptionColumns.uploaded_by,
+
+                Accounting.collection_attachments.selectOptionColumns.uploaded_date
+
+              ])
+
+              .where(Accounting.collection_attachments.selectOptionColumns.id)
+
+              .build();
+
+
+
+            const updateAttachmentValues = [
+
+              attachment.file || null,  // Base64 file data
+
+              attachment.name || attachment.fileName || null,  // Filename
+
+              attachment.remarks || null,
+
+              attachment.uploadedBy || attachment.uploaded_by || 'Current User',
+
+              attachment.uploaded_date || attachment.date || new Date().toLocaleDateString(),
+
+              attachment.id
+
+            ];
+
+
+
+            await connection.execute(updateAttachmentQuery, updateAttachmentValues);
+
+          } else {
+
+            const attachmentQuery = sql.insert(Accounting.collection_attachments.tablename, {
+
+              columns: Accounting.collection_attachments.insertColumns,
+
+              prefix: Accounting.collection_attachments.prefix,
+
+              isTransaction: true
+
+            }).build();
+
+
+
+            const attachmentValues = [
+
+              collectionId,
+
+              attachment.file || null,  // Base64 file data
+
+              attachment.name || attachment.fileName || null,  // Filename
+
+              attachment.remarks || null,
+
+              attachment.uploadedBy || attachment.uploaded_by || 'Current User',
+
+              attachment.uploaded_date || attachment.date || new Date().toLocaleDateString()
+
+            ];
+
+
+
+            await connection.execute(attachmentQuery, attachmentValues);
+
+          }
+
+        }
+
+      } else {
+
+        // Delete all attachments if none are provided
+
+        const deleteAllAttachmentsQuery = sql.delete()
+
+          .from(Accounting.collection_attachments.tablename)
+
+          .where(Accounting.collection_attachments.selectOptionColumns.collection_id)
+
+          .build();
+
+        
+
+        await connection.execute(deleteAllAttachmentsQuery, [collectionId]);
+
+      }
+
+      
+      // Track changes for audit trail using data fetched earlier
+      const auditChanges = [];
+      
+      // Helper function to normalize values for comparison
+      const normalizeValue = (val) => val === null || val === undefined ? '' : String(val).trim();
+      const normalizeNumber = (val) => val === null || val === undefined ? 0 : parseFloat(val);
+      
+      console.log('DEBUG: Current collection data:', currentCollectionData);
+      console.log('DEBUG: Request body data:', { customer_id, document_reference, mode_of_payment, bank_name, check_number, collection_date, remarks });
+      console.log('DEBUG: Collection items data:', collection_items);
+      console.log('DEBUG: Journal entries data:', journal_entries);
+      console.log('DEBUG: Attachments data:', attachments);
+      
+      if (currentCollectionData.length > 0) {
+        const current = currentCollectionData[0];
+        
+        if (current.customer_id !== actualCustomerId) {
+          auditChanges.push(`Customer ID: ${current.customer_id} → ${actualCustomerId}`);
+        }
+        
+        const currentDocRef = normalizeValue(current.document_reference);
+        const newDocRef = normalizeValue(document_reference);
+        console.log('DEBUG: Doc Ref comparison:', { current: currentDocRef, new: newDocRef, changed: currentDocRef !== newDocRef });
+        if (currentDocRef !== newDocRef) {
+          auditChanges.push(`Doc Ref: ${currentDocRef || 'NULL'} → ${newDocRef || 'NULL'}`);
+        }
+        
+        const currentModeOfPayment = normalizeValue(current.mode_of_payment);
+        const newModeOfPayment = normalizeValue(mode_of_payment);
+        console.log('DEBUG: Mode of payment comparison:', { current: currentModeOfPayment, new: newModeOfPayment, changed: currentModeOfPayment !== newModeOfPayment });
+        if (currentModeOfPayment !== newModeOfPayment) {
+          auditChanges.push(`Mode of Payment: ${currentModeOfPayment || 'NULL'} → ${newModeOfPayment || 'NULL'}`);
+        }
+        
+        const currentBankName = normalizeValue(current.bank_name);
+        const newBankName = normalizeValue(bank_name);
+        if (currentBankName !== newBankName) {
+          auditChanges.push(`Bank Name: ${currentBankName || 'NULL'} → ${newBankName || 'NULL'}`);
+        }
+        
+        const currentCheckNumber = normalizeValue(current.check_number);
+        const newCheckNumber = normalizeValue(check_number);
+        if (currentCheckNumber !== newCheckNumber) {
+          auditChanges.push(`Check Number: ${currentCheckNumber || 'NULL'} → ${newCheckNumber || 'NULL'}`);
+        }
+        
+        const currentCollectionDate = normalizeValue(current.collection_date);
+        const newCollectionDate = normalizeValue(collection_date);
+        if (currentCollectionDate !== newCollectionDate) {
+          auditChanges.push(`Collection Date: ${currentCollectionDate || 'NULL'} → ${newCollectionDate || 'NULL'}`);
+        }
+        
+        const currentRemarks = normalizeValue(current.remarks);
+        const newRemarks = normalizeValue(remarks);
+        console.log('DEBUG: Remarks comparison:', { current: currentRemarks, new: newRemarks, changed: currentRemarks !== newRemarks });
+        if (currentRemarks !== newRemarks) {
+          auditChanges.push(`Remarks: ${currentRemarks || 'NULL'} → ${newRemarks || 'NULL'}`);
+        }
+      }
+
+      // Track collection items changes using data fetched earlier
+      console.log('DEBUG: Current items data from DB:', currentItemsData);
+      if (collection_items && collection_items.length > 0) {
+        for (let i = 0; i < collection_items.length; i++) {
+          const item = collection_items[i];
+          console.log('DEBUG: Processing item:', item);
+          let currentItem = null;
+          
+          if (item.id) {
+            // Find by ID if available
+            currentItem = currentItemsData[0]?.find(i => i.id === item.id);
+          }
+          
+          console.log('DEBUG: Found current item:', currentItem);
+          if (currentItem) {
+            // Only compare amount if it's provided in the request (not undefined/null)
+            if (item.amount !== undefined && item.amount !== null) {
+              const currentAmount = normalizeNumber(currentItem.amount);
+              const newAmount = normalizeNumber(item.amount);
+              console.log('DEBUG: Item amount comparison:', { itemId: currentItem.id, current: currentAmount, new: newAmount, changed: currentAmount !== newAmount });
+              if (currentAmount !== newAmount) {
+                auditChanges.push(`Collection Item ${currentItem.id} Amount: ${currentAmount} → ${newAmount}`);
+              }
+            }
+          } else {
+            // Only track new items if they have a sales_id
+            if (item.sales_id) {
+              auditChanges.push(`Added new collection item: Sales ID ${item.sales_id}`);
+            }
+          }
+        }
+      }
+
+      // Track journal entries changes using data fetched earlier
+      console.log('DEBUG: Current journal data from DB:', currentJournalData);
+      if (journal_entries && journal_entries.length > 0) {
+        for (let i = 0; i < journal_entries.length; i++) {
+          const entry = journal_entries[i];
+          console.log('DEBUG: Processing journal entry:', entry);
+          const type = entry.debit > 0 ? 'debit' : 'credit';
+          const amount = entry.debit > 0 ? entry.debit : entry.credit;
+          let currentEntry = null;
+          
+          if (entry.id) {
+            // Find by ID if available
+            currentEntry = currentJournalData[0]?.find(j => j.id === entry.id);
+          } else {
+            // If no ID, try to match by account_id, type, and position
+            currentEntry = currentJournalData[0]?.find((existingEntry, index) => 
+              existingEntry.account_id === entry.account_id && 
+              existingEntry.type.toLowerCase() === type && 
+              index === i
+            );
+            
+            // If still not found, try to match by account_id and type only
+            if (!currentEntry && entry.account_id) {
+              currentEntry = currentJournalData[0]?.find(existingEntry => 
+                existingEntry.account_id === entry.account_id && 
+                existingEntry.type.toLowerCase() === type
+              );
+            }
+            
+            // If still not found, try to match by amount and type only
+            if (!currentEntry) {
+              currentEntry = currentJournalData[0]?.find(existingEntry => 
+                normalizeNumber(existingEntry.amount) === normalizeNumber(amount) && 
+                existingEntry.type.toLowerCase() === type
+              );
+            }
+          }
+          
+          console.log('DEBUG: Found current journal entry:', currentEntry);
+          if (currentEntry) {
+            const currentRespCenter = normalizeValue(currentEntry.responsibility_center);
+            const newRespCenter = normalizeValue(entry.responsibility_center);
+            console.log('DEBUG: Journal resp center comparison:', { entryId: currentEntry.id, current: currentRespCenter, new: newRespCenter, changed: currentRespCenter !== newRespCenter });
+            if (currentRespCenter !== newRespCenter) {
+              auditChanges.push(`Journal ${currentEntry.id} Resp Center: ${currentRespCenter || 'NULL'} → ${newRespCenter || 'NULL'}`);
+            }
+            
+            const currentAmount = normalizeNumber(currentEntry.amount);
+            const newAmount = normalizeNumber(amount);
+            if (currentAmount !== newAmount) {
+              auditChanges.push(`Journal ${currentEntry.id} Amount: ${currentAmount} → ${newAmount}`);
+            }
+            
+            const currentType = normalizeValue(currentEntry.type);
+            if (currentType.toLowerCase() !== type.toLowerCase()) {
+              auditChanges.push(`Journal ${currentEntry.id} Type: ${currentType} → ${type}`);
+            }
+          } else {
+            auditChanges.push(`Added new journal entry: ${normalizeValue(entry.responsibility_center) || 'Unassigned'}`);
+          }
+        }
+      }
+
+      // Track attachment changes
+      console.log('DEBUG: Current attachments data from DB:', currentAttachmentsData);
+      console.log('DEBUG: Request attachments data:', attachments);
+      
+      // Get existing attachments for comparison
+      const existingAttachmentsQuery = sql.select([
+        Accounting.collection_attachments.selectOptionColumns.id
+      ])
+        .from(Accounting.collection_attachments.tablename)
+        .where(Accounting.collection_attachments.selectOptionColumns.collection_id)
+        .build();
+
+      const existingAttachments = await Query(existingAttachmentsQuery, [collectionId], [Accounting.collection_attachments.prefix_]);
+      const existingAttachmentIds = existingAttachments.map(attachment => attachment.id);
+      
+      console.log('DEBUG: Existing attachment IDs:', existingAttachmentIds);
+
+      if (attachments && attachments.length > 0) {
+        // Filter out attachments with invalid IDs (null, undefined, 'null', 'undefined', empty string)
+        const validAttachments = attachments.filter(attachment =>
+          attachment.id &&
+          attachment.id !== null &&
+          attachment.id !== undefined &&
+          attachment.id !== '' &&
+          attachment.id !== 'null' &&
+          attachment.id !== 'undefined'
+        );
+        const payloadAttachmentIds = validAttachments.map(attachment => attachment.id);
+        console.log('DEBUG: Valid payload attachments:', validAttachments);
+        console.log('DEBUG: Payload attachment IDs:', payloadAttachmentIds);
+
+        // Find deleted attachments - IDs in DB but not in valid payload
+        const deletedAttachmentIds = existingAttachmentIds.filter(id => !payloadAttachmentIds.includes(id));
+        console.log('DEBUG: Deleted attachment IDs:', deletedAttachmentIds);
+        if (deletedAttachmentIds.length > 0) {
+          for (const deletedId of deletedAttachmentIds) {
+            // Fix: Access currentAttachmentsData[0] since connection.execute returns array
+            const deletedAttachment = currentAttachmentsData[0]?.find(a => a.id === deletedId);
+            console.log('DEBUG: Found deleted attachment:', deletedAttachment);
+            if (deletedAttachment) {
+              auditChanges.push(`Deleted attachment: ${normalizeValue(deletedAttachment.name) || 'Unknown'} (ID: ${deletedId})`);
+            }
+          }
+        }
+
+        for (const attachment of attachments) {
+          console.log('DEBUG: Processing attachment:', attachment);
+          console.log('DEBUG: Attachment ID:', attachment.id, 'Type:', typeof attachment.id);
+
+          // Check if ID is valid (not null, undefined, empty string, or string 'null')
+          const hasValidId = attachment.id &&
+                            attachment.id !== null &&
+                            attachment.id !== undefined &&
+                            attachment.id !== '' &&
+                            attachment.id !== 'null' &&
+                            attachment.id !== 'undefined';
+
+          console.log('DEBUG: Has valid ID:', hasValidId);
+
+          if (hasValidId) {
+            console.log('DEBUG: Attachment has valid ID, checking for updates...');
+            // Fix: Access currentAttachmentsData[0] since connection.execute returns array
+            const currentAttachment = currentAttachmentsData[0]?.find(a => a.id === attachment.id);
+            console.log('DEBUG: Found current attachment:', currentAttachment);
+            if (currentAttachment) {
+              // Only compare remarks if it's provided in the request (not undefined)
+              if (attachment.remarks !== undefined) {
+                const currentRemarks = normalizeValue(currentAttachment.remarks);
+                const newRemarks = normalizeValue(attachment.remarks);
+                console.log('DEBUG: Attachment remarks comparison:', { attachmentId: attachment.id, current: currentRemarks, new: newRemarks, changed: currentRemarks !== newRemarks });
+                if (currentRemarks !== newRemarks) {
+                  auditChanges.push(`Attachment ${attachment.id} Remarks: ${currentRemarks || 'NULL'} → ${newRemarks || 'NULL'}`);
+                }
+              }
+            } else {
+              console.log('DEBUG: Attachment ID not found in current data, treating as new');
+              auditChanges.push(`Added new attachment: ${normalizeValue(attachment.name) || normalizeValue(attachment.fileName) || 'Unknown'}`);
+            }
+          } else {
+            console.log('DEBUG: No valid attachment ID, treating as new attachment');
+            console.log('DEBUG: Attachment name:', attachment.name, 'fileName:', attachment.fileName);
+            auditChanges.push(`Added new attachment: ${normalizeValue(attachment.name) || normalizeValue(attachment.fileName) || 'Unknown'}`);
+          }
+        }
+      } else {
+        console.log('DEBUG: No attachments in payload, checking for deletions');
+        // All attachments were deleted
+        if (existingAttachmentIds.length > 0) {
+          for (const existingId of existingAttachmentIds) {
+            // Fix: Access currentAttachmentsData[0] since connection.execute returns array
+            const deletedAttachment = currentAttachmentsData[0]?.find(a => a.id === existingId);
+            console.log('DEBUG: Found deleted attachment (all):', deletedAttachment);
+            if (deletedAttachment) {
+              auditChanges.push(`Deleted attachment: ${normalizeValue(deletedAttachment.name) || 'Unknown'} (ID: ${existingId})`);
+            }
+          }
+        }
+      }
+
+      await connection.commit();
+
+      // Create audit trail entry
+      if (auditChanges.length > 0) {
+        const now = new Date();
+        const auditQueries = [{
+          sql: sql.insert(Master.audit_trail.tablename, {
+            columns: Master.audit_trail.insertColumns,
+            prefix: Master.audit_trail.prefix,
+            isTransaction: true
+          }).build(),
+          values: [
+            collectionId,
+            'COLLECTION_UPDATE',
+            req.context?.username || null,
+            now.toISOString().split('T')[0],
+            now.toTimeString().split(' ')[0],
+            `UPDATE: ${auditChanges.join(', ')}` 
+          ]
+        }];
+
+        await Transaction(auditQueries);
+      }
+
+      res.status(200).json({
+
+        success: true,
+
+        message: 'Collection updated successfully',
+
+        data: { id: collectionId },
+
+        timestamp: new Date().toISOString()
+
+      });
+
+
+
+    } catch (error) {
+
+      if (connection) {
+
+        await connection.rollback();
+
+      }
+
+      throw error;
+
+    } finally {
+
+      if (connection) {
+
+        connection.release();
+
+      }
+
+    }
+
+
+
+  } catch (error) {
+
+    console.error('Error updating collection:', error);
+
+    return res.status(500).json({
+
+      success: false,
+
+      message: 'Server error while updating collection',
+
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+
+    });
+
+  }
+
+}
+
 module.exports = {
 
   getCollections,
@@ -1655,6 +2584,8 @@ module.exports = {
   getSalesItemsCollection,
 
   createCollection,
+
+  updateCollection,
 
   updateCollectionState,
 

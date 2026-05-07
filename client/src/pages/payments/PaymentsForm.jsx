@@ -197,7 +197,7 @@ function useDragToScroll() {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, paymentData = null }) {
+export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, isEditMode = false, paymentData = null }) {
 
   // ── Payment items ──────────────────────────────────────────────────────
   // Each item shape (what lives in state):
@@ -231,7 +231,9 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
   const [modeSearch,        setModeSearch]        = useState('');
   const [bankName,          setBankName]          = useState('');
   const [checkNumber,       setCheckNumber]       = useState('');
+  const [paymentDate,      setPaymentDate]       = useState('');
   const [documentReference, setDocumentReference] = useState('');
+  const [createdBy,        setCreatedBy]        = useState('');
   const [remarks,           setRemarks]           = useState('');
 
   const [attachments, setAttachments] = useState([]);
@@ -300,59 +302,85 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
     if (isModalOpen) { fetchPurchaseData(); setSelectedPurchases([]); }
   }, [isModalOpen]);
 
-  // Populate form with payment data when in view mode
+  // Populate form with payment data when in view or edit mode
   useEffect(() => {
-    if (isViewMode && paymentData) {
+    console.log('useEffect triggered - isViewMode:', isViewMode, 'isEditMode:', isEditMode, 'paymentData:', paymentData);
+    if ((isViewMode || isEditMode) && paymentData) {
+      // Set loading flag to prevent useEffect from interfering
+      isLoadingData.current = true;
       console.log('Populating form with payment data:', paymentData);
+      console.log('paymentData structure:', Object.keys(paymentData));
       
-      // Populate basic payment info
+      // Populate basic payment info - handle different data structures
+      let payment = null;
       if (paymentData.data && paymentData.data.length > 0) {
-        const payment = paymentData.data[0];
-        setSelectedVendor(payment.vendor);
-        setVendorSearch(payment.vendor);
+        payment = paymentData.data[0];
+        console.log('Using paymentData.data[0]:', payment);
+      } else if (paymentData.data && paymentData.data.id) {
+        payment = paymentData.data;
+        console.log('Using paymentData.data directly:', payment);
+      } else if (paymentData.id) {
+        payment = paymentData;
+        console.log('Using paymentData directly:', payment);
+      } else if (typeof paymentData === 'object' && paymentData !== null) {
+        payment = paymentData;
+        console.log('Using paymentData as direct object:', payment);
+      }
+      
+      if (payment) {
+        console.log('Setting payment fields:', {
+          vendor: payment.vendor,
+          doc_ref: payment.doc_ref,
+          mode_of_payment: payment.mode_of_payment,
+          bank_name: payment.bank_name,
+          check_number: payment.check_number,
+          payment_date: payment.payment_date,
+          remarks: payment.remarks,
+          id: payment.id
+        });
+        
+        // Note: Vendor lookup is now handled in a separate useEffect
         setDocumentReference(payment.doc_ref || '');
         setModeOfPayment(payment.mode_of_payment || '');
         setModeSearch(payment.mode_of_payment || '');
+        setPaymentDate(payment.payment_date || '');
         setBankName(payment.bank_name || '');
         setCheckNumber(payment.check_number || '');
         setRemarks(payment.remarks || '');
+        setCreatedBy(payment.created_by || '');
+      } else {
+        console.warn('No payment data found in expected structure');
       }
-
+      
       // Populate payment items
       if (paymentData.items && paymentData.items.length > 0) {
-        const items = paymentData.items.map(item => {
-          const qty = parseFloat(item.quantity) || 0;
-          const price = parseFloat(item.purchase_price) || 0;
-          const discountValue = parseFloat(item.discount) || 0;
-          const discountType = item.discount_type || 'PERCENT';
-          const vatPct = parseFloat(item.vat_rate) || 0;
-          const whtPct = parseFloat(item.withholding_tax_rate) || 0;
-
-          const computed = computeItemAmounts(qty, price, discountValue, discountType, vatPct, whtPct);
-
-          const storedAmount = parseFloat(item.amount) || 0;
-          const storedWhtAmount = parseFloat(item.witholding_tax) || 0;
-
-          return {
-            id: item.id,
-            purchaseItemId: item.purchase_item_id,
-            invoiceRef: item.invoice_ref || '',
-            description: item.product_service_name || item.description || '',
-            responsibilityCenter: item.responsibility_center || '',
-            gross: computed.gross,
-            discAmt: computed.discAmt,
-            vatAmt: computed.vatAmt,
-            whtAmount: storedWhtAmount || computed.whtAmount,
-            amount: storedAmount || computed.amount,
-            isOther: false
-          };
-        });
+        console.log('Populating payment items:', paymentData.items);
+        const items = paymentData.items.map((item, index) => ({
+          id: item.id,
+          purchaseItemId: item.purchase_item_id,
+          invoiceRef: item.invoice_ref || '',
+          description: item.product_service_name || item.description || '',
+          responsibilityCenter: item.responsibility_center || '',
+          gross: (parseFloat(item.amount) || 0) + (parseFloat(item.witholding_tax) || 0),
+          discAmt: parseFloat(item.discount) || 0,
+          vatAmt: parseFloat(item.vat) || 0,
+          whtAmount: parseFloat(item.witholding_tax) || 0,
+          amount: parseFloat(item.amount) || 0,
+          isOther: false
+        }));
+        console.log('Setting payment items:', items);
         setPaymentItems(items);
+      } else {
+        console.log('No payment items found or empty array');
       }
-
+      
       // Populate journal entries
-      if (paymentData.journal && paymentData.journal.length > 0) {
-        const journal = paymentData.journal.map(entry => ({
+      // Check if journal entries are in paymentData.journal or as a separate property
+      const journalData = paymentData.journal || paymentData.journal_entries || [];
+      
+      if (journalData && journalData.length > 0) {
+        console.log('DEBUG: Loading journal entries from data:', journalData);
+        const journal = journalData.map((entry, index) => ({
           id: entry.id,
           account: entry.charts_of_accounts_name,
           accountSearch: entry.charts_of_accounts_name,
@@ -361,18 +389,25 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
           credit: entry.type === 'CREDIT' ? parseFloat(entry.amount) || 0 : 0,
           isManual: false
         }));
+        console.log('DEBUG: Setting journal entries in edit mode:', journal);
         setJournalEntries(journal);
+      } else {
+        console.log('DEBUG: No journal entries found or empty array');
+        console.log('DEBUG: paymentData structure:', Object.keys(paymentData));
+        console.log('DEBUG: paymentData.journal:', paymentData.journal);
+        console.log('DEBUG: paymentData.journal_entries:', paymentData.journal_entries);
       }
 
-      // Populate attachments
-      if (paymentData.attachments && paymentData.attachments.length > 0) {
-        console.log('Processing attachments:', paymentData.attachments);
-        const attachments = paymentData.attachments.map(att => {
+      // Populate attachments - handle both direct attachments property and nested structure
+      const attachmentsData = paymentData.attachments || [];
+      console.log('Processing attachments:', attachmentsData);
+      if (attachmentsData && attachmentsData.length > 0) {
+        const attachments = attachmentsData.map(att => {
           console.log('Processing attachment:', att.id, att.name, 'File data type:', typeof att.file, 'File data length:', att.file ? att.file.length : 'null');
           return {
             id: att.id,
-            fileName: att.name || '',
-            file: att.file || null, // Preserve base64 data from server for view mode
+            fileName: att.name || '', // Server now correctly sends name as filename
+            file: att.file || null,   // Server now correctly sends file as base64 string
             remarks: att.remarks || '',
             uploadedBy: att.uploaded_by || 'Current User',
             date: att.uploaded_date || new Date().toLocaleDateString()
@@ -380,9 +415,47 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
         });
         console.log('Final attachments array:', attachments);
         setAttachments(attachments);
+      } else {
+        console.log('No attachments found or empty array, clearing attachments');
+        setAttachments([]); // Explicitly set to empty array to prevent empty rows
       }
     }
-  }, [isViewMode, paymentData]);
+  }, [isViewMode, isEditMode, paymentData]);
+
+  // ── Vendor lookup for edit mode ─────────────────────────────────────────────
+  useEffect(() => {
+    if ((isViewMode || isEditMode) && paymentData && vendors.length > 0) {
+      // Extract payment data
+      let payment = null;
+      if (paymentData.data && paymentData.data.length > 0) {
+        payment = paymentData.data[0];
+      } else if (paymentData.data && paymentData.data.id) {
+        payment = paymentData.data;
+      } else if (paymentData.id) {
+        payment = paymentData;
+      } else if (typeof paymentData === 'object' && paymentData !== null) {
+        payment = paymentData;
+      }
+      
+      if (payment) {
+        // Find vendor ID from vendor name when in edit mode
+        const vendorName = payment.vendor || '';
+        console.log('Looking up vendor:', vendorName, 'Available vendors:', vendors);
+        const vendor = vendors.find(v => (v.name || v.v_name) === vendorName);
+        const vendorId = vendor ? vendor.id : '';
+        console.log('Found vendor:', vendor, 'Vendor ID:', vendorId);
+        
+        setSelectedVendor(vendorId);
+        setVendorSearch(vendorName);
+      }
+      
+      // Clear loading flag when data loading is complete
+      setTimeout(() => {
+        isLoadingData.current = false;
+        console.log('DEBUG: Data loading complete, loading flag cleared');
+      }, 100); // Small delay to ensure all state updates are complete
+    }
+  }, [isViewMode, isEditMode, paymentData, vendors]);
 
   // ── Item helpers ──────────────────────────────────────────────────────────
   const removePaymentItem = (id) => setPaymentItems(prev => prev.filter(i => i.id !== id));
@@ -453,18 +526,70 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
   };
 
   // ── Journal entry helpers ─────────────────────────────────────────────────
-  const addJournalEntry    = () => setJournalEntries(prev => [...prev, { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true }]);
+  const addJournalEntry    = () => {
+    console.log('DEBUG: addJournalEntry called');
+    console.log('DEBUG: Current journalEntries before adding:', journalEntries);
+    const newEntry = { id: Date.now(), account: '', accountSearch: '', center: '', debit: 0, credit: 0, isManual: true };
+    console.log('DEBUG: New entry to add:', newEntry);
+    setJournalEntries(prev => {
+      const updated = [...prev, newEntry];
+      console.log('DEBUG: Journal entries after adding:', updated);
+      return updated;
+    });
+  };
   const removeJournalEntry = (id) => setJournalEntries(prev => prev.filter(e => e.id !== id));
-  const updateJournalEntry = (id, field, value) => setJournalEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
+  const updateJournalEntry = (id, field, value) => {
+    console.log('DEBUG: updateJournalEntry called', { id, field, value });
+    setJournalEntries(prev => {
+      const updated = prev.map(e => e.id === id ? { ...e, [field]: value } : e);
+      console.log('DEBUG: Journal entries after update:', updated);
+      return updated;
+    });
+  };
 
   // ── Attachment helpers ────────────────────────────────────────────────────
-  const addAttachment    = () => setAttachments(prev => [...prev, { id: Date.now(), fileName: '', file: null, remarks: '', uploadedBy: 'Current User', date: new Date().toLocaleDateString() }]);
-  const removeAttachment = (id) => setAttachments(prev => prev.filter(a => a.id !== id));
-  const updateAttachment = (id, field, value) => setAttachments(prev => prev.map(att => att.id === id ? { ...att, [field]: value } : att));
+  const addAttachment    = () => {
+    console.log('addAttachment called, current attachments:', attachments);
+    // Generate a unique ID that won't conflict with existing server IDs
+    // Use negative timestamp to distinguish from server IDs (which are positive)
+    const newAttachment = { 
+      id: `new_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, 
+      fileName: '', 
+      file: null, 
+      remarks: '', 
+      uploadedBy: 'Current User', 
+      date: new Date().toLocaleDateString() 
+    };
+    console.log('Adding new attachment:', newAttachment);
+    setAttachments(prev => {
+      const updated = [...prev, newAttachment];
+      console.log('Updated attachments after add:', updated);
+      return updated;
+    });
+  };
+  const removeAttachment = (id) => {
+    console.log('removeAttachment called with id:', id, 'current attachments:', attachments);
+    setAttachments(prev => {
+      const updated = prev.filter(a => a.id !== id);
+      console.log('Updated attachments after remove:', updated);
+      return updated;
+    });
+  };
+  const updateAttachment = (id, field, value) => {
+    console.log('updateAttachment called with id:', id, 'field:', field, 'value:', value);
+    setAttachments(prev => {
+      const updated = prev.map(att => att.id === id ? { ...att, [field]: value } : att);
+      console.log('Updated attachments after update:', updated);
+      return updated;
+    });
+  };
   const handleFileChange = (id, file) => {
-    if (file) {
+    if (file && file instanceof File) {
       updateAttachment(id, 'fileName', file.name);
       updateAttachment(id, 'file', file);
+    } else if (file) {
+      console.error('Invalid file object provided to handleFileChange:', file);
+      setToast({ type: 'error', message: 'Invalid file selected. Please choose a valid file.' });
     }
   };
 
@@ -544,16 +669,61 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
     setJournalEntries(entries);
   };
 
+  // Add a ref to track if we're loading data to prevent race conditions
+  const isLoadingData = useRef(false);
+  
   useEffect(() => { 
-    // Only auto-generate journal entries when NOT in view mode
-    if (!isViewMode) {
-      generateJournalEntries(); 
+    // Auto-generate journal entries logic:
+    // 1. Never in view mode
+    // 2. Only when there are no manual entries (preserve user's manual work)
+    // 3. In create mode: always auto-generate if no manual entries
+    // 4. In edit mode: NEVER auto-generate if we're loading existing payment data
+    const hasManualEntries = journalEntries.some(entry => entry.isManual);
+    
+    console.log('DEBUG: useEffect running - isEditMode:', isEditMode, 'journalEntries.length:', journalEntries.length, 'hasManualEntries:', hasManualEntries, 'isLoadingData:', isLoadingData.current);
+    
+    if (!isViewMode && !hasManualEntries && !isLoadingData.current) {
+      // In create mode, always auto-generate
+      if (!isEditMode) {
+        console.log('DEBUG: Auto-generating in create mode');
+        generateJournalEntries();
+      } 
+      // In edit mode: only auto-generate if there are no payment items AND no existing entries AND we're not loading data
+      // This prevents overwriting existing database entries that are being loaded
+      else {
+        if (paymentItems.length === 0 && journalEntries.length === 0) {
+          console.log('DEBUG: Auto-generating in edit mode (no items, no entries)');
+          generateJournalEntries();
+        } else {
+          console.log('DEBUG: NOT auto-generating in edit mode - paymentItems:', paymentItems.length, 'journalEntries:', journalEntries.length);
+        }
+      }
+    } else {
+      console.log('DEBUG: NOT auto-generating - isViewMode:', isViewMode, 'hasManualEntries:', hasManualEntries, 'isLoadingData:', isLoadingData.current);
     }
-  }, [paymentItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode]);
+  }, [paymentItems, modeOfPayment, bankName, chartsOfAccounts, isViewMode, isEditMode]); 
+
+  // Separate useEffect to handle when manual entries are added (should not trigger auto-generation)
+  useEffect(() => {
+    // This effect runs when journalEntries change to ensure manual entries are preserved
+    // But it doesn't trigger auto-generation, preventing conflicts
+    if (isEditMode && journalEntries.length > 0) {
+      const hasManualEntries = journalEntries.some(entry => entry.isManual);
+      if (hasManualEntries) {
+        console.log('Manual entries detected, preserving them');
+      }
+    }
+  }, [journalEntries, isEditMode]);
 
   // ── Post Transaction ──────────────────────────────────────────────────────
   const fileToBase64 = (file) =>
     new Promise((resolve, reject) => {
+      // Validate that file is a Blob/File object
+      if (!file || !(file instanceof Blob)) {
+        reject(new Error('Invalid file: parameter is not a Blob or File object'));
+        return;
+      }
+      
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload  = () => resolve(reader.result);
@@ -590,35 +760,73 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
       //   ci_purchase_id    → purchaseItemId
       //   ci_amount         → amount       (discounted + VAT − WHT)
       //   ci_witholding_tax → whtAmount
-      const preparedItems = paymentItems
-        .filter(item => !item.isOther)
-        .map(item => ({
-          purchase_id:     item.purchaseItemId,
-          amount:           item.amount,
-          witholding_tax:   item.whtAmount,
-        }));
+      // Only include payment items if they're not from existing data (new items)
+      // In edit mode, existing payment items should not be sent unless they're modified
+      const preparedItems = isEditMode 
+        ? [] // Don't send existing payment items in edit mode
+        : paymentItems
+            .filter(item => !item.isOther)
+            .map(item => ({
+              purchase_id:     item.purchaseItemId,
+              amount:           item.amount,
+              witholding_tax:   item.whtAmount,
+            }));
 
-      const preparedJournalEntries = journalEntries.map(entry => ({
-        account_id:            entry.account || '',
-        responsibility_center: entry.center  || '',
-        debit:                 parseFloat(entry.debit)  || 0,
-        credit:                parseFloat(entry.credit) || 0,
-      }));
+      const preparedJournalEntries = journalEntries.map(entry => {
+        // Look up account ID from account name
+        const account = chartsOfAccounts.find(a => 
+          (a.name || a.account_name) === entry.account || 
+          (a.name || a.account_name) === entry.accountSearch
+        );
+        const accountId = account ? account.id : null;
+        
+        return {
+          account_id:            accountId,
+          responsibility_center: entry.center  || '',
+          debit:                 parseFloat(entry.debit)  || 0,
+          credit:                parseFloat(entry.credit) || 0,
+          id: entry.id || null,
+        };
+      });
+      
+      console.log('DEBUG: Journal entries being sent:', preparedJournalEntries);
+      console.log('DEBUG: Journal entries count:', preparedJournalEntries.length);
 
       const preparedAttachments = await Promise.all(
-        attachments.map(async att => ({
-          name:           att.fileName,
-          file:           att.file ? await fileToBase64(att.file) : null,
-          remarks:        att.remarks,
-          uploaded_by:    att.uploadedBy,
-          uploaded_date:  att.date,
-        }))
+        attachments.map(async att => {
+          try {
+            let fileData = null;
+            
+            // Only convert to base64 if it's a File object (new attachment)
+            if (att.file && att.file instanceof File) {
+              fileData = await fileToBase64(att.file);
+            } else if (att.file && typeof att.file === 'string' && att.file.startsWith('data:')) {
+              // Already a base64 string (existing attachment), use as-is
+              fileData = att.file;
+            }
+            
+            return {
+              // Map client structure to server structure
+              // Server expects: file (base64 string), name (filename)
+              file:       fileData,
+              name:       att.fileName || att.name || '',
+              remarks:    att.remarks || '',
+              uploadedBy: att.uploadedBy || 'Current User',
+              uploaded_date: att.date || new Date().toLocaleDateString(),
+              // Include ID for update operations
+              id: att.id || null
+            };
+          } catch (error) {
+            console.error('Error processing attachment:', att.fileName, error);
+            throw new Error(`Failed to process attachment "${att.fileName}": ${error.message}`);
+          }
+        })
       );
 
       // ── payments header payload — matches DB columns exactly ──
       // c_vendor_id, c_document_reference, c_mode_of_payment,
       // c_bank_name, c_check_number, c_payment_date, c_remarks, c_created_by
-      const paymentData = {
+      const requestPayload = {
         vendor_id:         selectedVendor,
         document_reference: documentReference,
         mode_of_payment:    modeOfPayment,
@@ -627,16 +835,33 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
         payment_date:       new Date().toISOString().split('T')[0],
         remarks,
         total_amount_due:   summary.totalCashCollected,
-        created_by:         createdBy,
         payment_items:      preparedItems,
         journal_entries:    preparedJournalEntries,
         attachments:        preparedAttachments,
       };
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/payments`, {
-        method:  'POST',
+      // Add ID and updated_by for edit mode
+      let paymentId = null;
+      if (isEditMode && paymentData) {
+        paymentId = paymentData.data?.[0]?.id || paymentData.id;
+        if (paymentId) {
+          requestPayload.id = paymentId;
+          requestPayload.updated_by = createdBy;
+        }
+      } else {
+        requestPayload.created_by = createdBy;
+      }
+
+      const url = isEditMode && paymentId 
+        ? `${import.meta.env.VITE_SERVER_LINK}/payments/${paymentId}`
+        : `${import.meta.env.VITE_SERVER_LINK}/payments`;
+      
+      const method = isEditMode && paymentId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method:  method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body:    JSON.stringify(paymentData),
+        body:    JSON.stringify(requestPayload),
       });
 
       if (!response.ok) {
@@ -646,12 +871,14 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
 
       const result = await response.json();
       if (result.success) {
-        const nextToast = { type: 'success', message: 'Payment posted successfully!' };
+        const action = isEditMode ? 'updated' : 'posted';
+        const nextToast = { type: 'success', message: `Payment ${action} successfully!` };
         setToast(nextToast);
         if (onSuccess) await onSuccess(nextToast);
         onBack();
       } else {
-        setToast({ type: 'error', message: result.message || 'Failed to post payment' });
+        const action = isEditMode ? 'update' : 'post';
+        setToast({ type: 'error', message: result.message || `Failed to ${action} payment` });
       }
 
     } catch (error) {
@@ -758,18 +985,6 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                   emptyText="No modes found"
                 />
               )}
-            </fieldset>
-            <fieldset>
-              <legend className="text-[11px] font-black uppercase text-gray-100">Payment Date</legend>
-              <input
-                type="date"
-                value={new Date().toISOString().split('T')[0]}
-                disabled={isViewMode}
-                className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode
-                  ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
-                  : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
-                  }`}
-              />
             </fieldset>
             {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
               <fieldset>
@@ -933,7 +1148,7 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                             {item.responsibilityCenter || '---'}
                           </td>
                           <td className="py-2 px-1 text-center">
-                            {!isViewMode && (
+                            {!isViewMode && !isEditMode && (
                               <button onClick={() => removePaymentItem(item.id)} className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors">
                                 <Trash2 size={14} />
                               </button>
@@ -957,7 +1172,7 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                 </div>
               )}
 
-              {!isViewMode && (
+              {!isViewMode && !isEditMode && (
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => setIsModalOpen(true)}
@@ -967,10 +1182,10 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                   </button>
                 </div>
               )}
-            </TableSection>
+                          </TableSection>
 
             {/* 2. JOURNAL ENTRIES */}
-            <TableSection title="Journal Entries" icon={<Layers size={14} />}>
+            <TableSection title={`Journal Entries`} icon={<Layers size={14} />}>
               <div className="w-full flex flex-col gap-[2px] mb-4">
                 <div className="h-[2px] w-full bg-red-600 rounded-full" />
                 <div className="h-[1px] w-full bg-black/10" />
@@ -993,15 +1208,15 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
               <div className="overflow-x-auto custom-table-scroller">
                 <table className="w-full text-center" style={{ tableLayout: 'fixed', minWidth: 600 }}>
                   <colgroup>
-                    <col style={{ width: '40%' }} />
-                    <col style={{ width: '22%' }} />
-                    <col style={{ width: '16%' }} />
-                    <col style={{ width: '16%' }} />
-                    <col style={{ width: '6%'  }} />
+                    <col style={{ width: '35%' }} /> {/* Charts of Account */}
+                    <col style={{ width: '18%' }} /> {/* Debit */}
+                    <col style={{ width: '18%' }} /> {/* Credit */}
+                    <col style={{ width: '23%' }} /> {/* Responsibility Center */}
+                    <col style={{ width: '6%'  }} /> {/* Delete */}
                   </colgroup>
                   <thead>
                     <tr className="border-b border-gray-100">
-                      {['Charts of Account', 'Responsibility Center', 'Debit', 'Credit', ''].map((h, i) => (
+                      {['Charts of Account', 'Debit', 'Credit', 'Responsibility Center', ''].map((h, i) => (
                         <th key={i} className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1">{h}</th>
                       ))}
                     </tr>
@@ -1029,33 +1244,32 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                         </td>
                         <td className="py-1.5 px-1">
                           <input 
-                            disabled={isViewMode}
-                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
-                            placeholder="Center..." 
-                            value={entry.center} 
-                            onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} 
-                          />
-                        </td>
-                        <td className="py-1.5 px-1">
-                          <input 
-                            disabled={isViewMode || !entry.isManual} 
-                            className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            disabled={isViewMode} 
+                            className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
                             placeholder="0.00" 
                             type="number"
                             value={entry.debit || ''} 
                             onChange={e => updateJournalEntry(entry.id, 'debit', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} 
-                            readOnly={!entry.isManual} 
                           />
                         </td>
                         <td className="py-1.5 px-1">
                           <input 
-                            disabled={isViewMode || !entry.isManual} 
-                            className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            disabled={isViewMode} 
+                            className={`${tableInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
                             placeholder="0.00" 
                             type="number"
                             value={entry.credit === null || entry.credit === undefined ? '' : entry.credit} 
                             onChange={e => updateJournalEntry(entry.id, 'credit', e.target.value === '' ? null : parseFloat(e.target.value) || 0)} 
                             readOnly={!entry.isManual} 
+                          />
+                        </td>
+                        <td className="py-1.5 px-1">
+                          <input 
+                            disabled={isViewMode}
+                            className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`} 
+                            placeholder="Center..." 
+                            value={entry.center} 
+                            onChange={e => updateJournalEntry(entry.id, 'center', e.target.value)} 
                           />
                         </td>
                         <td className="py-1.5 text-center">
@@ -1072,12 +1286,13 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                   </tbody>
                   <tfoot>
                     <tr className="bg-gray-50/50 border">
-                      <td colSpan={2} className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
+                      <td className="py-2 px-3 text-[12px] font-black uppercase text-black text-left">Balance Check</td>
                       <td className="py-2 px-1 text-center text-[13px] font-black">{fmt(totalDebit)}</td>
                       <td className={`py-2 px-1 text-center text-[13px] font-black ${isBalanced ? 'text-green-600' : 'text-red-600'}`}>
                         {fmt(totalCredit)} <span className="text-[11px]">{isBalanced ? '✅' : '❌'}</span>
                       </td>
-                      <td />
+                      <td /> {/* Empty Responsibility Center - no totals */}
+                      <td /> {/* Empty Delete column */}
                     </tr>
                   </tfoot>
                 </table>
@@ -1085,7 +1300,11 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
 
               {!isViewMode && (
                 <button
-                  onClick={addJournalEntry}
+                  onClick={() => {
+                    console.log('DEBUG: isViewMode:', isViewMode);
+                    console.log('DEBUG: Current journalEntries count:', journalEntries.length);
+                    addJournalEntry();
+                  }}
                   className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1"
                 >
                   <Plus size={15} /> Add Ledger Row
@@ -1115,7 +1334,7 @@ export default function PaymentsForm({ onBack, onSuccess, isViewMode = false, pa
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {attachments.map(file => (
+                      {console.log('Rendering attachments, current array:', attachments) || attachments.map(file => (
                         <tr key={file.id}>
                           <td className="py-2 px-1">
                             <input 

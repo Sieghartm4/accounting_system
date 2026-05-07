@@ -24,7 +24,9 @@ function CollectionsContent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isAdding, setIsAdding] = useState(false);
   const [isViewing, setIsViewing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [viewingCollection, setViewingCollection] = useState(null);
+  const [editingCollection, setEditingCollection] = useState(null);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -215,6 +217,23 @@ function CollectionsContent() {
     </RouteProtection>
   );
 
+  if (isEditing) return (
+    <RouteProtection routeName="collections">
+      <CollectionsForm
+        isEditMode={true}
+        collectionData={editingCollection}
+        onBack={() => {
+          setIsEditing(false);
+          setEditingCollection(null);
+        }}
+        onSuccess={async (nextToast) => {
+          if (nextToast) setToast(nextToast);
+          await refetchCollections();
+        }}
+      />
+    </RouteProtection>
+  );
+
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
@@ -397,8 +416,8 @@ function CollectionsContent() {
                   }
 
                   console.log('Collection details fetched for editing:', result);
-                  setViewingCollection(result);
-                  setIsAdding(true);
+                  setEditingCollection(result);
+                  setIsEditing(true);
 
                 } catch (error) {
                   console.error('Error fetching collection details for editing:', error);
