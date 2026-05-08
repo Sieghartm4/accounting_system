@@ -377,7 +377,7 @@ class SQLQueryBuilder {
     
     // Handle string conditions (legacy)
     const operators = ['=', '!=', '<>', '<', '>', ' LIKE ', ' IN ', ' IS ']
-    const hasOperator = operators.some((op) => cond.includes(op))
+    const hasOperator = operators.some((op) => cond && cond.includes && cond.includes(op))
 
     if (hasOperator) return cond
 

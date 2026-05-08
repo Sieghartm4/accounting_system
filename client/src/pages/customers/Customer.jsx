@@ -73,7 +73,7 @@ function CustomerContent() {
             formData.type,
             formData.status
           );
-      
+
       if (result.success) {
         setToast({
           type: 'success',

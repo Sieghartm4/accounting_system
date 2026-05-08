@@ -309,7 +309,7 @@ export default function Sidebar({ isCollapsed }) {
                 )}
 
                 {!isCollapsed && (
-                    <div className="ml-3 overflow-hidden whitespace-nowrap">
+                    <div className="ml-3">
                         <span className="font-bold tracking-tight text-white text-2xl block">
                             {company?.company_name || '\u00A0'}
                         </span>

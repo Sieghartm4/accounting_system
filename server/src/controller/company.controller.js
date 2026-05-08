@@ -185,7 +185,7 @@ const updateCompany = async (req, res, next) => {
         // Fetch existing company to compare changes
         const existingQuery = sql.select([Master.master_company.selectOptionColumns.company_name, Master.master_company.selectOptionColumns.owner_name, Master.master_company.selectOptionColumns.address, Master.master_company.selectOptionColumns.tin, Master.master_company.selectOptionColumns.website, Master.master_company.selectOptionColumns.email, Master.master_company.selectOptionColumns.phone, Master.master_company.selectOptionColumns.status])
           .from(Master.master_company.tablename)
-          .where(Master.master_company.selectOptionColumns.id)
+          .where(Master.master_company.selectOptionColumns.company_id)
           .build();
         const existingCompanies = await Query(existingQuery, [id], Master.master_company.prefix_);
         const old = existingCompanies[0] || {};
