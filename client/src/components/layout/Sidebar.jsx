@@ -793,7 +793,9 @@ export default function Sidebar({ isCollapsed }) {
 
                                         general_ledger: BookOpen,
 
-                                        balance_sheet: PieChart
+                                        balance_sheet: PieChart,
+
+                                        journal_entries: FileText
 
                                     };
 

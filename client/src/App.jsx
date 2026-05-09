@@ -26,6 +26,7 @@ import TrialBalance from './pages/reports/TrialBalance'
 import IncomeStatement from './pages/reports/IncomeStatement'
 import GeneralLedger from './pages/reports/GeneralLedger'
 import BalanceSheet from './pages/reports/BalanceSheet'
+import JournalEntries from './pages/reports/JournalEntries'
 
 function App() {
   return (
@@ -143,6 +144,11 @@ function App() {
           <Route path="balance-sheet" element={
             <ProtectedRoute routeName="balance_sheet">
               <BalanceSheet />
+            </ProtectedRoute>
+          } />
+          <Route path="journal-entries" element={
+            <ProtectedRoute routeName="journal_entries">
+              <JournalEntries />
             </ProtectedRoute>
           } />
         </Route>

@@ -212,7 +212,8 @@ export const ROUTE_CONFIG = {
   trial_balance: { name: 'trial_balance', label: 'Trial Balance', icon: 'Scale' },
   income_statement: { name: 'income_statement', label: 'Income Statement', icon: 'FileText' },
   general_ledger: { name: 'general_ledger', label: 'General Ledger', icon: 'BookOpen' },
-  balance_sheet: { name: 'balance_sheet', label: 'Balance Sheet', icon: 'PieChart' }
+  balance_sheet: { name: 'balance_sheet', label: 'Balance Sheet', icon: 'PieChart' },
+  journal_entries: { name: 'journal_entries', label: 'Journal Entries', icon: 'FileText' }
 };
 
 /**
@@ -276,7 +277,7 @@ export const getSidebarItems = (user) => {
   }
 
   // Reports section
-  const reportRoutes = ['trial_balance', 'income_statement', 'general_ledger', 'balance_sheet'];
+  const reportRoutes = ['trial_balance', 'income_statement', 'general_ledger', 'balance_sheet', 'journal_entries'];
   reportRoutes.forEach(route => {
     if (hasRouteAccess(route, user)) {
       items.reports.push(ROUTE_CONFIG[route]);
