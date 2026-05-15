@@ -1,6 +1,16 @@
 const os = require('os')
-const { checkConnection, SelectAll, Transaction, Query, Insert } = require('../database/util/queries.util')
-const { formatMemoryUsage, formatTime, DataModeling } = require('../util/helper.util')
+const {
+  checkConnection,
+  SelectAll,
+  Transaction,
+  Query,
+  Insert,
+} = require('../database/util/queries.util')
+const {
+  formatMemoryUsage,
+  formatTime,
+  DataModeling,
+} = require('../util/helper.util')
 const { Master } = require('../database/model/Master')
 const { Accounting } = require('../database/model/Accounting')
 const { SQLQueryBuilder } = require('../util/helper.util')
@@ -12,51 +22,61 @@ require('dotenv').config()
 
 const getTrialBalance = async (req, res, next) => {
   try {
-    const { start_date, end_date } = req.query;
+    const { start_date, end_date } = req.query
 
-    let dateFilter = '';
+    let dateFilter = ''
     if (start_date || end_date) {
-      const conditions = [];
-      if (start_date) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} >= '${start_date}'`);
-      if (end_date) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} <= '${end_date}'`);
-      dateFilter = ` AND ${conditions.join(' AND ')}`;
+      const conditions = []
+      if (start_date)
+        conditions.push(
+          `${Accounting.journal_entries.selectOptionColumns.date} >= '${start_date}'`,
+        )
+      if (end_date)
+        conditions.push(
+          `${Accounting.journal_entries.selectOptionColumns.date} <= '${end_date}'`,
+        )
+      dateFilter = ` AND ${conditions.join(' AND ')}`
     }
 
     const trial_balance_query = `SELECT ${Master.charts_of_accounts.selectOptionColumns.code} as 'Account Code', ${Master.charts_of_accounts.selectOptionColumns.name} as 'Account Name', SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as DEBIT, SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as CREDIT FROM ${Master.charts_of_accounts.tablename} LEFT JOIN ${Accounting.journal_entries.tablename} ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id} WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'${dateFilter} GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.code}, ${Master.charts_of_accounts.selectOptionColumns.name} ORDER BY ${Master.charts_of_accounts.selectOptionColumns.code}`
 
-    const trialBalance = await Query(trial_balance_query);
+    const trialBalance = await Query(trial_balance_query)
 
     res.status(200).json({
       success: true,
       message: 'Trial Balance retrieved successfully',
       data: trialBalance,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
-
   } catch (error) {
     console.error('Error fetching trial balance:', error)
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching trial balance',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
     })
   }
 }
 
 const getIncomeStatement = async (req, res, next) => {
   try {
-    const { start_date, end_date } = req.query;
+    const { start_date, end_date } = req.query
 
-    let dateFilter = '';
+    let dateFilter = ''
     if (start_date || end_date) {
-      const conditions = [];
-      if (start_date) conditions.push(
-        `${Accounting.journal_entries.selectOptionColumns.date} >= '${start_date}'`
-      );
-      if (end_date) conditions.push(
-        `${Accounting.journal_entries.selectOptionColumns.date} <= '${end_date}'`
-      );
-      dateFilter = ` AND ${conditions.join(' AND ')}`;
+      const conditions = []
+      if (start_date)
+        conditions.push(
+          `${Accounting.journal_entries.selectOptionColumns.date} >= '${start_date}'`,
+        )
+      if (end_date)
+        conditions.push(
+          `${Accounting.journal_entries.selectOptionColumns.date} <= '${end_date}'`,
+        )
+      dateFilter = ` AND ${conditions.join(' AND ')}`
     }
 
     // KEY INSIGHT:
@@ -114,22 +134,32 @@ const getIncomeStatement = async (req, res, next) => {
       ORDER BY
         ${Master.charts_of_accounts.selectOptionColumns.type},
         ${Master.charts_of_accounts.selectOptionColumns.code}
-    `;
+    `
 
-    const incomeStatement = await Query(income_statement_query);
+    const incomeStatement = await Query(income_statement_query)
 
-    const revenues = incomeStatement.filter(item => item['Account Type'] === 'REVENUE');
-    const expenses = incomeStatement.filter(item => item['Account Type'] === 'EXPENSES');
+    const revenues = incomeStatement.filter(
+      (item) => item['Account Type'] === 'REVENUE',
+    )
+    const expenses = incomeStatement.filter(
+      (item) => item['Account Type'] === 'EXPENSES',
+    )
 
     // totalRevenues: income accounts are positive, contra-revenue (Sales Discounts) is negative
     // They naturally net together correctly
-    const totalRevenues = revenues.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0);
+    const totalRevenues = revenues.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
 
     // totalExpenses: regular expense accounts are positive, contra-expense (Purchase Discounts) is negative
     // They naturally net together correctly
-    const totalExpenses = expenses.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0);
+    const totalExpenses = expenses.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
 
-    const netIncome = totalRevenues - totalExpenses;
+    const netIncome = totalRevenues - totalExpenses
 
     res.status(200).json({
       success: true,
@@ -139,42 +169,50 @@ const getIncomeStatement = async (req, res, next) => {
         expenses,
         totalRevenues,
         totalExpenses,
-        netIncome
+        netIncome,
       },
-      timestamp: new Date().toISOString()
-    });
-
+      timestamp: new Date().toISOString(),
+    })
   } catch (error) {
-    console.error('Error fetching income statement:', error);
+    console.error('Error fetching income statement:', error)
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching income statement',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
   }
-};
+}
 
 const getGeneralLedger = async (req, res, next) => {
   try {
-    const { start_date, end_date } = req.query;
+    const { start_date, end_date } = req.query
 
-    let startDate = start_date;
-    let endDate = end_date;
+    let startDate = start_date
+    let endDate = end_date
 
     if (!start_date && !end_date) {
-      const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      startDate = firstDay.toISOString().split('T')[0];
-      endDate = lastDay.toISOString().split('T')[0];
+      const now = new Date()
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      startDate = firstDay.toISOString().split('T')[0]
+      endDate = lastDay.toISOString().split('T')[0]
     }
 
-    let dateFilter = '';
+    let dateFilter = ''
     if (startDate || endDate) {
-      const conditions = [];
-      if (startDate) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} >= '${startDate}'`);
-      if (endDate) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} <= '${endDate}'`);
-      dateFilter = ` WHERE ${conditions.join(' AND ')}`;
+      const conditions = []
+      if (startDate)
+        conditions.push(
+          `${Accounting.journal_entries.selectOptionColumns.date} >= '${startDate}'`,
+        )
+      if (endDate)
+        conditions.push(
+          `${Accounting.journal_entries.selectOptionColumns.date} <= '${endDate}'`,
+        )
+      dateFilter = ` WHERE ${conditions.join(' AND ')}`
     }
 
     const general_ledger_query = `
@@ -198,15 +236,15 @@ const getGeneralLedger = async (req, res, next) => {
         ${Accounting.journal_entries.selectOptionColumns.db_name},
         ${Accounting.journal_entries.selectOptionColumns.date},
         ${Accounting.journal_entries.selectOptionColumns.db_id}
-    `;
+    `
 
-    const rows = await Query(general_ledger_query);
+    const rows = await Query(general_ledger_query)
 
-    const grouped = {};
+    const grouped = {}
     for (const row of rows) {
-      const section = row.db_name;
-      if (!grouped[section]) grouped[section] = [];
-      grouped[section].push(row);
+      const section = row.db_name
+      if (!grouped[section]) grouped[section] = []
+      grouped[section].push(row)
     }
 
     const SECTION_ORDER = [
@@ -217,7 +255,7 @@ const getGeneralLedger = async (req, res, next) => {
       'purchase',
       'payments',
       'cash_disbursements',
-    ];
+    ]
 
     const SECTION_LABELS = {
       adjustments: 'JOURNAL VOUCHER / ADJUSTMENTS',
@@ -227,14 +265,14 @@ const getGeneralLedger = async (req, res, next) => {
       purchase: 'PURCHASES',
       payments: 'PAYMENTS',
       cash_disbursements: 'CASH DISBURSEMENTS',
-    };
+    }
 
     const allSections = [
       ...SECTION_ORDER,
-      ...Object.keys(grouped).filter(k => !SECTION_ORDER.includes(k))
-    ].filter(k => grouped[k]);
+      ...Object.keys(grouped).filter((k) => !SECTION_ORDER.includes(k)),
+    ].filter((k) => grouped[k])
 
-    const sections = allSections.map(key => ({
+    const sections = allSections.map((key) => ({
       section_key: key,
       section_label: SECTION_LABELS[key] || key.toUpperCase().replace(/_/g, ' '),
       transactions: grouped[key].map((row, i) => ({
@@ -244,11 +282,11 @@ const getGeneralLedger = async (req, res, next) => {
         responsibility_center: row.responsibility_center || '',
         debit: parseFloat(row.Debit || 0),
         credit: parseFloat(row.Credit || 0),
-      }))
-    }));
+      })),
+    }))
 
-    const grandTotalDebit = rows.reduce((s, r) => s + parseFloat(r.Debit || 0), 0);
-    const grandTotalCredit = rows.reduce((s, r) => s + parseFloat(r.Credit || 0), 0);
+    const grandTotalDebit = rows.reduce((s, r) => s + parseFloat(r.Debit || 0), 0)
+    const grandTotalCredit = rows.reduce((s, r) => s + parseFloat(r.Credit || 0), 0)
 
     res.status(200).json({
       success: true,
@@ -261,34 +299,42 @@ const getGeneralLedger = async (req, res, next) => {
       },
       startDate,
       endDate,
-      timestamp: new Date().toISOString()
-    });
-
+      timestamp: new Date().toISOString(),
+    })
   } catch (error) {
-    console.error('Error fetching general ledger:', error);
+    console.error('Error fetching general ledger:', error)
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching general ledger',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
   }
-};
+}
 
 const getBalanceSheet = async (req, res, next) => {
   try {
-    const { start_date, end_date } = req.query;
+    const { start_date, end_date } = req.query
 
-    let dateFilter = '';
+    let dateFilter = ''
     if (start_date || end_date) {
-      const conditions = [];
-      if (start_date) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} >= '${start_date}'`);
-      if (end_date) conditions.push(`${Accounting.journal_entries.selectOptionColumns.date} <= '${end_date}'`);
-      dateFilter = ` AND ${conditions.join(' AND ')}`;
+      const conditions = []
+      if (start_date)
+        conditions.push(
+          `${Accounting.journal_entries.selectOptionColumns.date} >= '${start_date}'`,
+        )
+      if (end_date)
+        conditions.push(
+          `${Accounting.journal_entries.selectOptionColumns.date} <= '${end_date}'`,
+        )
+      dateFilter = ` AND ${conditions.join(' AND ')}`
     }
 
     const balance_sheet_query = `SELECT ${Master.charts_of_accounts.selectOptionColumns.code} as 'Account Code', ${Master.charts_of_accounts.selectOptionColumns.name} as 'Account Name', SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as Current FROM ${Master.charts_of_accounts.tablename} LEFT JOIN ${Accounting.journal_entries.tablename} ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id} WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE' AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('ASSETS', 'LIABILITIES', 'EQUITY')${dateFilter} GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.code}, ${Master.charts_of_accounts.selectOptionColumns.name}, ${Master.charts_of_accounts.selectOptionColumns.type} ORDER BY ${Master.charts_of_accounts.selectOptionColumns.type}, ${Master.charts_of_accounts.selectOptionColumns.code}`
 
-    const balanceSheet = await Query(balance_sheet_query);
+    const balanceSheet = await Query(balance_sheet_query)
 
     const income_statement_query = `
       SELECT 
@@ -318,33 +364,58 @@ const getBalanceSheet = async (req, res, next) => {
       GROUP BY
         ${Master.charts_of_accounts.selectOptionColumns.id},
         ${Master.charts_of_accounts.selectOptionColumns.type}
-    `;
+    `
 
-    const incomeStatement = await Query(income_statement_query);
+    const incomeStatement = await Query(income_statement_query)
 
-    const revenues = incomeStatement.filter(item => item['Account Type'] === 'REVENUE');
-    const expenses = incomeStatement.filter(item => item['Account Type'] === 'EXPENSES');
-    
-    const totalRevenues = revenues.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0);
-    const totalExpenses = expenses.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0);
-    const netIncome = totalRevenues - totalExpenses;
+    const revenues = incomeStatement.filter(
+      (item) => item['Account Type'] === 'REVENUE',
+    )
+    const expenses = incomeStatement.filter(
+      (item) => item['Account Type'] === 'EXPENSES',
+    )
 
-    const assets = balanceSheet.filter(item => item['Account Code'].startsWith('100'))
-    const liabilities = balanceSheet.filter(item => item['Account Code'].startsWith('200'))
-    const equity = balanceSheet.filter(item => item['Account Code'].startsWith('300'))
+    const totalRevenues = revenues.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
+    const totalExpenses = expenses.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
+    const netIncome = totalRevenues - totalExpenses
 
-    const updatedEquity = [...equity];
+    const assets = balanceSheet.filter((item) =>
+      item['Account Code'].startsWith('100'),
+    )
+    const liabilities = balanceSheet.filter((item) =>
+      item['Account Code'].startsWith('200'),
+    )
+    const equity = balanceSheet.filter((item) =>
+      item['Account Code'].startsWith('300'),
+    )
+
+    const updatedEquity = [...equity]
     if (netIncome !== 0) {
       updatedEquity.push({
         'Account Code': '300999',
         'Account Name': 'Current Period Net Income',
-        'Current': -netIncome
-      });
+        Current: -netIncome,
+      })
     }
 
-    const totalAssets = assets.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
-    const totalLiabilities = liabilities.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
-    const totalEquity = updatedEquity.reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
+    const totalAssets = assets.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
+    const totalLiabilities = liabilities.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
+    const totalEquity = updatedEquity.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
 
     res.status(200).json({
       success: true,
@@ -357,43 +428,45 @@ const getBalanceSheet = async (req, res, next) => {
         totalLiabilities: totalLiabilities,
         totalEquity: totalEquity,
         totalLiabilitiesAndEquity: totalLiabilities + totalEquity,
-        netIncome: netIncome
+        netIncome: netIncome,
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
-
   } catch (error) {
     console.error('Error fetching balance sheet:', error)
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching balance sheet',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
     })
   }
 }
 
 const getSearch = async (req, res, next) => {
-  const { startDate, endDate, search, searchFields } = req.query;
-  
+  const { startDate, endDate, search, searchFields } = req.query
+
   try {
     if (!startDate || !endDate) {
       return res.status(400).json({
         success: false,
         message: 'Start date and end date are required',
-        timestamp: new Date().toISOString()
-      });
+        timestamp: new Date().toISOString(),
+      })
     }
 
     if (!search || search.trim() === '') {
       return res.status(400).json({
         success: false,
         message: 'Search term is required',
-        timestamp: new Date().toISOString()
-      });
+        timestamp: new Date().toISOString(),
+      })
     }
 
-    const searchTerm = `%${search.trim()}%`;
-    const results = [];
+    const searchTerm = `%${search.trim()}%`
+    const results = []
 
     // Enhanced Sales Query - searches across multiple fields
     const salesQuery = `
@@ -419,10 +492,19 @@ const getSearch = async (req, res, next) => {
         CAST(sal.${Accounting.sales.selectOptionColumns.total_amount_due} AS CHAR) LIKE ?
       )
         AND sal.${Accounting.sales.selectOptionColumns.date_delivered} BETWEEN ? AND ?
-    `;
-    
-    const salesResults = await Query(salesQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
-    results.push(...salesResults);
+    `
+
+    const salesResults = await Query(salesQuery, [
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      startDate,
+      endDate,
+    ])
+    results.push(...salesResults)
 
     // Enhanced Collections Query - searches across multiple fields
     const collectionsQuery = `
@@ -453,10 +535,21 @@ const getSearch = async (req, res, next) => {
         coll.${Accounting.collections.selectOptionColumns.check_number} LIKE ?
       )
         AND coll.${Accounting.collections.selectOptionColumns.collection_date} BETWEEN ? AND ?
-    `;
-    
-    const collectionsResults = await Query(collectionsQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
-    results.push(...collectionsResults);
+    `
+
+    const collectionsResults = await Query(collectionsQuery, [
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      startDate,
+      endDate,
+    ])
+    results.push(...collectionsResults)
 
     // Enhanced Receipts Query - searches across multiple fields
     const receiptsQuery = `
@@ -488,10 +581,22 @@ const getSearch = async (req, res, next) => {
         rec.${Accounting.receipts.selectOptionColumns.check_number} LIKE ?
       )
         AND rec.${Accounting.receipts.selectOptionColumns.collection_date} BETWEEN ? AND ?
-    `;
-    
-    const receiptsResults = await Query(receiptsQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
-    results.push(...receiptsResults);
+    `
+
+    const receiptsResults = await Query(receiptsQuery, [
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      startDate,
+      endDate,
+    ])
+    results.push(...receiptsResults)
 
     // Enhanced Purchase Query - searches across multiple fields
     const purchaseQuery = `
@@ -517,10 +622,19 @@ const getSearch = async (req, res, next) => {
         CAST(pur.${Accounting.purchase.selectOptionColumns.total_amount_due} AS CHAR) LIKE ?
       )
         AND pur.${Accounting.purchase.selectOptionColumns.date_delivered} BETWEEN ? AND ?
-    `;
-    
-    const purchaseResults = await Query(purchaseQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
-    results.push(...purchaseResults);
+    `
+
+    const purchaseResults = await Query(purchaseQuery, [
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      startDate,
+      endDate,
+    ])
+    results.push(...purchaseResults)
 
     // Enhanced Cash Disbursements Query - searches across multiple fields
     const cashDisbursementsQuery = `
@@ -552,10 +666,22 @@ const getSearch = async (req, res, next) => {
         cd.${Accounting.cash_disbursements.selectOptionColumns.check_number} LIKE ?
       )
         AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} BETWEEN ? AND ?
-    `;
-    
-    const cashDisbursementsResults = await Query(cashDisbursementsQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
-    results.push(...cashDisbursementsResults);
+    `
+
+    const cashDisbursementsResults = await Query(cashDisbursementsQuery, [
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      startDate,
+      endDate,
+    ])
+    results.push(...cashDisbursementsResults)
 
     // Enhanced Payments Query - searches across multiple fields
     const paymentsQuery = `
@@ -586,10 +712,21 @@ const getSearch = async (req, res, next) => {
         pay.${Accounting.payments.selectOptionColumns.check_number} LIKE ?
       )
         AND pay.${Accounting.payments.selectOptionColumns.payment_date} BETWEEN ? AND ?
-    `;
-    
-    const paymentsResults = await Query(paymentsQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
-    results.push(...paymentsResults);
+    `
+
+    const paymentsResults = await Query(paymentsQuery, [
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      startDate,
+      endDate,
+    ])
+    results.push(...paymentsResults)
 
     // Enhanced Adjustments Query - searches across multiple fields
     const adjustmentsQuery = `
@@ -614,12 +751,20 @@ const getSearch = async (req, res, next) => {
         CAST(adj.${Accounting.adjustments.selectOptionColumns.total_amount} AS CHAR) LIKE ?
       )
         AND adj.${Accounting.adjustments.selectOptionColumns.posting_date} BETWEEN ? AND ?
-    `;
-    
-    const adjustmentsResults = await Query(adjustmentsQuery, [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, startDate, endDate]);
-    results.push(...adjustmentsResults);
+    `
 
-    results.sort((a, b) => new Date(b.document_date) - new Date(a.document_date));
+    const adjustmentsResults = await Query(adjustmentsQuery, [
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      searchTerm,
+      startDate,
+      endDate,
+    ])
+    results.push(...adjustmentsResults)
+
+    results.sort((a, b) => new Date(b.document_date) - new Date(a.document_date))
 
     res.status(200).json({
       success: true,
@@ -629,29 +774,366 @@ const getSearch = async (req, res, next) => {
       search_term: search,
       searchable_fields: [
         'Document Reference',
-        'Customer/Vendor Name', 
+        'Customer/Vendor Name',
         'Remarks',
         'Created By',
         'State',
         'Total Amount',
         'Mode of Payment',
         'Bank Name',
-        'Check Number'
+        'Check Number',
       ],
       date_range: {
         start_date: startDate,
-        end_date: endDate
+        end_date: endDate,
       },
-      timestamp: new Date().toISOString()
-    });
-
+      timestamp: new Date().toISOString(),
+    })
   } catch (error) {
-    console.error('Error performing search:', error);
+    console.error('Error performing search:', error)
     return res.status(500).json({
       success: false,
       message: 'Server error while performing search',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const getStatementOfComprehensiveIncome = async (req, res, next) => {
+  try {
+    const { start_date, end_date } = req.query
+
+    let dateFilter = ''
+    if (start_date || end_date) {
+      dateFilter =
+        ' AND ' +
+        Accounting.journal_entries.selectOptionColumns.date +
+        ' BETWEEN ? AND ?'
+    }
+
+    // Get Income Statement data (revenues and expenses)
+    const income_statement_query = `
+      SELECT 
+        ${Master.charts_of_accounts.selectOptionColumns.code}   AS 'Account Code',
+        ${Master.charts_of_accounts.selectOptionColumns.name}   AS 'Account Name',
+        ${Master.charts_of_accounts.selectOptionColumns.type}   AS 'Account Type',
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' 
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalCredit,
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'  
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalDebit,
+        CASE
+          WHEN ${Master.charts_of_accounts.selectOptionColumns.type} = 'REVENUE'
+            THEN SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+               - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+          WHEN ${Master.charts_of_accounts.selectOptionColumns.type} = 'EXPENSES'
+            THEN SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+               - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+        END AS Current
+      FROM ${Master.charts_of_accounts.tablename}
+      LEFT JOIN ${Accounting.journal_entries.tablename}
+        ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+           ${dateFilter.replace(' AND ', '')}
+      WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
+        AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
+      GROUP BY
+        ${Master.charts_of_accounts.selectOptionColumns.id},
+        ${Master.charts_of_accounts.selectOptionColumns.code},
+        ${Master.charts_of_accounts.selectOptionColumns.name},
+        ${Master.charts_of_accounts.selectOptionColumns.type}
+      ORDER BY
+        ${Master.charts_of_accounts.selectOptionColumns.type},
+        ${Master.charts_of_accounts.selectOptionColumns.code}
+    `
+
+    const queryParams = []
+    if (start_date && end_date) {
+      queryParams.push(start_date, end_date)
+    }
+
+    const incomeStatement = await Query(income_statement_query, queryParams)
+
+    // Separate revenues and expenses
+    const revenues = incomeStatement.filter(
+      (item) => item['Account Type'] === 'REVENUE',
+    )
+    const expenses = incomeStatement.filter(
+      (item) => item['Account Type'] === 'EXPENSES',
+    )
+
+    // Calculate totals
+    const totalRevenues = revenues.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
+    const totalExpenses = expenses.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
+    const netIncome = totalRevenues - totalExpenses
+
+    // Get Other Comprehensive Income items (OCI) - typically revaluation accounts, unrealized gains/losses
+    // These are typically EQUITY type accounts with specific codes or names containing 'OCI', 'Revaluation', 'Unrealized'
+    const oci_query = `
+      SELECT 
+        ${Master.charts_of_accounts.selectOptionColumns.code}   AS 'Account Code',
+        ${Master.charts_of_accounts.selectOptionColumns.name}   AS 'Account Name',
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' 
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalCredit,
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'  
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalDebit,
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                  THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+        - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                  THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS Current
+      FROM ${Master.charts_of_accounts.tablename}
+      LEFT JOIN ${Accounting.journal_entries.tablename}
+        ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+           ${dateFilter.replace(' AND ', '')}
+      WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
+        AND (${Master.charts_of_accounts.selectOptionColumns.name} LIKE '%OCI%'
+             OR ${Master.charts_of_accounts.selectOptionColumns.name} LIKE '%Revaluation%'
+             OR ${Master.charts_of_accounts.selectOptionColumns.name} LIKE '%Unrealized%'
+             OR ${Master.charts_of_accounts.selectOptionColumns.code} LIKE '35%')
+      GROUP BY
+        ${Master.charts_of_accounts.selectOptionColumns.id},
+        ${Master.charts_of_accounts.selectOptionColumns.code},
+        ${Master.charts_of_accounts.selectOptionColumns.name}
+      ORDER BY
+        ${Master.charts_of_accounts.selectOptionColumns.code}
+    `
+
+    const ociItems = await Query(oci_query, queryParams)
+    const totalOCI = ociItems.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
+
+    // Separate revenues into sales revenue and cost of sales
+    const salesRevenue = revenues
+      .filter(
+        (item) =>
+          !item['Account Name'].toLowerCase().includes('discount') &&
+          !item['Account Name'].toLowerCase().includes('contra') &&
+          !item['Account Name'].toLowerCase().includes('cost'),
+      )
+      .reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
+
+    const costOfSales = revenues
+      .filter(
+        (item) =>
+          item['Account Name'].toLowerCase().includes('cost') ||
+          item['Account Name'].toLowerCase().includes('cost of'),
+      )
+      .reduce((sum, item) => sum + parseFloat(item.Current || 0), 0)
+
+    const grossProfit = salesRevenue - Math.abs(costOfSales)
+
+    // Calculate operating expenses separately
+    const operatingExpenses = expenses.filter(
+      (item) =>
+        !item['Account Name'].toLowerCase().includes('other') &&
+        !item['Account Name'].toLowerCase().includes('tax'),
+    )
+
+    const totalOperatingExpenses = operatingExpenses.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
+    const operatingIncome = grossProfit - totalOperatingExpenses
+
+    const totalComprehensiveIncome = netIncome + totalOCI
+
+    res.status(200).json({
+      success: true,
+      message: 'Statement of Comprehensive Income retrieved successfully',
+      data: {
+        revenues: revenues,
+        salesRevenue: salesRevenue,
+        costOfSales: Math.abs(costOfSales),
+        grossProfit: grossProfit,
+        operatingExpenses: operatingExpenses,
+        totalOperatingExpenses: totalOperatingExpenses,
+        operatingIncome: operatingIncome,
+        expenses: expenses,
+        totalExpenses: totalExpenses,
+        netIncome: netIncome,
+        otherComprehensiveIncome: ociItems,
+        totalOCI: totalOCI,
+        totalComprehensiveIncome: totalComprehensiveIncome,
+      },
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching statement of comprehensive income:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching statement of comprehensive income',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const getBankReconciliation = async (req, res, next) => {
+  try {
+    const { start_date, end_date, bank_statement_balance } = req.query
+
+    let dateFilter = ''
+    if (start_date || end_date) {
+      const conditions = []
+      if (start_date)
+        conditions.push(
+          `${Accounting.journal_entries.selectOptionColumns.date} >= '${start_date}'`,
+        )
+      if (end_date)
+        conditions.push(
+          `${Accounting.journal_entries.selectOptionColumns.date} <= '${end_date}'`,
+        )
+      dateFilter = ` AND ${conditions.join(' AND ')}`
+    }
+
+    // Get Cash GL Balance (Account codes starting with 1010 are typically cash accounts)
+    const cash_balance_query = `
+      SELECT 
+        ${Master.charts_of_accounts.selectOptionColumns.code} as 'Account Code',
+        ${Master.charts_of_accounts.selectOptionColumns.name} as 'Account Name',
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' 
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) -
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' 
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as Balance
+      FROM ${Master.charts_of_accounts.tablename}
+      LEFT JOIN ${Accounting.journal_entries.tablename}
+        ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+           ${dateFilter}
+      WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
+        AND (${Master.charts_of_accounts.selectOptionColumns.code} LIKE '101%' OR ${Master.charts_of_accounts.selectOptionColumns.code} LIKE '102%')
+      GROUP BY
+        ${Master.charts_of_accounts.selectOptionColumns.id},
+        ${Master.charts_of_accounts.selectOptionColumns.code},
+        ${Master.charts_of_accounts.selectOptionColumns.name}
+      ORDER BY ${Master.charts_of_accounts.selectOptionColumns.code}
+    `
+
+    const cashAccounts = await Query(cash_balance_query)
+    const totalCashGL = cashAccounts.reduce(
+      (sum, acc) => sum + parseFloat(acc.Balance || 0),
+      0,
+    )
+
+    // Get Outstanding Checks (issued but not yet cleared)
+    const outstanding_checks_query = `
+      SELECT 
+        ${Accounting.cash_disbursements.selectOptionColumns.id},
+        ${Accounting.cash_disbursements.selectOptionColumns.document_reference} as 'Check Number',
+        ${Accounting.cash_disbursements.selectOptionColumns.total_amount_due} as 'Amount',
+        ${Accounting.cash_disbursements.selectOptionColumns.payment_date} as 'Date',
+        ${Accounting.cash_disbursements.selectOptionColumns.state} as 'Status'
+      FROM ${Accounting.cash_disbursements.tablename}
+      WHERE ${Accounting.cash_disbursements.selectOptionColumns.state} IN ('PENDING', 'ISSUED')
+        ${start_date ? `AND ${Accounting.cash_disbursements.selectOptionColumns.payment_date} >= '${start_date}'` : ''}
+        ${end_date ? `AND ${Accounting.cash_disbursements.selectOptionColumns.payment_date} <= '${end_date}'` : ''}
+      ORDER BY ${Accounting.cash_disbursements.selectOptionColumns.payment_date}
+    `
+
+    const outstandingChecks = await Query(outstanding_checks_query)
+    const totalOutstandingChecks = outstandingChecks.reduce(
+      (sum, check) => sum + parseFloat(check.Amount || 0),
+      0,
+    )
+
+    // Get Deposits in Transit (recorded but not yet cleared)
+    const deposits_in_transit_query = `
+      SELECT 
+        'Receipt' as type,
+        ${Accounting.receipts.selectOptionColumns.id},
+        ${Accounting.receipts.selectOptionColumns.document_reference} as 'Document Reference',
+        ${Accounting.receipts.selectOptionColumns.total_amount_due} as 'Amount',
+        ${Accounting.receipts.selectOptionColumns.collection_date} as 'Date',
+        ${Accounting.receipts.selectOptionColumns.state} as 'Status'
+      FROM ${Accounting.receipts.tablename}
+      WHERE ${Accounting.receipts.selectOptionColumns.state} IN ('PENDING', 'PARTIALLY_CLEARED')
+        ${start_date ? `AND ${Accounting.receipts.selectOptionColumns.collection_date} >= '${start_date}'` : ''}
+        ${end_date ? `AND ${Accounting.receipts.selectOptionColumns.collection_date} <= '${end_date}'` : ''}
+    `
+
+    const depositsInTransit = await Query(deposits_in_transit_query)
+    const totalDepositsInTransit = depositsInTransit.reduce(
+      (sum, dep) => sum + parseFloat(dep.Amount || 0),
+      0,
+    )
+
+    // Get Bank Adjustments from adjustments table (pending adjustments)
+    const bank_adjustments_query = `
+      SELECT 
+        ${Accounting.adjustments.selectOptionColumns.id},
+        ${Accounting.adjustments.selectOptionColumns.remarks} as 'Description',
+        ${Accounting.adjustments.selectOptionColumns.document_reference} as 'Reference',
+        ${Accounting.adjustments.selectOptionColumns.total_amount} as 'Amount',
+        ${Accounting.adjustments.selectOptionColumns.posting_date} as 'Date',
+        'ADJUSTMENT' as 'Type',
+        ${Accounting.adjustments.selectOptionColumns.status} as 'Status'
+      FROM ${Accounting.adjustments.tablename}
+      WHERE ${Accounting.adjustments.selectOptionColumns.status} IN ('PENDING', 'APPROVED')
+        ${start_date ? `AND ${Accounting.adjustments.selectOptionColumns.posting_date} >= '${start_date}'` : ''}
+        ${end_date ? `AND ${Accounting.adjustments.selectOptionColumns.posting_date} <= '${end_date}'` : ''}
+      ORDER BY ${Accounting.adjustments.selectOptionColumns.posting_date}
+    `
+
+    const bankAdjustments = await Query(bank_adjustments_query)
+    const totalBankAdjustments = bankAdjustments.reduce(
+      (sum, adj) => sum + parseFloat(adj.Amount || 0),
+      0,
+    )
+
+    // Calculate reconciliation
+    const bankStatementBalance = parseFloat(bank_statement_balance) || 0
+    const adjustedCashGL =
+      totalCashGL -
+      totalOutstandingChecks +
+      totalDepositsInTransit +
+      totalBankAdjustments
+    const difference = bankStatementBalance - adjustedCashGL
+
+    res.status(200).json({
+      success: true,
+      message: 'Bank Reconciliation retrieved successfully',
+      data: {
+        summary: {
+          cash_gl_balance: totalCashGL,
+          bank_statement_balance: bankStatementBalance,
+          adjusted_cash_balance: adjustedCashGL,
+          difference: difference,
+          is_reconciled: Math.abs(difference) < 0.01,
+        },
+        cash_accounts: cashAccounts,
+        outstanding_checks: outstandingChecks,
+        outstanding_checks_total: totalOutstandingChecks,
+        deposits_in_transit: depositsInTransit,
+        deposits_in_transit_total: totalDepositsInTransit,
+        bank_adjustments: bankAdjustments,
+        bank_adjustments_total: totalBankAdjustments,
+      },
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching bank reconciliation:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching bank reconciliation',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
   }
 }
 
@@ -660,5 +1142,7 @@ module.exports = {
   getIncomeStatement,
   getGeneralLedger,
   getBalanceSheet,
-  getSearch
+  getSearch,
+  getStatementOfComprehensiveIncome,
+  getBankReconciliation,
 }

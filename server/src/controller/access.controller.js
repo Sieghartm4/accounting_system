@@ -91,7 +91,9 @@ const createAccess = async (req, res, next) => {
             'income_statement', 
             'general_ledger', 
             'balance_sheet',
-            'journal_entries'
+            'journal_entries',
+            'statement_of_comprehensive_income',
+            'bank_reconciliation'
         ];
 
         let routeQueries = [];
