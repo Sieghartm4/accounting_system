@@ -26,6 +26,16 @@ module.exports = {
         type: Sequelize.DECIMAL(18, 2),
         allowNull: false,
         defaultValue: 0.00
+      },
+      br_created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+      },
+      br_updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
       }
     });
   },

@@ -202,97 +202,111 @@ const getGeneralLedger = async (req, res, next) => {
     }
 
     let dateFilter = ''
-    if (startDate || endDate) {
-      const conditions = []
-      if (startDate)
-        conditions.push(
-          `${Accounting.journal_entries.selectOptionColumns.date} >= '${startDate}'`,
-        )
-      if (endDate)
-        conditions.push(
-          `${Accounting.journal_entries.selectOptionColumns.date} <= '${endDate}'`,
-        )
-      dateFilter = ` WHERE ${conditions.join(' AND ')}`
-    }
+    const whereConditions = []
+    if (startDate)
+      whereConditions.push(
+        `${Accounting.journal_entries.selectOptionColumns.date} >= '${startDate}'`,
+      )
+    if (endDate)
+      whereConditions.push(
+        `${Accounting.journal_entries.selectOptionColumns.date} <= '${endDate}'`,
+      )
 
+    // Query to get all journal entries grouped by COA
     const general_ledger_query = `
       SELECT
-        ${Accounting.journal_entries.selectOptionColumns.db_name}            AS db_name,
-        ${Accounting.journal_entries.selectOptionColumns.db_id}              AS db_id,
+        ${Master.charts_of_accounts.selectOptionColumns.id}                  AS coa_id,
+        ${Master.charts_of_accounts.selectOptionColumns.code}                AS account_code,
+        ${Master.charts_of_accounts.selectOptionColumns.name}                AS account_name,
+        ${Master.charts_of_accounts.selectOptionColumns.type}                AS account_type,
         ${Accounting.journal_entries.selectOptionColumns.date}               AS posted_date,
+        ${Accounting.journal_entries.selectOptionColumns.type}               AS entry_type,
+        ${Accounting.journal_entries.selectOptionColumns.amount}             AS amount,
         ${Accounting.journal_entries.selectOptionColumns.responsibility_center} AS responsibility_center,
-        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
-              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS Debit,
-        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
-              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS Credit
+        ${Accounting.journal_entries.selectOptionColumns.db_name}            AS db_name,
+        ${Accounting.journal_entries.selectOptionColumns.db_id}              AS db_id
       FROM ${Accounting.journal_entries.tablename}
-      ${dateFilter}
-      GROUP BY
-        ${Accounting.journal_entries.selectOptionColumns.db_name},
-        ${Accounting.journal_entries.selectOptionColumns.db_id},
-        ${Accounting.journal_entries.selectOptionColumns.date},
-        ${Accounting.journal_entries.selectOptionColumns.responsibility_center}
+      INNER JOIN ${Master.charts_of_accounts.tablename}
+        ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+      WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
+      ${whereConditions.length > 0 ? `AND ${whereConditions.join(' AND ')}` : ''}
       ORDER BY
-        ${Accounting.journal_entries.selectOptionColumns.db_name},
+        ${Master.charts_of_accounts.selectOptionColumns.code},
         ${Accounting.journal_entries.selectOptionColumns.date},
         ${Accounting.journal_entries.selectOptionColumns.db_id}
     `
 
     const rows = await Query(general_ledger_query)
 
-    const grouped = {}
+    // Group by COA
+    const accountsMap = {}
     for (const row of rows) {
-      const section = row.db_name
-      if (!grouped[section]) grouped[section] = []
-      grouped[section].push(row)
-    }
-
-    const SECTION_ORDER = [
-      'adjustments',
-      'sales',
-      'collections',
-      'receipts',
-      'purchase',
-      'payments',
-      'cash_disbursements',
-    ]
-
-    const SECTION_LABELS = {
-      adjustments: 'JOURNAL VOUCHER / ADJUSTMENTS',
-      sales: 'SALES',
-      collections: 'COLLECTIONS',
-      receipts: 'CASH RECEIPTS',
-      purchase: 'PURCHASES',
-      payments: 'PAYMENTS',
-      cash_disbursements: 'CASH DISBURSEMENTS',
-    }
-
-    const allSections = [
-      ...SECTION_ORDER,
-      ...Object.keys(grouped).filter((k) => !SECTION_ORDER.includes(k)),
-    ].filter((k) => grouped[k])
-
-    const sections = allSections.map((key) => ({
-      section_key: key,
-      section_label: SECTION_LABELS[key] || key.toUpperCase().replace(/_/g, ' '),
-      transactions: grouped[key].map((row, i) => ({
-        trans_no: `${key.slice(0, 2).toUpperCase()}${row.db_id}`,
+      const coaKey = `${row.account_code}-${row.account_name}`
+      if (!accountsMap[coaKey]) {
+        accountsMap[coaKey] = {
+          coa_id: row.coa_id,
+          account_code: row.account_code,
+          account_name: row.account_name,
+          account_type: row.account_type,
+          entries: [],
+        }
+      }
+      accountsMap[coaKey].entries.push({
         posted_date: row.posted_date,
-        doc_ref: row.db_id,
+        entry_type: row.entry_type,
+        amount: parseFloat(row.amount || 0),
         responsibility_center: row.responsibility_center || '',
-        debit: parseFloat(row.Debit || 0),
-        credit: parseFloat(row.Credit || 0),
-      })),
-    }))
+        db_name: row.db_name,
+        db_id: row.db_id,
+      })
+    }
 
-    const grandTotalDebit = rows.reduce((s, r) => s + parseFloat(r.Debit || 0), 0)
-    const grandTotalCredit = rows.reduce((s, r) => s + parseFloat(r.Credit || 0), 0)
+    // Calculate running balances for each account
+    const accounts = Object.values(accountsMap).map((account) => {
+      let balance = 0
+      const accountTypeNormalBalance =
+        account.account_type === 'ASSETS' || account.account_type === 'EXPENSES'
+          ? 'DEBIT'
+          : 'CREDIT'
+
+      const entriesWithBalance = account.entries.map((entry) => {
+        if (entry.entry_type === 'DEBIT') {
+          balance +=
+            accountTypeNormalBalance === 'DEBIT' ? entry.amount : -entry.amount
+        } else {
+          balance +=
+            accountTypeNormalBalance === 'CREDIT' ? entry.amount : -entry.amount
+        }
+
+        return {
+          ...entry,
+          balance: balance,
+        }
+      })
+
+      return {
+        ...account,
+        entries: entriesWithBalance,
+        openingBalance: 0,
+        closingBalance: balance,
+      }
+    })
+
+    // Calculate grand totals
+    const grandTotalDebit = rows.reduce(
+      (s, r) => s + (r.entry_type === 'DEBIT' ? parseFloat(r.amount || 0) : 0),
+      0,
+    )
+    const grandTotalCredit = rows.reduce(
+      (s, r) => s + (r.entry_type === 'CREDIT' ? parseFloat(r.amount || 0) : 0),
+      0,
+    )
 
     res.status(200).json({
       success: true,
       message: 'General Ledger retrieved successfully',
       data: {
-        sections,
+        accounts,
         grandTotalDebit,
         grandTotalCredit,
         netTotal: grandTotalDebit - grandTotalCredit,

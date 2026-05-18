@@ -177,7 +177,7 @@ export default function TrialBalance() {
         </div>
 
         {/* Scrollable body */}
-        <div className="overflow-y-auto overflow-x-auto custom-scrollbar" style={{ maxHeight: '490px' }}>
+        <div className="overflow-y-auto overflow-x-auto custom-scrollbar" style={{ maxHeight: '570px' }}>
           <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: '480px' }}>
             <colgroup>
               <col style={{ width: '12%' }} />

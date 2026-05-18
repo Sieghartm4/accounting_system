@@ -46,10 +46,7 @@ const { reportsRouter } = require('../routes/reports.routes')
 
 const { dashboardRouter } = require('../routes/dashboard.routes')
 
-
-
 const initRoutes = (app) => {
-
   app.use('/credentials', credentialsRouter)
 
   app.use('/health', healthRouter)
@@ -97,10 +94,6 @@ const initRoutes = (app) => {
   app.use('/reports', reportsRouter)
 
   app.use('/dashboard', dashboardRouter)
-
 }
 
-
-
 module.exports = { initRoutes }
-

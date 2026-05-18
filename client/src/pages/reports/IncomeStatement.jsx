@@ -147,7 +147,7 @@ export default function IncomeStatement() {
             <TrendingUp size={14} className="text-green-500" />
             <span className="text-[11px] font-black uppercase tracking-[3px] text-white">Revenues</span>
           </div>
-          <div className="overflow-y-auto custom-scrollbar" style={{ maxHeight: '480px' }}>
+          <div className="overflow-y-auto custom-scrollbar" style={{ maxHeight: '570px' }}>
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-gray-50 z-10">
                 <tr className="border-b border-gray-100">
@@ -185,7 +185,7 @@ export default function IncomeStatement() {
             <TrendingDown size={14} className="text-red-500" />
             <span className="text-[11px] font-black uppercase tracking-[3px] text-white">Expenses</span>
           </div>
-          <div className="overflow-y-auto custom-scrollbar" style={{ maxHeight: '480px' }}>
+          <div className="overflow-y-auto custom-scrollbar" style={{ maxHeight: '570px' }}>
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-gray-50 z-10">
                 <tr className="border-b border-gray-100">

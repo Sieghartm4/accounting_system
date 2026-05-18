@@ -205,7 +205,7 @@ export default function JournalEntries() {
         </div>
 
         {/* Scrollable body */}
-        <div className="overflow-y-auto overflow-x-auto custom-scrollbar" style={{ maxHeight: '460px' }}>
+        <div className="overflow-y-auto overflow-x-auto custom-scrollbar" style={{ maxHeight: '550px' }}>
           <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: '800px' }}>
             <colgroup>
               <col style={{ width: '12%' }} />
