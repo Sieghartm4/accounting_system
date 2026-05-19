@@ -1,46 +1,62 @@
-'use strict';
+'use strict'
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('bank_reconciliation', {
-      br_id: {
+    await queryInterface.createTable('bank_reconciliation_items', {
+      bri_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
-        primaryKey: true
+        primaryKey: true,
       },
-      br_bank_account: {
-        type: Sequelize.STRING(255),
-        allowNull: false
-      },
-      br_coa_id: {
+      bri_br_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'charts_of_accounts',
-          key: 'coa_id'
+          model: 'bank_reconciliation',
+          key: 'br_id',
         },
         onUpdate: 'CASCADE',
-        onDelete: 'RESTRICT'
+        onDelete: 'CASCADE',
       },
-      br_running_balance: {
+      bri_date: {
+        type: Sequelize.DATE,
+        allowNull: false,
+      },
+      bri_description: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+      },
+      bri_reference_number: {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+      },
+      bri_details: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+      },
+      bri_debit: {
         type: Sequelize.DECIMAL(18, 2),
         allowNull: false,
-        defaultValue: 0.00
+        defaultValue: 0.0,
       },
-      br_created_at: {
-        type: Sequelize.DATE,
+      bri_credit: {
+        type: Sequelize.DECIMAL(18, 2),
         allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+        defaultValue: 0.0,
       },
-      br_updated_at: {
-        type: Sequelize.DATE,
+      bri_balance: {
+        type: Sequelize.DECIMAL(18, 2),
         allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
-      }
-    });
+        defaultValue: 0.0,
+      },
+      bri_created_by: {
+        type: Sequelize.STRING(300),
+        allowNull: false,
+      },
+    })
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('bank_reconciliation');
-  }
-};
+    await queryInterface.dropTable('bank_reconciliation_items')
+  },
+}

@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 module.exports = {
   async up(queryInterface, Sequelize) {
@@ -6,58 +6,57 @@ module.exports = {
       bri_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
-        primaryKey: true
+        primaryKey: true,
       },
       bri_br_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
           model: 'bank_reconciliation',
-          key: 'br_id'
+          key: 'br_id',
         },
         onUpdate: 'CASCADE',
-        onDelete: 'CASCADE'
-      },
-      bri_type: {
-        type: Sequelize.STRING(50),
-        allowNull: false
-      },
-      bri_reference: {
-        type: Sequelize.STRING(255),
-        allowNull: true
-      },
-      bri_description: {
-        type: Sequelize.TEXT,
-        allowNull: true
+        onDelete: 'CASCADE',
       },
       bri_date: {
         type: Sequelize.DATE,
-        allowNull: false
+        allowNull: false,
       },
-      bri_amount: {
+      bri_description: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+      },
+      bri_reference_number: {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+      },
+      bri_details: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+      },
+      bri_debit: {
         type: Sequelize.DECIMAL(18, 2),
         allowNull: false,
-        defaultValue: 0.00
+        defaultValue: 0.0,
       },
-      bri_status: {
-        type: Sequelize.STRING(50),
+      bri_credit: {
+        type: Sequelize.DECIMAL(18, 2),
         allowNull: false,
-        defaultValue: 'PENDING'
+        defaultValue: 0.0,
       },
-      bri_created_at: {
-        type: Sequelize.DATE,
+      bri_balance: {
+        type: Sequelize.DECIMAL(18, 2),
         allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+        defaultValue: 0.0,
       },
-      bri_updated_at: {
-        type: Sequelize.DATE,
+      bri_created_by: {
+        type: Sequelize.STRING(300),
         allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
-      }
-    });
+      },
+    })
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('bank_reconciliation_items');
-  }
-};
+    await queryInterface.dropTable('bank_reconciliation_items')
+  },
+}

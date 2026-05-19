@@ -46,6 +46,8 @@ const { reportsRouter } = require('../routes/reports.routes')
 
 const { dashboardRouter } = require('../routes/dashboard.routes')
 
+const { bankReconciliationRouter } = require('../routes/bank_reconciliation.routes')
+
 const initRoutes = (app) => {
   app.use('/credentials', credentialsRouter)
 
@@ -94,6 +96,8 @@ const initRoutes = (app) => {
   app.use('/reports', reportsRouter)
 
   app.use('/dashboard', dashboardRouter)
+
+  app.use('/bank_reconciliation', bankReconciliationRouter)
 }
 
 module.exports = { initRoutes }
