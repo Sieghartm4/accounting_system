@@ -253,6 +253,7 @@ export const ROUTE_CONFIG = {
   disbursement: { name: 'disbursement', label: 'Disbursements', icon: 'DollarSign' },
   sales: { name: 'sales', label: 'Sales', icon: 'TrendingUp' },
   collections: { name: 'collections', label: 'Collections', icon: 'HandCoins' },
+  aging_receivables: { name: 'aging_receivables', label: 'Aging Receivables', icon: 'Clock3' },
   purchase: { name: 'purchase', label: 'Purchase', icon: 'ShoppingCart' },
   payments: { name: 'payments', label: 'Payments', icon: 'PaymentCard' },
   adjustments: {
@@ -346,7 +347,7 @@ export const getSidebarItems = (user) => {
   })
 
   // Sales & Collections section
-  const salesRoutes = ['sales', 'collections']
+  const salesRoutes = ['sales', 'collections', 'aging_receivables']
   salesRoutes.forEach((route) => {
     if (hasRouteAccess(route, user)) {
       items.sales.push(ROUTE_CONFIG[route])

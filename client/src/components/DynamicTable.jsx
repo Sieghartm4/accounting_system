@@ -166,6 +166,10 @@ const DynamicTable = ({
       );
     }
 
+    if (React.isValidElement(value)) {
+      return value;
+    }
+
     if (optionColumns.has(header) && row) {
       // Get the row key for tracking option changes
       const rowKey = getRowKey(row, filteredAndSortedData.indexOf(row));

@@ -15,6 +15,7 @@ import Receipts from './pages/receipts/Receipts'
 import Disbursements from './pages/disbursements/Disbursements'
 import Sales from './pages/sales/Sales'
 import Collections from './pages/collections/Collections'
+import AgeingReceivables from './pages/aging_receivables/AgeingReceivables'
 import Purchase from './pages/purchase/Purchase'
 import Payments from './pages/payments/Payments'
 import Customer from './pages/customers/Customer'
@@ -115,6 +116,14 @@ function App() {
             element={
               <ProtectedRoute routeName="collections">
                 <Collections />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="aging_receivables"
+            element={
+              <ProtectedRoute routeName="aging_receivables">
+                <AgeingReceivables />
               </ProtectedRoute>
             }
           />

@@ -39,6 +39,7 @@ module.exports = {
       'statement_of_comprehensive_income',
       'bank_reconciliation',
       'audit_trail',
+      'aging_receivables',
     ]
 
     const seedData = []

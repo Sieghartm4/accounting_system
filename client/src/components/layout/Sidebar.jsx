@@ -28,6 +28,7 @@ import {
   PieChart,
   BarChart3,
   Landmark,
+  Clock3,
 } from 'lucide-react'
 
 import { getSidebarItems } from '../../utils/routeProtection'
@@ -521,6 +522,8 @@ export default function Sidebar({ isCollapsed }) {
                     sales: TrendingUp,
 
                     collections: HandCoins,
+
+                    aging_receivables: Clock3,
                   }
 
                   const Icon = iconMap[item.name] || Settings

@@ -110,6 +110,7 @@ const createAccess = async (req, res, next) => {
       'statement_of_comprehensive_income',
       'bank_reconciliation',
       'audit_trail',
+      'aging_receivables',
     ]
 
     let routeQueries = []
