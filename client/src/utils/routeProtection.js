@@ -356,9 +356,12 @@ export const getSidebarItems = (user) => {
   })
 
   // Adjustments section
-  if (hasRouteAccess('adjustments', user)) {
-    items.adjustments.push(ROUTE_CONFIG.adjustments)
-  }
+  const adjustmentRoutes = ['adjustments', 'bank_reconciliation']
+  adjustmentRoutes.forEach((route) => {
+    if (hasRouteAccess(route, user)) {
+      items.adjustments.push(ROUTE_CONFIG[route])
+    }
+  })
 
   // Reports section
   const reportRoutes = [
@@ -368,7 +371,6 @@ export const getSidebarItems = (user) => {
     'balance_sheet',
     'statement_of_comprehensive_income',
     'journal_entries',
-    'bank_reconciliation',
   ]
   reportRoutes.forEach((route) => {
     if (hasRouteAccess(route, user)) {

@@ -27,39 +27,57 @@ require('dotenv').config()
 
 const getBankReconciliations = async (req, res, next) => {
   try {
-    const query = sql
-      .select([
-        { col: Accounting.bank_reconciliation.selectOptionColumns.id, as: 'id' },
-        {
-          col: Accounting.bank_reconciliation.selectOptionColumns.bank_account,
-          as: 'bank_account',
-        },
-        {
-          col: Accounting.bank_reconciliation.selectOptionColumns.coa_id,
-          as: 'charts_of_accounts_id',
-        },
-        {
-          col: Master.charts_of_accounts.selectOptionColumns.name,
-          as: 'account_name',
-        },
-        {
-          col: Accounting.bank_reconciliation.selectOptionColumns.running_balance,
-          as: 'running_balance',
-        },
-      ])
-      .from(Accounting.bank_reconciliation.tablename)
-      .innerJoin(
-        Master.charts_of_accounts.tablename,
-        Accounting.bank_reconciliation.selectOptionColumns.coa_id,
-        Master.charts_of_accounts.selectOptionColumns.id,
-      )
-      .build()
+    const query = `
+      SELECT
+        br.br_id AS id,
+        br.br_bank_account AS bank_account,
+        br.br_coa_id AS charts_of_accounts_id,
+        br.br_coa_id AS coa_id,
+        coa.coa_name AS account_name,
+        COALESCE(je_summary.book_balance, br.br_running_balance, 0) AS running_balance,
+        COALESCE(je_summary.book_balance, br.br_running_balance, 0) AS book_balance,
+        COALESCE(item_summary.bank_statement_balance, 0) AS bank_statement_balance,
+        COALESCE(item_summary.item_count, 0) AS item_count
+      FROM ${Accounting.bank_reconciliation.tablename} br
+      INNER JOIN ${Master.charts_of_accounts.tablename} coa
+        ON br.br_coa_id = coa.coa_id
+      LEFT JOIN (
+        SELECT
+          bri_br_id,
+          COUNT(*) AS item_count,
+          SUM(
+            CASE
+              WHEN bri_details IN ('deposits_in_transit', 'interest_income', 'credit_memo')
+                THEN GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
+              WHEN bri_details IN ('outstanding_checks', 'bank_charges', 'nsf_checks', 'debit_memo')
+                THEN -GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
+              WHEN bri_details IN ('error_bank', 'error_book')
+                THEN COALESCE(bri_credit, 0) - COALESCE(bri_debit, 0)
+              ELSE GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
+            END
+          ) AS bank_statement_balance
+        FROM ${Accounting.bank_reconciliation_items.tablename}
+        GROUP BY bri_br_id
+      ) item_summary
+        ON item_summary.bri_br_id = br.br_id
+      LEFT JOIN (
+        SELECT
+          je_coa_id,
+          SUM(
+            CASE
+              WHEN LOWER(je_type) = 'debit' THEN COALESCE(je_amount, 0)
+              WHEN LOWER(je_type) = 'credit' THEN -COALESCE(je_amount, 0)
+              ELSE 0
+            END
+          ) AS book_balance
+        FROM ${Accounting.journal_entries.tablename}
+        GROUP BY je_coa_id
+      ) je_summary
+        ON je_summary.je_coa_id = br.br_coa_id
+      ORDER BY br.br_id DESC
+    `
 
-    let reconciliations = await Query(
-      query,
-      [],
-      [Accounting.bank_reconciliation.prefix_, Master.charts_of_accounts.prefix_],
-    )
+    let reconciliations = await Query(query)
 
     console.log(`Fetched ${JSON.stringify(reconciliations)} bank reconciliations`)
 

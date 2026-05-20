@@ -24,6 +24,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import DynamicToast from '../../components/DynamicToast'
+import RightSideModal from '../../components/RightSideModal'
 
 // ─── ITEM TYPE CONFIG ────────────────────────────────────────────────────────
 const ITEM_TYPES = [
@@ -494,6 +495,11 @@ export default function BankReconciliation() {
     )
   }
 
+  const closeItemModal = () => {
+    setShowItemModal(false)
+    setEditingItem(null)
+  }
+
   // ── Reconciliation Math ──
   const computeReconciliation = () => {
     const getAdjustmentAmount = (item) => {
@@ -522,6 +528,14 @@ export default function BankReconciliation() {
       selectedReconciliation?.bank_statement_balance || 0,
     )
     const bankStatementItems = items
+    const bankStatementDebit = bankStatementItems.reduce(
+      (sum, item) => sum + (parseFloat(item.debit) || 0),
+      0,
+    )
+    const bankStatementCredit = bankStatementItems.reduce(
+      (sum, item) => sum + (parseFloat(item.credit) || 0),
+      0,
+    )
     const bankStatementItemsBalance = bankStatementItems.reduce(
       (sum, item) => sum + getAdjustmentAmount(item),
       0,
@@ -564,6 +578,8 @@ export default function BankReconciliation() {
       bankStatementBalance,
       bankStatementInput,
       bankStatementItems,
+      bankStatementDebit,
+      bankStatementCredit,
       bankStatementItemsBalance,
       bookBalance,
       savedBookBalance,
@@ -1253,7 +1269,7 @@ export default function BankReconciliation() {
                 {/* Starting balance */}
                 <div className="flex justify-between items-center py-3 border-b border-gray-100">
                   <span className="text-sm text-gray-600">Journal Entry Debits</span>
-                  <span className="font-bold font-mono text-gray-900">
+                  <span className="font-bold font-mono text-blue-600">
                     ₱{fmt(recon.journalDebit)}
                   </span>
                 </div>
@@ -1311,101 +1327,24 @@ export default function BankReconciliation() {
                 </div>
               </div>
               <div className="p-5">
-                {/* Starting book balance */}
+                {/* Bank statement totals */}
                 <div className="flex justify-between items-center py-3 border-b border-gray-100">
                   <span className="text-sm text-gray-600">
-                    {recon.bankStatementItems.length > 0
-                      ? 'Bank Statement Items Loaded'
-                      : 'Manual Bank Statement Balance'}
+                    Reconciliation Item Debits
                   </span>
-                  <span className="font-bold font-mono text-gray-900">
-                    {recon.bankStatementItems.length > 0
-                      ? `${recon.bankStatementItems.length} item${recon.bankStatementItems.length === 1 ? '' : 's'}`
-                      : `₱${fmt(recon.bankStatementInput)}`}
+                  <span className="font-bold font-mono text-blue-600">
+                    {'₱'}{fmt(recon.bankStatementDebit)}
                   </span>
                 </div>
 
-                {/* Bank statement items */}
-                {recon.bankStatementItems.length > 0 && (
-                  <div className="mt-3 space-y-1">
-                    {recon.bankStatementItems.filter(
-                      (i) => getItemType(i.item_type || i.details).effect === '+',
-                    ).length > 0 && (
-                      <>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-2 pb-1">
-                          Add: Bank Statement Increases
-                        </p>
-                        {recon.bankStatementItems
-                          .filter(
-                            (i) =>
-                              getItemType(i.item_type || i.details).effect === '+',
-                          )
-                          .map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex justify-between items-start py-1.5 pl-3 border-l-2 border-emerald-400"
-                            >
-                              <div className="flex-1 min-w-0 pr-3">
-                                <p className="text-xs font-medium text-gray-700 truncate">
-                                  {item.description ||
-                                    getItemType(item.item_type || item.details)
-                                      .label}
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                  {new Date(item.date).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric',
-                                  })}
-                                </p>
-                              </div>
-                              <span className="text-sm font-bold text-emerald-600 font-mono shrink-0">
-                                +₱{fmt(item.credit || item.debit)}
-                              </span>
-                            </div>
-                          ))}
-                      </>
-                    )}
-                    {recon.bankStatementItems.filter(
-                      (i) => getItemType(i.item_type || i.details).effect === '-',
-                    ).length > 0 && (
-                      <>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-2 pb-1">
-                          Less: Bank Statement Decreases
-                        </p>
-                        {recon.bankStatementItems
-                          .filter(
-                            (i) =>
-                              getItemType(i.item_type || i.details).effect === '-',
-                          )
-                          .map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex justify-between items-start py-1.5 pl-3 border-l-2 border-rose-400"
-                            >
-                              <div className="flex-1 min-w-0 pr-3">
-                                <p className="text-xs font-medium text-gray-700 truncate">
-                                  {item.description ||
-                                    getItemType(item.item_type || item.details)
-                                      .label}
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                  {new Date(item.date).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric',
-                                  })}
-                                </p>
-                              </div>
-                              <span className="text-sm font-bold text-rose-600 font-mono shrink-0">
-                                (₱{fmt(item.debit || item.credit)})
-                              </span>
-                            </div>
-                          ))}
-                      </>
-                    )}
-                  </div>
-                )}
+                <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">
+                    Reconciliation Item Credits
+                  </span>
+                  <span className="font-bold font-mono text-purple-600">
+                    {'₱'}{fmt(recon.bankStatementCredit)}
+                  </span>
+                </div>
 
                 {recon.bankStatementItems.length === 0 && (
                   <div className="py-6 text-center">
@@ -1809,26 +1748,15 @@ export default function BankReconciliation() {
         </div>
 
         {/* ── ITEM MODAL ── */}
-        <AnimatePresence>
-          {showItemModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
-              onClick={() => {
-                setShowItemModal(false)
-                setEditingItem(null)
-              }}
-            >
-              <motion.div
-                initial={{ scale: 0.95, y: 16 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.95, y: 16 }}
-                onClick={(e) => e.stopPropagation()}
-                className="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden"
-              >
-                <div className="bg-gray-900 px-6 py-4">
+        <RightSideModal
+          isOpen={showItemModal}
+          onClose={closeItemModal}
+          title={editingItem ? 'Edit Reconciliation Item' : 'Add Reconciliation Items'}
+          size={editingItem ? 'xl' : '5xl'}
+        >
+          <div className="pb-16">
+              <div>
+                <div className="hidden">
                   <h3 className="text-base font-black text-white">
                     {editingItem
                       ? 'Edit Reconciliation Item'
@@ -1840,7 +1768,7 @@ export default function BankReconciliation() {
                   </p>
                 </div>
 
-                <div className="p-6 overflow-y-auto max-h-[70vh]">
+                <div className="p-2 overflow-y-auto max-h-[70vh]">
                   {editingItem ? (
                     <>
                       {/* Item Type — most important field, shown first */}
@@ -2007,13 +1935,13 @@ export default function BankReconciliation() {
                       </div>
                     </>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-xs font-black text-gray-900 uppercase tracking-wider">
                             Batch Reconciliation Items
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-500 mt-0.5">
                             Add deposits in transit, outstanding checks, bank
                             charges, and other reconciling items in one save.
                           </p>
@@ -2028,30 +1956,15 @@ export default function BankReconciliation() {
                         </button>
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-1.5">
                         {itemFormRows.map((row, index) => {
-                          const t = getItemType(row.item_type)
                           return (
                             <div
                               key={index}
-                              className="border border-gray-200 rounded-xl p-4 bg-white"
+                              className="border border-gray-200 rounded-lg p-2 bg-white"
                             >
-                              <div className="flex items-center justify-between mb-3">
-                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-                                  Item {index + 1}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => removeItemFormRow(index)}
-                                  disabled={itemFormRows.length === 1}
-                                  className="w-8 h-8 rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 disabled:opacity-40 disabled:hover:text-gray-400 disabled:hover:border-gray-200 flex items-center justify-center"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div className="md:col-span-2">
+                              <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                                <div className="md:col-span-3">
                                   <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
                                     Item Type *
                                   </label>
@@ -2064,7 +1977,7 @@ export default function BankReconciliation() {
                                         e.target.value,
                                       )
                                     }
-                                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm font-medium"
+                                    className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm font-medium"
                                   >
                                     <optgroup label="Bank Statement Increases">
                                       {ITEM_TYPES.filter(
@@ -2094,16 +2007,9 @@ export default function BankReconciliation() {
                                       ))}
                                     </optgroup>
                                   </select>
-                                  <div
-                                    className={`mt-2 px-3 py-2 rounded-lg text-xs font-medium ${t.bg} ${t.color}`}
-                                  >
-                                    <span className="font-bold">{t.label}</span> is a
-                                    bank statement item used for the bank-side
-                                    balance.
-                                  </div>
                                 </div>
 
-                                <div>
+                                <div className="md:col-span-2">
                                   <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
                                     Date *
                                   </label>
@@ -2117,11 +2023,11 @@ export default function BankReconciliation() {
                                         e.target.value,
                                       )
                                     }
-                                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                                    className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
                                   />
                                 </div>
 
-                                <div>
+                                <div className="md:col-span-2">
                                   <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
                                     Reference No.
                                   </label>
@@ -2136,7 +2042,7 @@ export default function BankReconciliation() {
                                       )
                                     }
                                     placeholder="Check no., receipt no."
-                                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                                    className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
                                   />
                                 </div>
 
@@ -2155,13 +2061,13 @@ export default function BankReconciliation() {
                                       )
                                     }
                                     placeholder="e.g. Service charge, deposit, outstanding check"
-                                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                                    className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
                                   />
                                 </div>
 
-                                <div>
+                                <div className="md:col-span-1">
                                   <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                                    Debit Amount
+                                    Debit
                                   </label>
                                   <div className="relative">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
@@ -2179,14 +2085,14 @@ export default function BankReconciliation() {
                                         )
                                       }
                                       placeholder="0.00"
-                                      className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                                      className="w-full pl-6 pr-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
                                     />
                                   </div>
                                 </div>
 
-                                <div>
+                                <div className="md:col-span-1">
                                   <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                                    Credit Amount
+                                    Credit
                                   </label>
                                   <div className="relative">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
@@ -2204,9 +2110,19 @@ export default function BankReconciliation() {
                                         )
                                       }
                                       placeholder="0.00"
-                                      className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                                      className="w-full pl-6 pr-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
                                     />
                                   </div>
+                                </div>
+                                <div className="md:col-span-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => removeItemFormRow(index)}
+                                    disabled={itemFormRows.length === 1}
+                                    className="w-full h-[38px] rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 disabled:opacity-40 disabled:hover:text-gray-400 disabled:hover:border-gray-200 flex items-center justify-center"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -2218,10 +2134,7 @@ export default function BankReconciliation() {
 
                   <div className="flex gap-3 mt-6">
                     <button
-                      onClick={() => {
-                        setShowItemModal(false)
-                        setEditingItem(null)
-                      }}
+                      onClick={closeItemModal}
                       className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 text-sm font-bold hover:bg-gray-50 transition"
                     >
                       Cancel
@@ -2237,10 +2150,9 @@ export default function BankReconciliation() {
                     </button>
                   </div>
                 </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </div>
+            </div>
+        </RightSideModal>
 
         {showToast && (
           <DynamicToast

@@ -150,8 +150,7 @@ export default function Sidebar({ isCollapsed }) {
 
         const shouldOpen =
           routes.some((route) => currentPath === `/${route}`) ||
-          (sectionKey === 'reports' &&
-            routes.some((route) => currentPath === `/${route.replace('_', '-')}`))
+          routes.some((route) => currentPath === `/${route.replace(/_/g, '-')}`)
 
         setState(shouldOpen)
       }
@@ -636,6 +635,8 @@ export default function Sidebar({ isCollapsed }) {
 
                   const iconMap = {
                     adjustments: FileSpreadsheet,
+
+                    bank_reconciliation: Landmark,
                   }
 
                   const Icon = iconMap[item.name] || Settings
@@ -643,8 +644,8 @@ export default function Sidebar({ isCollapsed }) {
                   return (
                     <Link
                       key={item.name || index}
-                      to={`/${item.name}`}
-                      className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                      to={`/${item.name.replace(/_/g, '-')}`}
+                      className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
                     </Link>
