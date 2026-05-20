@@ -19,63 +19,75 @@ const { Accounting } = require('../database/model/Accounting')
 
 const { SQLQueryBuilder } = require('../util/helper.util')
 
-const { getTenantPool } = require('../database/util/tenantConnection.util')
-
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
 
 const getBankReconciliations = async (req, res, next) => {
   try {
-    const query = `
+    const itemSummary = `(
       SELECT
-        br.br_id AS id,
-        br.br_bank_account AS bank_account,
-        br.br_coa_id AS charts_of_accounts_id,
-        br.br_coa_id AS coa_id,
-        coa.coa_name AS account_name,
-        COALESCE(je_summary.book_balance, br.br_running_balance, 0) AS running_balance,
-        COALESCE(je_summary.book_balance, br.br_running_balance, 0) AS book_balance,
-        COALESCE(item_summary.bank_statement_balance, 0) AS bank_statement_balance,
-        COALESCE(item_summary.item_count, 0) AS item_count
-      FROM ${Accounting.bank_reconciliation.tablename} br
-      INNER JOIN ${Master.charts_of_accounts.tablename} coa
-        ON br.br_coa_id = coa.coa_id
-      LEFT JOIN (
-        SELECT
-          bri_br_id,
-          COUNT(*) AS item_count,
-          SUM(
-            CASE
-              WHEN bri_details IN ('deposits_in_transit', 'interest_income', 'credit_memo')
-                THEN GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
-              WHEN bri_details IN ('outstanding_checks', 'bank_charges', 'nsf_checks', 'debit_memo')
-                THEN -GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
-              WHEN bri_details IN ('error_bank', 'error_book')
-                THEN COALESCE(bri_credit, 0) - COALESCE(bri_debit, 0)
-              ELSE GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
-            END
-          ) AS bank_statement_balance
-        FROM ${Accounting.bank_reconciliation_items.tablename}
-        GROUP BY bri_br_id
-      ) item_summary
-        ON item_summary.bri_br_id = br.br_id
-      LEFT JOIN (
-        SELECT
-          je_coa_id,
-          SUM(
-            CASE
-              WHEN LOWER(je_type) = 'debit' THEN COALESCE(je_amount, 0)
-              WHEN LOWER(je_type) = 'credit' THEN -COALESCE(je_amount, 0)
-              ELSE 0
-            END
-          ) AS book_balance
-        FROM ${Accounting.journal_entries.tablename}
-        GROUP BY je_coa_id
-      ) je_summary
-        ON je_summary.je_coa_id = br.br_coa_id
-      ORDER BY br.br_id DESC
-    `
+        bri_br_id,
+        COUNT(*) AS item_count,
+        SUM(
+          CASE
+            WHEN bri_details IN ('deposits_in_transit', 'interest_income', 'credit_memo')
+              THEN GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
+            WHEN bri_details IN ('outstanding_checks', 'bank_charges', 'nsf_checks', 'debit_memo')
+              THEN -GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
+            WHEN bri_details IN ('error_bank', 'error_book')
+              THEN COALESCE(bri_credit, 0) - COALESCE(bri_debit, 0)
+            ELSE GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
+          END
+        ) AS bank_statement_balance
+      FROM ${Accounting.bank_reconciliation_items.tablename}
+      GROUP BY bri_br_id
+    ) item_summary`
+    const journalSummary = `(
+      SELECT
+        je_coa_id,
+        SUM(
+          CASE
+            WHEN LOWER(je_type) = 'debit' THEN COALESCE(je_amount, 0)
+            WHEN LOWER(je_type) = 'credit' THEN -COALESCE(je_amount, 0)
+            ELSE 0
+          END
+        ) AS book_balance
+      FROM ${Accounting.journal_entries.tablename}
+      GROUP BY je_coa_id
+    ) je_summary`
+
+    const query = sql
+      .select([
+        { col: 'br.br_id', as: 'id' },
+        { col: 'br.br_bank_account', as: 'bank_account' },
+        { col: 'br.br_coa_id', as: 'charts_of_accounts_id' },
+        { col: 'br.br_coa_id', as: 'coa_id' },
+        { col: 'coa.coa_name', as: 'account_name' },
+        {
+          col: 'COALESCE(je_summary.book_balance, br.br_running_balance, 0)',
+          as: 'running_balance',
+        },
+        {
+          col: 'COALESCE(je_summary.book_balance, br.br_running_balance, 0)',
+          as: 'book_balance',
+        },
+        {
+          col: 'COALESCE(item_summary.bank_statement_balance, 0)',
+          as: 'bank_statement_balance',
+        },
+        { col: 'COALESCE(item_summary.item_count, 0)', as: 'item_count' },
+      ])
+      .from(`${Accounting.bank_reconciliation.tablename} br`)
+      .innerJoin(
+        `${Master.charts_of_accounts.tablename} coa`,
+        'br.br_coa_id',
+        'coa.coa_id',
+      )
+      .leftJoin(itemSummary, 'item_summary.bri_br_id', 'br.br_id')
+      .leftJoin(journalSummary, 'je_summary.je_coa_id', 'br.br_coa_id')
+      .orderBy('br.br_id', 'DESC')
+      .build()
 
     let reconciliations = await Query(query)
 
@@ -115,15 +127,22 @@ const getBankReconciliationDetail = async (req, res, next) => {
   }
 
   try {
-    const reconciliationQuery = `
-      SELECT
-        br_id AS id,
-        br_bank_account AS bank_account,
-        br_coa_id AS coa_id,
-        br_running_balance AS running_balance
-      FROM ${Accounting.bank_reconciliation.tablename}
-      WHERE br_id = ?
-    `
+    const reconciliationQuery = sql
+      .select([
+        { col: Accounting.bank_reconciliation.selectOptionColumns.id, as: 'id' },
+        {
+          col: Accounting.bank_reconciliation.selectOptionColumns.bank_account,
+          as: 'bank_account',
+        },
+        { col: Accounting.bank_reconciliation.selectOptionColumns.coa_id, as: 'coa_id' },
+        {
+          col: Accounting.bank_reconciliation.selectOptionColumns.running_balance,
+          as: 'running_balance',
+        },
+      ])
+      .from(Accounting.bank_reconciliation.tablename)
+      .where(Accounting.bank_reconciliation.selectOptionColumns.id, '=', '?')
+      .build()
 
     const reconciliationRows = await Query(reconciliationQuery, [reconciliationId])
 
@@ -141,11 +160,14 @@ const getBankReconciliationDetail = async (req, res, next) => {
     let accountCode = null
 
     if (reconciliation.coa_id) {
-      const accountQuery = `
-        SELECT coa_code AS code, coa_name AS name
-        FROM ${Master.charts_of_accounts.tablename}
-        WHERE ${Master.charts_of_accounts.selectOptionColumns.id} = ?
-      `
+      const accountQuery = sql
+        .select([
+          { col: Master.charts_of_accounts.selectOptionColumns.code, as: 'code' },
+          { col: Master.charts_of_accounts.selectOptionColumns.name, as: 'name' },
+        ])
+        .from(Master.charts_of_accounts.tablename)
+        .where(Master.charts_of_accounts.selectOptionColumns.id, '=', '?')
+        .build()
       const accountRows = await Query(accountQuery, [reconciliation.coa_id])
       if (accountRows && accountRows.length > 0) {
         accountCode = accountRows[0].code
@@ -153,35 +175,54 @@ const getBankReconciliationDetail = async (req, res, next) => {
       }
     }
 
-    const itemWhere = ['bri_br_id = ?']
+    const itemWhere = [{ column: Accounting.bank_reconciliation_items.selectOptionColumns.br_id, operator: '=', value: '?' }]
     const itemValues = [reconciliationId]
 
     if (start_date) {
-      itemWhere.push('bri_date >= ?')
+      itemWhere.push({
+        column: Accounting.bank_reconciliation_items.selectOptionColumns.date,
+        operator: '>=',
+        value: '?',
+      })
       itemValues.push(start_date)
     }
 
     if (end_date) {
-      itemWhere.push('bri_date <= ?')
+      itemWhere.push({
+        column: Accounting.bank_reconciliation_items.selectOptionColumns.date,
+        operator: '<=',
+        value: '?',
+      })
       itemValues.push(end_date)
     }
 
-    const itemsQuery = `
-      SELECT
-        bri_id AS id,
-        bri_br_id AS br_id,
-        bri_date AS date,
-        bri_description AS description,
-        bri_reference_number AS reference_number,
-        bri_details AS details,
-        bri_debit AS debit,
-        bri_credit AS credit,
-        bri_balance AS balance,
-        bri_created_by AS created_by
-      FROM ${Accounting.bank_reconciliation_items.tablename}
-      WHERE ${itemWhere.join(' AND ')}
-      ORDER BY bri_date ASC, bri_id ASC
-    `
+    const itemsQuery = sql
+      .select([
+        { col: Accounting.bank_reconciliation_items.selectOptionColumns.id, as: 'id' },
+        { col: Accounting.bank_reconciliation_items.selectOptionColumns.br_id, as: 'br_id' },
+        { col: Accounting.bank_reconciliation_items.selectOptionColumns.date, as: 'date' },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.description,
+          as: 'description',
+        },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.reference_number,
+          as: 'reference_number',
+        },
+        { col: Accounting.bank_reconciliation_items.selectOptionColumns.details, as: 'details' },
+        { col: Accounting.bank_reconciliation_items.selectOptionColumns.debit, as: 'debit' },
+        { col: Accounting.bank_reconciliation_items.selectOptionColumns.credit, as: 'credit' },
+        { col: Accounting.bank_reconciliation_items.selectOptionColumns.balance, as: 'balance' },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.created_by,
+          as: 'created_by',
+        },
+      ])
+      .from(Accounting.bank_reconciliation_items.tablename)
+      .where(itemWhere)
+      .orderBy(Accounting.bank_reconciliation_items.selectOptionColumns.date, 'ASC')
+      .orderBy(Accounting.bank_reconciliation_items.selectOptionColumns.id, 'ASC')
+      .build()
 
     const items = await Query(itemsQuery, itemValues)
 
@@ -223,26 +264,28 @@ const createBankReconciliation = async (req, res, next) => {
       })
     }
 
-    let connection
-
     try {
-      connection = await getTenantPool().getConnection()
-      await connection.beginTransaction()
+      const queries = [
+        {
+          sql: sql
+            .insert(Accounting.bank_reconciliation.tablename, {
+              columns: Accounting.bank_reconciliation.insertColumns,
+              prefix: Accounting.bank_reconciliation.prefix,
+              isTransaction: true,
+            })
+            .build(),
+          values: [bank_account || null, coa_id || null, 0.0],
+        },
+      ]
 
-      const mainQuery = sql
-        .insert(Accounting.bank_reconciliation.tablename, {
-          columns: Accounting.bank_reconciliation.insertColumns,
-          prefix: Accounting.bank_reconciliation.prefix,
-          isTransaction: true,
-        })
+      await Transaction(queries)
+
+      const idQuery = sql
+        .select([{ col: 'MAX(br_id)', as: 'id' }])
+        .from(Accounting.bank_reconciliation.tablename)
         .build()
-
-      const mainValues = [bank_account || null, coa_id || null, 0.0]
-
-      const [mainResult] = await connection.execute(mainQuery, mainValues)
-      const reconciliationId = mainResult.insertId
-
-      await connection.commit()
+      const idResult = await Query(idQuery)
+      const reconciliationId = idResult[0]?.id
 
       res.status(201).json({
         success: true,
@@ -256,18 +299,7 @@ const createBankReconciliation = async (req, res, next) => {
         timestamp: new Date().toISOString(),
       })
     } catch (error) {
-      if (connection) {
-        try {
-          await connection.rollback()
-        } catch (rollbackError) {
-          console.error('Rollback error:', rollbackError)
-        }
-      }
       throw error
-    } finally {
-      if (connection) {
-        connection.release()
-      }
     }
   } catch (error) {
     console.error('Error creating bank reconciliation:', error)
@@ -305,15 +337,7 @@ const addBankReconciliationItem = async (req, res, next) => {
       })
     }
 
-    let connection
-
     try {
-      connection = await getTenantPool().getConnection()
-      await connection.beginTransaction()
-
-      const now = new Date().toISOString()
-      const insertQuery = `INSERT INTO ${Accounting.bank_reconciliation_items.tablename} (bri_br_id, bri_date, bri_description, bri_reference_number, bri_details, bri_debit, bri_credit, bri_balance, bri_created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-
       const itemValues = [
         br_id || null,
         date || null,
@@ -326,31 +350,27 @@ const addBankReconciliationItem = async (req, res, next) => {
         created_by,
       ]
 
-      let itemResult
-      try {
-        ;[itemResult] = await connection.execute(insertQuery, itemValues)
-      } catch (insertError) {
-        if (
-          insertError.code === 'ER_NO_DEFAULT_FOR_FIELD' &&
-          insertError.sqlMessage.includes('bri_id')
-        ) {
-          const [[{ nextId }]] = await connection.execute(
-            `SELECT COALESCE(MAX(bri_id), 0) + 1 AS nextId FROM ${Accounting.bank_reconciliation_items.tablename}`,
-          )
-          const fallbackInsertQuery = `INSERT INTO ${Accounting.bank_reconciliation_items.tablename} (bri_id, bri_br_id, bri_date, bri_description, bri_reference_number, bri_details, bri_debit, bri_credit, bri_balance, bri_created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          const fallbackValues = [nextId, ...itemValues]
-          const [fallbackResult] = await connection.execute(
-            fallbackInsertQuery,
-            fallbackValues,
-          )
-          itemResult = fallbackResult
-        } else {
-          throw insertError
-        }
-      }
-      const itemId = itemResult.insertId
+      const queries = [
+        {
+          sql: sql
+            .insert(Accounting.bank_reconciliation_items.tablename, {
+              columns: Accounting.bank_reconciliation_items.insertColumns,
+              prefix: Accounting.bank_reconciliation_items.prefix,
+              isTransaction: true,
+            })
+            .build(),
+          values: itemValues,
+        },
+      ]
 
-      await connection.commit()
+      await Transaction(queries)
+
+      const idQuery = sql
+        .select([{ col: 'MAX(bri_id)', as: 'id' }])
+        .from(Accounting.bank_reconciliation_items.tablename)
+        .build()
+      const idResult = await Query(idQuery)
+      const itemId = idResult[0]?.id
 
       res.status(201).json({
         success: true,
@@ -370,18 +390,7 @@ const addBankReconciliationItem = async (req, res, next) => {
         timestamp: new Date().toISOString(),
       })
     } catch (error) {
-      if (connection) {
-        try {
-          await connection.rollback()
-        } catch (rollbackError) {
-          console.error('Rollback error:', rollbackError)
-        }
-      }
       throw error
-    } finally {
-      if (connection) {
-        connection.release()
-      }
     }
   } catch (error) {
     console.error('Error adding bank reconciliation item:', error)
@@ -409,12 +418,7 @@ const updateBankReconciliationItem = async (req, res, next) => {
       })
     }
 
-    let connection
-
     try {
-      connection = await getTenantPool().getConnection()
-      await connection.beginTransaction()
-
       // Build update query dynamically based on new schema
       const updateColumns = []
       const updateValues = []
@@ -454,21 +458,36 @@ const updateBankReconciliationItem = async (req, res, next) => {
           .json({ success: false, message: 'No fields to update' })
       }
 
-      updateValues.push(id)
+      const existingQuery = sql
+        .select([{ col: Accounting.bank_reconciliation_items.selectOptionColumns.id, as: 'id' }])
+        .from(Accounting.bank_reconciliation_items.tablename)
+        .where(Accounting.bank_reconciliation_items.selectOptionColumns.id, '=', '?')
+        .build()
+      const existingItems = await Query(existingQuery, [id])
 
-      const updateQuery = `UPDATE ${Accounting.bank_reconciliation_items.tablename} SET ${updateColumns.map((col) => `${col} = ?`).join(', ')} WHERE bri_id = ?`
-
-      const [result] = await connection.execute(updateQuery, updateValues)
-
-      if (result.affectedRows === 0) {
-        await connection.rollback()
+      if (!existingItems || existingItems.length === 0) {
         return res.status(404).json({
           success: false,
           message: 'Bank reconciliation item not found',
         })
       }
 
-      await connection.commit()
+      updateValues.push(id)
+
+      const updateQuery = sql
+        .update(Accounting.bank_reconciliation_items.tablename)
+        .set(updateColumns)
+        .where(Accounting.bank_reconciliation_items.selectOptionColumns.id, '=', '?')
+        .build()
+
+      const queries = [
+        {
+          sql: updateQuery,
+          values: updateValues,
+        },
+      ]
+
+      await Transaction(queries)
 
       res.status(200).json({
         success: true,
@@ -486,86 +505,13 @@ const updateBankReconciliationItem = async (req, res, next) => {
         timestamp: new Date().toISOString(),
       })
     } catch (error) {
-      if (connection) {
-        try {
-          await connection.rollback()
-        } catch (rollbackError) {
-          console.error('Rollback error:', rollbackError)
-        }
-      }
       throw error
-    } finally {
-      if (connection) {
-        connection.release()
-      }
     }
   } catch (error) {
     console.error('Error updating bank reconciliation item:', error)
     return res.status(500).json({
       success: false,
       message: 'Server error while updating bank reconciliation item',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
-    })
-  }
-}
-
-const deleteBankReconciliationItem = async (req, res, next) => {
-  try {
-    const { id } = req.params
-
-    if (!id) {
-      return res.status(400).json({
-        success: false,
-        message: 'Item ID is required',
-      })
-    }
-
-    let connection
-
-    try {
-      connection = await getTenantPool().getConnection()
-      await connection.beginTransaction()
-
-      const deleteQuery = `DELETE FROM ${Accounting.bank_reconciliation_items.tablename} WHERE bri_id = ?`
-      const [result] = await connection.execute(deleteQuery, [id])
-
-      if (result.affectedRows === 0) {
-        await connection.rollback()
-        return res.status(404).json({
-          success: false,
-          message: 'Bank reconciliation item not found',
-        })
-      }
-
-      await connection.commit()
-
-      res.status(200).json({
-        success: true,
-        message: 'Bank reconciliation item deleted successfully',
-        timestamp: new Date().toISOString(),
-      })
-    } catch (error) {
-      if (connection) {
-        try {
-          await connection.rollback()
-        } catch (rollbackError) {
-          console.error('Rollback error:', rollbackError)
-        }
-      }
-      throw error
-    } finally {
-      if (connection) {
-        connection.release()
-      }
-    }
-  } catch (error) {
-    console.error('Error deleting bank reconciliation item:', error)
-    return res.status(500).json({
-      success: false,
-      message: 'Server error while deleting bank reconciliation item',
       error:
         process.env.NODE_ENV === 'development'
           ? error.message
@@ -586,24 +532,35 @@ const updateBankReconciliationBalance = async (req, res, next) => {
       })
     }
 
-    let connection
-
     try {
-      connection = await getTenantPool().getConnection()
-      await connection.beginTransaction()
+      const existingQuery = sql
+        .select([{ col: Accounting.bank_reconciliation.selectOptionColumns.id, as: 'id' }])
+        .from(Accounting.bank_reconciliation.tablename)
+        .where(Accounting.bank_reconciliation.selectOptionColumns.id, '=', '?')
+        .build()
+      const existingReconciliations = await Query(existingQuery, [id])
 
-      const updateQuery = `UPDATE ${Accounting.bank_reconciliation.tablename} SET br_running_balance = ? WHERE br_id = ?`
-      const [result] = await connection.execute(updateQuery, [running_balance, id])
-
-      if (result.affectedRows === 0) {
-        await connection.rollback()
+      if (!existingReconciliations || existingReconciliations.length === 0) {
         return res.status(404).json({
           success: false,
           message: 'Bank reconciliation not found',
         })
       }
 
-      await connection.commit()
+      const updateQuery = sql
+        .update(Accounting.bank_reconciliation.tablename)
+        .set([Accounting.bank_reconciliation.selectOptionColumns.running_balance])
+        .where(Accounting.bank_reconciliation.selectOptionColumns.id, '=', '?')
+        .build()
+
+      const queries = [
+        {
+          sql: updateQuery,
+          values: [running_balance, id],
+        },
+      ]
+
+      await Transaction(queries)
 
       res.status(200).json({
         success: true,
@@ -615,18 +572,7 @@ const updateBankReconciliationBalance = async (req, res, next) => {
         timestamp: new Date().toISOString(),
       })
     } catch (error) {
-      if (connection) {
-        try {
-          await connection.rollback()
-        } catch (rollbackError) {
-          console.error('Rollback error:', rollbackError)
-        }
-      }
       throw error
-    } finally {
-      if (connection) {
-        connection.release()
-      }
     }
   } catch (error) {
     console.error('Error updating bank reconciliation balance:', error)
@@ -647,6 +593,5 @@ module.exports = {
   createBankReconciliation,
   addBankReconciliationItem,
   updateBankReconciliationItem,
-  deleteBankReconciliationItem,
   updateBankReconciliationBalance,
 }

@@ -442,32 +442,6 @@ export default function BankReconciliation() {
     setShowItemModal(true)
   }
 
-  const handleDeleteItem = async (itemId) => {
-    if (!window.confirm('Are you sure you want to delete this item?')) return
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/item/${itemId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-      const result = await response.json()
-      if (result.success) {
-        showToastMessage('Item deleted successfully')
-        await fetchReconciliationItems(selectedReconciliation.id)
-      } else {
-        showToastMessage(result.message || 'Failed to delete item', 'error')
-      }
-    } catch (err) {
-      showToastMessage('Server error while deleting item', 'error')
-    }
-  }
-
   const resetItemForm = () => {
     setItemFormData(emptyItemForm())
     setItemFormRows([emptyItemForm()])

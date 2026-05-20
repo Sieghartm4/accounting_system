@@ -252,7 +252,12 @@ class SQLQueryBuilder {
   }
 
   // WHERE clauses
-  where(conditions) {
+  where(conditions, operator, value) {
+    if (arguments.length >= 2) {
+      this.query.where = [{ column: conditions, operator, value }]
+      return this
+    }
+
     this.query.where = Array.isArray(conditions) ? conditions : [conditions]
     return this
   }
@@ -267,7 +272,12 @@ class SQLQueryBuilder {
     return this
   }
 
-  andWhere(condition) {
+  andWhere(condition, operator, value) {
+    if (arguments.length >= 2) {
+      this.query.where.push({ column: condition, operator, value })
+      return this
+    }
+
     this.query.where.push(condition)
     return this
   }

@@ -48,6 +48,8 @@ const { dashboardRouter } = require('../routes/dashboard.routes')
 
 const { bankReconciliationRouter } = require('../routes/bank_reconciliation.routes')
 
+const { auditTrailRouter } = require('../routes/audit_trail.routes')
+
 const initRoutes = (app) => {
   app.use('/credentials', credentialsRouter)
 
@@ -98,6 +100,8 @@ const initRoutes = (app) => {
   app.use('/dashboard', dashboardRouter)
 
   app.use('/bank_reconciliation', bankReconciliationRouter)
+
+  app.use('/audit-trail', auditTrailRouter)
 }
 
 module.exports = { initRoutes }

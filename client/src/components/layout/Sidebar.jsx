@@ -45,6 +45,8 @@ export default function Sidebar({ isCollapsed }) {
 
   const [isReportsOpen, setIsReportsOpen] = useState(false)
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+
   const location = useLocation()
 
   const [user, setUser] = useState(null)
@@ -65,6 +67,8 @@ export default function Sidebar({ isCollapsed }) {
     adjustments: null,
 
     reports: null,
+
+    settings: null,
   })
 
   useEffect(() => {
@@ -201,6 +205,14 @@ export default function Sidebar({ isCollapsed }) {
         'reports',
         sidebarItems.reports.map((item) => item.name),
         setIsReportsOpen,
+      )
+    }
+
+    if (sidebarItems.settings?.length > 0) {
+      checkAndSetState(
+        'settings',
+        sidebarItems.settings.map((item) => item.name),
+        setIsSettingsOpen,
       )
     }
   }, [location.pathname, sidebarItems, manualStates])
@@ -708,6 +720,65 @@ export default function Sidebar({ isCollapsed }) {
                     journal_entries: FileText,
 
                     bank_reconciliation: Landmark,
+                  }
+
+                  const Icon = iconMap[item.name] || Settings
+
+                  return (
+                    <Link
+                      key={item.name || index}
+                      to={`/${item.name.replace(/_/g, '-')}`}
+                      className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                    >
+                      <Icon size={14} /> {item.label || item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Settings Section */}
+
+        {sidebarItems.settings?.length > 0 && (
+          <div className="pt-4">
+            {!isCollapsed && (
+              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">
+                System
+              </p>
+            )}
+
+            <button
+              onClick={() =>
+                handleManualToggle('settings', isSettingsOpen, setIsSettingsOpen)
+              }
+              className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isSettingsOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
+            >
+              <div className="flex items-center gap-3">
+                <Settings
+                  size={20}
+                  className={isSettingsOpen ? 'text-red-600' : ''}
+                />
+
+                {!isCollapsed && <span className="text-sm">Settings</span>}
+              </div>
+
+              {!isCollapsed && (
+                <ChevronRight
+                  size={14}
+                  className={`transition-transform ${isSettingsOpen ? 'rotate-90' : ''}`}
+                />
+              )}
+            </button>
+
+            {isSettingsOpen && !isCollapsed && (
+              <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
+                {sidebarItems.settings?.map((item, index) => {
+                  if (!item || !item.name) return null
+
+                  const iconMap = {
+                    audit_trail: FileSearch,
                   }
 
                   const Icon = iconMap[item.name] || Settings

@@ -287,6 +287,11 @@ export const ROUTE_CONFIG = {
     label: 'Bank Reconciliation',
     icon: 'Landmark',
   },
+  audit_trail: {
+    name: 'audit_trail',
+    label: 'Audit Trail',
+    icon: 'History',
+  },
 }
 
 /**
@@ -305,6 +310,7 @@ export const getSidebarItems = (user) => {
     purchase: [],
     adjustments: [],
     reports: [],
+    settings: [],
   }
 
   // Main navigation
@@ -375,6 +381,14 @@ export const getSidebarItems = (user) => {
   reportRoutes.forEach((route) => {
     if (hasRouteAccess(route, user)) {
       items.reports.push(ROUTE_CONFIG[route])
+    }
+  })
+
+  // Settings section
+  const settingRoutes = ['audit_trail']
+  settingRoutes.forEach((route) => {
+    if (hasRouteAccess(route, user)) {
+      items.settings.push(ROUTE_CONFIG[route])
     }
   })
 

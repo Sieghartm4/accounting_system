@@ -28,6 +28,7 @@ import BalanceSheet from './pages/reports/BalanceSheet'
 import JournalEntries from './pages/reports/JournalEntries'
 import StatementOfComprehensiveIncome from './pages/reports/StatementOfComprehensiveIncome'
 import BankReconciliation from './pages/reports/BankReconciliation'
+import AuditTrail from './pages/audit_trail/AuditTrail'
 
 function App() {
   return (
@@ -234,6 +235,14 @@ function App() {
             element={
               <ProtectedRoute routeName="bank_reconciliation">
                 <BankReconciliation />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="audit-trail"
+            element={
+              <ProtectedRoute routeName="audit_trail">
+                <AuditTrail />
               </ProtectedRoute>
             }
           />
