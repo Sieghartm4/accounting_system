@@ -2211,7 +2211,7 @@ const updateReceiptState = async (req, res, next) => {
       const auditQueries = [];
 
       for (const result of results) {
-        let auditMessage = `ID ${result.id}: ${updates.find(u => u.id === result.id).currentState} → ${result.nextState}`;
+        let auditMessage = `STATE UPDATE: ${updates.find(u => u.id === result.id).currentState} → ${result.nextState}`;
 
         if (result.auditChanges) {
           auditMessage += ` | Changes: ${result.auditChanges.join(', ')}`;

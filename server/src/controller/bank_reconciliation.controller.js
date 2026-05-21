@@ -134,7 +134,10 @@ const getBankReconciliationDetail = async (req, res, next) => {
           col: Accounting.bank_reconciliation.selectOptionColumns.bank_account,
           as: 'bank_account',
         },
-        { col: Accounting.bank_reconciliation.selectOptionColumns.coa_id, as: 'coa_id' },
+        {
+          col: Accounting.bank_reconciliation.selectOptionColumns.coa_id,
+          as: 'coa_id',
+        },
         {
           col: Accounting.bank_reconciliation.selectOptionColumns.running_balance,
           as: 'running_balance',
@@ -175,7 +178,13 @@ const getBankReconciliationDetail = async (req, res, next) => {
       }
     }
 
-    const itemWhere = [{ column: Accounting.bank_reconciliation_items.selectOptionColumns.br_id, operator: '=', value: '?' }]
+    const itemWhere = [
+      {
+        column: Accounting.bank_reconciliation_items.selectOptionColumns.br_id,
+        operator: '=',
+        value: '?',
+      },
+    ]
     const itemValues = [reconciliationId]
 
     if (start_date) {
@@ -198,21 +207,43 @@ const getBankReconciliationDetail = async (req, res, next) => {
 
     const itemsQuery = sql
       .select([
-        { col: Accounting.bank_reconciliation_items.selectOptionColumns.id, as: 'id' },
-        { col: Accounting.bank_reconciliation_items.selectOptionColumns.br_id, as: 'br_id' },
-        { col: Accounting.bank_reconciliation_items.selectOptionColumns.date, as: 'date' },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.id,
+          as: 'id',
+        },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.br_id,
+          as: 'br_id',
+        },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.date,
+          as: 'date',
+        },
         {
           col: Accounting.bank_reconciliation_items.selectOptionColumns.description,
           as: 'description',
         },
         {
-          col: Accounting.bank_reconciliation_items.selectOptionColumns.reference_number,
+          col: Accounting.bank_reconciliation_items.selectOptionColumns
+            .reference_number,
           as: 'reference_number',
         },
-        { col: Accounting.bank_reconciliation_items.selectOptionColumns.details, as: 'details' },
-        { col: Accounting.bank_reconciliation_items.selectOptionColumns.debit, as: 'debit' },
-        { col: Accounting.bank_reconciliation_items.selectOptionColumns.credit, as: 'credit' },
-        { col: Accounting.bank_reconciliation_items.selectOptionColumns.balance, as: 'balance' },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.details,
+          as: 'details',
+        },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.debit,
+          as: 'debit',
+        },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.credit,
+          as: 'credit',
+        },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.balance,
+          as: 'balance',
+        },
         {
           col: Accounting.bank_reconciliation_items.selectOptionColumns.created_by,
           as: 'created_by',
@@ -459,7 +490,12 @@ const updateBankReconciliationItem = async (req, res, next) => {
       }
 
       const existingQuery = sql
-        .select([{ col: Accounting.bank_reconciliation_items.selectOptionColumns.id, as: 'id' }])
+        .select([
+          {
+            col: Accounting.bank_reconciliation_items.selectOptionColumns.id,
+            as: 'id',
+          },
+        ])
         .from(Accounting.bank_reconciliation_items.tablename)
         .where(Accounting.bank_reconciliation_items.selectOptionColumns.id, '=', '?')
         .build()
@@ -534,7 +570,9 @@ const updateBankReconciliationBalance = async (req, res, next) => {
 
     try {
       const existingQuery = sql
-        .select([{ col: Accounting.bank_reconciliation.selectOptionColumns.id, as: 'id' }])
+        .select([
+          { col: Accounting.bank_reconciliation.selectOptionColumns.id, as: 'id' },
+        ])
         .from(Accounting.bank_reconciliation.tablename)
         .where(Accounting.bank_reconciliation.selectOptionColumns.id, '=', '?')
         .build()

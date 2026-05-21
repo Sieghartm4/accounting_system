@@ -1307,7 +1307,8 @@ export default function BankReconciliation() {
                     Reconciliation Item Debits
                   </span>
                   <span className="font-bold font-mono text-blue-600">
-                    {'₱'}{fmt(recon.bankStatementDebit)}
+                    {'₱'}
+                    {fmt(recon.bankStatementDebit)}
                   </span>
                 </div>
 
@@ -1316,7 +1317,8 @@ export default function BankReconciliation() {
                     Reconciliation Item Credits
                   </span>
                   <span className="font-bold font-mono text-purple-600">
-                    {'₱'}{fmt(recon.bankStatementCredit)}
+                    {'₱'}
+                    {fmt(recon.bankStatementCredit)}
                   </span>
                 </div>
 
@@ -1725,407 +1727,403 @@ export default function BankReconciliation() {
         <RightSideModal
           isOpen={showItemModal}
           onClose={closeItemModal}
-          title={editingItem ? 'Edit Reconciliation Item' : 'Add Reconciliation Items'}
+          title={
+            editingItem ? 'Edit Reconciliation Item' : 'Add Reconciliation Items'
+          }
           size={editingItem ? 'xl' : '5xl'}
         >
           <div className="pb-16">
-              <div>
-                <div className="hidden">
-                  <h3 className="text-base font-black text-white">
-                    {editingItem
-                      ? 'Edit Reconciliation Item'
-                      : 'Add Reconciliation Item'}
-                  </h3>
-                  <p className="text-gray-400 text-xs mt-0.5">
-                    Categorize correctly — this determines which side of the
-                    reconciliation it affects
-                  </p>
-                </div>
+            <div>
+              <div className="hidden">
+                <h3 className="text-base font-black text-white">
+                  {editingItem
+                    ? 'Edit Reconciliation Item'
+                    : 'Add Reconciliation Item'}
+                </h3>
+                <p className="text-gray-400 text-xs mt-0.5">
+                  Categorize correctly — this determines which side of the
+                  reconciliation it affects
+                </p>
+              </div>
 
-                <div className="p-2 overflow-y-auto max-h-[70vh]">
-                  {editingItem ? (
-                    <>
-                      {/* Item Type — most important field, shown first */}
-                      <div className="mb-5">
-                        <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">
-                          Item Type *
+              <div className="p-2 overflow-y-auto max-h-[70vh]">
+                {editingItem ? (
+                  <>
+                    {/* Item Type — most important field, shown first */}
+                    <div className="mb-5">
+                      <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">
+                        Item Type *
+                      </label>
+                      <select
+                        value={itemFormData.item_type}
+                        onChange={(e) =>
+                          setItemFormData({
+                            ...itemFormData,
+                            item_type: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm font-medium"
+                      >
+                        <optgroup label="Bank Statement Increases">
+                          {ITEM_TYPES.filter((t) => t.effect === '+').map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label} ({t.effect})
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Bank Statement Decreases">
+                          {ITEM_TYPES.filter((t) => t.effect === '-').map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label} ({t.effect})
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Corrections / Errors">
+                          {ITEM_TYPES.filter((t) => t.effect === '+/-').map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label} ({t.effect})
+                            </option>
+                          ))}
+                        </optgroup>
+                      </select>
+                      {/* Explanation chip */}
+                      {itemFormData.item_type &&
+                        (() => {
+                          const t = getItemType(itemFormData.item_type)
+                          return (
+                            <div
+                              className={`mt-2 px-3 py-2 rounded-lg text-xs font-medium ${t.bg} ${t.color}`}
+                            >
+                              <span className="font-bold">{t.label}</span> is
+                              recorded as a bank statement item and{' '}
+                              {t.effect === '+'
+                                ? 'increases'
+                                : t.effect === '-'
+                                  ? 'decreases'
+                                  : 'corrects'}{' '}
+                              the bank-side balance.
+                            </div>
+                          )
+                        })()}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
+                          Date *
                         </label>
-                        <select
-                          value={itemFormData.item_type}
+                        <input
+                          type="date"
+                          value={itemFormData.date}
                           onChange={(e) =>
                             setItemFormData({
                               ...itemFormData,
-                              item_type: e.target.value,
+                              date: e.target.value,
                             })
                           }
-                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm font-medium"
-                        >
-                          <optgroup label="Bank Statement Increases">
-                            {ITEM_TYPES.filter((t) => t.effect === '+').map((t) => (
-                              <option key={t.value} value={t.value}>
-                                {t.label} ({t.effect})
-                              </option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="Bank Statement Decreases">
-                            {ITEM_TYPES.filter((t) => t.effect === '-').map((t) => (
-                              <option key={t.value} value={t.value}>
-                                {t.label} ({t.effect})
-                              </option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="Corrections / Errors">
-                            {ITEM_TYPES.filter((t) => t.effect === '+/-').map(
-                              (t) => (
-                                <option key={t.value} value={t.value}>
-                                  {t.label} ({t.effect})
-                                </option>
-                              ),
-                            )}
-                          </optgroup>
-                        </select>
-                        {/* Explanation chip */}
-                        {itemFormData.item_type &&
-                          (() => {
-                            const t = getItemType(itemFormData.item_type)
-                            return (
-                              <div
-                                className={`mt-2 px-3 py-2 rounded-lg text-xs font-medium ${t.bg} ${t.color}`}
-                              >
-                                <span className="font-bold">{t.label}</span> is
-                                recorded as a bank statement item and{' '}
-                                {t.effect === '+'
-                                  ? 'increases'
-                                  : t.effect === '-'
-                                    ? 'decreases'
-                                    : 'corrects'}{' '}
-                                the bank-side balance.
-                              </div>
-                            )
-                          })()}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
+                          Reference No.
+                        </label>
+                        <input
+                          type="text"
+                          value={itemFormData.reference_number}
+                          onChange={(e) =>
+                            setItemFormData({
+                              ...itemFormData,
+                              reference_number: e.target.value,
+                            })
+                          }
+                          placeholder="Check no., Receipt no."
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                        />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
-                            Date *
-                          </label>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
+                          Description
+                        </label>
+                        <input
+                          type="text"
+                          value={itemFormData.description}
+                          onChange={(e) =>
+                            setItemFormData({
+                              ...itemFormData,
+                              description: e.target.value,
+                            })
+                          }
+                          placeholder="e.g. Service charge for April, Deposit for check #1234"
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
+                          Debit Amount
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                            ₱
+                          </span>
                           <input
-                            type="date"
-                            value={itemFormData.date}
+                            type="number"
+                            step="0.01"
+                            value={itemFormData.debit}
                             onChange={(e) =>
                               setItemFormData({
                                 ...itemFormData,
-                                date: e.target.value,
+                                debit: e.target.value,
+                                credit: e.target.value ? '' : itemFormData.credit,
                               })
                             }
-                            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                            placeholder="0.00"
+                            className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
                           />
                         </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
-                            Reference No.
-                          </label>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
+                          Credit Amount
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                            ₱
+                          </span>
                           <input
-                            type="text"
-                            value={itemFormData.reference_number}
+                            type="number"
+                            step="0.01"
+                            value={itemFormData.credit}
                             onChange={(e) =>
                               setItemFormData({
                                 ...itemFormData,
-                                reference_number: e.target.value,
+                                credit: e.target.value,
+                                debit: e.target.value ? '' : itemFormData.debit,
                               })
                             }
-                            placeholder="Check no., Receipt no."
-                            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                            placeholder="0.00"
+                            className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
                           />
                         </div>
-
-                        <div className="col-span-2">
-                          <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
-                            Description
-                          </label>
-                          <input
-                            type="text"
-                            value={itemFormData.description}
-                            onChange={(e) =>
-                              setItemFormData({
-                                ...itemFormData,
-                                description: e.target.value,
-                              })
-                            }
-                            placeholder="e.g. Service charge for April, Deposit for check #1234"
-                            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
-                            Debit Amount
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                              ₱
-                            </span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={itemFormData.debit}
-                              onChange={(e) =>
-                                setItemFormData({
-                                  ...itemFormData,
-                                  debit: e.target.value,
-                                  credit: e.target.value ? '' : itemFormData.credit,
-                                })
-                              }
-                              placeholder="0.00"
-                              className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
-                            Credit Amount
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                              ₱
-                            </span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={itemFormData.credit}
-                              onChange={(e) =>
-                                setItemFormData({
-                                  ...itemFormData,
-                                  credit: e.target.value,
-                                  debit: e.target.value ? '' : itemFormData.debit,
-                                })
-                              }
-                              placeholder="0.00"
-                              className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-black text-gray-900 uppercase tracking-wider">
-                            Batch Reconciliation Items
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Add deposits in transit, outstanding checks, bank
-                            charges, and other reconciling items in one save.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={addItemFormRow}
-                          className="px-3 py-2 bg-black text-white rounded-lg text-xs font-black hover:bg-red-600 transition flex items-center gap-1.5"
-                        >
-                          <Plus size={13} />
-                          Add Row
-                        </button>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        {itemFormRows.map((row, index) => {
-                          return (
-                            <div
-                              key={index}
-                              className="border border-gray-200 rounded-lg p-2 bg-white"
-                            >
-                              <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-                                <div className="md:col-span-3">
-                                  <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                                    Item Type *
-                                  </label>
-                                  <select
-                                    value={row.item_type}
-                                    onChange={(e) =>
-                                      updateItemFormRow(
-                                        index,
-                                        'item_type',
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm font-medium"
-                                  >
-                                    <optgroup label="Bank Statement Increases">
-                                      {ITEM_TYPES.filter(
-                                        (type) => type.effect === '+',
-                                      ).map((type) => (
-                                        <option key={type.value} value={type.value}>
-                                          {type.label} ({type.effect})
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                    <optgroup label="Bank Statement Decreases">
-                                      {ITEM_TYPES.filter(
-                                        (type) => type.effect === '-',
-                                      ).map((type) => (
-                                        <option key={type.value} value={type.value}>
-                                          {type.label} ({type.effect})
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                    <optgroup label="Corrections / Errors">
-                                      {ITEM_TYPES.filter(
-                                        (type) => type.effect === '+/-',
-                                      ).map((type) => (
-                                        <option key={type.value} value={type.value}>
-                                          {type.label} ({type.effect})
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                  </select>
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                                    Date *
-                                  </label>
-                                  <input
-                                    type="date"
-                                    value={row.date}
-                                    onChange={(e) =>
-                                      updateItemFormRow(
-                                        index,
-                                        'date',
-                                        e.target.value,
-                                      )
-                                    }
-                                    className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
-                                  />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                                    Reference No.
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={row.reference_number}
-                                    onChange={(e) =>
-                                      updateItemFormRow(
-                                        index,
-                                        'reference_number',
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="Check no., receipt no."
-                                    className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
-                                  />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                                    Description
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={row.description}
-                                    onChange={(e) =>
-                                      updateItemFormRow(
-                                        index,
-                                        'description',
-                                        e.target.value,
-                                      )
-                                    }
-                                    placeholder="e.g. Service charge, deposit, outstanding check"
-                                    className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
-                                  />
-                                </div>
-
-                                <div className="md:col-span-1">
-                                  <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                                    Debit
-                                  </label>
-                                  <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                                      ₱
-                                    </span>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={row.debit}
-                                      onChange={(e) =>
-                                        updateItemFormRow(
-                                          index,
-                                          'debit',
-                                          e.target.value,
-                                        )
-                                      }
-                                      placeholder="0.00"
-                                      className="w-full pl-6 pr-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="md:col-span-1">
-                                  <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                                    Credit
-                                  </label>
-                                  <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                                      ₱
-                                    </span>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={row.credit}
-                                      onChange={(e) =>
-                                        updateItemFormRow(
-                                          index,
-                                          'credit',
-                                          e.target.value,
-                                        )
-                                      }
-                                      placeholder="0.00"
-                                      className="w-full pl-6 pr-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
-                                    />
-                                  </div>
-                                </div>
-                                <div className="md:col-span-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => removeItemFormRow(index)}
-                                    disabled={itemFormRows.length === 1}
-                                    className="w-full h-[38px] rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 disabled:opacity-40 disabled:hover:text-gray-400 disabled:hover:border-gray-200 flex items-center justify-center"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
                       </div>
                     </div>
-                  )}
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                          Batch Reconciliation Items
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Add deposits in transit, outstanding checks, bank charges,
+                          and other reconciling items in one save.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={addItemFormRow}
+                        className="px-3 py-2 bg-black text-white rounded-lg text-xs font-black hover:bg-red-600 transition flex items-center gap-1.5"
+                      >
+                        <Plus size={13} />
+                        Add Row
+                      </button>
+                    </div>
 
-                  <div className="flex gap-3 mt-6">
-                    <button
-                      onClick={closeItemModal}
-                      className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 text-sm font-bold hover:bg-gray-50 transition"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleAddOrUpdateItem}
-                      className="flex-1 px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-bold hover:bg-gray-800 transition flex items-center justify-center gap-2"
-                    >
-                      <Check size={16} />
-                      {editingItem
-                        ? 'Update Item'
-                        : `Add ${itemFormRows.length} Item${itemFormRows.length === 1 ? '' : 's'}`}
-                    </button>
+                    <div className="space-y-1.5">
+                      {itemFormRows.map((row, index) => {
+                        return (
+                          <div
+                            key={index}
+                            className="border border-gray-200 rounded-lg p-2 bg-white"
+                          >
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                              <div className="md:col-span-3">
+                                <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                                  Item Type *
+                                </label>
+                                <select
+                                  value={row.item_type}
+                                  onChange={(e) =>
+                                    updateItemFormRow(
+                                      index,
+                                      'item_type',
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm font-medium"
+                                >
+                                  <optgroup label="Bank Statement Increases">
+                                    {ITEM_TYPES.filter(
+                                      (type) => type.effect === '+',
+                                    ).map((type) => (
+                                      <option key={type.value} value={type.value}>
+                                        {type.label} ({type.effect})
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                  <optgroup label="Bank Statement Decreases">
+                                    {ITEM_TYPES.filter(
+                                      (type) => type.effect === '-',
+                                    ).map((type) => (
+                                      <option key={type.value} value={type.value}>
+                                        {type.label} ({type.effect})
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                  <optgroup label="Corrections / Errors">
+                                    {ITEM_TYPES.filter(
+                                      (type) => type.effect === '+/-',
+                                    ).map((type) => (
+                                      <option key={type.value} value={type.value}>
+                                        {type.label} ({type.effect})
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                </select>
+                              </div>
+
+                              <div className="md:col-span-2">
+                                <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                                  Date *
+                                </label>
+                                <input
+                                  type="date"
+                                  value={row.date}
+                                  onChange={(e) =>
+                                    updateItemFormRow(index, 'date', e.target.value)
+                                  }
+                                  className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                                />
+                              </div>
+
+                              <div className="md:col-span-2">
+                                <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                                  Reference No.
+                                </label>
+                                <input
+                                  type="text"
+                                  value={row.reference_number}
+                                  onChange={(e) =>
+                                    updateItemFormRow(
+                                      index,
+                                      'reference_number',
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="Check no., receipt no."
+                                  className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                                />
+                              </div>
+
+                              <div className="md:col-span-2">
+                                <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                                  Description
+                                </label>
+                                <input
+                                  type="text"
+                                  value={row.description}
+                                  onChange={(e) =>
+                                    updateItemFormRow(
+                                      index,
+                                      'description',
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="e.g. Service charge, deposit, outstanding check"
+                                  className="w-full px-2.5 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                                />
+                              </div>
+
+                              <div className="md:col-span-1">
+                                <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                                  Debit
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                                    ₱
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={row.debit}
+                                    onChange={(e) =>
+                                      updateItemFormRow(
+                                        index,
+                                        'debit',
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder="0.00"
+                                    className="w-full pl-6 pr-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="md:col-span-1">
+                                <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                                  Credit
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                                    ₱
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={row.credit}
+                                    onChange={(e) =>
+                                      updateItemFormRow(
+                                        index,
+                                        'credit',
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder="0.00"
+                                    className="w-full pl-6 pr-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-sm"
+                                  />
+                                </div>
+                              </div>
+                              <div className="md:col-span-1">
+                                <button
+                                  type="button"
+                                  onClick={() => removeItemFormRow(index)}
+                                  disabled={itemFormRows.length === 1}
+                                  className="w-full h-[38px] rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 disabled:opacity-40 disabled:hover:text-gray-400 disabled:hover:border-gray-200 flex items-center justify-center"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
+                )}
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={closeItemModal}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 text-sm font-bold hover:bg-gray-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddOrUpdateItem}
+                    className="flex-1 px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-bold hover:bg-gray-800 transition flex items-center justify-center gap-2"
+                  >
+                    <Check size={16} />
+                    {editingItem
+                      ? 'Update Item'
+                      : `Add ${itemFormRows.length} Item${itemFormRows.length === 1 ? '' : 's'}`}
+                  </button>
                 </div>
               </div>
             </div>
+          </div>
         </RightSideModal>
 
         {showToast && (

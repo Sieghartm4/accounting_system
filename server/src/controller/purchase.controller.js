@@ -1052,43 +1052,50 @@ const updatePurchaseState = async (req, res, next) => {
 
       // Audit trail for state update
 
-      const now = new Date();
+const now = new Date();
 
-      const stateTransitions = updates.map(u => `ID ${u.id}: ${u.currentState} → ${u.currentState === 'PREPARED' ? 'CHECKED' : 'APPROVED'}`).join(', ');
+const auditQueries = [];
 
-      const auditQueries = [];
+updates.forEach((u) => {
 
-      auditQueries.push({
+  const nextState =
+    u.currentState === 'PREPARED'
+      ? 'CHECKED'
+      : 'APPROVED';
 
-        sql: sql.insert(Master.audit_trail.tablename, {
+  auditQueries.push({
 
-          columns: Master.audit_trail.insertColumns,
+    sql: sql.insert(Master.audit_trail.tablename, {
 
-          prefix: Master.audit_trail.prefix,
+      columns: Master.audit_trail.insertColumns,
 
-          isTransaction: true
+      prefix: Master.audit_trail.prefix,
 
-        }).build(),
+      isTransaction: true
 
-        values: [
+    }).build(),
 
-          null,
+    values: [
 
-          'PURCHASE_STATE',
+      u.id, // FIXED: replace null with purchase ID
 
-          req.context?.username || null,
+      'PURCHASE_STATE',
 
-          now.toISOString().split('T')[0],
+      req.context?.username || null,
 
-          now.toTimeString().split(' ')[0],
+      now.toISOString().split('T')[0],
 
-          `STATE UPDATE: ${results.length} record(s) - ${stateTransitions}`
+      now.toTimeString().split(' ')[0],
 
-        ]
+      `STATE UPDATE: ${u.currentState} → ${nextState}`
 
-      });
+    ]
 
-      await Transaction(auditQueries);
+  });
+
+});
+
+await Transaction(auditQueries);
 
 
 

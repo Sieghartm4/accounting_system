@@ -1,42 +1,51 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { TrendingUp, ShoppingBag, ShieldCheck, Zap, ArrowRight, Download, FileText, Building } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import DynamicToast from '../../components/DynamicToast';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import useSales from './useSales';
-import SalesForm from './SalesForm';
-import { getAccessLevel } from '../../utils/routeProtection';
-import { generateSalesPDF } from '../../utils/generateSalesPDF';
+import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import {
+  TrendingUp,
+  ShoppingBag,
+  ShieldCheck,
+  Zap,
+  ArrowRight,
+  Download,
+  FileText,
+  Building,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import DynamicToast from '../../components/DynamicToast'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import { useSales } from './useSales'
+import SalesForm from './SalesForm'
+import { getAccessLevel } from '../../utils/routeProtection'
+import { generateSalesPDF } from '../../utils/generateSalesPDF'
 
 export default function Sales() {
   return (
     <RouteProtection routeName="sales">
       <SalesContent />
     </RouteProtection>
-  );
+  )
 }
 
 function SalesContent() {
-  const { sales, loading, error, refetchSales } = useSales();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [isAdding, setIsAdding] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingSales, setEditingSales] = useState(null);
-  const [isViewing, setIsViewing] = useState(false);
-  const [viewingSales, setViewingSales] = useState(null);
-  const [toast, setToast] = useState(null);
+  const { sales, loading, error, refetchSales } = useSales()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [isAdding, setIsAdding] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingSales, setEditingSales] = useState(null)
+  const [isViewing, setIsViewing] = useState(false)
+  const [viewingSales, setViewingSales] = useState(null)
+  const [toast, setToast] = useState(null)
 
   useEffect(() => {
-    const id = searchParams.get('id');
-    if (!id) return;
+    const id = searchParams.get('id')
+    if (!id) return
 
     const fetchSales = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('No authentication token found');
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
           `${import.meta.env.VITE_SERVER_LINK}/sales/${Number(id)}`,
@@ -46,41 +55,52 @@ function SalesContent() {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-          }
-        );
+          },
+        )
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Failed to fetch sales details');
+        const result = await response.json()
+        if (!response.ok)
+          throw new Error(result.message || 'Failed to fetch sales details')
 
-        setViewingSales(result);
-        setIsViewing(true);
-        setSearchParams(prev => {
-          const next = new URLSearchParams(prev);
-          next.delete('id');
-          return next;
-        }, { replace: true });
+        setViewingSales(result)
+        setIsViewing(true)
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('id')
+            return next
+          },
+          { replace: true },
+        )
       } catch (err) {
-        setToast({ type: 'error', message: err.message || 'Failed to fetch sales details' });
+        setToast({
+          type: 'error',
+          message: err.message || 'Failed to fetch sales details',
+        })
       }
-    };
+    }
 
-    fetchSales();
-  }, [searchParams, setSearchParams]);
+    fetchSales()
+  }, [searchParams, setSearchParams])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const accessLevel = getAccessLevel('sales', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const accessLevel = getAccessLevel('sales', user)
+  const enableCheckboxes =
+    accessLevel === 'Check Access' ||
+    accessLevel === 'Approve Access' ||
+    accessLevel === 'Edit Access' ||
+    accessLevel === 'Full Access'
 
-  const checkboxCondition = null; // Always show checkboxes (match Receipts behavior)
+  const checkboxCondition = null // Always show checkboxes (match Receipts behavior)
 
   // ─── Helper: fetch full sales data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No authentication token found');
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
 
-      const salesIds = selectedRows.map(row => row.id).join(',');
+      const salesIds = selectedRows.map((row) => row.id).join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/sales/print/${salesIds}?copyType=${copyType}`,
@@ -90,27 +110,29 @@ function SalesContent() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-        }
-      );
+        },
+      )
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Failed to fetch sales for printing');
+      const result = await response.json()
+      if (!response.ok)
+        throw new Error(result.message || 'Failed to fetch sales for printing')
 
-      const data = result.data || [];
-      console.log('PDF Data received:', data);
-      if (!Array.isArray(data)) throw new Error('Invalid data format received from server');
+      const data = result.data || []
+      console.log('PDF Data received:', data)
+      if (!Array.isArray(data))
+        throw new Error('Invalid data format received from server')
 
-      await generateSalesPDF(data, copyType);
+      await generateSalesPDF(data, copyType)
 
       setToast({
         type: 'success',
         message: `${data.length} sales PDF(s) downloaded (${copyType === 'customer' ? 'Customer' : 'Internal'} Copy)`,
-      });
+      })
     } catch (error) {
-      console.error('Error generating sales PDF:', error);
-      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' });
+      console.error('Error generating sales PDF:', error)
+      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' })
     }
-  };
+  }
 
   // Function to filter checkbox actions based on selected rows
   const getFilteredCheckboxActions = (selectedRows) => {
@@ -119,51 +141,65 @@ function SalesContent() {
         label: 'Approve Selected',
         onClick: async (selectedRows) => {
           try {
-            console.log('Approving sales:', selectedRows);
+            console.log('Approving sales:', selectedRows)
 
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token')
             if (!token) {
-              throw new Error('No authentication token found');
+              throw new Error('No authentication token found')
             }
 
-            const updates = selectedRows.map(row => ({
+            const validRows = selectedRows.filter(
+              (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+            )
+
+            if (validRows.length === 0) {
+              setToast({
+                type: 'warning',
+                message:
+                  'Only PREPARED or CHECKED sales can be bulk approved. Please select valid rows.',
+              })
+              return
+            }
+
+            const updates = validRows.map((row) => ({
               id: row.id,
-              currentState: row.state
-            }));
+              currentState: row.state,
+            }))
 
             const response = await fetch(
               `${import.meta.env.VITE_SERVER_LINK}/sales/sales-state`,
               {
-                method: "PUT",
+                method: 'PUT',
                 headers: {
-                  "Content-Type": "application/json",
+                  'Content-Type': 'application/json',
                   Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ updates })
-              }
-            );
+                body: JSON.stringify({ updates }),
+              },
+            )
 
-            const result = await response.json();
+            const result = await response.json()
 
             if (!response.ok) {
-              throw new Error(result.message || 'Failed to approve sales');
+              throw new Error(result.message || 'Failed to approve sales')
             }
 
-            await refetchSales();
+            await refetchSales()
 
             setToast({
               type: 'success',
-              message: result.message || `${selectedRows.length} sale(s) approved successfully`
-            });
-
+              message:
+                result.message ||
+                `${validRows.length} sale(s) approved successfully`,
+            })
           } catch (error) {
-            console.error('Error approving sales:', error);
+            console.error('Error approving sales:', error)
             setToast({
               type: 'error',
-              message: error.message || 'Failed to approve sales'
-            });
+              message: error.message || 'Failed to approve sales',
+            })
           }
-        }
+        },
       },
       {
         label: 'Internal Copy',
@@ -177,71 +213,78 @@ function SalesContent() {
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
         style: 'orange',
       },
-    ];
+    ]
 
-    return allActions.filter(action => {
+    return allActions.filter((action) => {
       if (action.label === 'Approve Selected') {
-        return selectedRows.some(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+        return selectedRows.some(
+          (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+        )
       }
-      return true;
-    });
-  };
+      return true
+    })
+  }
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
 
-  if (isAdding) return (
-    <RouteProtection routeName="sales">
-      <SalesForm
-        onBack={() => setIsAdding(false)}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchSales();
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isAdding)
+    return (
+      <RouteProtection routeName="sales">
+        <SalesForm
+          onBack={() => setIsAdding(false)}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchSales()
+          }}
+        />
+      </RouteProtection>
+    )
 
-  if (isEditing) return (
-    <RouteProtection routeName="sales">
-      <SalesForm
-        isViewMode={false}
-        isEditMode={true}
-        salesData={editingSales}
-        onBack={() => setIsEditing(false)}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchSales();
-          setIsEditing(false);
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isEditing)
+    return (
+      <RouteProtection routeName="sales">
+        <SalesForm
+          isViewMode={false}
+          isEditMode={true}
+          salesData={editingSales}
+          onBack={() => setIsEditing(false)}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchSales()
+            setIsEditing(false)
+          }}
+        />
+      </RouteProtection>
+    )
 
-  if (isViewing) return (
-    <RouteProtection routeName="sales">
-      <SalesForm
-        isViewMode={true}
-        salesData={viewingSales}
-        onBack={() => setIsViewing(false)}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchSales();
-          setIsViewing(false);
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isViewing)
+    return (
+      <RouteProtection routeName="sales">
+        <SalesForm
+          isViewMode={true}
+          salesData={viewingSales}
+          onBack={() => setIsViewing(false)}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchSales()
+            setIsViewing(false)
+          }}
+        />
+      </RouteProtection>
+    )
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Loading Revenue Stream...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Loading Revenue Stream...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -252,12 +295,11 @@ function SalesContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-
       {toast && (
         <DynamicToast
           type={toast.type}
@@ -300,7 +342,10 @@ function SalesContent() {
               EXPORT REPORT
             </button>
             <ProtectedAction routeName="sales">
-              <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button
+                onClick={() => setIsAdding(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
                 <ShoppingBag size={14} />
                 New Sale
               </button>
@@ -351,129 +396,137 @@ function SalesContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  console.log('View sales:', row);
+                  console.log('View sales:', row)
 
-                  const token = localStorage.getItem('token');
+                  const token = localStorage.getItem('token')
                   if (!token) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/sales/${Number(row.id)}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                       },
-                    }
-                  );
+                    },
+                  )
 
-                  const result = await response.json();
+                  const result = await response.json()
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch sales details');
+                    throw new Error(
+                      result.message || 'Failed to fetch sales details',
+                    )
                   }
 
-                  console.log('Sales details:', result);
+                  console.log('Sales details:', result)
 
                   // Set sales data for viewing
-                  setViewingSales(result);
-                  setIsViewing(true);
-
+                  setViewingSales(result)
+                  setIsViewing(true)
                 } catch (error) {
-                  console.error('Error fetching sales details:', error);
+                  console.error('Error fetching sales details:', error)
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch sales details'
-                  });
+                    message: error.message || 'Failed to fetch sales details',
+                  })
                 }
-              }
+              },
             },
             {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  console.log('Editing sales:', row);
+                  console.log('Editing sales:', row)
 
-                  const token = localStorage.getItem('token');
+                  const token = localStorage.getItem('token')
                   if (!token) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/sales/${Number(row.id)}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                       },
-                    }
-                  );
+                    },
+                  )
 
-                  const result = await response.json();
+                  const result = await response.json()
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch sales details');
+                    throw new Error(
+                      result.message || 'Failed to fetch sales details',
+                    )
                   }
 
-                  console.log('Sales details for editing:', result);
+                  console.log('Sales details for editing:', result)
 
                   // Set sales data for editing
-                  setEditingSales(result);
-                  setIsEditing(true);
-
+                  setEditingSales(result)
+                  setIsEditing(true)
                 } catch (error) {
-                  console.error('Error fetching sales details for editing:', error);
+                  console.error('Error fetching sales details for editing:', error)
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch sales details'
-                  });
+                    message: error.message || 'Failed to fetch sales details',
+                  })
                 }
-              }
+              },
             },
           ]}
           badgeColumns={[
             {
               column: 'status',
               values: {
-                'PAID': 'green',
-                'UNPAID': 'red',
-                'PARTIALLY PAID': 'yellow'
-              }
+                PAID: 'green',
+                UNPAID: 'red',
+                'PARTIALLY PAID': 'yellow',
+              },
             },
             {
               column: 'state',
               values: {
-                'PREPARED': 'orange',
-                'CHECKED': 'blue',
-                'APPROVED': 'green',
-                'REJECTED': 'red',
-                'CANCELLED': 'orange'
-              }
-            }
+                PREPARED: 'orange',
+                CHECKED: 'blue',
+                APPROVED: 'green',
+                REJECTED: 'red',
+                CANCELLED: 'orange',
+              },
+            },
           ]}
           checkboxActions={getFilteredCheckboxActions([])}
           checkboxActionsFilter={getFilteredCheckboxActions}
         />
       </motion.div>
     </div>
-  );
+  )
 }
 
-{/* --- HELPER COMPONENT (Fixed: This was likely missing) --- */ }
+{
+  /* --- HELPER COMPONENT (Fixed: This was likely missing) --- */
+}
 function SummaryCard({ icon, label, value, subText }) {
   return (
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }

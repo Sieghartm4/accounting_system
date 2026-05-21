@@ -3146,79 +3146,50 @@ const updateDisbursementState = async (req, res, next) => {
 
 
 
-      const now = new Date();
+ const now = new Date();
 
+const auditQueries = [];
 
+updates.forEach((u) => {
 
-      const stateTransitions = updates.map(u => `ID ${u.id}: ${u.currentState} → ${u.currentState === 'PREPARED' ? 'CHECKED' : 'APPROVED'}`).join(', ');
+  const nextState =
+    u.currentState === 'PREPARED'
+      ? 'CHECKED'
+      : 'APPROVED';
 
+  auditQueries.push({
 
+    sql: sql.insert(Master.audit_trail.tablename, {
 
-      const auditQueries = [];
+      columns: Master.audit_trail.insertColumns,
 
+      prefix: Master.audit_trail.prefix,
 
+      isTransaction: true
 
-      auditQueries.push({
+    }).build(),
 
+    values: [
 
+      u.id, // FIXED: use disbursement ID
 
-        sql: sql.insert(Master.audit_trail.tablename, {
+      'CASH_DISBURSEMENT_STATE',
 
+      req.context?.username || null,
 
+      now.toISOString().split('T')[0],
 
-          columns: Master.audit_trail.insertColumns,
+      now.toTimeString().split(' ')[0],
 
+      `STATE UPDATE: ${u.currentState} → ${nextState}`
 
+    ]
 
-          prefix: Master.audit_trail.prefix,
+  });
 
+});
 
-
-          isTransaction: true
-
-
-
-        }).build(),
-
-
-
-        values: [
-
-
-
-          null,
-
-
-
-          'CASH_DISBURSEMENT_STATE',
-
-
-
-          req.context?.username || null,
-
-
-
-          now.toISOString().split('T')[0],
-
-
-
-          now.toTimeString().split(' ')[0],
-
-
-
-          `STATE UPDATE: ${results.length} record(s) - ${stateTransitions}`
-
-
-
-        ]
-
-
-
-      });
-
-
-
-      await Transaction(auditQueries);
+await Transaction(auditQueries);
 
 
 

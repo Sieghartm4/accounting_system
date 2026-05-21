@@ -5,7 +5,8 @@ const useAgeingReceivables = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const refetchSales = useCallback(async () => {
+  // filters: { date_from: 'YYYY-MM-DD', date_to: 'YYYY-MM-DD' }
+  const refetchSales = useCallback(async (filters = {}) => {
     try {
       setLoading(true)
       setError(null)
@@ -15,7 +16,14 @@ const useAgeingReceivables = () => {
         throw new Error('No authorization token found')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/sales`, {
+      // Build query string from filters
+      const qs = []
+      if (filters.date_from)
+        qs.push(`date_from=${encodeURIComponent(filters.date_from)}`)
+      if (filters.date_to) qs.push(`date_to=${encodeURIComponent(filters.date_to)}`)
+      const url = `${import.meta.env.VITE_SERVER_LINK}/sales${qs.length ? `?${qs.join('&')}` : ''}`
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

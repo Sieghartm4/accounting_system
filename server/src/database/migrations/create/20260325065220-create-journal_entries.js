@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
@@ -7,44 +7,40 @@ module.exports = {
       je_id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
       },
       je_db_name: {
         type: Sequelize.STRING(300),
-        allowNull: false
+        allowNull: false,
       },
       je_db_id: {
         type: Sequelize.INTEGER,
-        allowNull: false
+        allowNull: false,
       },
       je_coa_id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
-        references: {
-          model: 'charts_of_accounts',
-          key: 'coa_id'
-        }
+        allowNull: true,
       },
       je_responsibility_center: {
         type: Sequelize.STRING(300),
-        allowNull: false
+        allowNull: false,
       },
       je_type: {
         type: Sequelize.ENUM('DEBIT', 'CREDIT'),
-        allowNull: false
+        allowNull: false,
       },
       je_amount: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: false
+        allowNull: false,
       },
       je_date: {
         type: Sequelize.STRING(30),
-        allowNull: false
-      }
-    });
+        allowNull: false,
+      },
+    })
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('journal_entries');
-  }
-};
+    await queryInterface.dropTable('journal_entries')
+  },
+}

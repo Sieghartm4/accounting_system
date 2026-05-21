@@ -331,26 +331,46 @@ const updateAdjustment = async (req, res, next) => {
       await connection.commit();
 
       // Audit trail for state update
-      const now = new Date();
-      const stateTransitions = updates.map(u => `ID ${u.id}: ${u.currentState} → ${u.currentState === 'PREPARED' ? 'CHECKED' : 'APPROVED'}`).join(', ');
-      const auditQueries = [];
-      auditQueries.push({
-        sql: sql.insert(Master.audit_trail.tablename, {
-          columns: Master.audit_trail.insertColumns,
-          prefix: Master.audit_trail.prefix,
-          isTransaction: true
-        }).build(),
-        values: [
-          null,
-          'ADJUSTMENT_STATE',
-          req.context?.username || null,
-          now.toISOString().split('T')[0],
-          now.toTimeString().split(' ')[0],
-          `STATE UPDATE: ${results.length} record(s) - ${stateTransitions}`
-        ]
-      });
-      await Transaction(auditQueries);
+const now = new Date();
 
+const auditQueries = [];
+
+updates.forEach((u) => {
+
+  const nextState =
+    u.currentState === 'PREPARED'
+      ? 'CHECKED'
+      : 'APPROVED';
+
+  auditQueries.push({
+
+    sql: sql.insert(Master.audit_trail.tablename, {
+      columns: Master.audit_trail.insertColumns,
+      prefix: Master.audit_trail.prefix,
+      isTransaction: true
+    }).build(),
+
+    values: [
+
+      u.id, // FIXED: replace null with adjustment ID
+
+      'ADJUSTMENT_STATE',
+
+      req.context?.username || null,
+
+      now.toISOString().split('T')[0],
+
+      now.toTimeString().split(' ')[0],
+
+      `STATE UPDATE: ${u.currentState} → ${nextState}`
+
+    ]
+
+  });
+
+});
+
+await Transaction(auditQueries);
       res.status(200).json({
         success: true,
         message: `${results.length} adjustment(s) updated successfully`,

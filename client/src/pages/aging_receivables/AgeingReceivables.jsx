@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { Clock3, TrendingUp, Download, RefreshCw } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
@@ -19,7 +20,40 @@ const formatDate = (value) => {
 const decimalFormat = (value) => {
   const number = Number(value)
   if (Number.isNaN(number)) return '0.00'
-  return number.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return number.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function FlipDigit({ digit }) {
+  return (
+    <div className="relative bg-gradient-to-b from-[#242930] to-[#111317] border border-[#2b313a] rounded-md px-1.5 py-1.5 shadow-[0_2px_5px_rgba(0,0,0,0.5)] flex items-center justify-center min-w-[20px] h-[30px] overflow-hidden">
+      <div className="absolute inset-x-0 top-1/2 h-[1px] bg-black/80 z-10 shadow-[0_0.5px_0_rgba(255,255,255,0.06)]" />
+      <div className="absolute inset-x-0 top-0 h-1/2 bg-white/[0.03] pointer-events-none z-0" />
+      <span className="font-mono text-[13px] font-black text-gray-100 tracking-wider z-0 leading-none select-none drop-shadow-[0_1.5px_2px_rgba(0,0,0,0.95)]">
+        {digit}
+      </span>
+    </div>
+  )
+}
+
+function FlipUnitGroup({ value, label }) {
+  const padValue = String(value).padStart(2, '0')
+  const digit1 = padValue.charAt(0)
+  const digit2 = padValue.charAt(1)
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="flex gap-0.5">
+        <FlipDigit digit={digit1} />
+        <FlipDigit digit={digit2} />
+      </div>
+      <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mt-0.5">
+        {label}
+      </span>
+    </div>
+  )
 }
 
 function AgingTimerCell({ dueDate, now }) {
@@ -33,29 +67,56 @@ function AgingTimerCell({ dueDate, now }) {
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
 
-  const formatBlock = (value) => String(value).padStart(2, '0')
   const statusLabel = isFuture ? 'Due in' : 'Overdue'
   const badgeClasses = isFuture
-    ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-    : 'bg-red-100 text-red-700 border-red-200'
+    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+    : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
 
   return (
-    <div className="flex flex-col items-start gap-2">
-      <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.3em] ${badgeClasses}`}>
+    <div className="inline-flex items-stretch">
+      {/* LEFT STATUS */}
+      <span
+        className={`flex items-center justify-center gap-1.5 
+      rounded-l-xl border border-r-0 
+      px-3 h-14 
+      text-[9px] font-black uppercase tracking-wider 
+      leading-none
+      ${badgeClasses}`}
+      >
+        <span
+          className={`h-1.5 w-1.5 rounded-full animate-pulse ${
+            isFuture ? 'bg-emerald-500' : 'bg-rose-500'
+          }`}
+        />
         {statusLabel}
       </span>
-      <div className="inline-flex items-center gap-1 rounded-3xl bg-[#111111] px-2 py-2 shadow-inner shadow-black/20">
-        {[days, hours, minutes, seconds].map((value, idx) => (
-          <div key={idx} className="flex flex-col items-center justify-center rounded-2xl bg-[#1f2937] px-3 py-2 min-w-10.5 shrink-0">
-            <span className="text-sm font-black text-white">{formatBlock(value)}</span>
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-4 gap-2 text-[10px] uppercase tracking-[0.2em] text-gray-500 w-full px-1">
-        <span className="text-center">D</span>
-        <span className="text-center">H</span>
-        <span className="text-center">M</span>
-        <span className="text-center">S</span>
+
+      {/* RIGHT TIMER */}
+      <div
+        className="flex items-center gap-1.5 
+      rounded-r-xl bg-[#0b0c0e] px-3 
+      h-14 border border-[#1b1c20] 
+      shadow-[inset_0_2px_8px_rgba(0,0,0,0.8),0_4px_12px_rgba(0,0,0,0.15)]"
+      >
+        <FlipUnitGroup value={days} label="Days" />
+
+        <span className="text-xs font-mono text-gray-500 font-bold select-none">
+          :
+        </span>
+
+        <FlipUnitGroup value={hours} label="Hours" />
+
+        <span className="text-xs font-mono text-gray-500 font-bold select-none">
+          :
+        </span>
+
+        <FlipUnitGroup value={minutes} label="Mins" />
+
+        <span className="text-xs font-mono text-gray-500 font-bold select-none">
+          :
+        </span>
+
+        <FlipUnitGroup value={seconds} label="Secs" />
       </div>
     </div>
   )
@@ -71,7 +132,10 @@ export default function AgeingReceivables() {
 
 function AgeingReceivablesContent() {
   const { sales, loading, error, refetchSales } = useAgeingReceivables()
+  const navigate = useNavigate()
   const [now, setNow] = useState(Date.now())
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   useEffect(() => {
     const intervalId = setInterval(() => setNow(Date.now()), 1000)
@@ -80,14 +144,15 @@ function AgeingReceivablesContent() {
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
   }
 
   const overdueCount = sales?.length || 0
   const totalAmountDue = useMemo(() => {
     return (sales || []).reduce(
       (sum, sale) =>
-        sum + (Number(sale.amount_due || sale.total_amount_due || sale.total_amount) || 0),
+        sum +
+        (Number(sale.amount_due || sale.total_amount_due || sale.total_amount) || 0),
       0,
     )
   }, [sales])
@@ -113,7 +178,9 @@ function AgeingReceivablesContent() {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Syncing Aging Receivables...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Syncing Aging Receivables...
+        </p>
       </div>
     )
   }
@@ -131,7 +198,6 @@ function AgeingReceivablesContent() {
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-      
       {/* --- HEADER SECTION --- */}
       <div className="shrink-0">
         <motion.div
@@ -152,20 +218,64 @@ function AgeingReceivablesContent() {
           </div>
 
           <div className="flex gap-3">
-            <button 
-              type="button"
-              className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm tracking-widest uppercase"
-            >
-              <Download size={14} />
-              Export List
-            </button>
-            <button
-              onClick={refetchSales}
-              className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
-            >
-              <RefreshCw size={14} />
-              Refresh
-            </button>
+            <div className="flex items-center gap-3">
+
+              {/* Inline Date Filter */}
+              <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-1 border border-gray-200">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider mr-1">
+                  Due
+                </label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="px-2 py-1 bg-gray-50 border border-gray-100 rounded text-sm text-gray-800"
+                />
+                <span className="text-gray-400">to</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="px-2 py-1 bg-gray-50 border border-gray-100 rounded text-sm text-gray-800"
+                />
+                
+                <button
+                  onClick={() =>
+                    refetchSales({ date_from: dateFrom, date_to: dateTo })
+                  }
+                  className="ml-2 px-3 py-1 bg-black text-white text-sm font-bold rounded-lg"
+                >
+                  Apply
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setDateFrom('')
+                    setDateTo('')
+                    refetchSales()
+                  }}
+                  className="px-2 py-1 bg-white border border-gray-200 text-sm font-bold rounded-lg"
+                >
+                  Clear
+                </button>
+              </div>
+              <button
+                type="button"
+                className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm tracking-widest uppercase"
+              >
+                <Download size={14} />
+                Export List
+              </button>
+              <button
+                onClick={() =>
+                  refetchSales({ date_from: dateFrom, date_to: dateTo })
+                }
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
+                <RefreshCw size={14} />
+                Refresh
+              </button>
+            </div>
           </div>
         </motion.div>
 
@@ -199,11 +309,22 @@ function AgeingReceivablesContent() {
         transition={{ delay: 0.3 }}
         className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
       >
+        {/* Date filter moved to header to preserve DynamicTable footer */}
+
         <DynamicTable
           data={tableData}
           title="Aging Receivables"
           enableAddButton={false}
-          enableActionColumn={false}
+          enableActionColumn={true}
+          actionButtons={[
+            {
+              label: 'View',
+              onClick: (row) => {
+                // navigate to Sales page with id query param to open SalesForm view
+                navigate(`/sales?id=${row.id}`)
+              },
+            },
+          ]}
           badgeColumns={[
             {
               column: 'status',
@@ -213,8 +334,8 @@ function AgeingReceivablesContent() {
                 APPROVED: 'blue',
                 PREPARED: 'yellow',
                 CHECKED: 'purple',
-              }
-            }
+              },
+            },
           ]}
         />
       </motion.div>
@@ -227,10 +348,14 @@ function SummaryCard({ icon, label, value, subText }) {
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
