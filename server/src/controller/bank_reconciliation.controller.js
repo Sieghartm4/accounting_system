@@ -284,6 +284,190 @@ const getBankReconciliationDetail = async (req, res, next) => {
   }
 }
 
+const getBankReconciliationAdjustments = async (req, res, next) => {
+  const { id } = req.params
+  const { start_date, end_date } = req.query
+  const reconciliationId = Number(id)
+
+  if (!Number.isInteger(reconciliationId) || reconciliationId <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid bank reconciliation id',
+    })
+  }
+
+  try {
+    const whereClauses = [
+      `${Accounting.journal_entries.selectOptionColumns.db_name} = ?`,
+      `${Accounting.journal_entries.selectOptionColumns.db_id} = ?`,
+    ]
+    const values = ['bank_reconciliation', reconciliationId]
+
+    if (start_date) {
+      whereClauses.push(
+        `${Accounting.journal_entries.selectOptionColumns.date} >= ?`,
+      )
+      values.push(start_date)
+    }
+    if (end_date) {
+      whereClauses.push(
+        `${Accounting.journal_entries.selectOptionColumns.date} <= ?`,
+      )
+      values.push(end_date)
+    }
+
+    const query = `SELECT
+        ${Accounting.journal_entries.selectOptionColumns.id} AS id,
+        ${Accounting.journal_entries.selectOptionColumns.db_name} AS db_name,
+        ${Accounting.journal_entries.selectOptionColumns.db_id} AS db_id,
+        ${Accounting.journal_entries.selectOptionColumns.coa_id} AS coa_id,
+        ${Master.charts_of_accounts.selectOptionColumns.name} AS coa_name,
+        ${Accounting.journal_entries.selectOptionColumns.responsibility_center} AS responsibility_center,
+        ${Accounting.journal_entries.selectOptionColumns.type} AS type,
+        ${Accounting.journal_entries.selectOptionColumns.amount} AS amount,
+        ${Accounting.journal_entries.selectOptionColumns.date} AS date
+      FROM ${Accounting.journal_entries.tablename}
+      INNER JOIN ${Master.charts_of_accounts.tablename}
+        ON ${Master.charts_of_accounts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.coa_id}
+      WHERE ${whereClauses.join(' AND ')}
+      ORDER BY ${Accounting.journal_entries.selectOptionColumns.date} ASC,
+               ${Accounting.journal_entries.selectOptionColumns.id} ASC`
+
+    const adjustments = await Query(query, values, [
+      Accounting.journal_entries.prefix_,
+      Master.charts_of_accounts.prefix_,
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Bank reconciliation adjustments retrieved successfully',
+      data: adjustments,
+      count: adjustments.length,
+      startDate: start_date || null,
+      endDate: end_date || null,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching bank reconciliation adjustments:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching bank reconciliation adjustments',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const addBankReconciliationAdjustment = async (req, res, next) => {
+  try {
+    const { id } = req.params
+    const { date, coa_id, responsibility_center, type, amount } = req.body
+    const reconciliationId = Number(id)
+
+    if (!Number.isInteger(reconciliationId) || reconciliationId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid bank reconciliation id',
+      })
+    }
+
+    if (!date || !coa_id || !type || amount === undefined || amount === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'Date, COA, type, and amount are required',
+      })
+    }
+
+    const formattedType = String(type).toUpperCase()
+    if (!['DEBIT', 'CREDIT'].includes(formattedType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Journal entry type must be DEBIT or CREDIT',
+      })
+    }
+
+    const reconciliationQuery = sql
+      .select([
+        { col: Accounting.bank_reconciliation.selectOptionColumns.id, as: 'id' },
+      ])
+      .from(Accounting.bank_reconciliation.tablename)
+      .where(Accounting.bank_reconciliation.selectOptionColumns.id, '=', '?')
+      .build()
+
+    const existingReconciliation = await Query(reconciliationQuery, [
+      reconciliationId,
+    ])
+    if (!existingReconciliation || existingReconciliation.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bank reconciliation not found',
+      })
+    }
+
+    try {
+      const queries = [
+        {
+          sql: sql
+            .insert(Accounting.journal_entries.tablename, {
+              columns: Accounting.journal_entries.insertColumns,
+              prefix: Accounting.journal_entries.prefix,
+              isTransaction: true,
+            })
+            .build(),
+          values: [
+            'bank_reconciliation',
+            reconciliationId,
+            coa_id,
+            responsibility_center || null,
+            formattedType,
+            parseFloat(amount) || 0,
+            date,
+          ],
+        },
+      ]
+
+      await Transaction(queries)
+
+      const idQuery = sql
+        .select([{ col: 'MAX(je_id)', as: 'id' }])
+        .from(Accounting.journal_entries.tablename)
+        .build()
+      const idResult = await Query(idQuery)
+      const journalEntryId = idResult[0]?.id
+
+      res.status(201).json({
+        success: true,
+        message: 'Adjustment journal entry created successfully',
+        data: {
+          id: journalEntryId,
+          db_name: 'bank_reconciliation',
+          db_id: reconciliationId,
+          coa_id,
+          responsibility_center: responsibility_center || null,
+          type: formattedType,
+          amount: parseFloat(amount) || 0,
+          date,
+        },
+        timestamp: new Date().toISOString(),
+      })
+    } catch (error) {
+      throw error
+    }
+  } catch (error) {
+    console.error('Error adding bank reconciliation adjustment:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while adding bank reconciliation adjustment',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
 const createBankReconciliation = async (req, res, next) => {
   try {
     const { bank_account, coa_id } = req.body
@@ -628,8 +812,10 @@ const updateBankReconciliationBalance = async (req, res, next) => {
 module.exports = {
   getBankReconciliations,
   getBankReconciliationDetail,
+  getBankReconciliationAdjustments,
   createBankReconciliation,
   addBankReconciliationItem,
+  addBankReconciliationAdjustment,
   updateBankReconciliationItem,
   updateBankReconciliationBalance,
 }

@@ -3,8 +3,10 @@ const express = require('express')
 const {
   getBankReconciliations,
   getBankReconciliationDetail,
+  getBankReconciliationAdjustments,
   createBankReconciliation,
   addBankReconciliationItem,
+  addBankReconciliationAdjustment,
   updateBankReconciliationItem,
   updateBankReconciliationBalance,
 } = require('../controller/bank_reconciliation.controller')
@@ -22,6 +24,12 @@ bankReconciliationRouter.post('/item/add', addBankReconciliationItem)
 
 // Update bank reconciliation item (must be before /:id routes)
 bankReconciliationRouter.put('/item/:id', updateBankReconciliationItem)
+
+// Add adjustment journal entry for a bank reconciliation
+bankReconciliationRouter.post('/:id/adjustment/add', addBankReconciliationAdjustment)
+
+// Fetch adjustment journal entries for a bank reconciliation
+bankReconciliationRouter.get('/:id/adjustments', getBankReconciliationAdjustments)
 
 // Get specific bank reconciliation with items (after item-specific routes)
 bankReconciliationRouter.get('/:id', getBankReconciliationDetail)
