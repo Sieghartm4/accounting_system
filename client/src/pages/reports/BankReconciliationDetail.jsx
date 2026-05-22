@@ -42,7 +42,6 @@ export default function BankReconciliationDetail({
     itemsLoading,
     journalEntries,
     journalEntriesLoading,
-    adjustmentsLoading,
     showItemModal,
     setShowItemModal,
     editingItem,
@@ -58,8 +57,6 @@ export default function BankReconciliationDetail({
     setBankSearchTerm,
     bookSearchTerm,
     setBookSearchTerm,
-    adjustmentSearchTerm,
-    setAdjustmentSearchTerm,
     showToast,
     setShowToast,
     toastMessage,
@@ -81,8 +78,6 @@ export default function BankReconciliationDetail({
     removeItemFormRow,
     depositsInTransit,
     outstandingChecks,
-    adjustmentDebits,
-    adjustmentCredits,
     bankErrors,
     bankStatementEndingBalance,
     adjustedBankBalance,
@@ -98,19 +93,32 @@ export default function BankReconciliationDetail({
     isReconciled,
     visibleBankItems,
     visibleJournalEntries,
-    visibleAdjustments,
-    adjDebits,
-    adjCredits,
     BANK_SECTION_ITEMS,
     BOOK_SECTION_ITEMS,
-    showAdjustmentModal,
-    setShowAdjustmentModal,
-    adjustmentFormRows,
-    handleAddAdjustment,
-    resetAdjustmentForm,
-    addAdjustmentFormRow,
-    removeAdjustmentFormRow,
-    updateAdjustmentFormRow,
+    // Adjustment state and handlers
+    bankAdjustments,
+    setBankAdjustments,
+    bookAdjustments,
+    setBookAdjustments,
+    showBankAdjustmentForm,
+    setShowBankAdjustmentForm,
+    showBookAdjustmentForm,
+    setShowBookAdjustmentForm,
+    bankAdjustmentForm,
+    setBankAdjustmentForm,
+    bookAdjustmentForm,
+    setBookAdjustmentForm,
+    handleAddBankAdjustment,
+    handleAddBookAdjustment,
+    handleRemoveBankAdjustment,
+    handleRemoveBookAdjustment,
+    handleSaveSummary,
+    bankCardAdditions,
+    bankCardDeductions,
+    bankCardErrors,
+    bookCardAdditions,
+    bookCardDeductions,
+    bookCardErrors,
   } = useBankReconciliation(selectedReconciliation)
 
   return (
@@ -167,13 +175,10 @@ export default function BankReconciliationDetail({
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
-                onClick={() => {
-                  resetAdjustmentForm()
-                  setShowAdjustmentModal(true)
-                }}
+                onClick={() => handleSaveSummary()}
                 className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-emerald-700 transition"
               >
-                <Plus size={16} /> Add Adjustment
+                <FileText size={16} /> Save Summary
               </motion.button>
             </div>
           </div>
@@ -286,6 +291,11 @@ export default function BankReconciliationDetail({
                 <p className="text-blue-300 text-xs">
                   Bank balance adjusted for deposits and outstanding checks
                 </p>
+                {detailStartDate && detailEndDate && (
+                  <p className="text-blue-400 text-[10px] mt-1">
+                    Period: {detailStartDate} to {detailEndDate}
+                  </p>
+                )}
               </div>
               <Building2 className="text-blue-400" size={22} />
             </div>
@@ -339,6 +349,120 @@ export default function BankReconciliationDetail({
                 </div>
               </div>
 
+              {/* Bank Adjustments Section */}
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Bank Adjustments
+                  </p>
+                  <button
+                    onClick={() => setShowBankAdjustmentForm(!showBankAdjustmentForm)}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  >
+                    <Plus size={12} />
+                    {showBankAdjustmentForm ? 'Cancel' : 'Add Adjustment'}
+                  </button>
+                </div>
+
+                {showBankAdjustmentForm && (
+                  <div className="bg-gray-50 rounded-xl p-3 mb-3 border border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          Adjustment Type
+                        </label>
+                        <select
+                          value={bankAdjustmentForm.type}
+                          onChange={(e) => setBankAdjustmentForm({ ...bankAdjustmentForm, type: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-blue-500"
+                        >
+                          <option value="">Select type...</option>
+                          <optgroup label="Bank Side">
+                            <option value="deposits_in_transit">Deposit in Transit (add)</option>
+                            <option value="outstanding_checks">Outstanding Check (less)</option>
+                            <option value="error_bank">Bank Error / Correction (add/less)</option>
+                          </optgroup>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          Amount
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={bankAdjustmentForm.amount}
+                          onChange={(e) => setBankAdjustmentForm({ ...bankAdjustmentForm, amount: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                        Description (optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Enter description..."
+                        value={bankAdjustmentForm.description}
+                        onChange={(e) => setBankAdjustmentForm({ ...bankAdjustmentForm, description: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleAddBankAdjustment}
+                        className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition"
+                      >
+                        Add Adjustment
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowBankAdjustmentForm(false)
+                          setBankAdjustmentForm({ type: '', description: '', amount: '' })
+                        }}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-100 transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Bank Adjustments List */}
+                {bankAdjustments.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {bankAdjustments.map((adj) => {
+                      const meta = getItemMeta(adj.type)
+                      return (
+                        <div key={adj.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold ${meta.badge}`}>
+                              {meta.label}
+                            </span>
+                            {adj.description && (
+                              <span className="text-xs text-gray-600">{adj.description}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-bold font-mono text-xs ${meta.effect === 'add' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {meta.effect === 'add' ? '+' : '−'} ₱{fmt(adj.amount)}
+                            </span>
+                            <button
+                              onClick={() => handleRemoveBankAdjustment(adj.id)}
+                              className="text-gray-400 hover:text-red-500"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-between items-center py-3 border-b border-gray-100">
                 <div className="flex items-center gap-2">
                   <TrendingUp size={15} className="text-emerald-500" />
@@ -352,7 +476,7 @@ export default function BankReconciliationDetail({
                   </div>
                 </div>
                 <span className="font-bold font-mono text-emerald-600">
-                  + ₱{fmt(depositsInTransit)}
+                  + ₱{fmt(depositsInTransit + bankCardAdditions)}
                 </span>
               </div>
 
@@ -369,9 +493,31 @@ export default function BankReconciliationDetail({
                   </div>
                 </div>
                 <span className="font-bold font-mono text-rose-600">
-                  − ₱{fmt(outstandingChecks)}
+                  − ₱{fmt(outstandingChecks + bankCardDeductions)}
                 </span>
               </div>
+
+              {bankCardErrors !== 0 && (
+                <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <Info size={15} className="text-amber-500" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">
+                        Add/Less: Bank Error Corrections
+                      </p>
+                      <p className="text-[10px] text-gray-400">
+                        Corrections for bank errors
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`font-bold font-mono ${bankCardErrors >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                  >
+                    {bankCardErrors >= 0 ? '+' : '−'} ₱
+                    {fmt(Math.abs(bankCardErrors))}
+                  </span>
+                </div>
+              )}
 
               <div className="mt-4 pt-4 border-t-2 border-blue-900 flex justify-between items-center bg-blue-50 -mx-5 px-5 py-3">
                 <div>
@@ -409,11 +555,16 @@ export default function BankReconciliationDetail({
                 <p className="text-violet-300 text-xs">
                   GL book records reconciled to bank reconciling items
                 </p>
+                {detailStartDate && detailEndDate && (
+                  <p className="text-violet-400 text-[10px] mt-1">
+                    Period: {detailStartDate} to {detailEndDate}
+                  </p>
+                )}
               </div>
               <FileText className="text-violet-400" size={22} />
             </div>
             <div className="p-5">
-              <div className="flex justify-between items-center py-3 border-b border-gray-100 gap-4 flex-wrap">
+              <div className="flex justify-between items-center py-3 border-b border-gray-100">
                 <div>
                   <p className="text-sm font-bold text-gray-800">
                     Unadjusted Book Balance
@@ -424,28 +575,126 @@ export default function BankReconciliationDetail({
                       : 'No journal entries loaded — using stored GL running balance'}
                   </p>
                 </div>
-                <div className="flex items-center gap-4 text-sm font-bold font-mono">
-                  <div className="text-right">
-                    <p className="text-gray-500 uppercase tracking-[1px] text-[10px]">
-                      Debit
-                    </p>
-                    <p className="text-violet-700">₱{fmt(glDebits)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-gray-500 uppercase tracking-[1px] text-[10px]">
-                      Credit
-                    </p>
-                    <p className="text-rose-600">₱{fmt(glCredits)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-gray-500 uppercase tracking-[1px] text-[10px]">
-                      Balance
-                    </p>
-                    <p className="text-xl font-black text-violet-900">
-                      ₱{fmt(unadjustedBookBalance)}
-                    </p>
-                  </div>
+                <span className="text-xl font-black text-violet-900 font-mono">
+                  ₱{fmt(unadjustedBookBalance)}
+                </span>
+              </div>
+
+              {/* Book Adjustments Section */}
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Book Adjustments
+                  </p>
+                  <button
+                    onClick={() => setShowBookAdjustmentForm(!showBookAdjustmentForm)}
+                    className="text-xs font-bold text-violet-600 hover:text-violet-700 flex items-center gap-1"
+                  >
+                    <Plus size={12} />
+                    {showBookAdjustmentForm ? 'Cancel' : 'Add Adjustment'}
+                  </button>
                 </div>
+
+                {showBookAdjustmentForm && (
+                  <div className="bg-gray-50 rounded-xl p-3 mb-3 border border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          Adjustment Type
+                        </label>
+                        <select
+                          value={bookAdjustmentForm.type}
+                          onChange={(e) => setBookAdjustmentForm({ ...bookAdjustmentForm, type: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-violet-500"
+                        >
+                          <option value="">Select type...</option>
+                          <optgroup label="Book Side">
+                            <option value="interest_income">Interest Earned (add)</option>
+                            <option value="credit_memo">Bank Credit Memo / EFT (add)</option>
+                            <option value="bank_charges">Bank Service Fee (less)</option>
+                            <option value="nsf_checks">NSF / Bounced Check (less)</option>
+                            <option value="debit_memo">Bank Debit Memo (less)</option>
+                            <option value="error_book">Book Error / Correction (add/less)</option>
+                          </optgroup>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          Amount
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={bookAdjustmentForm.amount}
+                          onChange={(e) => setBookAdjustmentForm({ ...bookAdjustmentForm, amount: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-violet-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                        Description (optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Enter description..."
+                        value={bookAdjustmentForm.description}
+                        onChange={(e) => setBookAdjustmentForm({ ...bookAdjustmentForm, description: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-violet-500"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleAddBookAdjustment}
+                        className="flex-1 bg-violet-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-violet-700 transition"
+                      >
+                        Add Adjustment
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowBookAdjustmentForm(false)
+                          setBookAdjustmentForm({ type: '', description: '', amount: '' })
+                        }}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-100 transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Book Adjustments List */}
+                {bookAdjustments.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {bookAdjustments.map((adj) => {
+                      const meta = getItemMeta(adj.type)
+                      return (
+                        <div key={adj.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold ${meta.badge}`}>
+                              {meta.label}
+                            </span>
+                            {adj.description && (
+                              <span className="text-xs text-gray-600">{adj.description}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-bold font-mono text-xs ${meta.effect === 'add' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {meta.effect === 'add' ? '+' : '−'} ₱{fmt(adj.amount)}
+                            </span>
+                            <button
+                              onClick={() => handleRemoveBookAdjustment(adj.id)}
+                              className="text-gray-400 hover:text-red-500"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-between items-center py-3 border-b border-gray-100">
@@ -461,7 +710,7 @@ export default function BankReconciliationDetail({
                   </div>
                 </div>
                 <span className="font-bold font-mono text-emerald-600">
-                  + ₱{fmt(bookAdditions)}
+                  + ₱{fmt(bookAdditions + bookCardAdditions)}
                 </span>
               </div>
 
@@ -478,11 +727,11 @@ export default function BankReconciliationDetail({
                   </div>
                 </div>
                 <span className="font-bold font-mono text-rose-600">
-                  − ₱{fmt(bookDeductions)}
+                  − ₱{fmt(bookDeductions + bookCardDeductions)}
                 </span>
               </div>
 
-              {bookErrorAdjustments !== 0 && (
+              {(bookErrorAdjustments !== 0 || bookCardErrors !== 0) && (
                 <div className="flex justify-between items-center py-3 border-b border-gray-100">
                   <div className="flex items-center gap-2">
                     <Info size={15} className="text-amber-500" />
@@ -496,10 +745,10 @@ export default function BankReconciliationDetail({
                     </div>
                   </div>
                   <span
-                    className={`font-bold font-mono ${bookErrorAdjustments >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                    className={`font-bold font-mono ${(bookErrorAdjustments + bookCardErrors) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
                   >
-                    {bookErrorAdjustments >= 0 ? '+' : '−'} ₱
-                    {fmt(Math.abs(bookErrorAdjustments))}
+                    {(bookErrorAdjustments + bookCardErrors) >= 0 ? '+' : '−'} ₱
+                    {fmt(Math.abs(bookErrorAdjustments + bookCardErrors))}
                   </span>
                 </div>
               )}
@@ -764,266 +1013,125 @@ export default function BankReconciliationDetail({
           )}
         </motion.div>
 
-        {/* SIDE-BY-SIDE GRID LAYOUT FOR BOTH BOOK TABLES */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Table A: General Ledger — Book Records */}
-          <motion.div
-            initial={{ y: 16, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm"
-          >
-            <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-violet-600 rounded flex items-center justify-center">
-                  <FileText className="w-3.5 h-3.5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-black text-sm text-gray-900 uppercase tracking-wider">
-                    General Ledger — Book Records
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    GL Balance: ₱{fmt(endingBookBalance)}
-                  </p>
-                </div>
+        {/* General Ledger — Book Records */}
+        <motion.div
+          initial={{ y: 16, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm"
+        >
+          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-violet-600 rounded flex items-center justify-center">
+                <FileText className="w-3.5 h-3.5 text-white" />
               </div>
-              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 h-9 focus-within:border-gray-900 focus-within:bg-white transition-all">
-                <Search size={14} className="text-gray-300 flex-shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Search GL..."
-                  value={bookSearchTerm}
-                  onChange={(e) => setBookSearchTerm(e.target.value)}
-                  className="w-36 bg-transparent border-none outline-none text-[12px] font-bold text-black placeholder:text-gray-300"
-                />
-              </div>
-            </div>
-
-            {journalEntriesLoading ? (
-              <div className="p-8 flex items-center justify-center">
-                <Loader className="w-8 h-8 text-gray-300 animate-spin" />
-              </div>
-            ) : visibleJournalEntries.length === 0 ? (
-              <div className="p-8 text-center">
-                <p className="text-gray-400 text-sm font-medium">
-                  No journal entries found
+              <div>
+                <h3 className="font-black text-sm text-gray-900 uppercase tracking-wider">
+                  General Ledger — Book Records
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  GL Balance: ₱{fmt(endingBookBalance)}
                 </p>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      {[
-                        'Date',
-                        'Reference / DB',
-                        'Responsibility Center',
-                        'Debit (+)',
-                        'Credit (−)',
-                      ].map((h, i) => (
-                        <th
-                          key={h}
-                          className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider ${i >= 3 ? 'text-right' : 'text-left'}`}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleJournalEntries.map((entry) => {
-                      const isDebit = entry.type?.toLowerCase() === 'debit'
-                      return (
-                        <motion.tr
-                          key={entry.id}
-                          className="border-b border-gray-50 hover:bg-violet-50/30 transition"
-                        >
-                          <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-                            {new Date(entry.date).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-700 font-mono font-medium">
-                            {entry.db_name || '—'}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-600">
-                            {entry.responsibility_center || '—'}
-                          </td>
-                          <td
-                            className={`px-4 py-3 text-right text-xs font-mono font-bold ${isDebit ? 'text-blue-700' : 'text-gray-300'}`}
-                          >
-                            {isDebit ? `₱${fmt(entry.amount)}` : '—'}
-                          </td>
-                          <td
-                            className={`px-4 py-3 text-right text-xs font-mono font-bold ${!isDebit ? 'text-rose-600' : 'text-gray-300'}`}
-                          >
-                            {!isDebit ? `₱${fmt(entry.amount)}` : '—'}
-                          </td>
-                        </motion.tr>
-                      )
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-gray-50 border-t-2 border-violet-900">
-                      <td
-                        colSpan="3"
-                        className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider"
-                      >
-                        TOTALS
-                      </td>
-                      <td className="px-4 py-3 text-right text-xs font-black text-blue-700 font-mono">
-                        ₱{fmt(glDebits)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-xs font-black text-rose-600 font-mono">
-                        ₱{fmt(glCredits)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-          </motion.div>
-
-          {/* Table B: New Book Adjustment Table */}
-          <motion.div
-            initial={{ y: 16, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.35 }}
-            className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm"
-          >
-            <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-emerald-600 rounded flex items-center justify-center">
-                  <RefreshCw className="w-3.5 h-3.5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-black text-sm text-gray-900 uppercase tracking-wider">
-                    Book Adjustments
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Adjustments created for this reconciliation period
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 h-9 focus-within:border-gray-900 focus-within:bg-white transition-all">
-                  <Search size={14} className="text-gray-300 flex-shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="Search Adj..."
-                    value={adjustmentSearchTerm}
-                    onChange={(e) => setAdjustmentSearchTerm(e.target.value)}
-                    className="w-36 bg-transparent border-none outline-none text-[12px] font-bold text-black placeholder:text-gray-300"
-                  />
-                </div>
-                {/* ADDED ADJUSTMENT BUTTON */}
-                <button
-                  onClick={() => {
-                    resetAdjustmentForm()
-                    setShowAdjustmentModal(true)
-                  }}
-                  className="px-4 h-9 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-emerald-700 transition shadow-sm"
-                >
-                  <Plus size={14} /> Add Adjustment
-                </button>
-              </div>
             </div>
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 h-9 focus-within:border-gray-900 focus-within:bg-white transition-all">
+              <Search size={14} className="text-gray-300 flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Search GL..."
+                value={bookSearchTerm}
+                onChange={(e) => setBookSearchTerm(e.target.value)}
+                className="w-36 bg-transparent border-none outline-none text-[12px] font-bold text-black placeholder:text-gray-300"
+              />
+            </div>
+          </div>
 
-            {adjustmentsLoading ? (
-              <div className="p-8 flex items-center justify-center">
-                <Loader className="w-8 h-8 text-gray-300 animate-spin" />
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      {[
-                        'Date',
-                        'Reference / DB',
-                        'Responsibility Center',
-                        'Debit (+)',
-                        'Credit (−)',
-                      ].map((h, i) => (
-                        <th
-                          key={h}
-                          className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider ${i >= 3 ? 'text-right' : 'text-left'}`}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleAdjustments.length === 0 ? (
-                      <tr className="border-b border-gray-50">
-                        <td
-                          colSpan="5"
-                          className="px-4 py-8 text-center text-sm text-gray-500"
-                        >
-                          No book adjustments recorded yet. Use Add Adjustment to
-                          create one.
-                        </td>
-                      </tr>
-                    ) : (
-                      visibleAdjustments.map((entry) => {
-                        const isDebit = entry.type?.toLowerCase() === 'debit'
-                        return (
-                          <motion.tr
-                            key={entry.id}
-                            className="border-b border-gray-50 hover:bg-emerald-50/30 transition"
-                          >
-                            <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-                              {new Date(entry.date).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                              })}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-gray-700 font-mono font-medium">
-                              {entry.reference_number || entry.db_name || '—'}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-gray-600">
-                              {entry.responsibility_center || '—'}
-                            </td>
-                            <td
-                              className={`px-4 py-3 text-right text-xs font-mono font-bold ${isDebit ? 'text-blue-700' : 'text-gray-300'}`}
-                            >
-                              {isDebit ? `₱${fmt(entry.amount)}` : '—'}
-                            </td>
-                            <td
-                              className={`px-4 py-3 text-right text-xs font-mono font-bold ${!isDebit ? 'text-rose-600' : 'text-gray-300'}`}
-                            >
-                              {!isDebit ? `₱${fmt(entry.amount)}` : '—'}
-                            </td>
-                          </motion.tr>
-                        )
-                      })
-                    )}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-gray-50 border-t-2 border-emerald-900">
-                      <td
-                        colSpan="3"
-                        className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider"
+          {journalEntriesLoading ? (
+            <div className="p-8 flex items-center justify-center">
+              <Loader className="w-8 h-8 text-gray-300 animate-spin" />
+            </div>
+          ) : visibleJournalEntries.length === 0 ? (
+            <div className="p-8 text-center">
+              <p className="text-gray-400 text-sm font-medium">
+                No journal entries found
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    {[
+                      'Date',
+                      'Reference / DB',
+                      'Responsibility Center',
+                      'Debit (+)',
+                      'Credit (−)',
+                    ].map((h, i) => (
+                      <th
+                        key={h}
+                        className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider ${i >= 3 ? 'text-right' : 'text-left'}`}
                       >
-                        TOTALS
-                      </td>
-                      <td className="px-4 py-3 text-right text-xs font-black text-blue-700 font-mono">
-                        ₱{fmt(adjDebits)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-xs font-black text-rose-600 font-mono">
-                        ₱{fmt(adjCredits)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-          </motion.div>
-        </div>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleJournalEntries.map((entry) => {
+                    const isDebit = entry.type?.toLowerCase() === 'debit'
+                    return (
+                      <motion.tr
+                        key={entry.id}
+                        className="border-b border-gray-50 hover:bg-violet-50/30 transition"
+                      >
+                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                          {new Date(entry.date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-700 font-mono font-medium">
+                          {entry.db_name || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600">
+                          {entry.responsibility_center || '—'}
+                        </td>
+                        <td
+                          className={`px-4 py-3 text-right text-xs font-mono font-bold ${isDebit ? 'text-blue-700' : 'text-gray-300'}`}
+                        >
+                          {isDebit ? `₱${fmt(entry.amount)}` : '—'}
+                        </td>
+                        <td
+                          className={`px-4 py-3 text-right text-xs font-mono font-bold ${!isDebit ? 'text-rose-600' : 'text-gray-300'}`}
+                        >
+                          {!isDebit ? `₱${fmt(entry.amount)}` : '—'}
+                        </td>
+                      </motion.tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-50 border-t-2 border-violet-900">
+                    <td
+                      colSpan="3"
+                      className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider"
+                    >
+                      TOTALS
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs font-black text-blue-700 font-mono">
+                      ₱{fmt(glDebits)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs font-black text-rose-600 font-mono">
+                      ₱{fmt(glCredits)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </motion.div>
       </div>
 
       {/* Add / Edit Item Modal */}
@@ -1383,159 +1491,6 @@ export default function BankReconciliationDetail({
         </div>
       </RightSideModal>
 
-      {/* NEW RIGHT SIDE MODAL FOR BOOK ADJUSTMENTS */}
-      <RightSideModal
-        isOpen={showAdjustmentModal}
-        onClose={() => {
-          setShowAdjustmentModal(false)
-          resetAdjustmentForm()
-        }}
-        title="Add Book Adjustments"
-        size="5xl"
-      >
-        <div className="pb-16">
-          <div className="p-3 overflow-y-auto max-h-[75vh]">
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs font-black text-gray-900 uppercase tracking-wider">
-                  Batch Book Adjustments
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Add multiple adjustments in one save. Each row creates a new
-                  adjustment ledger entry.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                {adjustmentFormRows.map((row, index) => (
-                  <div
-                    key={index}
-                    className="border border-emerald-200 rounded-xl p-3 bg-white"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-                      <div className="md:col-span-2">
-                        <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                          Type *
-                        </label>
-                        <select
-                          value={row.type}
-                          onChange={(e) =>
-                            updateAdjustmentFormRow(index, 'type', e.target.value)
-                          }
-                          className="w-full px-2.5 py-2 border border-gray-300 rounded-lg outline-none text-xs font-medium"
-                        >
-                          <option value="debit">Debit (+)</option>
-                          <option value="credit">Credit (−)</option>
-                        </select>
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                          Date *
-                        </label>
-                        <input
-                          type="date"
-                          value={row.date}
-                          onChange={(e) =>
-                            updateAdjustmentFormRow(index, 'date', e.target.value)
-                          }
-                          className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm"
-                        />
-                      </div>
-
-                      <div className="md:col-span-3">
-                        <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                          Responsibility Center
-                        </label>
-                        <input
-                          type="text"
-                          value={row.responsibility_center}
-                          onChange={(e) =>
-                            updateAdjustmentFormRow(
-                              index,
-                              'responsibility_center',
-                              e.target.value,
-                            )
-                          }
-                          placeholder="e.g. Finance, Head Office"
-                          className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm outline-none"
-                        />
-                      </div>
-
-                      <div className="md:col-span-3">
-                        <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                          Amount *
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                            ₱
-                          </span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={row.amount}
-                            onChange={(e) =>
-                              updateAdjustmentFormRow(
-                                index,
-                                'amount',
-                                e.target.value,
-                              )
-                            }
-                            placeholder="0.00"
-                            className="w-full pl-5 pr-2 py-2 border border-gray-300 rounded-lg text-sm outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="md:col-span-2 flex items-end">
-                        <button
-                          type="button"
-                          onClick={() => removeAdjustmentFormRow(index)}
-                          disabled={adjustmentFormRows.length === 1}
-                          className="w-full h-[38px] rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 transition text-xs font-bold"
-                        >
-                          <Trash2 size={14} />
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-2 flex justify-start">
-                <button
-                  type="button"
-                  onClick={addAdjustmentFormRow}
-                  className="px-4 py-2 border border-gray-900 text-gray-900 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-gray-50 transition flex items-center gap-1.5"
-                >
-                  <Plus size={13} /> Add Row
-                </button>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowAdjustmentModal(false)
-                  resetAdjustmentForm()
-                }}
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 text-sm font-bold hover:bg-gray-50 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddAdjustment}
-                className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition flex items-center justify-center gap-2"
-              >
-                <Check size={16} />
-                Save {adjustmentFormRows.length} Adjustment
-                {adjustmentFormRows.length === 1 ? '' : 's'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </RightSideModal>
 
       {showToast && (
         <DynamicToast
