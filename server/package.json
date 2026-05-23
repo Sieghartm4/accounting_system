@@ -8,6 +8,7 @@
     "db:setup": "node src/database/util/dbSetup.util.js",
     "db:status": "node src/database/util/checkMigrations.util.js",
     "db:migrate": "npx sequelize-cli db:migrate && node src/database/util/generateModels.util.js",
+    "db:migrate:tenant": "node src/database/util/migrateTenantDb.util.js",
     "db:migrate:undo": "npx sequelize-cli db:migrate:undo",
     "db:seed:undo": "npx sequelize-cli db:seed:undo:all",
     "db:drop": "node src/database/settings/confirmation.settings.js \"⚠️ WARNING: This will DROP the database. Type 'yes' to continue: \" && npx sequelize-cli db:drop",

@@ -1,11 +1,21 @@
 import { useState, useEffect } from 'react'
 
+const formatLocalDate = (d) => {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
+const getCurrentMonthRange = () => {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return [formatLocalDate(start), formatLocalDate(end)]
+}
 
 const BANK_SECTION_ITEMS = [
-
   {
-
     value: 'deposits_in_transit',
 
     label: 'Deposit in Transit',
@@ -21,11 +31,9 @@ const BANK_SECTION_ITEMS = [
     badge: 'bg-emerald-100 text-emerald-700',
 
     borderColor: 'border-emerald-200',
-
   },
 
   {
-
     value: 'outstanding_checks',
 
     label: 'Outstanding Check',
@@ -33,7 +41,6 @@ const BANK_SECTION_ITEMS = [
     effect: 'deduct',
 
     description:
-
       'Checks issued and recorded in the books but not yet cleared the bank',
 
     color: 'text-rose-700',
@@ -43,11 +50,9 @@ const BANK_SECTION_ITEMS = [
     badge: 'bg-rose-100 text-rose-700',
 
     borderColor: 'border-rose-200',
-
   },
 
   {
-
     value: 'error_bank',
 
     label: 'Bank Error',
@@ -55,7 +60,6 @@ const BANK_SECTION_ITEMS = [
     effect: 'adjustment',
 
     description:
-
       'An error made by the bank that requires correction on the bank side',
 
     color: 'text-amber-700',
@@ -65,17 +69,11 @@ const BANK_SECTION_ITEMS = [
     badge: 'bg-amber-100 text-amber-700',
 
     borderColor: 'border-amber-200',
-
   },
-
 ]
 
-
-
 const BOOK_SECTION_ITEMS = [
-
   {
-
     value: 'interest_income',
 
     label: 'Interest Earned',
@@ -91,11 +89,9 @@ const BOOK_SECTION_ITEMS = [
     badge: 'bg-emerald-100 text-emerald-700',
 
     borderColor: 'border-emerald-200',
-
   },
 
   {
-
     value: 'credit_memo',
 
     label: 'Bank Credit Memo',
@@ -111,11 +107,9 @@ const BOOK_SECTION_ITEMS = [
     badge: 'bg-emerald-100 text-emerald-700',
 
     borderColor: 'border-emerald-200',
-
   },
 
   {
-
     value: 'bank_charges',
 
     label: 'Bank Service Fee',
@@ -131,11 +125,9 @@ const BOOK_SECTION_ITEMS = [
     badge: 'bg-rose-100 text-rose-700',
 
     borderColor: 'border-rose-200',
-
   },
 
   {
-
     value: 'nsf_checks',
 
     label: 'NSF / Bounced Check',
@@ -143,7 +135,6 @@ const BOOK_SECTION_ITEMS = [
     effect: 'deduct',
 
     description:
-
       'A customer check deposited that was returned due to insufficient funds',
 
     color: 'text-rose-700',
@@ -153,11 +144,9 @@ const BOOK_SECTION_ITEMS = [
     badge: 'bg-rose-100 text-rose-700',
 
     borderColor: 'border-rose-200',
-
   },
 
   {
-
     value: 'debit_memo',
 
     label: 'Bank Debit Memo',
@@ -173,11 +162,9 @@ const BOOK_SECTION_ITEMS = [
     badge: 'bg-rose-100 text-rose-700',
 
     borderColor: 'border-rose-200',
-
   },
 
   {
-
     value: 'error_book',
 
     label: 'Book Error / Correction',
@@ -193,31 +180,24 @@ const BOOK_SECTION_ITEMS = [
     badge: 'bg-amber-100 text-amber-700',
 
     borderColor: 'border-amber-200',
-
   },
-
 ]
-
-
 
 const ALL_ITEM_TYPES = [...BANK_SECTION_ITEMS, ...BOOK_SECTION_ITEMS]
 
-
+const normalizeItemValue = (val) =>
+  String(val || '')
+    .trim()
+    .toLowerCase()
 
 const DEMO_RECONCILIATION = {
-
   bank_statement_balance: 40320.0,
 
   running_balance: 40320.0,
-
 }
 
-
-
 const DEMO_RECONCILIATION_ITEMS = [
-
   {
-
     id: 'demo-1',
 
     date: '2026-05-16',
@@ -229,11 +209,9 @@ const DEMO_RECONCILIATION_ITEMS = [
     debit: 100.0,
 
     credit: 0,
-
   },
 
   {
-
     id: 'demo-2',
 
     date: '2026-05-19',
@@ -245,11 +223,9 @@ const DEMO_RECONCILIATION_ITEMS = [
     debit: 1000.0,
 
     credit: 0,
-
   },
 
   {
-
     id: 'demo-3',
 
     date: '2026-05-19',
@@ -261,11 +237,9 @@ const DEMO_RECONCILIATION_ITEMS = [
     debit: 0,
 
     credit: 100.0,
-
   },
 
   {
-
     id: 'demo-4',
 
     date: '2026-05-20',
@@ -277,11 +251,9 @@ const DEMO_RECONCILIATION_ITEMS = [
     debit: 2000.0,
 
     credit: 0,
-
   },
 
   {
-
     id: 'demo-5',
 
     date: '2026-05-20',
@@ -293,112 +265,103 @@ const DEMO_RECONCILIATION_ITEMS = [
     debit: 0,
 
     credit: 1000.0,
-
   },
-
 ]
 
-
-
 const DEMO_MODE =
-
   import.meta.env.DEV && import.meta.env.VITE_BANK_RECONCILIATION_DEMO === 'true'
-
-
-
 export const getItemMeta = (val) => {
+  const normalized = normalizeItemValue(val)
+  const found = ALL_ITEM_TYPES.find(
+    (t) =>
+      normalizeItemValue(t.value) === normalized ||
+      normalizeItemValue(t.label) === normalized,
+  )
 
-  return ALL_ITEM_TYPES.find((t) => t.value === val) || BANK_SECTION_ITEMS[0]
+  if (found) return found
 
+  // Fallback: return a meta object that preserves the original DB value
+  const raw = String(val || '')
+  const pretty = raw
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/(^|\s)\S/g, (s) => s.toUpperCase())
+
+  return {
+    value: raw,
+    label: pretty || 'Unknown',
+    effect: 'adjustment',
+    badge: 'bg-gray-100 text-gray-700',
+  }
 }
-
-
 
 export const isBankSectionItem = (val) => {
-
-  return BANK_SECTION_ITEMS.some((t) => t.value === val)
-
+  const normalized = normalizeItemValue(val)
+  return BANK_SECTION_ITEMS.some(
+    (t) =>
+      normalizeItemValue(t.value) === normalized ||
+      normalizeItemValue(t.label) === normalized,
+  )
 }
-
-
 
 export const isBookSectionItem = (val) => {
-
-  return BOOK_SECTION_ITEMS.some((t) => t.value === val)
-
+  const normalized = normalizeItemValue(val)
+  return BOOK_SECTION_ITEMS.some(
+    (t) =>
+      normalizeItemValue(t.value) === normalized ||
+      normalizeItemValue(t.label) === normalized,
+  )
 }
 
-
-
 export const getItemSection = (item) => {
-
   const detailsValue = item.bri_details || item.details || item.item_type
 
   if (isBankSectionItem(detailsValue)) return 'BANK'
 
   if (isBookSectionItem(detailsValue)) return 'BOOK'
 
-  if (item.section === 'BOOK' || item.section === 'BANK') return item.section
+  const sectionValue = String(item.section || '')
+    .trim()
+    .toUpperCase()
+  if (sectionValue === 'BOOK') return 'BOOK'
+  if (sectionValue === 'BANK') return 'BANK'
 
   return 'BANK'
-
 }
 
-
-
 export const fmt = (num) => {
-
   const n = parseFloat(num)
 
   if (isNaN(n)) return '0.00'
 
   return n.toLocaleString('en-US', {
-
     minimumFractionDigits: 2,
 
     maximumFractionDigits: 2,
-
   })
-
 }
 
-
-
 export const getItemAmount = (item) => {
-
   const debit = Math.abs(parseFloat(item.bri_debit || item.debit || 0))
 
   const credit = Math.abs(parseFloat(item.bri_credit || item.credit || 0))
 
   const section = getItemSection(item)
 
-
-
   if (section === 'BOOK') {
-
     return debit > 0 ? debit : credit > 0 ? -credit : 0
-
   }
-
-
 
   if (section === 'BANK') {
-
     return debit > 0 ? debit : credit > 0 ? -credit : 0
-
   }
 
-
-
   return credit - debit
-
 }
 
-
-
 const emptyItemForm = () => ({
-
-  date: new Date().toISOString().split('T')[0],
+  date: formatLocalDate(new Date()),
 
   reference_number: '',
 
@@ -411,34 +374,20 @@ const emptyItemForm = () => ({
   credit: '',
 
   section: 'BANK',
-
 })
 
-
-
-
-
 export function useBankReconciliation(selectedReconciliation) {
-
   const [reconData, setReconData] = useState(
-
     DEMO_MODE ? DEMO_RECONCILIATION : selectedReconciliation,
-
   )
 
   const [items, setItems] = useState(DEMO_MODE ? DEMO_RECONCILIATION_ITEMS : [])
 
   const [itemsLoading, setItemsLoading] = useState(false)
 
-
-
   const [journalEntries, setJournalEntries] = useState([])
 
   const [journalEntriesLoading, setJournalEntriesLoading] = useState(false)
-
-
-
-
 
   const [showItemModal, setShowItemModal] = useState(false)
 
@@ -448,19 +397,15 @@ export function useBankReconciliation(selectedReconciliation) {
 
   const [itemFormRows, setItemFormRows] = useState([emptyItemForm()])
 
+  const [defaultStartDate, defaultEndDate] = getCurrentMonthRange()
 
+  const [detailStartDate, setDetailStartDate] = useState(defaultStartDate)
 
-  const [detailStartDate, setDetailStartDate] = useState('')
-
-  const [detailEndDate, setDetailEndDate] = useState('')
-
-
+  const [detailEndDate, setDetailEndDate] = useState(defaultEndDate)
 
   const [bankSearchTerm, setBankSearchTerm] = useState('')
 
   const [bookSearchTerm, setBookSearchTerm] = useState('')
-
-
 
   const [showToast, setShowToast] = useState(false)
 
@@ -468,17 +413,23 @@ export function useBankReconciliation(selectedReconciliation) {
 
   const [toastType, setToastType] = useState('success')
 
-
-
   const [bankSectionFilter, setBankSectionFilter] = useState('all')
-
-
 
   const [editingBankBalance, setEditingBankBalance] = useState(false)
 
   const [bankBalanceInput, setBankBalanceInput] = useState('')
 
+  const [editingBookBalance, setEditingBookBalance] = useState(false)
 
+  const [bookBalanceInput, setBookBalanceInput] = useState('')
+
+  const [availableMonths, setAvailableMonths] = useState([])
+
+  const [availableMonthsLoading, setAvailableMonthsLoading] = useState(false)
+
+  const [summaryDetails, setSummaryDetails] = useState(null)
+
+  const [summaryLoading, setSummaryLoading] = useState(false)
 
   // Adjustment state for Bank and Book cards
 
@@ -491,31 +442,24 @@ export function useBankReconciliation(selectedReconciliation) {
   const [showBookAdjustmentForm, setShowBookAdjustmentForm] = useState(false)
 
   const [bankAdjustmentForm, setBankAdjustmentForm] = useState({
-
     type: '',
 
     description: '',
 
-    amount: ''
-
+    amount: '',
+    direction: 'add',
   })
 
   const [bookAdjustmentForm, setBookAdjustmentForm] = useState({
-
     type: '',
 
     description: '',
 
-    amount: ''
-
+    amount: '',
+    direction: 'add',
   })
 
-
-
-
-
   const showToastMsg = (message, type = 'success') => {
-
     setToastMessage(message)
 
     setToastType(type)
@@ -523,13 +467,9 @@ export function useBankReconciliation(selectedReconciliation) {
     setShowToast(true)
 
     setTimeout(() => setShowToast(false), 3000)
-
   }
 
-
-
   const buildDateQuery = (start = detailStartDate, end = detailEndDate) => {
-
     const params = new URLSearchParams()
 
     if (start) params.append('start_date', start)
@@ -539,333 +479,277 @@ export function useBankReconciliation(selectedReconciliation) {
     const queryString = params.toString()
 
     return queryString ? `?${queryString}` : ''
-
   }
 
-
-
   const fetchJournalEntriesByCoa = async (
-
     coaId,
 
     start = detailStartDate,
 
     end = detailEndDate,
-
   ) => {
-
     try {
-
       setJournalEntriesLoading(true)
 
       const token = localStorage.getItem('token')
 
       const response = await fetch(
-
         `${import.meta.env.VITE_SERVER_LINK}/journal_entries/coa/${coaId}${buildDateQuery(start, end)}`,
 
         {
-
           headers: {
-
             'Content-Type': 'application/json',
 
             Authorization: `Bearer ${token}`,
-
           },
-
         },
-
       )
 
       const result = await response.json()
 
       if (result.success) {
-
         setJournalEntries(result.data || [])
-
       } else {
-
         showToastMsg('Failed to load journal entries', 'error')
-
       }
-
     } catch {
-
       showToastMsg('Failed to load journal entries', 'error')
-
     } finally {
-
       setJournalEntriesLoading(false)
-
     }
-
   }
 
-
-
-
-
   const fetchReconciliationItems = async (
-
     startDate = detailStartDate,
 
     endDate = detailEndDate,
-
   ) => {
-
     try {
-
       setItemsLoading(true)
 
       const token = localStorage.getItem('token')
 
       const response = await fetch(
-
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}${buildDateQuery(startDate, endDate)}`,
 
         {
-
           headers: {
-
             'Content-Type': 'application/json',
 
             Authorization: `Bearer ${token}`,
-
           },
-
         },
-
       )
 
       const result = await response.json()
 
       if (result.success) {
-
         setItems(result.data.items || [])
 
         setReconData(result.data)
 
         if (result.data.coa_id) {
-
           fetchJournalEntriesByCoa(result.data.coa_id, startDate, endDate)
-
         }
 
         // Fetch adjustments from backend
 
         fetchAdjustments(startDate, endDate)
 
-
-
         // Set initial date range from fetched items if not already set
 
-        if (!startDate && !endDate && result.data.items && result.data.items.length > 0) {
-
+        if (
+          !startDate &&
+          !endDate &&
+          result.data.items &&
+          result.data.items.length > 0
+        ) {
           const dates = result.data.items
 
-            .map(item => item.bri_date || item.date)
+            .map((item) => item.bri_date || item.date)
 
-            .filter(date => date)
+            .filter((date) => date)
 
           if (dates.length > 0) {
+            const minDate = new Date(Math.min(...dates.map((d) => new Date(d))))
 
-            const minDate = new Date(Math.min(...dates.map(d => new Date(d))))
-
-            const maxDate = new Date(Math.max(...dates.map(d => new Date(d))))
+            const maxDate = new Date(Math.max(...dates.map((d) => new Date(d))))
 
             setDetailStartDate(minDate.toISOString().split('T')[0])
 
             setDetailEndDate(maxDate.toISOString().split('T')[0])
-
           }
-
         }
-
       } else {
-
         showToastMsg('Failed to load reconciliation items', 'error')
-
       }
-
     } catch {
-
       showToastMsg('Failed to load reconciliation items', 'error')
-
     } finally {
-
       setItemsLoading(false)
-
     }
-
   }
 
-
-
-  const fetchAdjustments = async (startDate = detailStartDate, endDate = detailEndDate) => {
-
+  const fetchAdjustments = async (
+    startDate = detailStartDate,
+    endDate = detailEndDate,
+  ) => {
     try {
-
       const token = localStorage.getItem('token')
 
       const queryString = buildDateQuery(startDate, endDate)
 
       const response = await fetch(
-
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/adjustments${queryString}`,
 
         {
-
           headers: {
-
             'Content-Type': 'application/json',
 
             Authorization: `Bearer ${token}`,
-
           },
-
         },
-
       )
 
       const result = await response.json()
 
       if (result.success) {
-
         const adjustments = result.data || []
 
         // Separate adjustments by side
 
-        setBankAdjustments(adjustments.filter(adj => adj.side === 'BANK'))
+        setBankAdjustments(adjustments.filter((adj) => adj.side === 'BANK'))
 
-        setBookAdjustments(adjustments.filter(adj => adj.side === 'BOOK'))
-
+        setBookAdjustments(adjustments.filter((adj) => adj.side === 'BOOK'))
       }
-
     } catch {
-
       console.error('Failed to load adjustments')
-
     }
-
   }
 
-
-
   useEffect(() => {
-
     if (DEMO_MODE) return
 
     fetchReconciliationItems()
+    fetchAvailableMonths()
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-
   }, [])
 
-
-
   useEffect(() => {
-
     const delayDebounceFn = setTimeout(() => {
-
       fetchReconciliationItems(detailStartDate, detailEndDate)
-
     }, 350)
-
-
 
     return () => clearTimeout(delayDebounceFn)
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-
   }, [detailStartDate, detailEndDate])
 
-
-
   const handleUpdateBankStatementBalance = async () => {
-
     const val = parseFloat(bankBalanceInput)
 
     if (isNaN(val)) {
-
       showToastMsg('Please enter a valid amount', 'error')
 
       return
-
     }
 
-
-
     try {
-
       const token = localStorage.getItem('token')
 
       const response = await fetch(
-
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/balance`,
+        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/bank_statement_balance`,
 
         {
-
           method: 'PUT',
 
           headers: {
-
             'Content-Type': 'application/json',
 
             Authorization: `Bearer ${token}`,
-
           },
 
           body: JSON.stringify({
-
-            running_balance: val,
-
+            bank_statement_balance: val,
           }),
-
         },
-
       )
 
       const result = await response.json()
 
       if (result.success) {
-
         await fetchReconciliationItems()
 
         setEditingBankBalance(false)
 
         showToastMsg('Bank statement balance updated successfully')
-
       } else {
-
         showToastMsg(
-
           result.message || 'Failed to update bank statement balance',
 
           'error',
-
         )
-
       }
-
     } catch {
-
       showToastMsg('Server error while updating bank balance', 'error')
-
     }
-
   }
 
+  const handleUpdateGeneralLedgerBalance = async () => {
+    const val = parseFloat(bookBalanceInput)
 
+    if (isNaN(val)) {
+      showToastMsg('Please enter a valid amount', 'error')
+
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/balance`,
+
+        {
+          method: 'PUT',
+
+          headers: {
+            'Content-Type': 'application/json',
+
+            Authorization: `Bearer ${token}`,
+          },
+
+          body: JSON.stringify({
+            running_balance: val,
+          }),
+        },
+      )
+
+      const result = await response.json()
+
+      if (result.success) {
+        await fetchReconciliationItems()
+
+        setEditingBookBalance(false)
+
+        showToastMsg('General ledger balance updated successfully')
+      } else {
+        showToastMsg(
+          result.message || 'Failed to update general ledger balance',
+
+          'error',
+        )
+      }
+    } catch {
+      showToastMsg('Server error while updating general ledger balance', 'error')
+    }
+  }
 
   const handleAddOrUpdateItem = async () => {
-
     const rowsToSave = editingItem ? [itemFormData] : itemFormRows
 
-
-
     const hasInvalidRow = rowsToSave.some((row) => {
-
       const debit = parseFloat(row.debit) || 0
 
       const credit = parseFloat(row.credit) || 0
@@ -875,8 +759,6 @@ export function useBankReconciliation(selectedReconciliation) {
       const meta = getItemMeta(detailsValue)
 
       const section = isBankSectionItem(detailsValue) ? 'BANK' : 'BOOK'
-
-
 
       const sectionMismatch = row.section && row.section !== section
 
@@ -888,66 +770,40 @@ export function useBankReconciliation(selectedReconciliation) {
 
       const wrongSideCredit = meta.effect === 'add' && credit > 0
 
-
-
       return (
-
         !row.date ||
-
         !row.details ||
-
         invalidAmount ||
-
         bothAmounts ||
-
         sectionMismatch ||
-
         wrongSideDebit ||
-
         wrongSideCredit
-
       )
-
     })
 
-
-
     if (hasInvalidRow) {
-
       showToastMsg(
-
         'Each row must have a Date, Details, and either Debit or Credit greater than 0. Debit-only for additions, Credit-only for deductions.',
 
         'error',
-
       )
 
       return
-
     }
 
-
-
     try {
-
       const token = localStorage.getItem('token')
 
-
-
       for (const row of rowsToSave) {
-
         const debit = parseFloat(row.debit) || 0
 
         const credit = parseFloat(row.credit) || 0
-
-
 
         const detailsValue = row.details
 
         const enforcedSection = isBankSectionItem(detailsValue) ? 'BANK' : 'BOOK'
 
         const payload = {
-
           bri_date: row.date,
 
           date: row.date,
@@ -977,29 +833,21 @@ export function useBankReconciliation(selectedReconciliation) {
           bri_balance: credit - debit,
 
           balance: credit - debit,
-
         }
-
-
 
         let url = `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/item/add`
 
         let method = 'POST'
 
         let bodyData = {
-
           br_id: selectedReconciliation.id,
 
           bri_br_id: selectedReconciliation.id,
 
           ...payload,
-
         }
 
-
-
         if (editingItem) {
-
           const itemId = editingItem.bri_id || editingItem.id
 
           url = `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/item/${itemId}`
@@ -1007,51 +855,33 @@ export function useBankReconciliation(selectedReconciliation) {
           method = 'PUT'
 
           bodyData = payload
-
         }
 
-
-
         const response = await fetch(url, {
-
           method,
 
           headers: {
-
             'Content-Type': 'application/json',
 
             Authorization: `Bearer ${token}`,
-
           },
 
           body: JSON.stringify(bodyData),
-
         })
-
-
 
         const result = await response.json()
 
         if (!result.success) {
-
           showToastMsg(result.message || 'Failed to save line item', 'error')
 
           return
-
         }
-
       }
 
-
-
       showToastMsg(
-
         editingItem
-
           ? 'Item updated successfully'
-
           : `${rowsToSave.length} item(s) added successfully`,
-
       )
 
       await fetchReconciliationItems()
@@ -1061,21 +891,12 @@ export function useBankReconciliation(selectedReconciliation) {
       setEditingItem(null)
 
       resetItemForm()
-
     } catch {
-
       showToastMsg('Server error while saving reconciliation item', 'error')
-
     }
-
   }
 
-
-
-
-
   const handleEditItem = (item) => {
-
     const activeDetails = item.bri_details || item.details || item.item_type || ''
 
     const debit = parseFloat(item.bri_debit || item.debit || 0)
@@ -1084,12 +905,9 @@ export function useBankReconciliation(selectedReconciliation) {
 
     const resolvedSection = isBankSectionItem(activeDetails) ? 'BANK' : 'BOOK'
 
-
-
     setEditingItem(item)
 
     setItemFormData({
-
       date: item.bri_date || item.date || new Date().toISOString().split('T')[0],
 
       reference_number: item.bri_reference_number || item.reference_number || '',
@@ -1103,195 +921,116 @@ export function useBankReconciliation(selectedReconciliation) {
       debit: debit > 0 ? debit.toString() : '',
 
       credit: credit > 0 ? credit.toString() : '',
-
     })
 
     setShowItemModal(true)
-
   }
 
-
-
   const handleDeleteItem = async (itemId) => {
-
     if (!window.confirm('Are you sure you want to delete this item?')) return
 
-
-
     try {
-
       const token = localStorage.getItem('token')
 
       const response = await fetch(
-
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/item/${itemId}`,
 
         {
-
           method: 'DELETE',
 
           headers: {
-
             Authorization: `Bearer ${token}`,
-
           },
-
         },
-
       )
 
       const result = await response.json()
 
       if (result.success) {
-
         showToastMsg('Item deleted successfully')
 
         fetchReconciliationItems()
-
       } else {
-
         showToastMsg(result.message || 'Failed to delete item', 'error')
-
       }
-
     } catch {
-
       showToastMsg('Server error while deleting item', 'error')
-
     }
-
   }
 
-
-
   const resetItemForm = () => {
-
     setItemFormData(emptyItemForm())
 
     setItemFormRows([emptyItemForm()])
-
   }
 
-
-
-
-
   const updateItemFormRow = (index, field, value) => {
-
     setItemFormRows((prevRows) =>
-
       prevRows.map((row, i) => {
-
         if (i !== index) return row
 
-
-
         if (field === 'details') {
-
           const section = isBankSectionItem(value) ? 'BANK' : 'BOOK'
 
           return { ...row, details: value, section }
-
         }
-
-
 
         if (field === 'debit' && value) {
-
           return { ...row, debit: value, credit: '' }
-
         }
-
-
 
         if (field === 'credit' && value) {
-
           return { ...row, credit: value, debit: '' }
-
         }
 
-
-
         return { ...row, [field]: value }
-
       }),
-
     )
-
   }
-
-
-
-
 
   const addItemFormRow = () => {
-
     setItemFormRows((prevRows) => [...prevRows, emptyItemForm()])
-
   }
-
-
-
-
 
   const removeItemFormRow = (index) => {
-
     setItemFormRows((prevRows) =>
-
       prevRows.length === 1 ? prevRows : prevRows.filter((_, i) => i !== index),
-
     )
-
   }
-
-
 
   // Adjustment handlers
 
   const handleAddBankAdjustment = async () => {
-
     if (!bankAdjustmentForm.type || !bankAdjustmentForm.amount) {
-
       showToastMsg('Please select type and enter amount', 'error')
 
       return
-
     }
 
     const amount = parseFloat(bankAdjustmentForm.amount)
 
     if (isNaN(amount) || amount <= 0) {
-
       showToastMsg('Please enter a valid amount', 'error')
 
       return
-
     }
 
-
-
     try {
-
       const token = localStorage.getItem('token')
 
       const response = await fetch(
-
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/add`,
 
         {
-
           method: 'POST',
 
           headers: {
-
             'Content-Type': 'application/json',
 
             Authorization: `Bearer ${token}`,
-
           },
 
           body: JSON.stringify({
-
             br_id: selectedReconciliation.id,
 
             date: new Date().toISOString().split('T')[0],
@@ -1300,20 +1039,22 @@ export function useBankReconciliation(selectedReconciliation) {
 
             description: bankAdjustmentForm.description,
 
-            amount: amount,
+            // for error adjustments, respect user-selected direction by sending signed amount
+            amount:
+              bankAdjustmentForm.type === 'error_bank'
+                ? bankAdjustmentForm.direction === 'add'
+                  ? amount
+                  : -amount
+                : amount,
 
             side: 'BANK',
-
           }),
-
         },
-
       )
 
       const result = await response.json()
 
       if (result.success) {
-
         await fetchAdjustments()
 
         setBankAdjustmentForm({ type: '', description: '', amount: '' })
@@ -1321,67 +1062,45 @@ export function useBankReconciliation(selectedReconciliation) {
         setShowBankAdjustmentForm(false)
 
         showToastMsg('Bank adjustment added successfully')
-
       } else {
-
         showToastMsg(result.message || 'Failed to add bank adjustment', 'error')
-
       }
-
     } catch {
-
       showToastMsg('Server error while adding bank adjustment', 'error')
-
     }
-
   }
 
-
-
   const handleAddBookAdjustment = async () => {
-
     if (!bookAdjustmentForm.type || !bookAdjustmentForm.amount) {
-
       showToastMsg('Please select type and enter amount', 'error')
 
       return
-
     }
 
     const amount = parseFloat(bookAdjustmentForm.amount)
 
     if (isNaN(amount) || amount <= 0) {
-
       showToastMsg('Please enter a valid amount', 'error')
 
       return
-
     }
 
-
-
     try {
-
       const token = localStorage.getItem('token')
 
       const response = await fetch(
-
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/add`,
 
         {
-
           method: 'POST',
 
           headers: {
-
             'Content-Type': 'application/json',
 
             Authorization: `Bearer ${token}`,
-
           },
 
           body: JSON.stringify({
-
             br_id: selectedReconciliation.id,
 
             date: new Date().toISOString().split('T')[0],
@@ -1390,20 +1109,22 @@ export function useBankReconciliation(selectedReconciliation) {
 
             description: bookAdjustmentForm.description,
 
-            amount: amount,
+            // for error adjustments, respect user-selected direction by sending signed amount
+            amount:
+              bookAdjustmentForm.type === 'error_book'
+                ? bookAdjustmentForm.direction === 'add'
+                  ? amount
+                  : -amount
+                : amount,
 
             side: 'BOOK',
-
           }),
-
         },
-
       )
 
       const result = await response.json()
 
       if (result.success) {
-
         await fetchAdjustments()
 
         setBookAdjustmentForm({ type: '', description: '', amount: '' })
@@ -1411,258 +1132,367 @@ export function useBankReconciliation(selectedReconciliation) {
         setShowBookAdjustmentForm(false)
 
         showToastMsg('Book adjustment added successfully')
-
       } else {
-
         showToastMsg(result.message || 'Failed to add book adjustment', 'error')
-
       }
-
     } catch {
-
       showToastMsg('Server error while adding book adjustment', 'error')
-
     }
-
   }
 
-
-
   const handleRemoveBankAdjustment = async (id) => {
-
     try {
-
       const token = localStorage.getItem('token')
 
       const response = await fetch(
-
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/${id}`,
 
         {
-
           method: 'DELETE',
 
           headers: {
-
             Authorization: `Bearer ${token}`,
-
           },
-
         },
-
       )
 
       const result = await response.json()
 
       if (result.success) {
-
         await fetchAdjustments()
 
         showToastMsg('Bank adjustment removed successfully')
-
       } else {
-
         showToastMsg(result.message || 'Failed to remove bank adjustment', 'error')
-
       }
-
     } catch {
-
       showToastMsg('Server error while removing bank adjustment', 'error')
-
     }
-
   }
 
-
-
   const handleRemoveBookAdjustment = async (id) => {
-
     try {
-
       const token = localStorage.getItem('token')
 
       const response = await fetch(
-
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/${id}`,
 
         {
-
           method: 'DELETE',
 
           headers: {
-
             Authorization: `Bearer ${token}`,
-
           },
-
         },
-
       )
 
       const result = await response.json()
 
       if (result.success) {
-
         await fetchAdjustments()
 
         showToastMsg('Book adjustment removed successfully')
-
       } else {
-
         showToastMsg(result.message || 'Failed to remove book adjustment', 'error')
-
       }
-
     } catch {
-
       showToastMsg('Server error while removing book adjustment', 'error')
-
     }
-
   }
 
+  const fetchAvailableMonths = async () => {
+    const reconciliationId = reconData?.id || selectedReconciliation?.id
+    if (!reconciliationId) return
 
+    try {
+      setAvailableMonthsLoading(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliationId}/summary-months`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
 
+      const result = await response.json()
+      if (result.success && result.data) {
+        setAvailableMonths(result.data)
+        if (result.data.length > 0) {
+          const first = result.data[0]
+          setDetailStartDate(first.start_date)
+          setDetailEndDate(first.end_date)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching available months:', error)
+    } finally {
+      setAvailableMonthsLoading(false)
+    }
+  }
 
+  const handleSaveSummary = async () => {
+    const reconciliationId = reconData?.id || selectedReconciliation?.id
+
+    if (!reconciliationId) {
+      showToastMsg('Unable to determine reconciliation id', 'error')
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/summary/add`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            br_id: reconciliationId,
+            start_date: detailStartDate,
+            end_date: detailEndDate,
+            adjusted_bank_balance: adjustedBankBalance,
+            adjusted_book_balance: adjustedBookBalance,
+            final_output: isReconciled ? 'Reconciled' : 'Not reconciled',
+          }),
+        },
+      )
+
+      const result = await response.json()
+
+      if (!result.success) {
+        showToastMsg(result.message || 'Failed to save summary', 'error')
+        return
+      }
+
+      await fetchAvailableMonths()
+      await fetchReconciliationItems()
+      await fetchAdjustments()
+      await fetchSummaryDetails(detailStartDate, detailEndDate)
+      showToastMsg('Summary saved successfully')
+    } catch {
+      showToastMsg('Server error while saving summary', 'error')
+    }
+  }
+
+  const fetchSummaryDetails = async (
+    startDate = detailStartDate,
+    endDate = detailEndDate,
+  ) => {
+    const reconciliationId = reconData?.id || selectedReconciliation?.id
+    if (!reconciliationId || !startDate || !endDate) return null
+
+    try {
+      setSummaryLoading(true)
+      const token = localStorage.getItem('token')
+
+      // Convert dates to YYYY-MM-DD format if they're in ISO format
+      const normalizeDate = (dateStr) => {
+        if (!dateStr) return ''
+        const date = new Date(dateStr)
+        return formatLocalDate(date)
+      }
+
+      const normalizedStart = normalizeDate(startDate)
+      const normalizedEnd = normalizeDate(endDate)
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliationId}/summary?start_date=${encodeURIComponent(
+          normalizedStart,
+        )}&end_date=${encodeURIComponent(normalizedEnd)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      const result = await response.json()
+      if (result.success && result.data) {
+        setSummaryDetails(result.data)
+        return result.data
+      }
+
+      setSummaryDetails(null)
+      return null
+    } catch (error) {
+      console.error('Failed to fetch bank reconciliation summary details:', error)
+      setSummaryDetails(null)
+      return null
+    } finally {
+      setSummaryLoading(false)
+    }
+  }
+
+  const hasSavedSummary = availableMonths.some(
+    (month) =>
+      month.start_date === detailStartDate && month.end_date === detailEndDate,
+  )
+
+  useEffect(() => {
+    if (hasSavedSummary) {
+      fetchSummaryDetails(detailStartDate, detailEndDate)
+    } else {
+      setSummaryDetails(null)
+    }
+  }, [hasSavedSummary, detailStartDate, detailEndDate])
+
+  const handleExportSummaryPdf = async () => {
+    const reconciliationId = reconData?.id || selectedReconciliation?.id
+    if (!reconciliationId) {
+      showToastMsg('Unable to determine reconciliation id', 'error')
+      return
+    }
+
+    const hasSavedSummary = availableMonths.some(
+      (month) =>
+        month.start_date === detailStartDate && month.end_date === detailEndDate,
+    )
+
+    if (!hasSavedSummary) {
+      showToastMsg('No saved summary found for the selected period', 'error')
+      return
+    }
+
+    const summary = await fetchSummaryDetails(detailStartDate, detailEndDate)
+    if (!summary) {
+      showToastMsg('Unable to load summary details for export', 'error')
+      return
+    }
+
+    try {
+      const { generateBankReconciliationPDF } =
+        await import('../../utils/generateBankReconciliationPDF')
+
+      await generateBankReconciliationPDF({
+        reconData,
+        summary,
+        detailStartDate,
+        detailEndDate,
+        bankStatementEndingBalance,
+        endingBookBalance,
+        depositsInTransit,
+        outstandingChecks,
+        bankAdditions,
+        bankDeductions,
+        bankCardAdditions,
+        bankCardDeductions,
+        bankErrors,
+        bookAdditions,
+        bookDeductions,
+        bookErrorAdjustments,
+        bookCardAdditions,
+        bookCardDeductions,
+        bookCardErrors,
+        adjustedBankBalance,
+        adjustedBookBalance,
+        reconDifference,
+        isReconciled,
+        bankAdjustments,
+        bookAdjustments,
+      })
+    } catch (error) {
+      console.error('Error generating export PDF:', error)
+      showToastMsg('Failed to generate PDF', 'error')
+    }
+  }
 
   const bankSectionItems = items.filter((item) => getItemSection(item) === 'BANK')
 
   const bookSectionItems = items.filter((item) => getItemSection(item) === 'BOOK')
 
-
-
   const depositsInTransit = bankSectionItems
 
     .filter(
-
       (item) =>
-
         (item.bri_details || item.details || item.item_type) ===
-
         'deposits_in_transit',
-
     )
 
     .reduce((sum, item) => {
-
       const debit = Math.abs(parseFloat(item.bri_debit || item.debit || 0))
 
       return sum + debit
-
     }, 0)
-
-
 
   const outstandingChecks = bankSectionItems
 
     .filter(
-
       (item) =>
-
         (item.bri_details || item.details || item.item_type) ===
-
         'outstanding_checks',
-
     )
 
     .reduce((sum, item) => {
-
       const credit = Math.abs(parseFloat(item.bri_credit || item.credit || 0))
 
       return sum + credit
-
     }, 0)
-
-
 
   const bankErrors = bankSectionItems
 
     .filter(
-
       (item) =>
-
         (item.bri_details || item.details || item.item_type) === 'error_bank',
-
     )
 
     .reduce((sum, item) => {
-
       const c = parseFloat(item.bri_credit || item.credit || 0)
 
       const d = parseFloat(item.bri_debit || item.debit || 0)
 
       return sum + (c - d)
-
     }, 0)
 
-
-
   const bankStatementEndingBalance = parseFloat(
-
     reconData?.bank_statement_balance || 0,
-
   )
 
-
-
   const bankAdditions = bankSectionItems.reduce((sum, item) => {
-
     const debit = Math.abs(parseFloat(item.bri_debit || item.debit || 0))
 
     return sum + debit
-
   }, 0)
 
-
-
   const bankDeductions = bankSectionItems.reduce((sum, item) => {
-
     const credit = Math.abs(parseFloat(item.bri_credit || item.credit || 0))
 
     return sum + credit
-
   }, 0)
-
-
 
   // Calculate bank adjustments from the card adjustments
 
   const bankCardAdditions = bankAdjustments
 
-    .filter(adj => adj.type === 'deposits_in_transit')
+    .filter((adj) => adj.type === 'deposits_in_transit')
 
-    .reduce((sum, adj) => sum + adj.amount, 0)
-
-
+    .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
 
   const bankCardDeductions = bankAdjustments
 
-    .filter(adj => adj.type === 'outstanding_checks')
+    .filter((adj) => adj.type === 'outstanding_checks')
 
-    .reduce((sum, adj) => sum + adj.amount, 0)
-
-
+    .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
 
   const bankCardErrors = bankAdjustments
 
-    .filter(adj => adj.type === 'error_bank')
+    .filter((adj) => adj.type === 'error_bank')
 
     .reduce((sum, adj) => {
-
-      const meta = getItemMeta(adj.type)
-
-      return sum + (meta.effect === 'add' ? adj.amount : -adj.amount)
-
+      // adjustments for errors are stored with sign according to user selection
+      return sum + (parseFloat(adj.amount) || 0)
     }, 0)
 
-
-
   const adjustedBankBalance =
-
-    bankStatementEndingBalance + bankAdditions + bankCardAdditions - bankDeductions - bankCardDeductions + bankCardErrors
-
-
+    bankStatementEndingBalance +
+    depositsInTransit +
+    bankCardAdditions -
+    outstandingChecks -
+    bankCardDeductions +
+    bankCardErrors
 
   const glDebits = journalEntries
 
@@ -1670,176 +1500,125 @@ export function useBankReconciliation(selectedReconciliation) {
 
     .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
 
-
-
   const glCredits = journalEntries
 
     .filter((e) => e.type?.toLowerCase() === 'credit')
 
     .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
 
-
-
   const unadjustedBookBalance = glDebits - glCredits
 
+  const parsedRunningBalance = parseFloat(reconData?.running_balance)
   const endingBookBalance =
-
     journalEntries.length > 0
-
       ? unadjustedBookBalance
-
-      : parseFloat(reconData?.running_balance || 0)
-
-
+      : Number.isFinite(parsedRunningBalance)
+        ? parsedRunningBalance
+        : 0
 
   const bookAdditions = bookSectionItems
 
     .filter(
-
       (item) =>
-
         getItemMeta(item.bri_details || item.details || item.item_type).effect ===
-
         'add',
-
     )
 
     .reduce((sum, item) => {
-
       const d = Math.abs(parseFloat(item.bri_debit || item.debit || 0))
 
       const c = Math.abs(parseFloat(item.bri_credit || item.credit || 0))
 
       return sum + Math.max(d, c)
-
     }, 0)
-
-
 
   const bookDeductions = bookSectionItems
 
     .filter(
-
       (item) =>
-
         getItemMeta(item.bri_details || item.details || item.item_type).effect ===
-
         'deduct',
-
     )
 
     .reduce((sum, item) => {
-
       const d = Math.abs(parseFloat(item.bri_debit || item.debit || 0))
 
       const c = Math.abs(parseFloat(item.bri_credit || item.credit || 0))
 
       return sum + Math.max(d, c)
-
     }, 0)
-
-
 
   const bookErrorAdjustments = bookSectionItems
 
     .filter(
-
       (item) =>
-
         (item.bri_details || item.details || item.item_type) === 'error_book',
-
     )
 
     .reduce((sum, item) => {
-
       const c = parseFloat(item.bri_credit || item.credit || 0)
 
       const d = parseFloat(item.bri_debit || item.debit || 0)
 
       return sum + (c - d)
-
     }, 0)
-
-
 
   // Calculate book adjustments from the card adjustments
 
   const bookCardAdditions = bookAdjustments
 
-    .filter(adj => {
-
+    .filter((adj) => {
       const meta = getItemMeta(adj.type)
 
       return meta.effect === 'add'
-
     })
 
-    .reduce((sum, adj) => sum + adj.amount, 0)
-
-
+    .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
 
   const bookCardDeductions = bookAdjustments
 
-    .filter(adj => {
-
+    .filter((adj) => {
       const meta = getItemMeta(adj.type)
 
       return meta.effect === 'deduct'
-
     })
 
-    .reduce((sum, adj) => sum + adj.amount, 0)
-
-
+    .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
 
   const bookCardErrors = bookAdjustments
 
-    .filter(adj => adj.type === 'error_book')
+    .filter((adj) => adj.type === 'error_book')
 
     .reduce((sum, adj) => {
-
-      const meta = getItemMeta(adj.type)
-
-      return sum + (meta.effect === 'add' ? adj.amount : -adj.amount)
-
+      // adjustments for errors are stored with sign according to user selection
+      return sum + (parseFloat(adj.amount) || 0)
     }, 0)
 
-
-
   const adjustedBookBalance =
-
-    endingBookBalance + bookAdditions + bookCardAdditions - bookDeductions - bookCardDeductions + bookErrorAdjustments + bookCardErrors
-
-
+    endingBookBalance +
+    bookAdditions +
+    bookCardAdditions -
+    bookDeductions -
+    bookCardDeductions +
+    bookErrorAdjustments +
+    bookCardErrors
 
   const reconDifference = adjustedBookBalance - adjustedBankBalance
 
   const isReconciled = Math.abs(reconDifference) < 0.005
 
-
-
   const allBankItemsFiltered =
-
     bankSectionFilter === 'bank'
-
       ? bankSectionItems
-
       : bankSectionFilter === 'book'
-
         ? bookSectionItems
-
         : items
-
-
 
   const bankSearch = bankSearchTerm.toLowerCase().trim()
 
   const visibleBankItems = bankSearch
-
     ? allBankItemsFiltered.filter((item) =>
-
         [
-
           item.bri_date || item.date,
 
           item.bri_reference_number || item.reference_number,
@@ -1847,27 +1626,19 @@ export function useBankReconciliation(selectedReconciliation) {
           item.bri_description || item.description,
 
           getItemMeta(item.bri_details || item.details || item.item_type).label,
-
         ]
 
           .filter(Boolean)
 
           .some((v) => String(v).toLowerCase().includes(bankSearch)),
-
       )
-
     : allBankItemsFiltered
-
-
 
   const bookSearch = bookSearchTerm.toLowerCase().trim()
 
   const visibleJournalEntries = bookSearch
-
     ? journalEntries.filter((entry) =>
-
         [
-
           entry.date,
 
           entry.db_name,
@@ -1879,23 +1650,15 @@ export function useBankReconciliation(selectedReconciliation) {
           entry.type,
 
           entry.amount,
-
         ]
 
           .filter(Boolean)
 
           .some((v) => String(v).toLowerCase().includes(bookSearch)),
-
       )
-
     : journalEntries
 
-
-
-
-
   return {
-
     reconData,
 
     items,
@@ -1928,6 +1691,10 @@ export function useBankReconciliation(selectedReconciliation) {
 
     setDetailEndDate,
 
+    availableMonths,
+
+    availableMonthsLoading,
+
     bankSearchTerm,
 
     setBankSearchTerm,
@@ -1956,9 +1723,19 @@ export function useBankReconciliation(selectedReconciliation) {
 
     setBankBalanceInput,
 
+    editingBookBalance,
+
+    setEditingBookBalance,
+
+    bookBalanceInput,
+
+    setBookBalanceInput,
+
     fetchReconciliationItems,
 
     handleUpdateBankStatementBalance,
+
+    handleUpdateGeneralLedgerBalance,
 
     handleAddOrUpdateItem,
 
@@ -2052,6 +1829,16 @@ export function useBankReconciliation(selectedReconciliation) {
 
     handleRemoveBookAdjustment,
 
+    handleSaveSummary,
+
+    summaryDetails,
+
+    summaryLoading,
+
+    hasSavedSummary,
+
+    handleExportSummaryPdf,
+
     bankCardAdditions,
 
     bankCardDeductions,
@@ -2063,8 +1850,5 @@ export function useBankReconciliation(selectedReconciliation) {
     bookCardDeductions,
 
     bookCardErrors,
-
   }
-
 }
-

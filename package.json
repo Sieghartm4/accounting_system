@@ -13,6 +13,7 @@
     "migrate": "dotenv -e .env -- npm run db:migrate -w server",
     "migrate:undo": "dotenv -e .env -- npm run db:migrate:undo -w server",
     "migrate:prod": "dotenv -e .env -- npm run db:migrate:prod -w server",
+    "migrate:tenant": "dotenv -e .env -- npm run db:migrate:tenant -w server --",
     "seed": "dotenv -e .env -- npm run db:seed -w server",
     "db:status": "dotenv -e .env -- npm run db:status -w server",
     "db:reset": "dotenv -e .env -- npm run db:reset -w server",

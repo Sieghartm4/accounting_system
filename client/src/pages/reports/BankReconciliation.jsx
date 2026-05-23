@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import DynamicToast from '../../components/DynamicToast'
 import BankReconciliationDetail from './BankReconciliationDetail'
+import { getItemSection, getItemMeta } from './useBankReconciliation'
 
 const fmt = (n) =>
   parseFloat(n || 0).toLocaleString('en-US', {
@@ -36,12 +37,249 @@ export default function BankReconciliation() {
     coa_id: '',
     bank_statement_balance: '',
   })
+  const [reconciliationSummaries, setReconciliationSummaries] = useState({})
 
   const showToastMessage = (message, type = 'success') => {
     setToastMessage(message)
     setToastType(type)
     setShowToast(true)
     setTimeout(() => setShowToast(false), 3000)
+  }
+
+  const formatLocalDate = (d) => {
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const getCurrentMonthRange = () => {
+    const now = new Date()
+    const start = new Date(now.getFullYear(), now.getMonth(), 1)
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    return [formatLocalDate(start), formatLocalDate(end)]
+  }
+
+  const buildDateQuery = (start, end) => {
+    const params = new URLSearchParams()
+    if (start) params.append('start_date', start)
+    if (end) params.append('end_date', end)
+    const queryString = params.toString()
+    return queryString ? `?${queryString}` : ''
+  }
+
+  const fetchReconciliationSummaries = async (reconciliationsList) => {
+    const token = localStorage.getItem('token')
+    const [startDate, endDate] = getCurrentMonthRange()
+    const queryString = buildDateQuery(startDate, endDate)
+    const summaries = {}
+
+    await Promise.all(
+      reconciliationsList.map(async (reconciliation) => {
+        try {
+          const detailResponse = await fetch(
+            `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliation.id}${queryString}`,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          )
+          const detailResult = await detailResponse.json()
+
+          const adjustmentsResponse = await fetch(
+            `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliation.id}/adjustments${queryString}`,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          )
+          const adjustmentsResult = await adjustmentsResponse.json()
+
+          const journalResponse = reconciliation.coa_id
+            ? await fetch(
+                `${import.meta.env.VITE_SERVER_LINK}/journal_entries/coa/${reconciliation.coa_id}${queryString}`,
+                {
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                },
+              )
+            : null
+          const journalResult = journalResponse
+            ? await journalResponse.json()
+            : { success: false, data: [] }
+
+          if (!detailResult.success) return
+
+          const items = detailResult.data.items || []
+          const adjustments = adjustmentsResult.success
+            ? adjustmentsResult.data || []
+            : []
+          const journalEntries = journalResult.success
+            ? journalResult.data || []
+            : []
+
+          const bankSectionItems = items.filter(
+            (item) => getItemSection(item) === 'BANK',
+          )
+          const bookSectionItems = items.filter(
+            (item) => getItemSection(item) === 'BOOK',
+          )
+
+          const depositsInTransit = bankSectionItems
+            .filter(
+              (item) =>
+                (item.bri_details || item.details || item.item_type) ===
+                'deposits_in_transit',
+            )
+            .reduce((sum, item) => {
+              const debit = Math.abs(parseFloat(item.bri_debit || item.debit || 0))
+              return sum + debit
+            }, 0)
+
+          const outstandingChecks = bankSectionItems
+            .filter(
+              (item) =>
+                (item.bri_details || item.details || item.item_type) ===
+                'outstanding_checks',
+            )
+            .reduce((sum, item) => {
+              const credit = Math.abs(
+                parseFloat(item.bri_credit || item.credit || 0),
+              )
+              return sum + credit
+            }, 0)
+
+          const bookAdditions = bookSectionItems
+            .filter(
+              (item) =>
+                getItemMeta(item.bri_details || item.details || item.item_type)
+                  .effect === 'add',
+            )
+            .reduce((sum, item) => {
+              const debit = Math.abs(parseFloat(item.bri_debit || item.debit || 0))
+              const credit = Math.abs(
+                parseFloat(item.bri_credit || item.credit || 0),
+              )
+              return sum + Math.max(debit, credit)
+            }, 0)
+
+          const bookDeductions = bookSectionItems
+            .filter(
+              (item) =>
+                getItemMeta(item.bri_details || item.details || item.item_type)
+                  .effect === 'deduct',
+            )
+            .reduce((sum, item) => {
+              const debit = Math.abs(parseFloat(item.bri_debit || item.debit || 0))
+              const credit = Math.abs(
+                parseFloat(item.bri_credit || item.credit || 0),
+              )
+              return sum + Math.max(debit, credit)
+            }, 0)
+
+          const bookErrorAdjustments = bookSectionItems
+            .filter(
+              (item) =>
+                (item.bri_details || item.details || item.item_type) ===
+                'error_book',
+            )
+            .reduce((sum, item) => {
+              const c = parseFloat(item.bri_credit || item.credit || 0)
+              const d = parseFloat(item.bri_debit || item.debit || 0)
+              return sum + (c - d)
+            }, 0)
+
+          const bankCardAdditions = adjustments
+            .filter(
+              (adj) => adj.side === 'BANK' && adj.type === 'deposits_in_transit',
+            )
+            .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
+
+          const bankCardDeductions = adjustments
+            .filter(
+              (adj) => adj.side === 'BANK' && adj.type === 'outstanding_checks',
+            )
+            .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
+
+          const bankCardErrors = adjustments
+            .filter((adj) => adj.side === 'BANK' && adj.type === 'error_bank')
+            .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
+
+          const bookCardAdditions = adjustments
+            .filter((adj) => adj.side === 'BOOK')
+            .filter((adj) => getItemMeta(adj.type).effect === 'add')
+            .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
+
+          const bookCardDeductions = adjustments
+            .filter((adj) => adj.side === 'BOOK')
+            .filter((adj) => getItemMeta(adj.type).effect === 'deduct')
+            .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
+
+          const bookCardErrors = adjustments
+            .filter((adj) => adj.side === 'BOOK' && adj.type === 'error_book')
+            .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
+
+          const glDebits = journalEntries
+            .filter((e) => e.type?.toLowerCase() === 'debit')
+            .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
+
+          const glCredits = journalEntries
+            .filter((e) => e.type?.toLowerCase() === 'credit')
+            .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
+
+          const endingBookBalance = journalEntries.length
+            ? glDebits - glCredits
+            : parseFloat(detailResult.data.running_balance || 0)
+
+          const adjustedBankBalance =
+            parseFloat(detailResult.data.bank_statement_balance || 0) +
+            depositsInTransit -
+            outstandingChecks +
+            bankCardAdditions -
+            bankCardDeductions +
+            bankCardErrors
+
+          const adjustedBookBalance =
+            endingBookBalance +
+            bookAdditions +
+            bookCardAdditions -
+            bookDeductions -
+            bookCardDeductions +
+            bookErrorAdjustments +
+            bookCardErrors
+
+          const reconDifference = adjustedBookBalance - adjustedBankBalance
+
+          summaries[reconciliation.id] = {
+            bankStatementBalance: parseFloat(
+              detailResult.data.bank_statement_balance || 0,
+            ),
+            glBalance: endingBookBalance,
+            adjustedBankBalance,
+            adjustedBookBalance,
+            reconDifference,
+            isReconciled: Math.abs(reconDifference) < 0.01,
+            items,
+            adjustments,
+            journalEntries,
+          }
+        } catch (error) {
+          console.error(
+            'Failed to fetch summary for reconciliation',
+            reconciliation.id,
+            error,
+          )
+        }
+      }),
+    )
+
+    setReconciliationSummaries(summaries)
   }
 
   const fetchReconciliations = async () => {
@@ -59,8 +297,11 @@ export default function BankReconciliation() {
         },
       )
       const result = await res.json()
-      if (result.success) setReconciliations(result.data || [])
-      else {
+      if (result.success) {
+        const list = result.data || []
+        setReconciliations(list)
+        fetchReconciliationSummaries(list)
+      } else {
         setError('Failed to fetch bank reconciliations')
         showToastMessage('Failed to load reconciliations', 'error')
       }
@@ -154,20 +395,32 @@ export default function BankReconciliation() {
   // Adjusted Bank = Bank Statement + Deposits in Transit - Outstanding Checks - Bank Errors
   // Adjusted Book = GL Balance + Interest/Credits - Fees/NSF/Debits + Book Errors
   // Both sides should equal each other when reconciled
-  const totalBankStatement = reconciliations.reduce(
-    (sum, r) => sum + (parseFloat(r.bank_statement_balance) || 0),
-    0,
-  )
-  const totalBookBalance = reconciliations.reduce(
-    (sum, r) => sum + (parseFloat(r.running_balance) || 0),
-    0,
-  )
-  // For list view, we show the raw difference between bank statement and GL
+  const totalBankStatement = reconciliations.reduce((sum, r) => {
+    const summary = reconciliationSummaries[r.id] || {}
+    const bankValue =
+      typeof summary.bankStatementBalance === 'number'
+        ? summary.bankStatementBalance
+        : parseFloat(r.bank_statement_balance || 0)
+    return sum + bankValue
+  }, 0)
+
+  const totalBookBalance = reconciliations.reduce((sum, r) => {
+    const summary = reconciliationSummaries[r.id] || {}
+    const bookValue =
+      typeof summary.glBalance === 'number'
+        ? summary.glBalance
+        : parseFloat(r.running_balance || 0)
+    return sum + bookValue
+  }, 0)
+
   const totalVariance = totalBankStatement - totalBookBalance
   const reconciledCount = reconciliations.filter((r) => {
+    const summary = reconciliationSummaries[r.id] || {}
     const diff =
-      (parseFloat(r.bank_statement_balance) || 0) -
-      (parseFloat(r.running_balance) || 0)
+      typeof summary.reconDifference === 'number'
+        ? summary.reconDifference
+        : parseFloat(r.bank_statement_balance || 0) -
+          parseFloat(r.running_balance || 0)
     return Math.abs(diff) < 0.01
   }).length
 
@@ -214,7 +467,7 @@ export default function BankReconciliation() {
         {/* Method explanation banner */}
         <div className="bg-white border border-gray-100 rounded-2xl p-4 mb-5 shadow-sm">
           <div className="flex items-start gap-4 flex-wrap">
-            <div className="flex-1 min-w-[240px]">
+            <div className="flex-1 min-w-60">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-[2px] mb-2">
                 How it works — Two-Section Method
               </p>
@@ -321,7 +574,7 @@ export default function BankReconciliation() {
                 className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm"
               >
                 <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${stat.iconClass}`}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${stat.iconClass}`}
                 >
                   {stat.icon}
                 </div>
@@ -400,10 +653,22 @@ export default function BankReconciliation() {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 <AnimatePresence>
                   {reconciliations.map((r, i) => {
-                    const bankStatement = parseFloat(r.bank_statement_balance || 0)
-                    const glBalance = parseFloat(r.running_balance || 0)
-                    const rawDiff = bankStatement - glBalance
-                    const isReconciled = Math.abs(rawDiff) < 0.01
+                    const summary = reconciliationSummaries[r.id] || {}
+                    const bankStatement =
+                      summary.bankStatementBalance ??
+                      parseFloat(r.bank_statement_balance || 0)
+                    const glBalance =
+                      summary.glBalance ?? parseFloat(r.running_balance || 0)
+                    const effectiveDiff =
+                      typeof summary.reconDifference === 'number'
+                        ? summary.reconDifference
+                        : bankStatement - glBalance
+                    const isReconciled =
+                      typeof summary.isReconciled === 'boolean'
+                        ? summary.isReconciled
+                        : Math.abs(effectiveDiff) < 0.01
+                    const adjustedBankBalance = summary.adjustedBankBalance
+                    const adjustedBookBalance = summary.adjustedBookBalance
 
                     return (
                       <motion.button
@@ -431,7 +696,7 @@ export default function BankReconciliation() {
                               </p>
                             </div>
                             <div
-                              className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all
                                 ${
                                   isReconciled
                                     ? 'bg-emerald-50 text-emerald-500 group-hover:bg-emerald-600 group-hover:text-white'
@@ -466,6 +731,19 @@ export default function BankReconciliation() {
                             </div>
                           </div>
 
+                          {adjustedBankBalance != null &&
+                            adjustedBookBalance != null && (
+                              <div className="mt-3 rounded-xl bg-slate-50 border border-slate-100 p-3 text-[11px] text-slate-700">
+                                <p className="font-black uppercase tracking-[2px] text-slate-400 mb-1">
+                                  Current month adjusted balances
+                                </p>
+                                <div className="flex flex-wrap gap-2 text-slate-800">
+                                  <span>Bank ₱{fmt(adjustedBankBalance)}</span>
+                                  <span>Book ₱{fmt(adjustedBookBalance)}</span>
+                                </div>
+                              </div>
+                            )}
+
                           <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
                             <span
                               className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1
@@ -478,7 +756,7 @@ export default function BankReconciliation() {
                               ) : (
                                 <>
                                   <AlertCircle size={10} /> Variance ₱
-                                  {fmt(Math.abs(rawDiff))}
+                                  {fmt(Math.abs(effectiveDiff))}
                                 </>
                               )}
                             </span>

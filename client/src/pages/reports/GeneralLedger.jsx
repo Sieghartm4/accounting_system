@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import * as XLSX from 'xlsx'
 import {
   FileText,
   Download,
@@ -21,6 +22,7 @@ export default function GeneralLedger() {
   const [endDate, setEndDate] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [activeAccount, setActiveAccount] = useState(null)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
 
   useEffect(() => {
     fetchGeneralLedger()
@@ -113,6 +115,277 @@ export default function GeneralLedger() {
 
   const totalRows = filteredAccounts.reduce((s, acc) => s + acc.entries.length, 0)
 
+  const buildExportRows = () => {
+    const rows = []
+    filteredAccounts.forEach((acc) => {
+      rows.push([`${acc.account_code} - ${acc.account_name}`])
+      rows.push([
+        'Posted Date',
+        'Source',
+        'Debit',
+        'Credit',
+        'Balance',
+        'Center',
+        'DocRef',
+      ])
+      let subtotalDebit = 0
+      let subtotalCredit = 0
+      acc.entries.forEach((entry) => {
+        const debit = entry.entry_type === 'DEBIT' ? entry.amount : ''
+        const credit = entry.entry_type === 'CREDIT' ? entry.amount : ''
+        subtotalDebit += entry.entry_type === 'DEBIT' ? entry.amount : 0
+        subtotalCredit += entry.entry_type === 'CREDIT' ? entry.amount : 0
+        rows.push([
+          formatDate(entry.posted_date),
+          entry.db_name?.replace(/_/g, ' ').toUpperCase() || '—',
+          debit !== '' ? fmt(debit) : '',
+          credit !== '' ? fmt(credit) : '',
+          fmt(entry.balance),
+          entry.responsibility_center || 'HQ',
+          entry.db_id || '—',
+        ])
+      })
+      rows.push([
+        '',
+        'Subtotal',
+        fmt(subtotalDebit),
+        fmt(subtotalCredit),
+        '',
+        '',
+        '',
+      ])
+      rows.push([])
+    })
+    return rows
+  }
+
+  const handleExportExcel = () => {
+    const rows = buildExportRows()
+    if (rows.length === 0) return
+
+    const workbook = XLSX.utils.book_new()
+    const worksheet = XLSX.utils.aoa_to_sheet(rows)
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'General Ledger')
+    XLSX.writeFile(
+      workbook,
+      `general-ledger-${new Date().toISOString().split('T')[0]}.xlsx`,
+    )
+    setExportMenuOpen(false)
+  }
+
+const handleExportPDF = async () => {
+  try {
+    const { jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'pt',
+      format: 'letter',
+    })
+
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const margin = 40
+    let currentY = 45
+
+    // --- Color Palette Definitions ---
+    const COLOR_PRIMARY_BLACK = [17, 24, 39]     // #111827 - Solid structural headers
+    const COLOR_ACCENT_RED = [220, 38, 38]       // #DC2626 - Indicators and Grand totals
+    const COLOR_MUTED_GRAY = [107, 114, 128]     // #6B7280 - Sub-labels and metadata
+    const COLOR_BORDER_LIGHT = [229, 231, 235]   // #E5E7EB - Table column separators
+    const COLOR_ROW_ALT = [249, 250, 251]        // #F9FAFB - Alternating rows
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 1. REPORT HEADER DESIGN
+    // ─────────────────────────────────────────────────────────────────────────
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(18)
+    doc.setTextColor(...COLOR_PRIMARY_BLACK)
+    doc.text('GENERAL LEDGER', margin, currentY)
+    
+    // Decorative Right-Aligned Stamp
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...COLOR_ACCENT_RED)
+    doc.text('FINANCIAL MANAGEMENT REPORT', pageWidth - margin, currentY, { align: 'right' })
+    currentY += 16
+
+    // Metadata details
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...COLOR_MUTED_GRAY)
+    const periodText = `${startDate || 'All Dates'} — ${endDate || 'All Dates'}`
+    doc.text(`Reporting Period: ${periodText}`, margin, currentY)
+    
+    const genTimestamp = `Generated: ${new Date().toLocaleString('en-PH')}`
+    doc.text(genTimestamp, pageWidth - margin, currentY, { align: 'right' })
+    currentY += 14
+
+    // Top structural accent rule
+    doc.setDrawColor(...COLOR_PRIMARY_BLACK)
+    doc.setLineWidth(1.5)
+    doc.line(margin, currentY, pageWidth - margin, currentY)
+    currentY += 24
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 2. ITERATE ACCOUNTS & GENERATE SECTION SCHEMATICS
+    // ─────────────────────────────────────────────────────────────────────────
+    filteredAccounts.forEach((acc) => {
+      // Prevent orphaned account headers near bottom bounds
+      if (currentY > pageHeight - 130) {
+        doc.addPage()
+        currentY = margin + 10
+      }
+
+      // Draw Account Title bar structure
+      doc.setDrawColor(...COLOR_BORDER_LIGHT)
+      doc.setLineWidth(1)
+      doc.line(margin, currentY - 4, pageWidth - margin, currentY - 4)
+
+      // Tiny Red Indicator Block left accent box
+      doc.setFillColor(...COLOR_ACCENT_RED)
+      doc.rect(margin, currentY, 4, 14, 'F')
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(11)
+      doc.setTextColor(...COLOR_PRIMARY_BLACK)
+      doc.text(`${acc.account_code}   ${acc.account_name.toUpperCase()}`, margin + 10, currentY + 11)
+      currentY += 22
+
+      // Map out individual database items
+      const body = acc.entries.map((entry) => [
+        formatDate(entry.posted_date),
+        entry.db_name?.replace(/_/g, ' ').toUpperCase() || '—',
+        entry.entry_type === 'DEBIT' ? fmt(entry.amount) : '',
+        entry.entry_type === 'CREDIT' ? fmt(entry.amount) : '',
+        fmt(entry.balance),
+        entry.responsibility_center || 'HQ',
+        entry.db_id || '—',
+      ])
+
+      // Calculate localized subtotals
+      const subtotalDebit = acc.entries.reduce(
+        (sum, entry) => sum + (entry.entry_type === 'DEBIT' ? entry.amount : 0),
+        0,
+      )
+      const subtotalCredit = acc.entries.reduce(
+        (sum, entry) => sum + (entry.entry_type === 'CREDIT' ? entry.amount : 0),
+        0,
+      )
+
+      // Inject subtotal line calculation straight into the autoTable row structure
+      body.push([
+        { content: 'Account Subtotals', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [243, 244, 246] } },
+        { content: fmt(subtotalDebit), styles: { fontStyle: 'bold', halign: 'right', fillColor: [243, 244, 246] } },
+        { content: fmt(subtotalCredit), styles: { fontStyle: 'bold', halign: 'right', fillColor: [243, 244, 246] } },
+        { content: '', colSpan: 3, styles: { fillColor: [243, 244, 246] } }
+      ])
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Posted Date', 'Source Ledger', 'Debit Amount', 'Credit Amount', 'Running Balance', 'Resp Center', 'Doc Reference']],
+        body,
+        theme: 'striped',
+        margin: { left: margin, right: margin },
+        headStyles: {
+          fillColor: COLOR_PRIMARY_BLACK,
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 6,
+          halign: 'left',
+        },
+        styles: {
+          fontSize: 8.5,
+          cellPadding: 5,
+          textColor: [55, 65, 81],
+          lineColor: COLOR_BORDER_LIGHT,
+          lineWidth: 0.5,
+          valign: 'middle',
+        },
+        alternateRowStyles: {
+          fillColor: COLOR_ROW_ALT,
+        },
+        columnStyles: {
+          0: { cellWidth: 80, halign: 'left' },
+          1: { cellWidth: 150, halign: 'left' },
+          2: { cellWidth: 100, halign: 'right' },
+          3: { cellWidth: 100, halign: 'right' },
+          4: { cellWidth: 110, halign: 'right', fontStyle: 'bold' },
+          5: { cellWidth: 80, halign: 'center' },
+          6: { halign: 'left' },
+        },
+        didDrawPage: (data) => {
+          currentY = data.cursor.y + 25
+        },
+      })
+
+      // Track cursor progression point safely across boundaries
+      currentY = doc.previousAutoTable?.finalY ? doc.previousAutoTable.finalY + 25 : currentY + 25
+    })
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 3. FINAL SUMMARY SUMMARY / GRAND TOTAL SECTION
+    // ─────────────────────────────────────────────────────────────────────────
+    if (filteredAccounts.length > 0) {
+      if (currentY > pageHeight - 100) {
+        doc.addPage()
+        currentY = margin + 15
+      }
+
+      const totalBlockWidth = 320
+      const startX = pageWidth - margin - totalBlockWidth
+
+      // Structural header block for totals
+      doc.setFillColor(...COLOR_PRIMARY_BLACK)
+      doc.rect(startX, currentY, totalBlockWidth, 22, 'F')
+      
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(255)
+      doc.text('REPORT GRAND SUMMARY TOTALS', startX + 10, currentY + 14)
+      currentY += 22
+
+      // Row for Total Debit
+      doc.setFillColor(...COLOR_ROW_ALT)
+      doc.rect(startX, currentY, totalBlockWidth, 20, 'F')
+      doc.setDrawColor(...COLOR_BORDER_LIGHT)
+      doc.setLineWidth(0.5)
+      doc.rect(startX, currentY, totalBlockWidth, 20, 'S')
+      
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...COLOR_PRIMARY_BLACK)
+      doc.text('Consolidated Balance Debit:', startX + 10, currentY + 13)
+      doc.setFont('helvetica', 'bold')
+      doc.text(fmt(grandTotalDebit), pageWidth - margin - 10, currentY + 13, { align: 'right' })
+      currentY += 20
+
+      // Row for Total Credit
+      doc.setFillColor(255)
+      doc.rect(startX, currentY, totalBlockWidth, 20, 'F')
+      doc.rect(startX, currentY, totalBlockWidth, 20, 'S')
+      
+      doc.setFont('helvetica', 'normal')
+      doc.text('Consolidated Balance Credit:', startX + 10, currentY + 13)
+      doc.setFont('helvetica', 'bold')
+      doc.text(fmt(grandTotalCredit), pageWidth - margin - 10, currentY + 13, { align: 'right' })
+      currentY += 20
+
+      // Accent closure line double weight under final entries
+      doc.setDrawColor(...COLOR_ACCENT_RED)
+      doc.setLineWidth(1.5)
+      doc.line(startX, currentY, pageWidth - margin, currentY)
+    }
+
+    // Trigger saving output stream
+    doc.save(`general-ledger-${new Date().toISOString().split('T')[0]}.pdf`)
+    setExportMenuOpen(false)
+  } catch (err) {
+    console.error('PDF export layout engine compilation failure:', err)
+  }
+}
+
   // Scroll to account function
   const scrollToAccount = (accountCode) => {
     const element = document.getElementById(`account-${accountCode}`)
@@ -167,10 +440,33 @@ export default function GeneralLedger() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-[11px] font-black text-black rounded-xl hover:bg-gray-50 uppercase tracking-widest">
-            <Download size={13} /> Export PDF
-          </button>
+        <div className="flex gap-2 items-center relative">
+          <div className="relative">
+            <button
+              onClick={() => setExportMenuOpen((prev) => !prev)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 border border-emerald-600 text-[11px] font-black text-white rounded-xl hover:bg-emerald-700 uppercase tracking-widest transition-colors"
+            >
+              <Download size={13} /> Export
+            </button>
+            {exportMenuOpen && (
+              <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
+                <button
+                  type="button"
+                  onClick={handleExportPDF}
+                  className="w-full text-left px-4 py-3 text-[11px] font-black text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Export PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  className="w-full text-left px-4 py-3 text-[11px] font-black text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Export Excel
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={fetchGeneralLedger}
             className="w-10 h-10 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center justify-center transition-colors"
@@ -364,14 +660,6 @@ export default function GeneralLedger() {
               </div>
             ) : (
               filteredAccounts.map((acc) => {
-                const totalDebit = acc.entries.reduce(
-                  (s, e) => s + (e.entry_type === 'DEBIT' ? e.amount : 0),
-                  0,
-                )
-                const totalCredit = acc.entries.reduce(
-                  (s, e) => s + (e.entry_type === 'CREDIT' ? e.amount : 0),
-                  0,
-                )
                 const closingBal = acc.closingBalance || 0
 
                 return (

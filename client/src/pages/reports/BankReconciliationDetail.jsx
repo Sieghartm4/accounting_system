@@ -2,24 +2,25 @@ import React from 'react'
 // eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion'
 import {
+  ArrowLeft,
+  Edit,
   Plus,
-  Trash2,
+  RefreshCw,
+  AlertCircle,
+  Building2,
+  Calendar,
+  Download,
+  FileText,
+  Scale,
+  Loader,
+  CheckCircle2,
   Check,
   X,
-  Building2,
-  AlertCircle,
-  Loader,
-  ArrowLeft,
-  FileText,
-  CheckCircle2,
-  Scale,
-  RefreshCw,
+  Trash2,
   Search,
-  Calendar,
+  Info,
   TrendingUp,
   TrendingDown,
-  Info,
-  Edit,
 } from 'lucide-react'
 import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
@@ -53,6 +54,8 @@ export default function BankReconciliationDetail({
     setDetailStartDate,
     detailEndDate,
     setDetailEndDate,
+    availableMonths,
+    availableMonthsLoading,
     bankSearchTerm,
     setBankSearchTerm,
     bookSearchTerm,
@@ -67,8 +70,13 @@ export default function BankReconciliationDetail({
     setEditingBankBalance,
     bankBalanceInput,
     setBankBalanceInput,
+    editingBookBalance,
+    setEditingBookBalance,
+    bookBalanceInput,
+    setBookBalanceInput,
     fetchReconciliationItems,
     handleUpdateBankStatementBalance,
+    handleUpdateGeneralLedgerBalance,
     handleAddOrUpdateItem,
     handleEditItem,
     handleDeleteItem,
@@ -113,6 +121,8 @@ export default function BankReconciliationDetail({
     handleRemoveBankAdjustment,
     handleRemoveBookAdjustment,
     handleSaveSummary,
+    hasSavedSummary,
+    handleExportSummaryPdf,
     bankCardAdditions,
     bankCardDeductions,
     bankCardErrors,
@@ -172,6 +182,16 @@ export default function BankReconciliationDetail({
               >
                 <Plus size={16} /> Add Reconciling Item
               </motion.button>
+              {hasSavedSummary && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => handleExportSummaryPdf()}
+                  className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-blue-700 transition"
+                >
+                  <Download size={16} /> Export PDF
+                </motion.button>
+              )}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
@@ -184,45 +204,68 @@ export default function BankReconciliationDetail({
           </div>
         </div>
 
-        {/* Date Filter */}
+        {/* Month Filter */}
         <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 mb-4 flex items-center gap-3 flex-wrap shadow-sm">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
               <Calendar size={15} />
             </div>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-              Filter by Date
+              Reconciliation Period
             </p>
           </div>
           <div className="hidden md:block w-px h-8 bg-gray-100" />
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-              From
-            </span>
-            <input
-              type="date"
-              value={detailStartDate}
-              onChange={(e) => setDetailStartDate(e.target.value)}
-              className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
-            />
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-              To
-            </span>
-            <input
-              type="date"
-              value={detailEndDate}
-              onChange={(e) => setDetailEndDate(e.target.value)}
-              className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
-            />
-            <button
-              onClick={() => {
-                setDetailStartDate('')
-                setDetailEndDate('')
-              }}
-              className="px-4 py-2 border border-gray-900 rounded-xl text-[10px] font-black text-gray-900 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-all bg-white"
-            >
-              Clear
-            </button>
+            {availableMonthsLoading ? (
+              <div className="flex items-center gap-2 text-gray-400 text-sm">
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+                Loading periods...
+              </div>
+            ) : availableMonths.length === 0 ? (
+              <p className="text-gray-500 text-sm">No saved periods available</p>
+            ) : (
+              <>
+                <select
+                  value={`${detailStartDate}|${detailEndDate}`}
+                  onChange={(e) => {
+                    const selected = availableMonths.find(
+                      (m) => `${m.start_date}|${m.end_date}` === e.target.value,
+                    )
+                    if (selected) {
+                      setDetailStartDate(selected.start_date)
+                      setDetailEndDate(selected.end_date)
+                    }
+                  }}
+                  className="px-3 py-2 border border-gray-100 rounded-xl bg-white text-sm font-bold text-black outline-none focus:border-blue-500 focus:bg-blue-50 transition-all cursor-pointer"
+                >
+                  <option value="" disabled>
+                    Select a month...
+                  </option>
+                  {availableMonths.map((month, idx) => (
+                    <option
+                      key={idx}
+                      value={`${month.start_date}|${month.end_date}`}
+                    >
+                      {month.label}
+                    </option>
+                  ))}
+                </select>
+                {detailStartDate && detailEndDate && (
+                  <span className="text-xs font-semibold text-gray-600 bg-blue-50 px-3 py-1.5 rounded-lg">
+                    {new Date(detailStartDate).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}{' '}
+                    -{' '}
+                    {new Date(detailEndDate).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </span>
+                )}
+              </>
+            )}
           </div>
         </div>
 
@@ -303,7 +346,7 @@ export default function BankReconciliationDetail({
               <div className="flex justify-between items-center py-3 border-b border-gray-100">
                 <div>
                   <p className="text-sm font-bold text-gray-800">
-                    Bank Statement Ending Balance
+                    Ending Balance per Bank Statement
                   </p>
                   <p className="text-[10px] text-gray-400 mt-0.5">
                     Editable base bank statement closing amount
@@ -356,7 +399,9 @@ export default function BankReconciliationDetail({
                     Bank Adjustments
                   </p>
                   <button
-                    onClick={() => setShowBankAdjustmentForm(!showBankAdjustmentForm)}
+                    onClick={() =>
+                      setShowBankAdjustmentForm(!showBankAdjustmentForm)
+                    }
                     className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
                   >
                     <Plus size={12} />
@@ -373,17 +418,48 @@ export default function BankReconciliationDetail({
                         </label>
                         <select
                           value={bankAdjustmentForm.type}
-                          onChange={(e) => setBankAdjustmentForm({ ...bankAdjustmentForm, type: e.target.value })}
+                          onChange={(e) =>
+                            setBankAdjustmentForm({
+                              ...bankAdjustmentForm,
+                              type: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-blue-500"
                         >
                           <option value="">Select type...</option>
                           <optgroup label="Bank Side">
-                            <option value="deposits_in_transit">Deposit in Transit (add)</option>
-                            <option value="outstanding_checks">Outstanding Check (less)</option>
-                            <option value="error_bank">Bank Error / Correction (add/less)</option>
+                            <option value="deposits_in_transit">
+                              Deposit in Transit (add)
+                            </option>
+                            <option value="outstanding_checks">
+                              Outstanding Check (less)
+                            </option>
+                            <option value="error_bank">
+                              Bank Error / Correction (add/less)
+                            </option>
                           </optgroup>
                         </select>
                       </div>
+                      {bankAdjustmentForm.type === 'error_bank' && (
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            Effect
+                          </label>
+                          <select
+                            value={bankAdjustmentForm.direction}
+                            onChange={(e) =>
+                              setBankAdjustmentForm({
+                                ...bankAdjustmentForm,
+                                direction: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-blue-500"
+                          >
+                            <option value="add">Add (increase)</option>
+                            <option value="less">Less (decrease)</option>
+                          </select>
+                        </div>
+                      )}
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
                           Amount
@@ -393,7 +469,12 @@ export default function BankReconciliationDetail({
                           step="0.01"
                           placeholder="0.00"
                           value={bankAdjustmentForm.amount}
-                          onChange={(e) => setBankAdjustmentForm({ ...bankAdjustmentForm, amount: e.target.value })}
+                          onChange={(e) =>
+                            setBankAdjustmentForm({
+                              ...bankAdjustmentForm,
+                              amount: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-blue-500"
                         />
                       </div>
@@ -406,7 +487,12 @@ export default function BankReconciliationDetail({
                         type="text"
                         placeholder="Enter description..."
                         value={bankAdjustmentForm.description}
-                        onChange={(e) => setBankAdjustmentForm({ ...bankAdjustmentForm, description: e.target.value })}
+                        onChange={(e) =>
+                          setBankAdjustmentForm({
+                            ...bankAdjustmentForm,
+                            description: e.target.value,
+                          })
+                        }
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-blue-500"
                       />
                     </div>
@@ -420,7 +506,11 @@ export default function BankReconciliationDetail({
                       <button
                         onClick={() => {
                           setShowBankAdjustmentForm(false)
-                          setBankAdjustmentForm({ type: '', description: '', amount: '' })
+                          setBankAdjustmentForm({
+                            type: '',
+                            description: '',
+                            amount: '',
+                          })
                         }}
                         className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-100 transition"
                       >
@@ -430,37 +520,7 @@ export default function BankReconciliationDetail({
                   </div>
                 )}
 
-                {/* Bank Adjustments List */}
-                {bankAdjustments.length > 0 && (
-                  <div className="space-y-2 mb-3">
-                    {bankAdjustments.map((adj) => {
-                      const meta = getItemMeta(adj.type)
-                      return (
-                        <div key={adj.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold ${meta.badge}`}>
-                              {meta.label}
-                            </span>
-                            {adj.description && (
-                              <span className="text-xs text-gray-600">{adj.description}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`font-bold font-mono text-xs ${meta.effect === 'add' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {meta.effect === 'add' ? '+' : '−'} ₱{fmt(adj.amount)}
-                            </span>
-                            <button
-                              onClick={() => handleRemoveBankAdjustment(adj.id)}
-                              className="text-gray-400 hover:text-red-500"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                {/* Bank-specific adjustment lists now rendered under each Add/Less row */}
               </div>
 
               <div className="flex justify-between items-center py-3 border-b border-gray-100">
@@ -475,10 +535,46 @@ export default function BankReconciliationDetail({
                     </p>
                   </div>
                 </div>
-                <span className="font-bold font-mono text-emerald-600">
-                  + ₱{fmt(depositsInTransit + bankCardAdditions)}
-                </span>
+                <div className="w-48 text-right">
+                  <div className="font-bold font-mono text-emerald-600">
+                    + ₱{fmt(depositsInTransit + bankCardAdditions)}
+                  </div>
+                </div>
               </div>
+
+              {/* List deposits adjustments under the Add row */}
+              {bankAdjustments.filter((adj) => adj.type === 'deposits_in_transit')
+                .length > 0 && (
+                <div className="mt-2 space-y-1 mb-3">
+                  {bankAdjustments
+                    .filter((adj) => adj.type === 'deposits_in_transit')
+                    .map((adj) => {
+                      const meta = getItemMeta(adj.type)
+                      return (
+                        <div
+                          key={adj.id}
+                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
+                        >
+                          <div className="text-sm text-gray-700">
+                            {adj.description || meta.label}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-mono font-bold text-emerald-600">
+                              + ₱{fmt(adj.amount)}
+                            </div>
+                            <button
+                              onClick={() => handleRemoveBankAdjustment(adj.id)}
+                              className="text-gray-400 hover:text-red-500"
+                              title="Delete adjustment"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
 
               <div className="flex justify-between items-center py-3 border-b border-gray-100">
                 <div className="flex items-center gap-2">
@@ -492,10 +588,46 @@ export default function BankReconciliationDetail({
                     </p>
                   </div>
                 </div>
-                <span className="font-bold font-mono text-rose-600">
-                  − ₱{fmt(outstandingChecks + bankCardDeductions)}
-                </span>
+                <div className="w-48 text-right">
+                  <div className="font-bold font-mono text-rose-600">
+                    − ₱{fmt(outstandingChecks + bankCardDeductions)}
+                  </div>
+                </div>
               </div>
+
+              {/* List outstanding check adjustments under the Less row */}
+              {bankAdjustments.filter((adj) => adj.type === 'outstanding_checks')
+                .length > 0 && (
+                <div className="mt-2 space-y-1 mb-3">
+                  {bankAdjustments
+                    .filter((adj) => adj.type === 'outstanding_checks')
+                    .map((adj) => {
+                      const meta = getItemMeta(adj.type)
+                      return (
+                        <div
+                          key={adj.id}
+                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
+                        >
+                          <div className="text-sm text-gray-700">
+                            {adj.description || meta.label}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-mono font-bold text-rose-600">
+                              − ₱{fmt(adj.amount)}
+                            </div>
+                            <button
+                              onClick={() => handleRemoveBankAdjustment(adj.id)}
+                              className="text-gray-400 hover:text-red-500"
+                              title="Delete adjustment"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
 
               {bankCardErrors !== 0 && (
                 <div className="flex justify-between items-center py-3 border-b border-gray-100">
@@ -516,6 +648,44 @@ export default function BankReconciliationDetail({
                     {bankCardErrors >= 0 ? '+' : '−'} ₱
                     {fmt(Math.abs(bankCardErrors))}
                   </span>
+                </div>
+              )}
+
+              {/* List individual bank error adjustments under the error summary */}
+              {bankAdjustments.filter((adj) => adj.type === 'error_bank').length >
+                0 && (
+                <div className="mt-2 space-y-1 mb-3">
+                  {bankAdjustments
+                    .filter((adj) => adj.type === 'error_bank')
+                    .map((adj) => {
+                      const sign = (parseFloat(adj.amount) || 0) >= 0 ? '+' : '−'
+                      const color =
+                        (parseFloat(adj.amount) || 0) >= 0
+                          ? 'text-emerald-600'
+                          : 'text-rose-600'
+                      return (
+                        <div
+                          key={adj.id}
+                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
+                        >
+                          <div className="text-sm text-gray-700">
+                            {adj.description || 'Bank Error'}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className={`font-mono font-bold ${color}`}>
+                              {sign} ₱{fmt(Math.abs(adj.amount))}
+                            </div>
+                            <button
+                              onClick={() => handleRemoveBankAdjustment(adj.id)}
+                              className="text-gray-400 hover:text-red-500"
+                              title="Delete adjustment"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
                 </div>
               )}
 
@@ -567,17 +737,50 @@ export default function BankReconciliationDetail({
               <div className="flex justify-between items-center py-3 border-b border-gray-100">
                 <div>
                   <p className="text-sm font-bold text-gray-800">
-                    Unadjusted Book Balance
+                    Ending Balance per General Ledger
                   </p>
                   <p className="text-[10px] text-gray-400 mt-0.5">
-                    {journalEntries.length > 0
-                      ? 'GL total debits minus GL total credits'
-                      : 'No journal entries loaded — using stored GL running balance'}
+                    Editable base general ledger ending balance
                   </p>
                 </div>
-                <span className="text-xl font-black text-violet-900 font-mono">
-                  ₱{fmt(unadjustedBookBalance)}
-                </span>
+                <div className="text-right">
+                  {editingBookBalance ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-sm">₱</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={bookBalanceInput}
+                        onChange={(e) => setBookBalanceInput(e.target.value)}
+                        className="w-32 px-2 py-1 border border-violet-500 rounded-lg text-sm font-mono font-bold outline-none text-right"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleUpdateGeneralLedgerBalance}
+                        className="text-emerald-600 hover:text-emerald-700"
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        onClick={() => setEditingBookBalance(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="font-black font-mono text-violet-700 text-xl hover:underline"
+                      onClick={() => {
+                        setBookBalanceInput(endingBookBalance.toFixed(2))
+                        setEditingBookBalance(true)
+                      }}
+                      title="Click to update general ledger balance"
+                    >
+                      ₱{fmt(endingBookBalance)}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Book Adjustments Section */}
@@ -587,7 +790,9 @@ export default function BankReconciliationDetail({
                     Book Adjustments
                   </p>
                   <button
-                    onClick={() => setShowBookAdjustmentForm(!showBookAdjustmentForm)}
+                    onClick={() =>
+                      setShowBookAdjustmentForm(!showBookAdjustmentForm)
+                    }
                     className="text-xs font-bold text-violet-600 hover:text-violet-700 flex items-center gap-1"
                   >
                     <Plus size={12} />
@@ -604,20 +809,57 @@ export default function BankReconciliationDetail({
                         </label>
                         <select
                           value={bookAdjustmentForm.type}
-                          onChange={(e) => setBookAdjustmentForm({ ...bookAdjustmentForm, type: e.target.value })}
+                          onChange={(e) =>
+                            setBookAdjustmentForm({
+                              ...bookAdjustmentForm,
+                              type: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-violet-500"
                         >
                           <option value="">Select type...</option>
                           <optgroup label="Book Side">
-                            <option value="interest_income">Interest Earned (add)</option>
-                            <option value="credit_memo">Bank Credit Memo / EFT (add)</option>
-                            <option value="bank_charges">Bank Service Fee (less)</option>
-                            <option value="nsf_checks">NSF / Bounced Check (less)</option>
-                            <option value="debit_memo">Bank Debit Memo (less)</option>
-                            <option value="error_book">Book Error / Correction (add/less)</option>
+                            <option value="interest_income">
+                              Interest Earned (add)
+                            </option>
+                            <option value="credit_memo">
+                              Bank Credit Memo / EFT (add)
+                            </option>
+                            <option value="bank_charges">
+                              Bank Service Fee (less)
+                            </option>
+                            <option value="nsf_checks">
+                              NSF / Bounced Check (less)
+                            </option>
+                            <option value="debit_memo">
+                              Bank Debit Memo (less)
+                            </option>
+                            <option value="error_book">
+                              Book Error / Correction (add/less)
+                            </option>
                           </optgroup>
                         </select>
                       </div>
+                      {bookAdjustmentForm.type === 'error_book' && (
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                            Effect
+                          </label>
+                          <select
+                            value={bookAdjustmentForm.direction}
+                            onChange={(e) =>
+                              setBookAdjustmentForm({
+                                ...bookAdjustmentForm,
+                                direction: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-violet-500"
+                          >
+                            <option value="add">Add (increase)</option>
+                            <option value="less">Less (decrease)</option>
+                          </select>
+                        </div>
+                      )}
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
                           Amount
@@ -627,7 +869,12 @@ export default function BankReconciliationDetail({
                           step="0.01"
                           placeholder="0.00"
                           value={bookAdjustmentForm.amount}
-                          onChange={(e) => setBookAdjustmentForm({ ...bookAdjustmentForm, amount: e.target.value })}
+                          onChange={(e) =>
+                            setBookAdjustmentForm({
+                              ...bookAdjustmentForm,
+                              amount: e.target.value,
+                            })
+                          }
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-violet-500"
                         />
                       </div>
@@ -640,7 +887,12 @@ export default function BankReconciliationDetail({
                         type="text"
                         placeholder="Enter description..."
                         value={bookAdjustmentForm.description}
-                        onChange={(e) => setBookAdjustmentForm({ ...bookAdjustmentForm, description: e.target.value })}
+                        onChange={(e) =>
+                          setBookAdjustmentForm({
+                            ...bookAdjustmentForm,
+                            description: e.target.value,
+                          })
+                        }
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-violet-500"
                       />
                     </div>
@@ -654,7 +906,11 @@ export default function BankReconciliationDetail({
                       <button
                         onClick={() => {
                           setShowBookAdjustmentForm(false)
-                          setBookAdjustmentForm({ type: '', description: '', amount: '' })
+                          setBookAdjustmentForm({
+                            type: '',
+                            description: '',
+                            amount: '',
+                          })
                         }}
                         className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-100 transition"
                       >
@@ -664,37 +920,7 @@ export default function BankReconciliationDetail({
                   </div>
                 )}
 
-                {/* Book Adjustments List */}
-                {bookAdjustments.length > 0 && (
-                  <div className="space-y-2 mb-3">
-                    {bookAdjustments.map((adj) => {
-                      const meta = getItemMeta(adj.type)
-                      return (
-                        <div key={adj.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold ${meta.badge}`}>
-                              {meta.label}
-                            </span>
-                            {adj.description && (
-                              <span className="text-xs text-gray-600">{adj.description}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`font-bold font-mono text-xs ${meta.effect === 'add' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {meta.effect === 'add' ? '+' : '−'} ₱{fmt(adj.amount)}
-                            </span>
-                            <button
-                              onClick={() => handleRemoveBookAdjustment(adj.id)}
-                              className="text-gray-400 hover:text-red-500"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                {/* Book-specific adjustment lists are rendered under Add/Less rows below */}
               </div>
 
               <div className="flex justify-between items-center py-3 border-b border-gray-100">
@@ -709,10 +935,47 @@ export default function BankReconciliationDetail({
                     </p>
                   </div>
                 </div>
-                <span className="font-bold font-mono text-emerald-600">
-                  + ₱{fmt(bookAdditions + bookCardAdditions)}
-                </span>
+                <div className="w-48 text-right">
+                  <div className="font-bold font-mono text-emerald-600">
+                    + ₱{fmt(bookAdditions + bookCardAdditions)}
+                  </div>
+                </div>
               </div>
+
+              {/* List book additions under the Add row */}
+              {bookAdjustments.filter(
+                (adj) => getItemMeta(adj.type).effect === 'add',
+              ).length > 0 && (
+                <div className="mt-2 space-y-1 mb-3">
+                  {bookAdjustments
+                    .filter((adj) => getItemMeta(adj.type).effect === 'add')
+                    .map((adj) => {
+                      const meta = getItemMeta(adj.type)
+                      return (
+                        <div
+                          key={adj.id}
+                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
+                        >
+                          <div className="text-sm text-gray-700">
+                            {adj.description || meta.label}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-mono font-bold text-emerald-600">
+                              + ₱{fmt(adj.amount)}
+                            </div>
+                            <button
+                              onClick={() => handleRemoveBookAdjustment(adj.id)}
+                              className="text-gray-400 hover:text-red-500"
+                              title="Delete adjustment"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
 
               <div className="flex justify-between items-center py-3 border-b border-gray-100">
                 <div className="flex items-center gap-2">
@@ -726,10 +989,47 @@ export default function BankReconciliationDetail({
                     </p>
                   </div>
                 </div>
-                <span className="font-bold font-mono text-rose-600">
-                  − ₱{fmt(bookDeductions + bookCardDeductions)}
-                </span>
+                <div className="w-48 text-right">
+                  <div className="font-bold font-mono text-rose-600">
+                    − ₱{fmt(bookDeductions + bookCardDeductions)}
+                  </div>
+                </div>
               </div>
+
+              {/* List book deductions under the Less row */}
+              {bookAdjustments.filter(
+                (adj) => getItemMeta(adj.type).effect === 'deduct',
+              ).length > 0 && (
+                <div className="mt-2 space-y-1 mb-3">
+                  {bookAdjustments
+                    .filter((adj) => getItemMeta(adj.type).effect === 'deduct')
+                    .map((adj) => {
+                      const meta = getItemMeta(adj.type)
+                      return (
+                        <div
+                          key={adj.id}
+                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
+                        >
+                          <div className="text-sm text-gray-700">
+                            {adj.description || meta.label}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-mono font-bold text-rose-600">
+                              − ₱{fmt(adj.amount)}
+                            </div>
+                            <button
+                              onClick={() => handleRemoveBookAdjustment(adj.id)}
+                              className="text-gray-400 hover:text-red-500"
+                              title="Delete adjustment"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
 
               {(bookErrorAdjustments !== 0 || bookCardErrors !== 0) && (
                 <div className="flex justify-between items-center py-3 border-b border-gray-100">
@@ -745,11 +1045,49 @@ export default function BankReconciliationDetail({
                     </div>
                   </div>
                   <span
-                    className={`font-bold font-mono ${(bookErrorAdjustments + bookCardErrors) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                    className={`font-bold font-mono ${bookErrorAdjustments + bookCardErrors >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
                   >
-                    {(bookErrorAdjustments + bookCardErrors) >= 0 ? '+' : '−'} ₱
+                    {bookErrorAdjustments + bookCardErrors >= 0 ? '+' : '−'} ₱
                     {fmt(Math.abs(bookErrorAdjustments + bookCardErrors))}
                   </span>
+                </div>
+              )}
+
+              {/* List individual book error adjustments under the error summary */}
+              {bookAdjustments.filter((adj) => adj.type === 'error_book').length >
+                0 && (
+                <div className="mt-2 space-y-1 mb-3">
+                  {bookAdjustments
+                    .filter((adj) => adj.type === 'error_book')
+                    .map((adj) => {
+                      const sign = (parseFloat(adj.amount) || 0) >= 0 ? '+' : '−'
+                      const color =
+                        (parseFloat(adj.amount) || 0) >= 0
+                          ? 'text-emerald-600'
+                          : 'text-rose-600'
+                      return (
+                        <div
+                          key={adj.id}
+                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
+                        >
+                          <div className="text-sm text-gray-700">
+                            {adj.description || 'Book Error'}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className={`font-mono font-bold ${color}`}>
+                              {sign} ₱{fmt(Math.abs(adj.amount))}
+                            </div>
+                            <button
+                              onClick={() => handleRemoveBookAdjustment(adj.id)}
+                              className="text-gray-400 hover:text-red-500"
+                              title="Delete adjustment"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
                 </div>
               )}
 
@@ -898,7 +1236,6 @@ export default function BankReconciliationDetail({
                   <tr className="bg-gray-50 border-b border-gray-100">
                     {[
                       'Date',
-                      'Section',
                       'Details',
                       'Reference',
                       'Description',
@@ -937,13 +1274,6 @@ export default function BankReconciliationDetail({
                             day: 'numeric',
                             year: 'numeric',
                           })}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${isBank ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}
-                          >
-                            {isBank ? 'Bank' : 'Book'}
-                          </span>
                         </td>
                         <td className="px-5 py-3.5">
                           <span
@@ -1490,7 +1820,6 @@ export default function BankReconciliationDetail({
           </div>
         </div>
       </RightSideModal>
-
 
       {showToast && (
         <DynamicToast
