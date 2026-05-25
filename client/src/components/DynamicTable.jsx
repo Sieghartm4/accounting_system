@@ -26,6 +26,7 @@ const DynamicTable = ({
   // --- ACTION COLUMN PROPS ---
   enableActionColumn = false, // if true, shows an action column with buttons
   actionButtons = [], // array of { label, onClick(row), icon } buttons for each row
+  routeName = null, // optional explicit route name for access checks
   // --- BADGE PROPS ---
   badgeColumns = [], // array of { column: 'status', values: { 'PAID': 'green', 'UNPAID': 'red' } } for dynamic badges
   // --- HIGHLIGHT PROPS ---
@@ -96,8 +97,12 @@ const DynamicTable = ({
 
     // Get current user and access level for this route
     const user = JSON.parse(localStorage.getItem('user') || '{}')
-    const routeName = window.location.pathname.split('/')[1] // Extract route from URL
-    const accessLevel = getAccessLevel(routeName, user)
+    const inferredRouteName = window.location.pathname
+      .replace(/^\//, '')
+      .split('/')[0]
+      .replace(/-/g, '_')
+    const effectiveRouteName = routeName || inferredRouteName
+    const accessLevel = getAccessLevel(effectiveRouteName, user)
 
     return actionButtons.filter((button) => {
       const label = button.label.toLowerCase()
@@ -347,7 +352,7 @@ const DynamicTable = ({
   return (
     <div className="h-full flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
       {/* --- INTEGRATED CONTROL BAR --- */}
-      <div className="bg-black p-4 flex-shrink-0">
+      <div className="bg-black p-4 shrink-0">
         <div className="flex items-center justify-between gap-4">
           {/* LEFT SIDE: Title & Search */}
           <div className="flex items-center flex-1 gap-4">
@@ -486,7 +491,7 @@ const DynamicTable = ({
 
       {/* --- CHECKBOX ACTION BAR (shown when rows are selected) --- */}
       {enableCheckbox && selectedKeys.size > 0 && checkboxActions.length > 0 && (
-        <div className="flex-shrink-0 bg-red-50 border-b border-red-100 px-6 py-2 flex items-center gap-3 animate-in slide-in-from-top-1">
+        <div className="shrink-0 bg-red-50 border-b border-red-100 px-6 py-2 flex items-center gap-3 animate-in slide-in-from-top-1">
           <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">
             {selectedKeys.size} Selected
           </span>
@@ -773,7 +778,7 @@ const DynamicTable = ({
 
       {/* --- IMAGE MODAL --- */}
       {imageModal.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-100 flex items-center justify-center p-8 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
           <button
             onClick={() => setImageModal({ isOpen: false, imageSrc: '' })}
             className="absolute top-6 right-6 text-white hover:text-red-500 transition-colors"

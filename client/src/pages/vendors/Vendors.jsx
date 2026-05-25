@@ -1,61 +1,70 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Truck, PackagePlus, ShieldCheck, Search, ArrowRight, Download, Plus, Edit2 } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import RightSideModal from '../../components/RightSideModal';
-import DynamicToast from '../../components/DynamicToast';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import useVendors from './useVendors';
+import React, { useState } from 'react'
+import { motion } from 'framer-motion'
+import {
+  Truck,
+  PackagePlus,
+  ShieldCheck,
+  Search,
+  ArrowRight,
+  Download,
+  Plus,
+  Edit2,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import RightSideModal from '../../components/RightSideModal'
+import DynamicToast from '../../components/DynamicToast'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import useVendors from './useVendors'
 
 function VendorsContent() {
-  const { vendors, loading, error, createVendor, updateVendor } = useVendors();
+  const { vendors, loading, error, createVendor, updateVendor } = useVendors()
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingVendor, setEditingVendor] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingVendor, setEditingVendor] = useState(null)
   const [formData, setFormData] = useState({
     code: '',
     name: '',
     category: '',
     type: '',
-    status: 'active'
-  });
-  const [toast, setToast] = useState(null);
+    status: 'active',
+  })
+  const [toast, setToast] = useState(null)
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
 
   const handleAddVendorClick = () => {
-    setEditingVendor(null);
-    setFormData({ code: '', name: '', category: '', type: '', status: 'active' });
-    setIsModalOpen(true);
-  };
+    setEditingVendor(null)
+    setFormData({ code: '', name: '', category: '', type: '', status: 'active' })
+    setIsModalOpen(true)
+  }
 
   const handleEditVendorClick = (row) => {
-    setEditingVendor(row);
+    setEditingVendor(row)
     setFormData({
       code: row.code || '',
       name: row.name || '',
       category: row.category || '',
       type: row.type || '',
-      status: row.status || 'active'
-    });
-    setIsModalOpen(true);
-  };
+      status: row.status || 'active',
+    })
+    setIsModalOpen(true)
+  }
 
   const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingVendor(null);
-  };
+    setIsModalOpen(false)
+    setEditingVendor(null)
+  }
 
   const handleToastClose = () => {
-    setToast(null);
-  };
+    setToast(null)
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     try {
       const result = editingVendor
         ? await updateVendor(
@@ -64,44 +73,48 @@ function VendorsContent() {
             formData.name,
             formData.category,
             formData.type,
-            formData.status
+            formData.status,
           )
         : await createVendor(
             formData.code,
             formData.name,
             formData.category,
             formData.type,
-            formData.status
-          );
+            formData.status,
+          )
 
       if (result.success) {
         setToast({
           type: 'success',
-          message: `Vendor "${formData.name}" ${editingVendor ? 'updated' : 'created'} successfully!`
-        });
-        setIsModalOpen(false);
-        setEditingVendor(null);
+          message: `Vendor "${formData.name}" ${editingVendor ? 'updated' : 'created'} successfully!`,
+        })
+        setIsModalOpen(false)
+        setEditingVendor(null)
       } else {
         setToast({
           type: 'error',
-          message: result.message || `Failed to ${editingVendor ? 'update' : 'create'} vendor`
-        });
+          message:
+            result.message ||
+            `Failed to ${editingVendor ? 'update' : 'create'} vendor`,
+        })
       }
     } catch (error) {
       setToast({
         type: 'error',
-        message: `Network error occurred while ${editingVendor ? 'updating' : 'creating'} vendor`
-      });
+        message: `Network error occurred while ${editingVendor ? 'updating' : 'creating'} vendor`,
+      })
     }
-  };
+  }
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Syncing Vendor Database...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Syncing Vendor Database...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -112,12 +125,11 @@ function VendorsContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
         {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -152,7 +164,10 @@ function VendorsContent() {
               EXPORT LIST
             </button>
             <ProtectedAction routeName="vendors">
-              <button onClick={handleAddVendorClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest">
+              <button
+                onClick={handleAddVendorClick}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest"
+              >
                 <PackagePlus size={14} />
                 Add Vendor
               </button>
@@ -199,18 +214,18 @@ function VendorsContent() {
             {
               label: 'Edit',
               onClick: (row) => handleEditVendorClick(row),
-              icon: <Edit2 size={16} />
-            }
+              icon: <Edit2 size={16} />,
+            },
           ]}
           badgeColumns={[
             {
               column: 'status',
               values: {
-                'ACTIVE': 'green',
-                'INACTIVE': 'red',
-                'PENDING': 'yellow'
-              }
-            }
+                ACTIVE: 'green',
+                INACTIVE: 'red',
+                PENDING: 'yellow',
+              },
+            },
           ]}
         />
       </motion.div>
@@ -258,7 +273,9 @@ function VendorsContent() {
               <input
                 type="text"
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter category..."
                 required
@@ -289,7 +306,9 @@ function VendorsContent() {
               </label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, status: e.target.value })
+                }
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
@@ -328,7 +347,7 @@ function VendorsContent() {
         />
       )}
     </div>
-  );
+  )
 }
 
 function SummaryCard({ icon, label, value, subText }) {
@@ -336,14 +355,18 @@ function SummaryCard({ icon, label, value, subText }) {
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 export default function Vendors() {
@@ -351,5 +374,5 @@ export default function Vendors() {
     <RouteProtection routeName="vendors">
       <VendorsContent />
     </RouteProtection>
-  );
+  )
 }

@@ -184,9 +184,8 @@ const getJournalEntriesByCoaId = async (req, res, next) => {
     console.log(
       `Fetched ${journalEntries.length} journal entries for COA ID ${coaIdNum}`,
     )
-    console.log('Raw result:', JSON.stringify(journalEntries, null, 2))
+    // console.log('Raw result:', JSON.stringify(journalEntries, null, 2))
 
-    // Calculate total debit and credit
     let totalDebit = 0
     let totalCredit = 0
     journalEntries.forEach((entry) => {

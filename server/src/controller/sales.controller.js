@@ -248,6 +248,8 @@ const getSales = async (req, res, next) => {
       .select([
         { col: Accounting.sales.selectOptionColumns.id, as: 'id' },
 
+        { col: Accounting.sales.selectOptionColumns.customer_id, as: 'customer_id' },
+
         { col: Master.customers.selectOptionColumns.name, as: 'customer' },
 
         {

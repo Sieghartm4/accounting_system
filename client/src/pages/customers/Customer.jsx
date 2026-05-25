@@ -1,61 +1,71 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Users, UserPlus, ShieldCheck, Search, ArrowRight, Download, X, Plus, Edit2 } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import RightSideModal from '../../components/RightSideModal';
-import DynamicToast from '../../components/DynamicToast';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import useCustomer from './useCustomer';
+import React, { useState } from 'react'
+import { motion } from 'framer-motion'
+import {
+  Users,
+  UserPlus,
+  ShieldCheck,
+  Search,
+  ArrowRight,
+  Download,
+  X,
+  Plus,
+  Edit2,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import RightSideModal from '../../components/RightSideModal'
+import DynamicToast from '../../components/DynamicToast'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import useCustomer from './useCustomer'
 
 function CustomerContent() {
-  const { customers, loading, error, createCustomer, updateCustomer } = useCustomer();
+  const { customers, loading, error, createCustomer, updateCustomer } = useCustomer()
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingCustomer, setEditingCustomer] = useState(null)
   const [formData, setFormData] = useState({
     code: '',
     name: '',
     category: '',
     type: '',
-    status: 'active'
-  });
-  const [toast, setToast] = useState(null);
+    status: 'active',
+  })
+  const [toast, setToast] = useState(null)
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
 
   const handleAddCustomerClick = () => {
-    setEditingCustomer(null);
-    setFormData({ code: '', name: '', category: '', type: '', status: 'active' });
-    setIsModalOpen(true);
-  };
+    setEditingCustomer(null)
+    setFormData({ code: '', name: '', category: '', type: '', status: 'active' })
+    setIsModalOpen(true)
+  }
 
   const handleEditCustomerClick = (row) => {
-    setEditingCustomer(row);
+    setEditingCustomer(row)
     setFormData({
       code: row.code || '',
       name: row.name || '',
       category: row.category || '',
       type: row.type || '',
-      status: row.status || 'active'
-    });
-    setIsModalOpen(true);
-  };
+      status: row.status || 'active',
+    })
+    setIsModalOpen(true)
+  }
 
   const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingCustomer(null);
-  };
+    setIsModalOpen(false)
+    setEditingCustomer(null)
+  }
 
   const handleToastClose = () => {
-    setToast(null);
-  };
+    setToast(null)
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     try {
       const result = editingCustomer
         ? await updateCustomer(
@@ -64,44 +74,48 @@ function CustomerContent() {
             formData.name,
             formData.category,
             formData.type,
-            formData.status
+            formData.status,
           )
         : await createCustomer(
             formData.code,
             formData.name,
             formData.category,
             formData.type,
-            formData.status
-          );
+            formData.status,
+          )
 
       if (result.success) {
         setToast({
           type: 'success',
-          message: `Customer "${formData.name}" ${editingCustomer ? 'updated' : 'created'} successfully!`
-        });
-        setIsModalOpen(false);
-        setEditingCustomer(null);
+          message: `Customer "${formData.name}" ${editingCustomer ? 'updated' : 'created'} successfully!`,
+        })
+        setIsModalOpen(false)
+        setEditingCustomer(null)
       } else {
         setToast({
           type: 'error',
-          message: result.message || `Failed to ${editingCustomer ? 'update' : 'create'} customer`
-        });
+          message:
+            result.message ||
+            `Failed to ${editingCustomer ? 'update' : 'create'} customer`,
+        })
       }
     } catch (error) {
       setToast({
         type: 'error',
-        message: `Network error occurred while ${editingCustomer ? 'updating' : 'creating'} customer`
-      });
+        message: `Network error occurred while ${editingCustomer ? 'updating' : 'creating'} customer`,
+      })
     }
-  };
+  }
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Syncing Database...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Syncing Database...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -112,12 +126,11 @@ function CustomerContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-      
       {/* --- HEADER SECTION (Fixed height) --- */}
       <div className="flex-shrink-0">
         {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -126,7 +139,7 @@ function CustomerContent() {
           <span className="text-black">Customer Masterlist</span>
         </nav> */}
 
-        <motion.div 
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -149,7 +162,10 @@ function CustomerContent() {
               EXPORT
             </button>
             <ProtectedAction routeName="customers">
-              <button onClick={handleAddCustomerClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button
+                onClick={handleAddCustomerClick}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
                 <UserPlus size={14} />
                 Add Account
               </button>
@@ -159,29 +175,29 @@ function CustomerContent() {
 
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard 
-            icon={<Users className="text-red-600" size={20} />} 
-            label="Total Entities" 
-            value={customers?.length || 0} 
+          <SummaryCard
+            icon={<Users className="text-red-600" size={20} />}
+            label="Total Entities"
+            value={customers?.length || 0}
             subText="Accounts"
           />
-          <SummaryCard 
-            icon={<ShieldCheck className="text-black" size={20} />} 
-            label="Verified" 
-            value={Math.floor((customers?.length || 0) * 0.9)} 
+          <SummaryCard
+            icon={<ShieldCheck className="text-black" size={20} />}
+            label="Verified"
+            value={Math.floor((customers?.length || 0) * 0.9)}
             subText="Compliance"
           />
-          <SummaryCard 
-            icon={<Search className="text-gray-400" size={20} />} 
-            label="Pending" 
-            value="3" 
+          <SummaryCard
+            icon={<Search className="text-gray-400" size={20} />}
+            label="Pending"
+            value="3"
             subText="Queue"
           />
         </div>
       </div>
 
       {/* --- TABLE SECTION (Flex-1 tells it to take remaining space) --- */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -196,16 +212,16 @@ function CustomerContent() {
             {
               label: 'Edit',
               onClick: (row) => handleEditCustomerClick(row),
-              icon: <Edit2 size={16} />
-            }
+              icon: <Edit2 size={16} />,
+            },
           ]}
         />
       </motion.div>
 
       {/* Add Customer Modal */}
-      <RightSideModal 
-        isOpen={isModalOpen} 
-        onClose={handleCloseModal} 
+      <RightSideModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
         title={editingCustomer ? 'Edit Customer' : 'Create New Customer'}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -217,13 +233,13 @@ function CustomerContent() {
               <input
                 type="text"
                 value={formData.code}
-                onChange={(e) => setFormData({...formData, code: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter customer code..."
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Customer Name <span className="text-red-600">*</span>
@@ -231,13 +247,13 @@ function CustomerContent() {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter customer name..."
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Category <span className="text-red-600">*</span>
@@ -245,20 +261,22 @@ function CustomerContent() {
               <input
                 type="text"
                 value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter category..."
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Type <span className="text-red-600">*</span>
               </label>
               <select
                 value={formData.type}
-                onChange={(e) => setFormData({...formData, type: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
@@ -269,14 +287,16 @@ function CustomerContent() {
                 <option value="non-profit">Non-Profit</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Status <span className="text-red-600">*</span>
               </label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({...formData, status: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, status: e.target.value })
+                }
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
@@ -285,7 +305,7 @@ function CustomerContent() {
               </select>
             </div>
           </div>
-          
+
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -304,7 +324,7 @@ function CustomerContent() {
           </div>
         </form>
       </RightSideModal>
-      
+
       {/* Toast Notification */}
       {toast && (
         <DynamicToast
@@ -315,7 +335,7 @@ function CustomerContent() {
         />
       )}
     </div>
-  );
+  )
 }
 
 function SummaryCard({ icon, label, value, subText }) {
@@ -323,14 +343,18 @@ function SummaryCard({ icon, label, value, subText }) {
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 export default function Customer() {
@@ -338,5 +362,5 @@ export default function Customer() {
     <RouteProtection routeName="customers">
       <CustomerContent />
     </RouteProtection>
-  );
+  )
 }

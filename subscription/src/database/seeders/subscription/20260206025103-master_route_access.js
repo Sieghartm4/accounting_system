@@ -40,6 +40,8 @@ module.exports = {
       'bank_reconciliation',
       'audit_trail',
       'aging_receivables',
+      'customer_transactions',
+      'vendor_transactions'
     ]
 
     const seedData = []

@@ -58,6 +58,10 @@ const getCashDisbursements = async (req, res, next) => {
 
 
 
+      { col: Accounting.cash_disbursements.selectOptionColumns.vendor_id, as: 'vendor_id' },
+
+
+
       { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
 
 

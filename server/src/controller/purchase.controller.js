@@ -272,6 +272,8 @@ const getPurchase = async (req, res, next) => {
 
       { col: Accounting.purchase.selectOptionColumns.id, as: 'id' },
 
+      { col: Accounting.purchase.selectOptionColumns.vendor_id, as: 'vendor_id' },
+
       { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
 
       { col: Accounting.purchase.selectOptionColumns.document_reference, as: 'doc_ref' },

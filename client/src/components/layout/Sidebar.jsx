@@ -46,6 +46,8 @@ export default function Sidebar({ isCollapsed }) {
 
   const [isReportsOpen, setIsReportsOpen] = useState(false)
 
+  const [isPartnersOpen, setIsPartnersOpen] = useState(false)
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const location = useLocation()
@@ -69,6 +71,8 @@ export default function Sidebar({ isCollapsed }) {
 
     reports: null,
 
+    partners: null,
+
     settings: null,
   })
 
@@ -91,10 +95,13 @@ export default function Sidebar({ isCollapsed }) {
       setSidebarItems({
         main: [],
         masters: [],
+        partners: [],
         receipts: [],
         sales: [],
         purchase: [],
         adjustments: [],
+        reports: [],
+        settings: [],
       })
     }
   }, [])
@@ -198,6 +205,14 @@ export default function Sidebar({ isCollapsed }) {
         'adjustments',
         sidebarItems.adjustments.map((item) => item.name),
         setIsAdjustmentsOpen,
+      )
+    }
+
+    if (sidebarItems.partners?.length > 0) {
+      checkAndSetState(
+        'partners',
+        sidebarItems.partners.map((item) => item.name),
+        setIsPartnersOpen,
       )
     }
 
@@ -410,6 +425,67 @@ export default function Sidebar({ isCollapsed }) {
                       </Link>
                     )
                   })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Customers & Vendors Section */}
+
+        {sidebarItems.partners?.length > 0 && (
+          <div className="pt-4">
+            {!isCollapsed && (
+              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">
+                Partners
+              </p>
+            )}
+
+            <button
+              onClick={() =>
+                handleManualToggle('partners', isPartnersOpen, setIsPartnersOpen)
+              }
+              className={`w-full flex items-center justify-between px-3 py-3 rounded-xl font-semibold transition-all ${isPartnersOpen ? 'text-white' : 'text-gray-400 hover:bg-white/5'}`}
+            >
+              <div className="flex items-center gap-3">
+                <Users size={20} className={isPartnersOpen ? 'text-red-600' : ''} />
+
+                {!isCollapsed && (
+                  <span className="text-sm">Customers & Vendors</span>
+                )}
+              </div>
+
+              {!isCollapsed && (
+                <ChevronRight
+                  size={14}
+                  className={`transition-transform ${isPartnersOpen ? 'rotate-90' : ''}`}
+                />
+              )}
+            </button>
+
+            {isPartnersOpen && !isCollapsed && (
+              <div className="mt-2 ml-4 space-y-1 border-l border-white/10 pl-4">
+                {sidebarItems.partners?.map((item, index) => {
+                  if (!item || !item.name) return null
+
+                  const iconMap = {
+                    customers: Users,
+                    customer_transactions: FileText,
+                    vendors: Warehouse,
+                    vendor_transactions: FileText,
+                  }
+
+                  const Icon = iconMap[item.name] || Settings
+
+                  return (
+                    <Link
+                      key={item.name || index}
+                      to={`/${item.name.replace(/_/g, '-')}`}
+                      className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                    >
+                      <Icon size={14} /> {item.label || item.name}
+                    </Link>
+                  )
+                })}
               </div>
             )}
           </div>

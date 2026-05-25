@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/dashboard/Dashboard'
 import Users from './pages/users/Users'
 import Vendors from './pages/vendors/Vendors'
+import VendorTransactions from './pages/vendors/VendorTransactions'
 import Access from './pages/access/Access'
 import Company from './pages/company/Company'
 import ChartsOfAccounts from './pages/charts/Charts'
@@ -19,6 +20,7 @@ import AgeingReceivables from './pages/aging_receivables/AgeingReceivables'
 import Purchase from './pages/purchase/Purchase'
 import Payments from './pages/payments/Payments'
 import Customer from './pages/customers/Customer'
+import CustomerTransactions from './pages/customers/CustomerTransactions'
 import Vat from './pages/vat/Vat'
 import WithholdingTax from './pages/withholding_tax/WithholdingTax'
 import Adjustments from './pages/adjustments/Adjustments'
@@ -152,6 +154,14 @@ function App() {
             }
           />
           <Route
+            path="customer-transactions"
+            element={
+              <ProtectedRoute routeName="customers">
+                <CustomerTransactions />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="access"
             element={
               <ProtectedRoute routeName="access">
@@ -172,6 +182,14 @@ function App() {
             element={
               <ProtectedRoute routeName="vat">
                 <Vat />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="vendor-transactions"
+            element={
+              <ProtectedRoute routeName="vendors">
+                <VendorTransactions />
               </ProtectedRoute>
             }
           />

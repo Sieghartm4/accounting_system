@@ -249,11 +249,25 @@ export const ROUTE_CONFIG = {
     label: 'Withholding Tax',
     icon: 'Receipt',
   },
+  customer_transactions: {
+    name: 'customer_transactions',
+    label: 'Customer Transactions',
+    icon: 'FileText',
+  },
+  vendor_transactions: {
+    name: 'vendor_transactions',
+    label: 'Vendor Transactions',
+    icon: 'FileText',
+  },
   receipts: { name: 'receipts', label: 'Receipts', icon: 'CreditCard' },
   disbursement: { name: 'disbursement', label: 'Disbursements', icon: 'DollarSign' },
   sales: { name: 'sales', label: 'Sales', icon: 'TrendingUp' },
   collections: { name: 'collections', label: 'Collections', icon: 'HandCoins' },
-  aging_receivables: { name: 'aging_receivables', label: 'Aging Receivables', icon: 'Clock3' },
+  aging_receivables: {
+    name: 'aging_receivables',
+    label: 'Aging Receivables',
+    icon: 'Clock3',
+  },
   purchase: { name: 'purchase', label: 'Purchase', icon: 'ShoppingCart' },
   payments: { name: 'payments', label: 'Payments', icon: 'PaymentCard' },
   adjustments: {
@@ -306,6 +320,7 @@ export const getSidebarItems = (user) => {
   const items = {
     main: [],
     masters: [],
+    partners: [],
     receipts: [],
     sales: [],
     purchase: [],
@@ -323,14 +338,19 @@ export const getSidebarItems = (user) => {
   const masterRoutes = [
     'access',
     'users',
-    'customers',
-    'vendors',
     'charts',
     'proforma_entries',
     'product_service',
     'company',
     'vat',
     'witholding_tax',
+  ]
+
+  const partnerRoutes = [
+    'customers',
+    'customer_transactions',
+    'vendors',
+    'vendor_transactions',
   ]
   masterRoutes.forEach((route) => {
     if (hasRouteAccess(route, user)) {
@@ -359,6 +379,20 @@ export const getSidebarItems = (user) => {
   purchaseRoutes.forEach((route) => {
     if (hasRouteAccess(route, user)) {
       items.purchase.push(ROUTE_CONFIG[route])
+    }
+  })
+
+  // Partner section for customers and vendors
+  partnerRoutes.forEach((route) => {
+    const hasAccess =
+      route === 'customer_transactions'
+        ? hasRouteAccess('customers', user)
+        : route === 'vendor_transactions'
+          ? hasRouteAccess('vendors', user)
+          : hasRouteAccess(route, user)
+
+    if (hasAccess) {
+      items.partners.push(ROUTE_CONFIG[route])
     }
   })
 
