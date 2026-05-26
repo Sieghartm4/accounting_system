@@ -41,7 +41,8 @@ module.exports = {
       'audit_trail',
       'aging_receivables',
       'customer_transactions',
-      'vendor_transactions'
+      'vendor_transactions',
+      'advances',
     ]
 
     const seedData = []

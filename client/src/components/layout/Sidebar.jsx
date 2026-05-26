@@ -29,6 +29,7 @@ import {
   BarChart3,
   Landmark,
   Clock3,
+  ArrowRight,
 } from 'lucide-react'
 
 import { getSidebarItems } from '../../utils/routeProtection'
@@ -726,7 +727,7 @@ export default function Sidebar({ isCollapsed }) {
 
                   const iconMap = {
                     adjustments: FileSpreadsheet,
-
+                    advances: ArrowRight,
                     bank_reconciliation: Landmark,
                   }
 

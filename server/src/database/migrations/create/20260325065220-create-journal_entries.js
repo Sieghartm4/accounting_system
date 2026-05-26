@@ -11,11 +11,11 @@ module.exports = {
       },
       je_db_name: {
         type: Sequelize.STRING(300),
-        allowNull: false,
+        allowNull: true,
       },
       je_db_id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        allowNull: true,
       },
       je_coa_id: {
         type: Sequelize.INTEGER,

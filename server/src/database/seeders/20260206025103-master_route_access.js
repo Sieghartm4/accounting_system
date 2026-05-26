@@ -15,7 +15,7 @@ module.exports = {
        const routes = [
       'dashboard', 'access', 'users', 'customers', 'vendors', 'charts',
       'proforma_entries', 'product_service', 'company', 'receipts',
-      'disbursement', 'sales', 'collections', 'purchase', 'payments', 'adjustments', 'vat', 'witholding_tax', 'trial_balance', 'income_statement', 'general_ledger', 'balance_sheet', 'journal_entries', 'statement_of_comprehensive_income', 'bank_reconciliation', 'audit_trail', 'aging_receivables', 'customer_transactions', 'vendor_transactions'
+      'disbursement', 'sales', 'collections', 'purchase', 'payments', 'adjustments', 'vat', 'witholding_tax', 'trial_balance', 'income_statement', 'general_ledger', 'balance_sheet', 'journal_entries', 'statement_of_comprehensive_income', 'bank_reconciliation', 'audit_trail', 'aging_receivables', 'customer_transactions', 'vendor_transactions', 'advances'
     ];
 
     const seedData = [];

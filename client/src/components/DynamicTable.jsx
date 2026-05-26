@@ -237,6 +237,15 @@ const DynamicTable = ({
       return <span className="text-red-600 font-black">{String(value)}</span>
     }
 
+    if (
+      routeName === 'advances' &&
+      header === 'amount' &&
+      value !== null &&
+      value !== undefined
+    ) {
+      return <span className="text-green-600 font-black">{String(value)}</span>
+    }
+
     return value !== null && value !== undefined && String(value).trim() !== '' ? (
       String(value)
     ) : (

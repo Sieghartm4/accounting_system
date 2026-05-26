@@ -7,6 +7,10 @@
  * @returns {boolean} - Whether user has access
  */
 export const hasRouteAccess = (routeName, user) => {
+  if (Array.isArray(routeName)) {
+    return routeName.some((name) => hasRouteAccess(name, user))
+  }
+
   if (!user || !user.route_access || !routeName || typeof routeName !== 'string') {
     return false
   }
@@ -302,6 +306,11 @@ export const ROUTE_CONFIG = {
     label: 'Bank Reconciliation',
     icon: 'Landmark',
   },
+  advances: {
+    name: 'advances',
+    label: 'Advances',
+    icon: 'ArrowRight',
+  },
   audit_trail: {
     name: 'audit_trail',
     label: 'Audit Trail',
@@ -397,9 +406,14 @@ export const getSidebarItems = (user) => {
   })
 
   // Adjustments section
-  const adjustmentRoutes = ['adjustments', 'bank_reconciliation']
+  const adjustmentRoutes = ['adjustments', 'bank_reconciliation', 'advances']
   adjustmentRoutes.forEach((route) => {
-    if (hasRouteAccess(route, user)) {
+    const hasAccess =
+      route === 'advances'
+        ? hasRouteAccess('adjustments', user) || hasRouteAccess('advances', user)
+        : hasRouteAccess(route, user)
+
+    if (hasAccess) {
       items.adjustments.push(ROUTE_CONFIG[route])
     }
   })

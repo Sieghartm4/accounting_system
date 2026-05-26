@@ -23,6 +23,7 @@ const getJournalEntries = async (req, res, next) => {
       .select([
         Accounting.journal_entries.selectOptionColumns.id,
         Accounting.journal_entries.selectOptionColumns.db_name,
+        Accounting.journal_entries.selectOptionColumns.db_id,
         `${Master.charts_of_accounts.selectOptionColumns.name} as coa_name`,
         Accounting.journal_entries.selectOptionColumns.responsibility_center,
         Accounting.journal_entries.selectOptionColumns.type,
@@ -58,6 +59,7 @@ const getJournalEntries = async (req, res, next) => {
     // Build manual SQL query
     let sqlQuery = `SELECT ${Accounting.journal_entries.selectOptionColumns.id}, 
                           ${Accounting.journal_entries.selectOptionColumns.db_name}, 
+                          ${Accounting.journal_entries.selectOptionColumns.db_id}, 
                           ${Master.charts_of_accounts.selectOptionColumns.name} as coa_name, 
                           ${Accounting.journal_entries.selectOptionColumns.responsibility_center}, 
                           ${Accounting.journal_entries.selectOptionColumns.type}, 
@@ -98,6 +100,66 @@ const getJournalEntries = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching journal entries',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const getAdvances = async (req, res, next) => {
+  try {
+    const { start_date, end_date } = req.query
+
+    const whereConditions = [
+      `(${Accounting.journal_entries.selectOptionColumns.db_name} IS NULL OR ${Accounting.journal_entries.selectOptionColumns.db_name} = '' OR ${Accounting.journal_entries.selectOptionColumns.db_id} IS NULL OR ${Accounting.journal_entries.selectOptionColumns.db_id} = '')`,
+    ]
+    const values = []
+
+    if (start_date) {
+      whereConditions.push(
+        `${Accounting.journal_entries.selectOptionColumns.date} >= ?`,
+      )
+      values.push(start_date)
+    }
+    if (end_date) {
+      whereConditions.push(
+        `${Accounting.journal_entries.selectOptionColumns.date} <= ?`,
+      )
+      values.push(end_date)
+    }
+
+    const sqlQuery = `SELECT ${Accounting.journal_entries.selectOptionColumns.id}, 
+                          ${Master.charts_of_accounts.selectOptionColumns.name} as coa_name, 
+                          ${Accounting.journal_entries.selectOptionColumns.responsibility_center}, 
+                          ${Accounting.journal_entries.selectOptionColumns.type}, 
+                          ${Accounting.journal_entries.selectOptionColumns.amount}, 
+                          ${Accounting.journal_entries.selectOptionColumns.date} 
+                   FROM ${Accounting.journal_entries.tablename} 
+                   INNER JOIN ${Master.charts_of_accounts.tablename} ON ${Master.charts_of_accounts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.coa_id} 
+                   WHERE ${whereConditions.join(' AND ')} 
+                   ORDER BY ${Accounting.journal_entries.selectOptionColumns.date} DESC`
+
+    const advances = await Query(sqlQuery, values, [
+      Accounting.journal_entries.prefix_,
+      Master.charts_of_accounts.prefix_,
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Advances retrieved successfully',
+      data: advances,
+      count: advances.length,
+      startDate: start_date,
+      endDate: end_date,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching advances:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching advances',
       error:
         process.env.NODE_ENV === 'development'
           ? error.message
@@ -227,5 +289,6 @@ const getJournalEntriesByCoaId = async (req, res, next) => {
 
 module.exports = {
   getJournalEntries,
+  getAdvances,
   getJournalEntriesByCoaId,
 }

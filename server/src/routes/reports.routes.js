@@ -8,7 +8,10 @@ const {
   getStatementOfComprehensiveIncome,
   getBankReconciliation,
 } = require('../controller/reports.controller')
-const { getJournalEntries } = require('../controller/journal_entries.controller')
+const {
+  getJournalEntries,
+  getAdvances,
+} = require('../controller/journal_entries.controller')
 
 const reportsRouter = express.Router()
 
@@ -26,6 +29,7 @@ reportsRouter.get(
 )
 
 reportsRouter.get('/journal-entries', getJournalEntries)
+reportsRouter.get('/advances', getAdvances)
 
 reportsRouter.get('/bank-reconciliation', getBankReconciliation)
 
