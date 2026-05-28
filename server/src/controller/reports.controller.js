@@ -212,7 +212,7 @@ const getGeneralLedger = async (req, res, next) => {
         `${Accounting.journal_entries.selectOptionColumns.date} <= '${endDate}'`,
       )
 
-    // Query to get all journal entries grouped by COA
+    // Query to get all journal entries in chronological order
     const general_ledger_query = `
       SELECT
         ${Master.charts_of_accounts.selectOptionColumns.id}                  AS coa_id,
@@ -231,66 +231,48 @@ const getGeneralLedger = async (req, res, next) => {
       WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
       ${whereConditions.length > 0 ? `AND ${whereConditions.join(' AND ')}` : ''}
       ORDER BY
-        ${Master.charts_of_accounts.selectOptionColumns.code},
+        ${Accounting.journal_entries.selectOptionColumns.db_name},
+        ${Accounting.journal_entries.selectOptionColumns.db_id},
         ${Accounting.journal_entries.selectOptionColumns.date},
         ${Accounting.journal_entries.selectOptionColumns.db_id}
     `
 
     const rows = await Query(general_ledger_query)
 
-    // Group by COA
-    const accountsMap = {}
+    // Build chronological ledger entries grouped by source (db_name + db_id)
+    let runningBalance = 0
+    const ledgerEntries = []
+    let prevSourceKey = null
+
     for (const row of rows) {
-      const coaKey = `${row.account_code}-${row.account_name}`
-      if (!accountsMap[coaKey]) {
-        accountsMap[coaKey] = {
-          coa_id: row.coa_id,
-          account_code: row.account_code,
-          account_name: row.account_name,
-          account_type: row.account_type,
-          entries: [],
-        }
+      const amount = parseFloat(row.amount || 0)
+
+      // Update running balance
+      if (row.entry_type === 'DEBIT') {
+        runningBalance += amount
+      } else {
+        runningBalance -= amount
       }
-      accountsMap[coaKey].entries.push({
-        posted_date: row.posted_date,
-        entry_type: row.entry_type,
-        amount: parseFloat(row.amount || 0),
+
+      const sourceKey = `${row.db_name || ''}::${row.db_id || ''}`
+
+      ledgerEntries.push({
+        // show the date only on the first line of each source group
+        date: prevSourceKey === sourceKey ? '' : row.posted_date,
+        particulars: `${row.account_code} - ${row.account_name}`,
+        account_code: row.account_code,
+        account_name: row.account_name,
+        account_type: row.account_type,
+        debit: row.entry_type === 'DEBIT' ? amount : 0,
+        credit: row.entry_type === 'CREDIT' ? amount : 0,
+        balance: runningBalance,
+        source: row.db_name,
+        source_id: row.db_id,
         responsibility_center: row.responsibility_center || '',
-        db_name: row.db_name,
-        db_id: row.db_id,
       })
+
+      prevSourceKey = sourceKey
     }
-
-    // Calculate running balances for each account
-    const accounts = Object.values(accountsMap).map((account) => {
-      let balance = 0
-      const accountTypeNormalBalance =
-        account.account_type === 'ASSETS' || account.account_type === 'EXPENSES'
-          ? 'DEBIT'
-          : 'CREDIT'
-
-      const entriesWithBalance = account.entries.map((entry) => {
-        if (entry.entry_type === 'DEBIT') {
-          balance +=
-            accountTypeNormalBalance === 'DEBIT' ? entry.amount : -entry.amount
-        } else {
-          balance +=
-            accountTypeNormalBalance === 'CREDIT' ? entry.amount : -entry.amount
-        }
-
-        return {
-          ...entry,
-          balance: balance,
-        }
-      })
-
-      return {
-        ...account,
-        entries: entriesWithBalance,
-        openingBalance: 0,
-        closingBalance: balance,
-      }
-    })
 
     // Calculate grand totals
     const grandTotalDebit = rows.reduce(
@@ -305,12 +287,10 @@ const getGeneralLedger = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'General Ledger retrieved successfully',
-      data: {
-        accounts,
-        grandTotalDebit,
-        grandTotalCredit,
-        netTotal: grandTotalDebit - grandTotalCredit,
-      },
+      data: ledgerEntries,
+      grandTotalDebit,
+      grandTotalCredit,
+      netTotal: grandTotalDebit - grandTotalCredit,
       startDate,
       endDate,
       timestamp: new Date().toISOString(),
