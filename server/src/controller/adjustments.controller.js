@@ -333,12 +333,36 @@ const createAdjustment = async (req, res, next) => {
       }
 
       if (journal_entries && journal_entries.length > 0) {
-        const accountLookup = await resolveChartOfAccountIds(
-          connection,
-          journal_entries,
+        const entriesNeedingLookup = journal_entries.filter(
+          (entry) =>
+            !entry.id &&
+            normalizeAccountKey(entry.account_id) !== null &&
+            !isNumericAccountKey(entry.account_id),
         )
+        const accountLookup =
+          entriesNeedingLookup.length > 0
+            ? await resolveChartOfAccountIds(connection, entriesNeedingLookup)
+            : {}
 
         for (const entry of journal_entries) {
+          if (entry.id) {
+            const updateQuery = sql
+              .update(Accounting.journal_entries.tablename)
+              .set([
+                Accounting.journal_entries.selectOptionColumns.db_name,
+                Accounting.journal_entries.selectOptionColumns.db_id,
+              ])
+              .where(Accounting.journal_entries.selectOptionColumns.id)
+              .build()
+
+            await connection.execute(updateQuery, [
+              'adjustments',
+              adjustmentId,
+              entry.id,
+            ])
+            continue
+          }
+
           const entryQuery = sql
             .insert(Accounting.journal_entries.tablename, {
               columns: Accounting.journal_entries.insertColumns,

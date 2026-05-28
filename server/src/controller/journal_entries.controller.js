@@ -12,6 +12,9 @@ const {
 } = require('../util/helper.util')
 const { Accounting } = require('../database/model/Accounting')
 const { Master } = require('../database/model/Master')
+const { getTenantPool } = require('../database/util/tenantConnection.util')
+
+const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
 
@@ -287,8 +290,106 @@ const getJournalEntriesByCoaId = async (req, res, next) => {
   }
 }
 
+const createJournalEntries = async (req, res, next) => {
+  let connection
+  try {
+    // normalize payload: accept array body, { entries: [...] } or single object
+    let payload = []
+    if (Array.isArray(req.body)) payload = req.body
+    else if (req.body && Array.isArray(req.body.entries)) payload = req.body.entries
+    else if (req.body && req.body.entries) payload = [req.body.entries]
+    else if (req.body && Object.keys(req.body).length > 0) payload = [req.body]
+
+    console.log('Received payload for creating journal entries:', req.body)
+    if (!payload || payload.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No journal entry data provided',
+      })
+    }
+
+    connection = await getTenantPool().getConnection()
+    await connection.beginTransaction()
+
+    const results = []
+
+    for (const entry of payload) {
+      let coaId = parseInt(entry.coa_id)
+      if (!Number.isInteger(coaId)) {
+        const [coaRows] = await connection.execute(
+          `SELECT ${Master.charts_of_accounts.selectOptionColumns.id} AS id FROM ${Master.charts_of_accounts.tablename}
+           WHERE ${Master.charts_of_accounts.selectOptionColumns.name} = ?
+           OR ${Master.charts_of_accounts.selectOptionColumns.code} = ?
+           LIMIT 1`,
+          [entry.coa_id, entry.coa_id],
+        )
+
+        if (coaRows.length > 0) {
+          coaId = coaRows[0].id
+        } else {
+          await connection.rollback()
+          return res.status(400).json({
+            success: false,
+            message: `Unable to resolve coa_id from charts of accounts: ${entry.coa_id}`,
+          })
+        }
+      }
+
+      const mainQuery = sql
+        .insert(Accounting.journal_entries.tablename, {
+          columns: Accounting.journal_entries.insertColumns,
+          prefix: Accounting.journal_entries.prefix,
+          isTransaction: true,
+        })
+        .build()
+
+      const mainValues = [
+        entry.db_name || null,
+        parseInt(entry.db_id) || null,
+        coaId || null,
+        entry.responsibility_center || null,
+        entry.type || null,
+        entry.amount != null ? parseFloat(entry.amount) : 0,
+        entry.date || new Date().toISOString().split('T')[0],
+      ]
+
+      const [mainResult] = await connection.execute(mainQuery, mainValues)
+      results.push({ id: mainResult.insertId || null, values: mainValues })
+    }
+
+    await connection.commit()
+    return res.status(201).json({
+      success: true,
+      message: 'Journal entries created successfully',
+      count: results.length,
+      data: results,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error creating journal entries:', error)
+    if (connection) {
+      try {
+        await connection.rollback()
+      } catch (rbErr) {
+        console.error('Rollback error:', rbErr)
+      }
+    }
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while creating journal entries',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  } finally {
+    if (connection) connection.release()
+  }
+}
+
 module.exports = {
   getJournalEntries,
   getAdvances,
   getJournalEntriesByCoaId,
+  createJournalEntries,
 }

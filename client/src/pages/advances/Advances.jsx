@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
@@ -31,6 +32,7 @@ const formatDate = (value) => {
 function AdvancesContent() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const navigate = useNavigate()
   const { advances, loading, error, refreshAdvances } = useAdvances(
     startDate,
     endDate,
@@ -48,15 +50,22 @@ function AdvancesContent() {
 
   const tableData = advances.map((entry) => ({
     ...entry,
+    amount_raw: entry.amount,
     amount: `₱${fmt(entry.amount)}`,
     date: formatDate(entry.date),
   }))
 
   const handleCreateAdjustment = (selectedRows) => {
-    const ids = selectedRows.map((row) => row.id).join(', ')
-    window.alert(
-      `Create Adjustment for ${selectedRows.length} selected advance(s): ${ids}`,
-    )
+    const selectedAdvanceJournalEntries = selectedRows.map((row) => ({
+      ...row,
+      amount: row.amount_raw ?? row.amount,
+    }))
+
+    navigate('/adjustments', {
+      state: {
+        selectedAdvanceJournalEntries,
+      },
+    })
   }
 
   if (loading && advances.length === 0) {

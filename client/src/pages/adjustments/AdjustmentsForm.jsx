@@ -223,6 +223,7 @@ export default function AdjustmentsForm({
   isViewMode = false,
   isEditMode = false,
   adjustmentData = null,
+  initialJournalEntries = [],
 }) {
   const [journalEntries, setJournalEntries] = useState([])
 
@@ -376,9 +377,72 @@ export default function AdjustmentsForm({
   const parseNumeric = (value) => {
     const cleaned = String(value || '')
       .replace(/,/g, '')
+      .replace(/[₱\$]/g, '')
       .trim()
     return cleaned === '' || Number.isNaN(Number(cleaned)) ? null : Number(cleaned)
   }
+
+  const mapInitialJournalEntry = (entry) => {
+    const normalizedAmount =
+      entry.amount_raw ?? entry.amount ?? entry.debit ?? entry.credit ?? ''
+    const amount = parseNumeric(normalizedAmount)
+    const type = String(entry.type || '')
+      .trim()
+      .toUpperCase()
+    const isDebit = type === 'DEBIT'
+    const isCredit = type === 'CREDIT'
+
+    return {
+      id: entry.id ?? Date.now() + Math.random(),
+      account: entry.coa_id ?? entry.account ?? entry.account_id ?? '',
+      accountSearch:
+        entry.account_name || entry.coa_name || entry.account || entry.name || '',
+      center: entry.responsibility_center ?? entry.center ?? '',
+      debit: isDebit ? amount || 0 : 0,
+      credit: isCredit ? amount || 0 : 0,
+      isManual: true,
+    }
+  }
+
+  useEffect(() => {
+    if (
+      !isViewMode &&
+      !isEditMode &&
+      Array.isArray(initialJournalEntries) &&
+      initialJournalEntries.length > 0
+    ) {
+      const mapped = initialJournalEntries.map(mapInitialJournalEntry)
+
+      // Add a balancing credit entry for Advances when entries come from Advances
+      const balancingLabel = 'Advances to Officers and Employees'
+      const totalDebit = mapped.reduce(
+        (s, e) => s + (isNaN(parseFloat(e.debit)) ? 0 : parseFloat(e.debit)),
+        0,
+      )
+
+      const hasBalancing = mapped.some(
+        (e) =>
+          String(e.accountSearch || '')
+            .trim()
+            .toLowerCase() === balancingLabel.toLowerCase(),
+      )
+
+      if (totalDebit > 0 && !hasBalancing) {
+        const balancingEntry = {
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          account: '',
+          accountSearch: balancingLabel,
+          center: '',
+          debit: 0,
+          credit: totalDebit,
+          isManual: false,
+        }
+        mapped.push(balancingEntry)
+      }
+
+      setJournalEntries(mapped)
+    }
+  }, [initialJournalEntries, isEditMode, isViewMode])
 
   const findCoaIdByLabel = (label) => {
     if (!label) return ''
@@ -556,6 +620,7 @@ export default function AdjustmentsForm({
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
 
       const preparedJournalEntries = journalEntries.map((entry) => ({
+        id: entry.id,
         account_id: entry.account || '',
         responsibility_center: entry.center || '',
         debit: parseFloat(entry.debit) || 0,

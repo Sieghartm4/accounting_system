@@ -1,40 +1,59 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Plus, Eye, Edit, Trash2, FileText, Download, CheckCircle, XCircle, Clock, AlertCircle, Layers, ShieldCheck, Wallet, ArrowRight } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import DynamicToast from '../../components/DynamicToast';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import useAdjustments from './useAdjustments';
-import AdjustmentsForm from './AdjustmentsForm';
-import { getAccessLevel } from '../../utils/routeProtection';
+import React, { useEffect, useMemo, useState } from 'react'
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import {
+  ArrowLeft,
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
+  FileText,
+  Download,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertCircle,
+  Layers,
+  ShieldCheck,
+  Wallet,
+  ArrowRight,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import DynamicToast from '../../components/DynamicToast'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import useAdjustments from './useAdjustments'
+import AdjustmentsForm from './AdjustmentsForm'
+import { getAccessLevel } from '../../utils/routeProtection'
 
 export default function Adjustments() {
   return (
     <RouteProtection routeName="adjustments">
       <AdjustmentsContent />
     </RouteProtection>
-  );
+  )
 }
 
 function AdjustmentsContent() {
-  const { adjustments, loading, error, refetchAdjustments } = useAdjustments();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [isAdding, setIsAdding] = useState(false);
-  const [isViewing, setIsViewing] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [viewingAdjustment, setViewingAdjustment] = useState(null);
-  const [toast, setToast] = useState(null);
+  const { adjustments, loading, error, refetchAdjustments } = useAdjustments()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [isAdding, setIsAdding] = useState(false)
+  const [isViewing, setIsViewing] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [viewingAdjustment, setViewingAdjustment] = useState(null)
+  const [initialJournalEntries, setInitialJournalEntries] = useState([])
+  const [toast, setToast] = useState(null)
 
   useEffect(() => {
-    const id = searchParams.get('id');
-    if (!id) return;
+    const id = searchParams.get('id')
+    if (!id) return
 
     const fetchAdjustment = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('No authentication token found');
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
           `${import.meta.env.VITE_SERVER_LINK}/adjustments/${Number(id)}`,
@@ -44,154 +63,199 @@ function AdjustmentsContent() {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-          }
-        );
+          },
+        )
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Failed to fetch adjustment details');
+        const result = await response.json()
+        if (!response.ok)
+          throw new Error(result.message || 'Failed to fetch adjustment details')
 
-        setViewingAdjustment(result);
-        setIsViewing(true);
-        setSearchParams(prev => {
-          const next = new URLSearchParams(prev);
-          next.delete('id');
-          return next;
-        }, { replace: true });
+        setViewingAdjustment(result)
+        setIsViewing(true)
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('id')
+            return next
+          },
+          { replace: true },
+        )
       } catch (err) {
-        setToast({ type: 'error', message: err.message || 'Failed to fetch adjustment details' });
+        setToast({
+          type: 'error',
+          message: err.message || 'Failed to fetch adjustment details',
+        })
       }
-    };
+    }
 
-    fetchAdjustment();
-  }, [searchParams, setSearchParams]);
+    fetchAdjustment()
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    const selectedAdvanceJournalEntries =
+      location.state?.selectedAdvanceJournalEntries || []
+
+    if (selectedAdvanceJournalEntries.length > 0) {
+      setInitialJournalEntries(selectedAdvanceJournalEntries)
+      setIsAdding(true)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state, navigate, location.pathname])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const accessLevel = getAccessLevel('adjustments', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const accessLevel = getAccessLevel('adjustments', user)
+  const enableCheckboxes =
+    accessLevel === 'Check Access' ||
+    accessLevel === 'Approve Access' ||
+    accessLevel === 'Edit Access' ||
+    accessLevel === 'Full Access'
 
   // Determine checkbox condition based on access level
   const checkboxCondition = enableCheckboxes
-    ? accessLevel === 'Full Access' 
+    ? accessLevel === 'Full Access'
       ? { column: 'status', value: 'APPROVED', exclude: true } // Exclude APPROVED state for Full Access
-      : { column: 'status', value: accessLevel === 'Check Access' ? 'PREPARED' : accessLevel === 'Approve Access' ? 'CHECKED' : 'CHECKED' }
-    : null;
+      : {
+          column: 'status',
+          value:
+            accessLevel === 'Check Access'
+              ? 'PREPARED'
+              : accessLevel === 'Approve Access'
+                ? 'CHECKED'
+                : 'CHECKED',
+        }
+    : null
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
 
   const actionButtons = [
     {
       label: 'View',
       icon: Eye,
       onClick: (adjustment) => {
-        setViewingAdjustment(adjustment);
-        setIsViewing(true);
-      }
+        setViewingAdjustment(adjustment)
+        setIsViewing(true)
+      },
     },
     {
       label: 'Edit',
       icon: Edit,
       onClick: (adjustment) => {
-        setViewingAdjustment(adjustment);
-        setIsAdding(true);
-      }
+        setViewingAdjustment(adjustment)
+        setIsAdding(true)
+      },
     },
     {
       label: 'Delete',
       icon: Trash2,
       onClick: (adjustment) => {
         // Handle delete
-        setToast({ type: 'warning', message: 'Delete functionality not implemented yet' });
-      }
-    }
-  ];
+        setToast({
+          type: 'warning',
+          message: 'Delete functionality not implemented yet',
+        })
+      },
+    },
+  ]
 
   const badgeColumns = [
     {
       column: 'status',
       values: {
-        'PREPARED': 'gray',
-        'CHECKED': 'blue',
-        'APPROVED': 'green',
-        'REJECTED': 'red',
-        'CANCELLED': 'orange'
-      }
-    }
-  ];
+        PREPARED: 'gray',
+        CHECKED: 'blue',
+        APPROVED: 'green',
+        REJECTED: 'red',
+        CANCELLED: 'orange',
+      },
+    },
+  ]
 
   const checkboxActions = [
     {
       label: 'Approve',
       icon: CheckCircle,
       onClick: async (selectedIds) => {
-        setToast({ type: 'success', message: `${selectedIds.length} adjustment(s) approved` });
-        refetchAdjustments();
+        setToast({
+          type: 'success',
+          message: `${selectedIds.length} adjustment(s) approved`,
+        })
+        refetchAdjustments()
       },
       color: 'text-green-600 hover:bg-green-50',
-      condition: accessLevel === 'Full Access'
+      condition: accessLevel === 'Full Access',
     },
     {
       label: 'Reject',
       icon: XCircle,
       onClick: async (selectedIds) => {
-        setToast({ type: 'warning', message: `${selectedIds.length} adjustment(s) rejected` });
-        refetchAdjustments();
+        setToast({
+          type: 'warning',
+          message: `${selectedIds.length} adjustment(s) rejected`,
+        })
+        refetchAdjustments()
       },
       color: 'text-red-600 hover:bg-red-50',
-      condition: accessLevel === 'Full Access'
-    }
-  ];
+      condition: accessLevel === 'Full Access',
+    },
+  ]
 
   const handleBack = () => {
-    setIsAdding(false);
-    setIsViewing(false);
-    setIsEditing(false);
-    setViewingAdjustment(null);
-  };
+    setIsAdding(false)
+    setIsViewing(false)
+    setIsEditing(false)
+    setViewingAdjustment(null)
+    setInitialJournalEntries([])
+  }
 
   const handleSuccess = (toastMessage) => {
-    setToast(toastMessage);
-    handleBack();
-    refetchAdjustments();
-  };
+    setToast(toastMessage)
+    handleBack()
+    refetchAdjustments()
+  }
 
-  if (isAdding) return (
-    <RouteProtection routeName="adjustments">
-      <AdjustmentsForm
-        isEditMode={isEditing}
-        adjustmentData={isEditing ? viewingAdjustment : null}
-        onBack={() => setIsAdding(false)}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchAdjustments();
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isAdding)
+    return (
+      <RouteProtection routeName="adjustments">
+        <AdjustmentsForm
+          isEditMode={isEditing}
+          adjustmentData={isEditing ? viewingAdjustment : null}
+          initialJournalEntries={initialJournalEntries}
+          onBack={handleBack}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchAdjustments()
+          }}
+        />
+      </RouteProtection>
+    )
 
-  if (isViewing) return (
-    <RouteProtection routeName="adjustments">
-      <AdjustmentsForm
-        isViewMode={true}
-        adjustmentData={viewingAdjustment}
-        onBack={() => {
-          setIsViewing(false);
-          setViewingAdjustment(null);
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isViewing)
+    return (
+      <RouteProtection routeName="adjustments">
+        <AdjustmentsForm
+          isViewMode={true}
+          adjustmentData={viewingAdjustment}
+          onBack={() => {
+            setIsViewing(false)
+            setViewingAdjustment(null)
+          }}
+        />
+      </RouteProtection>
+    )
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Retrieving Adjustments...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Retrieving Adjustments...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -202,12 +266,11 @@ function AdjustmentsContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-
       {toast && (
         <DynamicToast
           type={toast.type}
@@ -241,7 +304,10 @@ function AdjustmentsContent() {
               EXPORT LEDGER
             </button>
             <ProtectedAction routeName="adjustments">
-              <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button
+                onClick={() => setIsAdding(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
                 <CheckCircle size={14} />
                 New Adjustment
               </button>
@@ -292,155 +358,163 @@ function AdjustmentsContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  console.log('Viewing adjustment:', row);
-                  
-                  const token = localStorage.getItem('token');
+                  console.log('Viewing adjustment:', row)
+
+                  const token = localStorage.getItem('token')
                   if (!token) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/adjustments/${row.id}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
-                      }
-                    }
-                  );
+                      },
+                    },
+                  )
 
-                  const result = await response.json();
+                  const result = await response.json()
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch adjustment details');
+                    throw new Error(
+                      result.message || 'Failed to fetch adjustment details',
+                    )
                   }
 
-                  console.log('Adjustment details fetched:', result);
-                  setViewingAdjustment(result);
-                  setIsViewing(true);
-
+                  console.log('Adjustment details fetched:', result)
+                  setViewingAdjustment(result)
+                  setIsViewing(true)
                 } catch (error) {
-                  console.error('Error fetching adjustment details:', error);
+                  console.error('Error fetching adjustment details:', error)
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch adjustment details'
-                  });
+                    message: error.message || 'Failed to fetch adjustment details',
+                  })
                 }
-              }
+              },
             },
             {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  console.log('Editing adjustment:', row);
-                  
-                  const token = localStorage.getItem('token');
+                  console.log('Editing adjustment:', row)
+
+                  const token = localStorage.getItem('token')
                   if (!token) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/adjustments/${row.id}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
-                      }
-                    }
-                  );
+                      },
+                    },
+                  )
 
-                  const result = await response.json();
+                  const result = await response.json()
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch adjustment details');
+                    throw new Error(
+                      result.message || 'Failed to fetch adjustment details',
+                    )
                   }
 
-                  console.log('Adjustment details fetched for editing:', result);
-                  setViewingAdjustment(result);
-                  setIsEditing(true);
-                  setIsAdding(true);
-
+                  console.log('Adjustment details fetched for editing:', result)
+                  setViewingAdjustment(result)
+                  setIsEditing(true)
+                  setIsAdding(true)
                 } catch (error) {
-                  console.error('Error fetching adjustment details for editing:', error);
+                  console.error(
+                    'Error fetching adjustment details for editing:',
+                    error,
+                  )
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch adjustment details'
-                  });
+                    message: error.message || 'Failed to fetch adjustment details',
+                  })
                 }
-              }
-            }
+              },
+            },
           ]}
           badgeColumns={[
             {
               column: 'status',
               values: {
-                'PREPARED': 'orange',
-                'CHECKED': 'blue',
-                'APPROVED': 'green',
-                'REJECTED': 'red',
-                'CANCELLED': 'orange'
-              }
-            }
+                PREPARED: 'orange',
+                CHECKED: 'blue',
+                APPROVED: 'green',
+                REJECTED: 'red',
+                CANCELLED: 'orange',
+              },
+            },
           ]}
           checkboxActions={[
             {
               label: 'Approve Selected',
               onClick: async (selectedRows) => {
                 try {
-                  console.log('Approving adjustments:', selectedRows);
+                  console.log('Approving adjustments:', selectedRows)
 
-                  const token = localStorage.getItem('token');
+                  const token = localStorage.getItem('token')
                   if (!token) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
-                  const updates = selectedRows.map(row => ({
+                  const updates = selectedRows.map((row) => ({
                     id: row.id,
-                    currentState: row.status
-                  }));
+                    currentState: row.status,
+                  }))
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/adjustments/adjustment-state`,
                     {
-                      method: "PUT",
+                      method: 'PUT',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                       },
-                      body: JSON.stringify({ updates })
-                    }
-                  );
+                      body: JSON.stringify({ updates }),
+                    },
+                  )
 
-                  const result = await response.json();
+                  const result = await response.json()
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to approve adjustments');
+                    throw new Error(
+                      result.message || 'Failed to approve adjustments',
+                    )
                   }
 
                   // Refresh adjustments data
-                  await refetchAdjustments();
+                  await refetchAdjustments()
 
                   setToast({
                     type: 'success',
-                    message: result.message || `${selectedRows.length} adjustment(s) approved successfully`
-                  });
-
+                    message:
+                      result.message ||
+                      `${selectedRows.length} adjustment(s) approved successfully`,
+                  })
                 } catch (error) {
-                  console.error('Error approving adjustments:', error);
+                  console.error('Error approving adjustments:', error)
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to approve adjustments'
-                  });
+                    message: error.message || 'Failed to approve adjustments',
+                  })
                 }
-              }
-            }
+              },
+            },
           ]}
         />
       </motion.div>
     </div>
-  );
+  )
 }
 
 // Reusable SummaryCard (Same as used in other pages)
@@ -449,12 +523,16 @@ function SummaryCard({ icon, label, value, subText }) {
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }
