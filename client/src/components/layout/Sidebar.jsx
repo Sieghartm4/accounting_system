@@ -662,7 +662,7 @@ export default function Sidebar({ isCollapsed }) {
 
                   const iconMap = {
                     purchase: ShoppingCart,
-
+                    purchase_order: Package,
                     payments: PaymentCard,
                   }
 
@@ -678,6 +678,12 @@ export default function Sidebar({ isCollapsed }) {
                     </Link>
                   )
                 })}
+                <Link
+                  to="/purchase_order"
+                  className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/purchase_order' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                >
+                  <Package size={14} /> Purchase Orders
+                </Link>
               </div>
             )}
           </div>

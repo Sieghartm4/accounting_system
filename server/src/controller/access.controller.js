@@ -113,7 +113,8 @@ const createAccess = async (req, res, next) => {
       'aging_receivables',
       'customer_transactions',
       'vendor_transactions',
-      'advances'
+      'advances',
+      'purchase_order'
     ]
 
     let routeQueries = []

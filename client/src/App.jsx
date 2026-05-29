@@ -18,6 +18,7 @@ import Sales from './pages/sales/Sales'
 import Collections from './pages/collections/Collections'
 import AgeingReceivables from './pages/aging_receivables/AgeingReceivables'
 import Purchase from './pages/purchase/Purchase'
+import PurchaseOrder from './pages/purchase_order/PurchaseOrder'
 import Payments from './pages/payments/Payments'
 import Customer from './pages/customers/Customer'
 import CustomerTransactions from './pages/customers/CustomerTransactions'
@@ -135,6 +136,14 @@ function App() {
             element={
               <ProtectedRoute routeName="purchase">
                 <Purchase />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="purchase_order"
+            element={
+              <ProtectedRoute routeName="purchase_order">
+                <PurchaseOrder />
               </ProtectedRoute>
             }
           />

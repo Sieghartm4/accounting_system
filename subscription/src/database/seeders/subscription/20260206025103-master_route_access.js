@@ -43,6 +43,7 @@ module.exports = {
       'customer_transactions',
       'vendor_transactions',
       'advances',
+      'purchase_order',
     ]
 
     const seedData = []

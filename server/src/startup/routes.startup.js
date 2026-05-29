@@ -22,6 +22,8 @@ const { collectionRouter } = require('../routes/collection.routes')
 
 const { purchaseRouter } = require('../routes/purchase.routes')
 
+const { purchaseOrderRouter } = require('../routes/purchase_order.routes')
+
 const { paymentRouter } = require('../routes/payments.routes')
 
 const { journalEntriesRouter } = require('../routes/journal_entries.routes')
@@ -74,6 +76,8 @@ const initRoutes = (app) => {
   app.use('/collections', collectionRouter)
 
   app.use('/purchase', purchaseRouter)
+
+  app.use('/purchase_order', purchaseOrderRouter)
 
   app.use('/payments', paymentRouter)
 
