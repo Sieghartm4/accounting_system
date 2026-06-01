@@ -305,6 +305,7 @@ const createJournalEntries = async (req, res, next) => {
 
     console.log('Received payload for creating journal entries:', req.body)
     if (!payload || payload.length === 0) {
+      console.log('No journal entry data provided')
       return res.status(400).json({
         success: false,
         message: 'No journal entry data provided',
@@ -331,6 +332,7 @@ const createJournalEntries = async (req, res, next) => {
           coaId = coaRows[0].id
         } else {
           await connection.rollback()
+          console.log(`Unable to resolve coa_id from charts of accounts: ${entry.coa_id}`)
           return res.status(400).json({
             success: false,
             message: `Unable to resolve coa_id from charts of accounts: ${entry.coa_id}`,
