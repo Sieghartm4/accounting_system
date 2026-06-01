@@ -13,6 +13,7 @@ const DynamicTable = ({
   onAddClick = null,
   optionColumns = new Set(),
   onOptionChange = null,
+  hiddenColumns = new Set(),
   // --- OPTION SELECT PROPS ---
   selectOptions = [], // array of { value, label } for select dropdowns
   // --- CHECKBOX PROPS ---
@@ -264,8 +265,11 @@ const DynamicTable = ({
   }, [])
 
   const headers = useMemo(
-    () => (Array.isArray(data) && data.length > 0 ? Object.keys(data[0]) : []),
-    [data],
+    () =>
+      Array.isArray(data) && data.length > 0
+        ? Object.keys(data[0]).filter((header) => !hiddenColumns.has(header))
+        : [],
+    [data, hiddenColumns],
   )
 
   useEffect(() => {

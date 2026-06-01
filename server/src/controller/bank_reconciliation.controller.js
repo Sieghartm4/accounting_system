@@ -79,7 +79,6 @@ const getBankReconciliations = async (req, res, next) => {
         ) AS book_balance
 
       FROM ${Accounting.journal_entries.tablename}
-
       GROUP BY je_coa_id
 
     ) je_summary`

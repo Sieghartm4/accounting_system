@@ -367,27 +367,29 @@ class SQLQueryBuilder {
   _formatCondition(cond, isNot = false) {
     // Handle object conditions (from whereIn, whereNot, etc.)
     if (typeof cond === 'object' && cond !== null) {
-      const { column, values, operator, type, subquery } = cond;
-      
+      const { column, values, operator, type, subquery } = cond
+
       // Handle NOT EXISTS subqueries
       if (type === 'NOT EXISTS') {
-        return `NOT EXISTS (${subquery})`;
+        return `NOT EXISTS (${subquery})`
       }
-      
+
       if (operator === 'IN') {
-        const placeholders = values.map(() => '?').join(', ');
-        return `${column} IN (${placeholders})`;
+        const placeholders = values.map(() => '?').join(', ')
+        return `${column} IN (${placeholders})`
       }
-      
+
       // Handle other operators for objects
-      const operators = ['=', '!=', '<>', '<', '>', ' LIKE ', ' IS '];
-      const op = operator || (isNot ? '!=' : '=');
-      return `${column} ${op} ?`;
+      const operators = ['=', '!=', '<>', '<', '>', ' LIKE ', ' IS ']
+      const op = operator || (isNot ? '!=' : '=')
+      return `${column} ${op} ?`
     }
-    
+
     // Handle string conditions (legacy)
     const operators = ['=', '!=', '<>', '<', '>', ' LIKE ', ' IN ', ' IS ']
-    const hasOperator = operators.some((op) => cond && cond.includes && cond.includes(op))
+    const hasOperator = operators.some(
+      (op) => cond && cond.includes && cond.includes(op),
+    )
 
     if (hasOperator) return cond
 

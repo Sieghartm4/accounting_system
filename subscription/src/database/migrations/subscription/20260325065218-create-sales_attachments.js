@@ -27,7 +27,7 @@ module.exports = {
       },
       sa_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: true
       },
       sa_uploaded_by: {
         type: Sequelize.STRING(300),

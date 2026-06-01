@@ -24,24 +24,67 @@ const getTrialBalance = async (req, res, next) => {
   try {
     const { start_date, end_date } = req.query
 
-    let dateFilter = ''
-    if (start_date || end_date) {
-      const conditions = []
-      if (start_date)
-        conditions.push(
-          `${Accounting.journal_entries.selectOptionColumns.date} >= '${start_date}'`,
-        )
-      if (end_date)
-        conditions.push(
-          `${Accounting.journal_entries.selectOptionColumns.date} <= '${end_date}'`,
-        )
-      dateFilter = ` AND ${conditions.join(' AND ')}`
+    const queryParams = ['ACTIVE']
+
+    const trial_balance_query = sql
+      .select([
+        {
+          col: Master.charts_of_accounts.selectOptionColumns.code,
+          as: "'Account Code'",
+        },
+        {
+          col: Master.charts_of_accounts.selectOptionColumns.name,
+          as: "'Account Name'",
+        },
+        {
+          col: `SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)`,
+          as: 'DEBIT',
+        },
+        {
+          col: `SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)`,
+          as: 'CREDIT',
+        },
+      ])
+      .from(Master.charts_of_accounts.tablename)
+      .leftJoin(
+        Accounting.journal_entries.tablename,
+        Accounting.journal_entries.selectOptionColumns.coa_id,
+        Master.charts_of_accounts.selectOptionColumns.id,
+      )
+      .where(Master.charts_of_accounts.selectOptionColumns.status)
+      .whereNot(Accounting.journal_entries.selectOptionColumns.db_name)
+      .andWhereNot(Accounting.journal_entries.selectOptionColumns.db_id)
+      .andWhereNot(Accounting.journal_entries.selectOptionColumns.coa_id) 
+
+    if (start_date) {
+      trial_balance_query.andWhere(
+        Accounting.journal_entries.selectOptionColumns.date,
+        '>=',
+        start_date,
+      )
+      queryParams.push(start_date)
     }
 
-    const trial_balance_query = `SELECT ${Master.charts_of_accounts.selectOptionColumns.code} as 'Account Code', ${Master.charts_of_accounts.selectOptionColumns.name} as 'Account Name', SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as DEBIT, SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as CREDIT FROM ${Master.charts_of_accounts.tablename} LEFT JOIN ${Accounting.journal_entries.tablename} ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id} WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'${dateFilter} GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.code}, ${Master.charts_of_accounts.selectOptionColumns.name} ORDER BY ${Master.charts_of_accounts.selectOptionColumns.code}`
+    if (end_date) {
+      trial_balance_query.andWhere(
+        Accounting.journal_entries.selectOptionColumns.date,
+        '<=',
+        end_date,
+      )
+      queryParams.push(end_date)
+    }
 
-    const trialBalance = await Query(trial_balance_query)
+    const builtQuery = trial_balance_query
+      .groupBy(
+        Master.charts_of_accounts.selectOptionColumns.id,
+        Master.charts_of_accounts.selectOptionColumns.code,
+        Master.charts_of_accounts.selectOptionColumns.name,
+      )
+      .orderBy(Master.charts_of_accounts.selectOptionColumns.code)
+      .build()
 
+    const trialBalance = await Query(builtQuery, ['ACTIVE','', '', ''], queryParams)
+console.log('Trial Balance Query:', trialBalance)
     res.status(200).json({
       success: true,
       message: 'Trial Balance retrieved successfully',
@@ -126,6 +169,9 @@ const getIncomeStatement = async (req, res, next) => {
            ${dateFilter}
       WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
         AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
+        AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
+        AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
+        AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
       GROUP BY
         ${Master.charts_of_accounts.selectOptionColumns.id},
         ${Master.charts_of_accounts.selectOptionColumns.code},
@@ -230,6 +276,9 @@ const getGeneralLedger = async (req, res, next) => {
         ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
       WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
       ${whereConditions.length > 0 ? `AND ${whereConditions.join(' AND ')}` : ''}
+      AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
+      AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
+      AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
       ORDER BY
         ${Accounting.journal_entries.selectOptionColumns.db_name},
         ${Accounting.journal_entries.selectOptionColumns.db_id},
@@ -355,6 +404,9 @@ const getBalanceSheet = async (req, res, next) => {
            ${dateFilter}
       WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
         AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
+        AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
+        AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
+        AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
       GROUP BY
         ${Master.charts_of_accounts.selectOptionColumns.id},
         ${Master.charts_of_accounts.selectOptionColumns.type}
@@ -442,6 +494,28 @@ const getBalanceSheet = async (req, res, next) => {
 const getSearch = async (req, res, next) => {
   const { startDate, endDate, search, searchFields } = req.query
 
+  const allowedRoutesParam = req.query.allowedRoutes
+  const allowedRoutes = Array.isArray(allowedRoutesParam)
+    ? allowedRoutesParam.flatMap((value) => String(value).split(','))
+    : String(allowedRoutesParam || '')
+        .split(',')
+        .map((route) => route.trim().toLowerCase())
+        .filter(Boolean)
+
+  const defaultSearchRoutes = [
+    'sales',
+    'collections',
+    'receipts',
+    'purchase',
+    'disbursement',
+    'payments',
+    'adjustments',
+  ]
+
+  const allowedSearchRoutes = new Set(
+    allowedRoutes.length > 0 ? allowedRoutes : defaultSearchRoutes,
+  )
+
   try {
     if (!startDate || !endDate) {
       return res.status(400).json({
@@ -462,8 +536,9 @@ const getSearch = async (req, res, next) => {
     const searchTerm = `%${search.trim()}%`
     const results = []
 
-    // Enhanced Sales Query - searches across multiple fields
-    const salesQuery = `
+    if (allowedSearchRoutes.has('sales')) {
+      // Enhanced Sales Query - searches across multiple fields
+      const salesQuery = `
       SELECT 
         'Sales' as document_type,
         sal.${Accounting.sales.selectOptionColumns.id} as document_id,
@@ -488,20 +563,22 @@ const getSearch = async (req, res, next) => {
         AND sal.${Accounting.sales.selectOptionColumns.date_delivered} BETWEEN ? AND ?
     `
 
-    const salesResults = await Query(salesQuery, [
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      startDate,
-      endDate,
-    ])
-    results.push(...salesResults)
+      const salesResults = await Query(salesQuery, [
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        startDate,
+        endDate,
+      ])
+      results.push(...salesResults)
+    }
 
-    // Enhanced Collections Query - searches across multiple fields
-    const collectionsQuery = `
+    if (allowedSearchRoutes.has('collections')) {
+      // Enhanced Collections Query - searches across multiple fields
+      const collectionsQuery = `
       SELECT 
         'Collection' as document_type,
         coll.${Accounting.collections.selectOptionColumns.id} as document_id,
@@ -531,22 +608,24 @@ const getSearch = async (req, res, next) => {
         AND coll.${Accounting.collections.selectOptionColumns.collection_date} BETWEEN ? AND ?
     `
 
-    const collectionsResults = await Query(collectionsQuery, [
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      startDate,
-      endDate,
-    ])
-    results.push(...collectionsResults)
+      const collectionsResults = await Query(collectionsQuery, [
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        startDate,
+        endDate,
+      ])
+      results.push(...collectionsResults)
+    }
 
-    // Enhanced Receipts Query - searches across multiple fields
-    const receiptsQuery = `
+    if (allowedSearchRoutes.has('receipts')) {
+      // Enhanced Receipts Query - searches across multiple fields
+      const receiptsQuery = `
       SELECT 
         'Receipt' as document_type,
         rec.${Accounting.receipts.selectOptionColumns.id} as document_id,
@@ -577,23 +656,25 @@ const getSearch = async (req, res, next) => {
         AND rec.${Accounting.receipts.selectOptionColumns.collection_date} BETWEEN ? AND ?
     `
 
-    const receiptsResults = await Query(receiptsQuery, [
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      startDate,
-      endDate,
-    ])
-    results.push(...receiptsResults)
+      const receiptsResults = await Query(receiptsQuery, [
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        startDate,
+        endDate,
+      ])
+      results.push(...receiptsResults)
+    }
 
-    // Enhanced Purchase Query - searches across multiple fields
-    const purchaseQuery = `
+    if (allowedSearchRoutes.has('purchase')) {
+      // Enhanced Purchase Query - searches across multiple fields
+      const purchaseQuery = `
       SELECT 
         'Purchase' as document_type,
         pur.${Accounting.purchase.selectOptionColumns.id} as document_id,
@@ -618,20 +699,22 @@ const getSearch = async (req, res, next) => {
         AND pur.${Accounting.purchase.selectOptionColumns.date_delivered} BETWEEN ? AND ?
     `
 
-    const purchaseResults = await Query(purchaseQuery, [
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      startDate,
-      endDate,
-    ])
-    results.push(...purchaseResults)
+      const purchaseResults = await Query(purchaseQuery, [
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        startDate,
+        endDate,
+      ])
+      results.push(...purchaseResults)
+    }
 
-    // Enhanced Cash Disbursements Query - searches across multiple fields
-    const cashDisbursementsQuery = `
+    if (allowedSearchRoutes.has('disbursement')) {
+      // Enhanced Cash Disbursements Query - searches across multiple fields
+      const cashDisbursementsQuery = `
       SELECT 
         'Cash Disbursement' as document_type,
         cd.${Accounting.cash_disbursements.selectOptionColumns.id} as document_id,
@@ -662,23 +745,25 @@ const getSearch = async (req, res, next) => {
         AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} BETWEEN ? AND ?
     `
 
-    const cashDisbursementsResults = await Query(cashDisbursementsQuery, [
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      startDate,
-      endDate,
-    ])
-    results.push(...cashDisbursementsResults)
+      const cashDisbursementsResults = await Query(cashDisbursementsQuery, [
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        startDate,
+        endDate,
+      ])
+      results.push(...cashDisbursementsResults)
+    }
 
-    // Enhanced Payments Query - searches across multiple fields
-    const paymentsQuery = `
+    if (allowedSearchRoutes.has('payments')) {
+      // Enhanced Payments Query - searches across multiple fields
+      const paymentsQuery = `
       SELECT 
         'Payment' as document_type,
         pay.${Accounting.payments.selectOptionColumns.id} as document_id,
@@ -708,22 +793,24 @@ const getSearch = async (req, res, next) => {
         AND pay.${Accounting.payments.selectOptionColumns.payment_date} BETWEEN ? AND ?
     `
 
-    const paymentsResults = await Query(paymentsQuery, [
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      startDate,
-      endDate,
-    ])
-    results.push(...paymentsResults)
+      const paymentsResults = await Query(paymentsQuery, [
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        startDate,
+        endDate,
+      ])
+      results.push(...paymentsResults)
+    }
 
-    // Enhanced Adjustments Query - searches across multiple fields
-    const adjustmentsQuery = `
+    if (allowedSearchRoutes.has('adjustments')) {
+      // Enhanced Adjustments Query - searches across multiple fields
+      const adjustmentsQuery = `
       SELECT 
         'Adjustment' as document_type,
         adj.${Accounting.adjustments.selectOptionColumns.id} as document_id,
@@ -747,16 +834,17 @@ const getSearch = async (req, res, next) => {
         AND adj.${Accounting.adjustments.selectOptionColumns.posting_date} BETWEEN ? AND ?
     `
 
-    const adjustmentsResults = await Query(adjustmentsQuery, [
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      searchTerm,
-      startDate,
-      endDate,
-    ])
-    results.push(...adjustmentsResults)
+      const adjustmentsResults = await Query(adjustmentsQuery, [
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        startDate,
+        endDate,
+      ])
+      results.push(...adjustmentsResults)
+    }
 
     results.sort((a, b) => new Date(b.document_date) - new Date(a.document_date))
 

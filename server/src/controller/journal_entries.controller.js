@@ -40,6 +40,7 @@ const getJournalEntries = async (req, res, next) => {
         Accounting.journal_entries.selectOptionColumns.coa_id,
         '=',
       )
+      .where(Master.charts_of_accounts.selectOptionColumns.status)
       .orderBy(Accounting.journal_entries.selectOptionColumns.date, 'DESC')
 
     // Simple date filtering test
@@ -69,8 +70,10 @@ const getJournalEntries = async (req, res, next) => {
                           ${Accounting.journal_entries.selectOptionColumns.amount}, 
                           ${Accounting.journal_entries.selectOptionColumns.date} 
                    FROM ${Accounting.journal_entries.tablename} 
-                   INNER JOIN ${Master.charts_of_accounts.tablename} ON ${Master.charts_of_accounts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.coa_id}`
-
+                   INNER JOIN ${Master.charts_of_accounts.tablename} ON ${Master.charts_of_accounts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.coa_id}
+                   AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
+                   AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
+                   AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL`
     if (whereConditions.length > 0) {
       sqlQuery += ` WHERE ${whereConditions.join(' AND ')}`
     }

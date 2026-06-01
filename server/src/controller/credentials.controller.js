@@ -159,7 +159,7 @@ const login = async (req, res, next) => {
 
       .build();
 
-    
+    console.log('Tenant123:', tenantPool)
 
     const route_access = await Query(route_access_query, [users[0].access_id], [Master.master_route_access.prefix_], tenantPool)
 

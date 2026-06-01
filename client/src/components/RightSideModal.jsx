@@ -48,7 +48,7 @@ const RightSideModal = ({ isOpen, onClose, title, children, size = 'md' }) => {
         </div>
         
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 bg-white">
+        <div className="flex-1 overflow-y-auto p-4 bg-white h-screen">
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
             {children}
           </div>
