@@ -23,6 +23,13 @@ const getDashboardData = async (req, res, next) => {
       endDate = lastDay.toISOString().split('T')[0];
     }
 
+    // Reuseable snippet to enforce complete journal entry items
+    const validJeCondition = `
+      AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
+      AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
+      AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
+    `;
+
     // ==================== FINANCIAL HEALTH (Quick KPIs) ====================
 
     // Net Income - from Income Statement logic (using subquery to avoid nested aggregates)
@@ -52,6 +59,7 @@ const getDashboardData = async (req, res, next) => {
         FROM ${Master.charts_of_accounts.tablename}
         LEFT JOIN ${Accounting.journal_entries.tablename}
           ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+          ${validJeCondition} /* Enforced Null Checks */
         WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
           AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
           AND (${Accounting.journal_entries.selectOptionColumns.date} >= '${startDate}' 
@@ -95,12 +103,13 @@ const getDashboardData = async (req, res, next) => {
           ${Master.charts_of_accounts.selectOptionColumns.code},
           ${Master.charts_of_accounts.selectOptionColumns.name},
           COALESCE(SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' 
-                              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END), 0) -
+                               THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END), 0) -
           COALESCE(SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' 
-                              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END), 0) AS account_balance
+                               THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END), 0) AS account_balance
         FROM ${Master.charts_of_accounts.tablename}
         LEFT JOIN ${Accounting.journal_entries.tablename}
           ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+          ${validJeCondition} /* Enforced Null Checks */
         WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
           AND ${Master.charts_of_accounts.selectOptionColumns.type} = 'Assets'
           AND (${Accounting.journal_entries.selectOptionColumns.date} >= '${startDate}' 
@@ -214,6 +223,7 @@ const getDashboardData = async (req, res, next) => {
         SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' 
                  THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS totalCredit
       FROM ${Accounting.journal_entries.tablename}
+      WHERE 1=1 ${validJeCondition} /* Enforced Null Checks */
     `;
     const trialBalanceResult = await Query(trial_balance_check_query);
     const totalDebit = parseFloat(trialBalanceResult[0]?.totalDebit || 0);
@@ -236,6 +246,7 @@ const getDashboardData = async (req, res, next) => {
         FROM ${Master.charts_of_accounts.tablename}
         LEFT JOIN ${Accounting.journal_entries.tablename}
           ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+          ${validJeCondition} /* Enforced Null Checks */
         WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
         GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.type}
       ) AS account_balances
@@ -260,9 +271,9 @@ const getDashboardData = async (req, res, next) => {
     const overdueARCount = overdueARResult[0]?.overdueCount || 0;
     const overdueARAmount = overdueARResult[0]?.overdueAmount || 0;
 
-// ==================== PERIOD COMPARISON TREND CHARTS ====================
+    // ==================== PERIOD COMPARISON TREND CHARTS ====================
 
-// Revenue vs Expenses trend (monthly comparison)
+    // Revenue vs Expenses trend (monthly comparison)
     const revenue_expense_trend_query = `
       SELECT 
         month,
@@ -288,6 +299,7 @@ const getDashboardData = async (req, res, next) => {
         FROM ${Master.charts_of_accounts.tablename}
         LEFT JOIN ${Accounting.journal_entries.tablename}
           ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+          ${validJeCondition} /* Enforced Null Checks */
         WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
           AND (${Accounting.journal_entries.selectOptionColumns.date} >= '${startDate}' 
                AND ${Accounting.journal_entries.selectOptionColumns.date} <= '${endDate}')
