@@ -116,7 +116,12 @@ const getJournalEntries = async (req, res, next) => {
 
 const getAdvances = async (req, res, next) => {
   try {
-    const { start_date, end_date } = req.query
+    const { start_date, end_date, offset, limit } = req.query
+    const shouldPaginate = offset !== undefined && limit !== undefined
+    const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset) || 0) : 0
+    const limitNum = shouldPaginate
+      ? Math.max(1, Math.min(500, parseInt(limit) || 50))
+      : null
 
     const whereConditions = [
       `(${Accounting.journal_entries.selectOptionColumns.db_name} IS NULL OR ${Accounting.journal_entries.selectOptionColumns.db_name} = '' OR ${Accounting.journal_entries.selectOptionColumns.db_id} IS NULL OR ${Accounting.journal_entries.selectOptionColumns.db_id} = '')`,
@@ -136,7 +141,7 @@ const getAdvances = async (req, res, next) => {
       values.push(end_date)
     }
 
-    const sqlQuery = `SELECT ${Accounting.journal_entries.selectOptionColumns.id}, 
+    let sqlQuery = `SELECT ${Accounting.journal_entries.selectOptionColumns.id}, 
                           ${Master.charts_of_accounts.selectOptionColumns.name} as coa_name, 
                           ${Accounting.journal_entries.selectOptionColumns.responsibility_center}, 
                           ${Accounting.journal_entries.selectOptionColumns.type}, 
@@ -147,7 +152,12 @@ const getAdvances = async (req, res, next) => {
                    WHERE ${whereConditions.join(' AND ')} 
                    ORDER BY ${Accounting.journal_entries.selectOptionColumns.date} DESC`
 
-    const advances = await Query(sqlQuery, values, [
+    const queryValues = shouldPaginate ? [...values, limitNum, offsetNum] : values
+    if (shouldPaginate) {
+      sqlQuery += '\n                   LIMIT ? OFFSET ?'
+    }
+
+    const advances = await Query(sqlQuery, queryValues, [
       Accounting.journal_entries.prefix_,
       Master.charts_of_accounts.prefix_,
     ])
@@ -157,6 +167,9 @@ const getAdvances = async (req, res, next) => {
       message: 'Advances retrieved successfully',
       data: advances,
       count: advances.length,
+      offset: offsetNum,
+      limit: limitNum,
+      hasMore: shouldPaginate ? advances.length === limitNum : false,
       startDate: start_date,
       endDate: end_date,
       timestamp: new Date().toISOString(),

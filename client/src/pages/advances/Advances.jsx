@@ -30,13 +30,20 @@ const formatDate = (value) => {
 }
 
 function AdvancesContent() {
+  const [filterStartDate, setFilterStartDate] = useState('')
+  const [filterEndDate, setFilterEndDate] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const navigate = useNavigate()
-  const { advances, loading, error, refreshAdvances } = useAdvances(
-    startDate,
-    endDate,
-  )
+  const {
+    advances,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    refreshAdvances,
+    loadMore,
+  } = useAdvances(startDate, endDate)
 
   const totalDebit = advances.reduce(
     (sum, entry) => (entry.type === 'DEBIT' ? sum + Number(entry.amount || 0) : sum),
@@ -119,8 +126,8 @@ function AdvancesContent() {
             </label>
             <input
               type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              value={filterStartDate}
+              onChange={(e) => setFilterStartDate(e.target.value)}
               className="h-10 w-36 rounded-lg border border-gray-200 bg-white px-2 text-xs font-bold text-black outline-none focus:ring-2 focus:ring-red-500"
             />
           </div>
@@ -130,13 +137,24 @@ function AdvancesContent() {
             </label>
             <input
               type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              value={filterEndDate}
+              onChange={(e) => setFilterEndDate(e.target.value)}
               className="h-10 w-36 rounded-lg border border-gray-200 bg-white px-2 text-xs font-bold text-black outline-none focus:ring-2 focus:ring-red-500"
             />
           </div>
           <button
             onClick={() => {
+              setStartDate(filterStartDate)
+              setEndDate(filterEndDate)
+            }}
+            className="h-10 px-4 bg-red-600 text-white font-black rounded-xl hover:bg-red-700 tracking-widest"
+          >
+            Submit
+          </button>
+          <button
+            onClick={() => {
+              setFilterStartDate('')
+              setFilterEndDate('')
               setStartDate('')
               setEndDate('')
             }}
@@ -240,6 +258,10 @@ function AdvancesContent() {
               onClick: handleCreateAdjustment,
             },
           ]}
+          enableInfiniteScroll={true}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
+          onLoadMore={loadMore}
         />
       </motion.div>
     </div>

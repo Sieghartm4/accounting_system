@@ -32,6 +32,11 @@ const DynamicTable = ({
   badgeColumns = [], // array of { column: 'status', values: { 'PAID': 'green', 'UNPAID': 'red' } } for dynamic badges
   // --- HIGHLIGHT PROPS ---
   highlightRow = null, // { column: 'id', value: 123 } - highlight row where column matches value
+  // --- INFINITE SCROLL PROPS ---
+  enableInfiniteScroll = false, // if true, enables infinite scroll
+  hasMore = false, // if true, more rows can be loaded
+  isLoadingMore = false, // if true, currently loading more rows
+  onLoadMore = null, // callback function to load more rows
 }) => {
   const [searchParams] = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
@@ -47,6 +52,8 @@ const DynamicTable = ({
   // --- OPTION COLUMNS STATE: track changes to dropdown values ---
   const [optionData, setOptionData] = useState(new Map())
   const dropdownRef = useRef(null)
+  const tableScrollRef = useRef(null)
+  const loadingMoreRef = useRef(false)
 
   // Auto-fill search term from URL parameters on component mount
   useEffect(() => {
@@ -264,6 +271,40 @@ const DynamicTable = ({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    loadingMoreRef.current = isLoadingMore
+  }, [isLoadingMore])
+
+  // --- INFINITE SCROLL HANDLER ---
+  useEffect(() => {
+    if (
+      !enableInfiniteScroll ||
+      !tableScrollRef.current ||
+      !onLoadMore ||
+      loadingMoreRef.current
+    ) {
+      return
+    }
+
+    const handleScroll = () => {
+      const element = tableScrollRef.current
+      if (!element) return
+
+      // Check if scrolled near bottom (within 200px)
+      const isNearBottom =
+        element.scrollHeight - element.scrollTop - element.clientHeight < 200
+
+      if (isNearBottom && hasMore && !loadingMoreRef.current) {
+        loadingMoreRef.current = true
+        onLoadMore()
+      }
+    }
+
+    const scrollElement = tableScrollRef.current
+    scrollElement.addEventListener('scroll', handleScroll)
+    return () => scrollElement.removeEventListener('scroll', handleScroll)
+  }, [enableInfiniteScroll, hasMore, onLoadMore])
+
   const headers = useMemo(
     () =>
       Array.isArray(data) && data.length > 0
@@ -361,6 +402,32 @@ const DynamicTable = ({
       selectedKeys.has(getRowKey(row, idx)),
     )
   }, [filteredAndSortedData, selectedKeys])
+
+  // Sum numeric values from selected rows (prefer `amount_raw`, fallback to `amount`)
+  const selectedTotal = useMemo(() => {
+    const toNumber = (val) => {
+      if (val === null || val === undefined) return 0
+      if (typeof val === 'number') return val
+      if (typeof val === 'string') {
+        const cleaned = val.replace(/[^0-9.-]+/g, '')
+        const parsed = parseFloat(cleaned)
+        return isNaN(parsed) ? 0 : parsed
+      }
+      return 0
+    }
+
+    return selectedRows.reduce((sum, row) => {
+      const v = row.amount_raw ?? row.amount ?? 0
+      return sum + toNumber(v)
+    }, 0)
+  }, [selectedRows])
+
+  const selectedTotalFormatted = useMemo(() => {
+    return new Intl.NumberFormat('en-PH', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(selectedTotal || 0)
+  }, [selectedTotal])
 
   return (
     <div className="h-full flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
@@ -505,9 +572,14 @@ const DynamicTable = ({
       {/* --- CHECKBOX ACTION BAR (shown when rows are selected) --- */}
       {enableCheckbox && selectedKeys.size > 0 && checkboxActions.length > 0 && (
         <div className="shrink-0 bg-red-50 border-b border-red-100 px-6 py-2 flex items-center gap-3 animate-in slide-in-from-top-1">
-          <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">
-            {selectedKeys.size} Selected
-          </span>
+          <div className="flex items-baseline gap-3">
+            <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">
+              {selectedKeys.size} Selected
+            </span>
+            <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">
+              Total: ₱{selectedTotalFormatted}
+            </span>
+          </div>
           <div className="w-px h-4 bg-red-200" />
           {(checkboxActionsFilter
             ? checkboxActionsFilter(selectedRows)
@@ -564,7 +636,10 @@ const DynamicTable = ({
       )}
 
       {/* --- DATA TABLE --- */}
-      <div className="flex-1 overflow-auto bg-white custom-scrollbar">
+      <div
+        className="flex-1 overflow-auto bg-white custom-scrollbar"
+        ref={tableScrollRef}
+      >
         <style
           dangerouslySetInnerHTML={{
             __html: `
@@ -707,6 +782,17 @@ const DynamicTable = ({
             })}
           </tbody>
         </table>
+        {/* --- LOADING MORE INDICATOR --- */}
+        {enableInfiniteScroll && isLoadingMore && (
+          <div className="flex items-center justify-center py-6 border-t border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                Loading more rows...
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* --- REFINED DATA METRICS FOOTER --- */}
