@@ -318,6 +318,13 @@ const createJournalEntries = async (req, res, next) => {
     const results = []
 
     for (const entry of payload) {
+      // 🟢 ADDED: Parse and validate amount right away. If it's 0, skip this item entirely.
+      const parsedAmount = entry.amount != null ? parseFloat(entry.amount) : 0
+      if (parsedAmount === 0) {
+        console.log('Skipping entry with zero amount:', entry)
+        continue // Skips COA resolution and DB insertion, moving to the next item
+      }
+
       let coaId = parseInt(entry.coa_id)
       if (!Number.isInteger(coaId)) {
         const [coaRows] = await connection.execute(
@@ -332,7 +339,9 @@ const createJournalEntries = async (req, res, next) => {
           coaId = coaRows[0].id
         } else {
           await connection.rollback()
-          console.log(`Unable to resolve coa_id from charts of accounts: ${entry.coa_id}`)
+          console.log(
+            `Unable to resolve coa_id from charts of accounts: ${entry.coa_id}`,
+          )
           return res.status(400).json({
             success: false,
             message: `Unable to resolve coa_id from charts of accounts: ${entry.coa_id}`,
@@ -354,7 +363,7 @@ const createJournalEntries = async (req, res, next) => {
         coaId || null,
         entry.responsibility_center || null,
         entry.type || null,
-        entry.amount != null ? parseFloat(entry.amount) : 0,
+        parsedAmount, // 🟢 UPDATED: Reused the already parsedAmount variable here
         entry.date || new Date().toISOString().split('T')[0],
       ]
 
