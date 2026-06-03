@@ -1,40 +1,59 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Receipt, FilePlus, ShieldCheck, CreditCard, ArrowRight, Download, Check, FileText, Building } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import DynamicToast from '../../components/DynamicToast';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import useReceipts from './useReceipts';
-import ReceiptsForm from './ReceiptsForm';
-import { hasRouteAccess, getAccessLevel } from '../../utils/routeProtection';
-import { generateReceiptPDF } from '../../utils/generateReceiptPDF'; // <-- import PDF util
+import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import {
+  Receipt,
+  FilePlus,
+  ShieldCheck,
+  CreditCard,
+  ArrowRight,
+  Download,
+  Check,
+  FileText,
+  Building,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import DynamicToast from '../../components/DynamicToast'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import useReceipts from './useReceipts'
+import ReceiptsForm from './ReceiptsForm'
+import { hasRouteAccess, getAccessLevel } from '../../utils/routeProtection'
+import { generateReceiptPDF } from '../../utils/generateReceiptPDF' // <-- import PDF util
 
 export default function Receipts() {
   return (
     <RouteProtection routeName="receipts">
       <ReceiptsContent />
     </RouteProtection>
-  );
+  )
 }
 
 function ReceiptsContent() {
-  const { receipts, loading, error, refetchReceipts } = useReceipts();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [isAdding, setIsAdding] = useState(false);
-  const [viewingReceipt, setViewingReceipt] = useState(null);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [toast, setToast] = useState(null);
+  const {
+    receipts,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    refetchReceipts,
+    loadMore,
+    prependReceipt,
+  } = useReceipts()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [isAdding, setIsAdding] = useState(false)
+  const [viewingReceipt, setViewingReceipt] = useState(null)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [toast, setToast] = useState(null)
 
   useEffect(() => {
-    const id = searchParams.get('id');
-    if (!id) return;
+    const id = searchParams.get('id')
+    if (!id) return
 
     const fetchReceipt = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('No authentication token found');
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
           `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(id)}`,
@@ -44,36 +63,71 @@ function ReceiptsContent() {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-          }
-        );
+          },
+        )
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Failed to fetch receipt details');
+        const result = await response.json()
+        if (!response.ok)
+          throw new Error(result.message || 'Failed to fetch receipt details')
 
-        setViewingReceipt(result);
-        setIsEditMode(false);
-        setSearchParams(prev => {
-          const next = new URLSearchParams(prev);
-          next.delete('id');
-          return next;
-        }, { replace: true });
+        setViewingReceipt(result)
+        setIsEditMode(false)
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('id')
+            return next
+          },
+          { replace: true },
+        )
       } catch (err) {
-        setToast({ type: 'error', message: err.message || 'Failed to fetch receipt details' });
+        setToast({
+          type: 'error',
+          message: err.message || 'Failed to fetch receipt details',
+        })
       }
-    };
+    }
 
-    fetchReceipt();
-  }, [searchParams, setSearchParams]);
+    fetchReceipt()
+  }, [searchParams, setSearchParams])
 
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const accessLevel = getAccessLevel('receipts', user);
+  useEffect(() => {
+    const serverLink = import.meta.env.VITE_SERVER_LINK
+    if (!serverLink) return
+
+    const protocol = serverLink.startsWith('https') ? 'wss' : 'ws'
+    const socketUrl = serverLink.replace(/^http/, protocol)
+    const socket = new WebSocket(socketUrl)
+
+    socket.addEventListener('message', (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        if (payload?.type === 'receipt_created' && payload?.data?.receipt) {
+          prependReceipt(payload.data.receipt)
+        }
+      } catch (err) {
+        console.error('Receipt WebSocket message parse error', err)
+      }
+    })
+
+    socket.addEventListener('error', (err) => {
+      console.error('Receipt WebSocket error', err)
+    })
+
+    return () => {
+      socket.close()
+    }
+  }, [prependReceipt])
+
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const accessLevel = getAccessLevel('receipts', user)
   const enableCheckboxes =
-    accessLevel === 'Check Access'   ||
+    accessLevel === 'Check Access' ||
     accessLevel === 'Approve Access' ||
-    accessLevel === 'Edit Access'    ||
-    accessLevel === 'Full Access';
+    accessLevel === 'Edit Access' ||
+    accessLevel === 'Full Access'
 
-  const checkboxCondition = null; // Always show checkboxes
+  const checkboxCondition = null // Always show checkboxes
 
   // Function to filter checkbox actions based on selected rows' states
   const getFilteredCheckboxActions = (selectedRows) => {
@@ -83,18 +137,26 @@ function ReceiptsContent() {
         icon: <Check size={14} />,
         onClick: async (selectedRows) => {
           try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No authentication token found');
+            const token = localStorage.getItem('token')
+            if (!token) throw new Error('No authentication token found')
 
             // Filter to only include approvable rows (PREPARED or CHECKED)
-            const approvableRows = selectedRows.filter(row => row.state === 'PREPARED' || row.state === 'CHECKED');
-            
+            const approvableRows = selectedRows.filter(
+              (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+            )
+
             if (approvableRows.length === 0) {
-              setToast({ type: 'error', message: 'No receipts are eligible for approval' });
-              return;
+              setToast({
+                type: 'error',
+                message: 'No receipts are eligible for approval',
+              })
+              return
             }
 
-            const updates = approvableRows.map(row => ({ id: row.id, currentState: row.state }));
+            const updates = approvableRows.map((row) => ({
+              id: row.id,
+              currentState: row.state,
+            }))
 
             const response = await fetch(
               `${import.meta.env.VITE_SERVER_LINK}/receipt/receipt-state`,
@@ -105,19 +167,25 @@ function ReceiptsContent() {
                   Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({ updates }),
-              }
-            );
+              },
+            )
 
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.message || 'Failed to approve receipts');
+            const result = await response.json()
+            if (!response.ok)
+              throw new Error(result.message || 'Failed to approve receipts')
 
-            await refetchReceipts();
+            await refetchReceipts()
             setToast({
               type: 'success',
-              message: result.message || `${approvableRows.length} receipt(s) approved successfully`,
-            });
+              message:
+                result.message ||
+                `${approvableRows.length} receipt(s) approved successfully`,
+            })
           } catch (error) {
-            setToast({ type: 'error', message: error.message || 'Failed to approve receipts' });
+            setToast({
+              type: 'error',
+              message: error.message || 'Failed to approve receipts',
+            })
           }
         },
       },
@@ -135,30 +203,32 @@ function ReceiptsContent() {
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
         style: 'orange', // Orange color for customer copy
       },
-    ];
+    ]
 
     // Filter Approve Selected button - show if at least one selected row is PREPARED or CHECKED
-    return allActions.filter(action => {
+    return allActions.filter((action) => {
       if (action.label === 'Approve Selected') {
         // Show approve button if at least one selected row has state PREPARED or CHECKED
-        return selectedRows.some(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+        return selectedRows.some(
+          (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+        )
       }
-      return true; // Always show other actions
-    });
-  };
+      return true // Always show other actions
+    })
+  }
 
   const fadeInUp = {
-    hidden:  { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-  };
+  }
 
   // ─── Helper: fetch full receipt data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No authentication token found');
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
 
-      const receiptIds = selectedRows.map(row => row.id).join(',');
+      const receiptIds = selectedRows.map((row) => row.id).join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/receipt/print/${receiptIds}?copyType=${copyType}`,
@@ -168,66 +238,75 @@ function ReceiptsContent() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-        }
-      );
+        },
+      )
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Failed to fetch receipts for printing');
+      const result = await response.json()
+      if (!response.ok)
+        throw new Error(result.message || 'Failed to fetch receipts for printing')
 
       // Extract the actual receipt data from the response
-      const data = result.data || [];
-      console.log('PDF Data received:', data);
-      console.log('First receipt items:', data[0]?.items);
-      console.log('First receipt journal:', data[0]?.journal);
-      if (!Array.isArray(data)) throw new Error('Invalid data format received from server');
+      const data = result.data || []
+      console.log('PDF Data received:', data)
+      console.log('First receipt items:', data[0]?.items)
+      console.log('First receipt journal:', data[0]?.journal)
+      if (!Array.isArray(data))
+        throw new Error('Invalid data format received from server')
 
       // Generate & auto-download PDFs (one per receipt)
-      await generateReceiptPDF(data, copyType);
+      await generateReceiptPDF(data, copyType)
 
       setToast({
         type: 'success',
         message: `${data.length} receipt PDF(s) downloaded (${copyType === 'customer' ? 'Customer' : 'Internal'} Copy)`,
-      });
+      })
     } catch (error) {
-      console.error('Error generating receipt PDF:', error);
-      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' });
+      console.error('Error generating receipt PDF:', error)
+      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' })
     }
-  };
+  }
 
-  if (isAdding) return (
-    <RouteProtection routeName="receipts">
-      <ReceiptsForm
-        onBack={() => setIsAdding(false)}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchReceipts();
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isAdding)
+    return (
+      <RouteProtection routeName="receipts">
+        <ReceiptsForm
+          onBack={() => setIsAdding(false)}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchReceipts()
+          }}
+        />
+      </RouteProtection>
+    )
 
-  if (viewingReceipt) return (
-    <RouteProtection routeName="receipts">
-      <ReceiptsForm
-        isViewMode={!isEditMode}
-        isEditMode={isEditMode}
-        receiptData={viewingReceipt}
-        onBack={() => { setViewingReceipt(null); setIsEditMode(false); }}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchReceipts();
-        }}
-      />
-    </RouteProtection>
-  );
+  if (viewingReceipt)
+    return (
+      <RouteProtection routeName="receipts">
+        <ReceiptsForm
+          isViewMode={!isEditMode}
+          isEditMode={isEditMode}
+          receiptData={viewingReceipt}
+          onBack={() => {
+            setViewingReceipt(null)
+            setIsEditMode(false)
+          }}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchReceipts()
+          }}
+        />
+      </RouteProtection>
+    )
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Syncing Receipt Ledger...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Syncing Receipt Ledger...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -238,12 +317,11 @@ function ReceiptsContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-
       {toast && (
         <DynamicToast
           type={toast.type}
@@ -325,16 +403,20 @@ function ReceiptsContent() {
           enableCheckbox={enableCheckboxes}
           checkboxColumn="id"
           checkboxCondition={checkboxCondition}
+          enableInfiniteScroll={true}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
+          onLoadMore={loadMore}
           enableActionColumn={true}
           badgeColumns={[
             {
               column: 'state',
               values: {
-                'PREPARED':  'yellow',
-                'CHECKED':   'blue',
-                'APPROVED':  'green',
-                'REJECTED':  'red',
-                'CANCELLED': 'orange',
+                PREPARED: 'yellow',
+                CHECKED: 'blue',
+                APPROVED: 'green',
+                REJECTED: 'red',
+                CANCELLED: 'orange',
               },
             },
           ]}
@@ -343,8 +425,8 @@ function ReceiptsContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  const token = localStorage.getItem('token');
-                  if (!token) throw new Error('No authentication token found');
+                  const token = localStorage.getItem('token')
+                  if (!token) throw new Error('No authentication token found')
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(row.id)}`,
@@ -354,16 +436,22 @@ function ReceiptsContent() {
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                       },
-                    }
-                  );
+                    },
+                  )
 
-                  const result = await response.json();
-                  if (!response.ok) throw new Error(result.message || 'Failed to fetch receipt details');
+                  const result = await response.json()
+                  if (!response.ok)
+                    throw new Error(
+                      result.message || 'Failed to fetch receipt details',
+                    )
 
-                  setViewingReceipt(result);
-                  setIsEditMode(false);
+                  setViewingReceipt(result)
+                  setIsEditMode(false)
                 } catch (error) {
-                  setToast({ type: 'error', message: error.message || 'Failed to fetch receipt details' });
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch receipt details',
+                  })
                 }
               },
             },
@@ -371,8 +459,8 @@ function ReceiptsContent() {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  const token = localStorage.getItem('token');
-                  if (!token) throw new Error('No authentication token found');
+                  const token = localStorage.getItem('token')
+                  if (!token) throw new Error('No authentication token found')
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(row.id)}`,
@@ -382,16 +470,22 @@ function ReceiptsContent() {
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                       },
-                    }
-                  );
+                    },
+                  )
 
-                  const result = await response.json();
-                  if (!response.ok) throw new Error(result.message || 'Failed to fetch receipt details');
+                  const result = await response.json()
+                  if (!response.ok)
+                    throw new Error(
+                      result.message || 'Failed to fetch receipt details',
+                    )
 
-                  setViewingReceipt(result);
-                  setIsEditMode(true);
+                  setViewingReceipt(result)
+                  setIsEditMode(true)
                 } catch (error) {
-                  setToast({ type: 'error', message: error.message || 'Failed to fetch receipt details' });
+                  setToast({
+                    type: 'error',
+                    message: error.message || 'Failed to fetch receipt details',
+                  })
                 }
               },
             },
@@ -401,7 +495,7 @@ function ReceiptsContent() {
         />
       </motion.div>
     </div>
-  );
+  )
 }
 
 function SummaryCard({ icon, label, value, subText }) {
@@ -409,12 +503,16 @@ function SummaryCard({ icon, label, value, subText }) {
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }

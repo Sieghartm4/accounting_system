@@ -1,95 +1,97 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 const usePurchase = () => {
-  const [purchases, setPurchases] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [purchases, setPurchases] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState(null)
+  const [hasMore, setHasMore] = useState(false)
+
+  const purchasesRef = useRef([])
+
+  const LIMIT = 50
+
+  const prependPurchase = useCallback((purchase) => {
+    if (!purchase || !purchase.id) return
+
+    setPurchases((prev) => {
+      if (prev.some((row) => row.id === purchase.id)) {
+        return prev
+      }
+      const next = [purchase, ...prev]
+      purchasesRef.current = next
+      return next
+    })
+  }, [])
+
+  const fetchPurchase = async (offset = 0, append = false) => {
+    if (!append) {
+      setLoading(true)
+      setError(null)
+    } else {
+      setLoadingMore(true)
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authorization token found')
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/purchase?offset=${offset}&limit=${LIMIT}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+
+      const result = await response.json()
+      if (!result.success)
+        throw new Error(result.message || 'Failed to fetch purchases')
+
+      const data = Array.isArray(result.data) ? result.data : []
+
+      if (append) {
+        const next = [...(purchasesRef.current || []), ...data]
+        purchasesRef.current = next
+        setPurchases(next)
+      } else {
+        purchasesRef.current = data
+        setPurchases(data)
+      }
+
+      setHasMore(Boolean(result.hasMore))
+    } catch (err) {
+      setError(err.message || 'Failed to fetch purchases')
+      if (!append) setPurchases([])
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchPurchase = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem("token");
+    fetchPurchase(0, false)
+  }, [])
 
-        if (!token) {
-          throw new Error("No authorization token found");
-        }
-        const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/purchase`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+  const refetchPurchases = async () => fetchPurchase(0, false)
 
-        const result = await response.json();
-        console.log('Purchase API response:', result);
+  const loadMore = async () => fetchPurchase(purchasesRef.current.length || 0, true)
 
-        if (result.success) {
-          console.log('Purchase data received:', result.data);
-          setPurchases(result.data);
-        } else {
-          console.error('Purchase fetch error:', result.message);
-          setError(result.message || 'Failed to fetch purchases');
-        }
-      } catch (err) {
-        console.error('Purchase fetch exception:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
+  return {
+    purchases,
+    loading,
+    loadingMore,
+    hasMore,
+    error,
+    refetchPurchases,
+    loadMore,
+    prependPurchase,
+  }
+}
 
-    fetchPurchase();
-  }, []);
-
-  const refetchPurchases = async () => {
-    const fetchPurchase = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-          throw new Error("No authorization token found");
-        }
-        const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/purchase`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        if (result.success) {
-          setPurchases(result.data);
-        } else {
-          setError(result.message || 'Failed to fetch purchases');
-        }
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    await fetchPurchase();
-  };
-
-  return { purchases, loading, error, refetchPurchases };
-};
-
-export default usePurchase;
+export default usePurchase

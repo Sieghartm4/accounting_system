@@ -1,41 +1,105 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Layers, CheckCircle, ShieldCheck, Wallet, ArrowRight, Download, Plus, FileText, Building } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import DynamicToast from '../../components/DynamicToast';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import usePayments from './usePayments';
-import PaymentsForm from './PaymentsForm';
-import { getAccessLevel } from '../../utils/routeProtection';
-import { generatePaymentPDF } from '../../utils/generatePaymentPDF';
+import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import {
+  Layers,
+  CheckCircle,
+  ShieldCheck,
+  Wallet,
+  ArrowRight,
+  Download,
+  Plus,
+  FileText,
+  Building,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import DynamicToast from '../../components/DynamicToast'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import usePayments from './usePayments'
+import PaymentsForm from './PaymentsForm'
+import { getAccessLevel } from '../../utils/routeProtection'
+import { generatePaymentPDF } from '../../utils/generatePaymentPDF'
 
 export default function Payments() {
   return (
     <RouteProtection routeName="payments">
       <PaymentsContent />
     </RouteProtection>
-  );
+  )
 }
 
 function PaymentsContent() {
-  const { payments, loading, error, refetchPayments } = usePayments();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [isAdding, setIsAdding] = useState(false);
-  const [isViewing, setIsViewing] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [viewingPayment, setViewingPayment] = useState(null);
-  const [toast, setToast] = useState(null);
+  const {
+    payments,
+    loading,
+    loadingMore,
+    hasMore,
+    error,
+    refetchPayments,
+    loadMore,
+    prependPayment,
+  } = usePayments()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [isAdding, setIsAdding] = useState(false)
+  const [isViewing, setIsViewing] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [viewingPayment, setViewingPayment] = useState(null)
+  const [toast, setToast] = useState(null)
+
+  // WebSocket subscription for live payment updates
+  useEffect(() => {
+    const serverLink = import.meta.env.VITE_SERVER_LINK
+    const protocol = serverLink.startsWith('https') ? 'wss' : 'ws'
+    const wsUrl = serverLink.replace(/^https?/, protocol)
+
+    let ws
+
+    try {
+      ws = new WebSocket(wsUrl)
+
+      ws.onopen = () => {
+        console.log('WebSocket connected for payments')
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data)
+          if (message.type === 'payment_created' && message.data?.payment) {
+            console.log('New payment received:', message.data.payment)
+            prependPayment(message.data.payment)
+          }
+        } catch (err) {
+          console.error('Error parsing WebSocket message:', err)
+        }
+      }
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error)
+      }
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected for payments')
+      }
+    } catch (err) {
+      console.error('Error creating WebSocket connection:', err)
+    }
+
+    return () => {
+      if (ws) {
+        ws.close()
+      }
+    }
+  }, [prependPayment])
 
   useEffect(() => {
-    const id = searchParams.get('id');
-    if (!id) return;
+    const id = searchParams.get('id')
+    if (!id) return
 
     const fetchPayment = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('No authentication token found');
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
           `${import.meta.env.VITE_SERVER_LINK}/payments/${Number(id)}`,
@@ -45,41 +109,52 @@ function PaymentsContent() {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-          }
-        );
+          },
+        )
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Failed to fetch payment details');
+        const result = await response.json()
+        if (!response.ok)
+          throw new Error(result.message || 'Failed to fetch payment details')
 
-        setViewingPayment(result);
-        setIsViewing(true);
-        setSearchParams(prev => {
-          const next = new URLSearchParams(prev);
-          next.delete('id');
-          return next;
-        }, { replace: true });
+        setViewingPayment(result)
+        setIsViewing(true)
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('id')
+            return next
+          },
+          { replace: true },
+        )
       } catch (err) {
-        setToast({ type: 'error', message: err.message || 'Failed to fetch payment details' });
+        setToast({
+          type: 'error',
+          message: err.message || 'Failed to fetch payment details',
+        })
       }
-    };
+    }
 
-    fetchPayment();
-  }, [searchParams, setSearchParams]);
+    fetchPayment()
+  }, [searchParams, setSearchParams])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const accessLevel = getAccessLevel('payments', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const accessLevel = getAccessLevel('payments', user)
+  const enableCheckboxes =
+    accessLevel === 'Check Access' ||
+    accessLevel === 'Approve Access' ||
+    accessLevel === 'Edit Access' ||
+    accessLevel === 'Full Access'
 
-  const checkboxCondition = null; // Always show checkboxes (match other pages)
+  const checkboxCondition = null // Always show checkboxes (match other pages)
 
   // ─── Helper: fetch full payment data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No authentication token found');
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
 
-      const paymentIds = selectedRows.map(row => row.id).join(',');
+      const paymentIds = selectedRows.map((row) => row.id).join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/payments/print/${paymentIds}?copyType=${copyType}`,
@@ -89,27 +164,29 @@ function PaymentsContent() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-        }
-      );
+        },
+      )
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Failed to fetch payments for printing');
+      const result = await response.json()
+      if (!response.ok)
+        throw new Error(result.message || 'Failed to fetch payments for printing')
 
-      const data = result.data || [];
-      console.log('PDF Data received:', data);
-      if (!Array.isArray(data)) throw new Error('Invalid data format received from server');
+      const data = result.data || []
+      console.log('PDF Data received:', data)
+      if (!Array.isArray(data))
+        throw new Error('Invalid data format received from server')
 
-      await generatePaymentPDF(data, copyType);
+      await generatePaymentPDF(data, copyType)
 
       setToast({
         type: 'success',
         message: `${data.length} payment PDF(s) downloaded (${copyType === 'customer' ? 'Vendor' : 'Internal'} Copy)`,
-      });
+      })
     } catch (error) {
-      console.error('Error generating payment PDF:', error);
-      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' });
+      console.error('Error generating payment PDF:', error)
+      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' })
     }
-  };
+  }
 
   // Function to filter checkbox actions based on selected rows
   const getFilteredCheckboxActions = (selectedRows) => {
@@ -118,51 +195,52 @@ function PaymentsContent() {
         label: 'Approve Selected',
         onClick: async (selectedRows) => {
           try {
-            console.log('Approving payments:', selectedRows);
+            console.log('Approving payments:', selectedRows)
 
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token')
             if (!token) {
-              throw new Error('No authentication token found');
+              throw new Error('No authentication token found')
             }
 
-            const updates = selectedRows.map(row => ({
+            const updates = selectedRows.map((row) => ({
               id: row.id,
-              currentState: row.state
-            }));
+              currentState: row.state,
+            }))
 
             const response = await fetch(
               `${import.meta.env.VITE_SERVER_LINK}/payments/payment-state`,
               {
-                method: "PUT",
+                method: 'PUT',
                 headers: {
-                  "Content-Type": "application/json",
+                  'Content-Type': 'application/json',
                   Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ updates })
-              }
-            );
+                body: JSON.stringify({ updates }),
+              },
+            )
 
-            const result = await response.json();
+            const result = await response.json()
 
             if (!response.ok) {
-              throw new Error(result.message || 'Failed to approve payments');
+              throw new Error(result.message || 'Failed to approve payments')
             }
 
-            await refetchPayments();
+            await refetchPayments()
 
             setToast({
               type: 'success',
-              message: result.message || `${selectedRows.length} payment(s) approved successfully`
-            });
-
+              message:
+                result.message ||
+                `${selectedRows.length} payment(s) approved successfully`,
+            })
           } catch (error) {
-            console.error('Error approving payments:', error);
+            console.error('Error approving payments:', error)
             setToast({
               type: 'error',
-              message: error.message || 'Failed to approve payments'
-            });
+              message: error.message || 'Failed to approve payments',
+            })
           }
-        }
+        },
       },
       {
         label: 'Internal Copy',
@@ -176,61 +254,67 @@ function PaymentsContent() {
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
         style: 'orange',
       },
-    ];
+    ]
 
-    return allActions.filter(action => {
+    return allActions.filter((action) => {
       if (action.label === 'Approve Selected') {
-        return selectedRows.some(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+        return selectedRows.some(
+          (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+        )
       }
-      return true;
-    });
-  };
+      return true
+    })
+  }
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
 
-  if (isAdding || isEditing) return (
-    <RouteProtection routeName="payments">
-      <PaymentsForm
-        isEditMode={isEditing}
-        isViewMode={isViewing}
-        paymentData={viewingPayment}
-        onBack={() => {
-          setIsAdding(false);
-          setIsEditing(false);
-          setIsViewing(false);
-          setViewingPayment(null);
-        }}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchPayments();
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isAdding || isEditing)
+    return (
+      <RouteProtection routeName="payments">
+        <PaymentsForm
+          isEditMode={isEditing}
+          isViewMode={isViewing}
+          paymentData={viewingPayment}
+          onBack={() => {
+            setIsAdding(false)
+            setIsEditing(false)
+            setIsViewing(false)
+            setViewingPayment(null)
+          }}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchPayments()
+          }}
+        />
+      </RouteProtection>
+    )
 
-  if (isViewing) return (
-    <RouteProtection routeName="payments">
-      <PaymentsForm
-        isViewMode={true}
-        paymentData={viewingPayment}
-        onBack={() => {
-          setIsViewing(false);
-          setViewingPayment(null);
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isViewing)
+    return (
+      <RouteProtection routeName="payments">
+        <PaymentsForm
+          isViewMode={true}
+          paymentData={viewingPayment}
+          onBack={() => {
+            setIsViewing(false)
+            setViewingPayment(null)
+          }}
+        />
+      </RouteProtection>
+    )
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Retrieving Payments...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Retrieving Payments...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -241,12 +325,11 @@ function PaymentsContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-
       {toast && (
         <DynamicToast
           type={toast.type}
@@ -256,7 +339,7 @@ function PaymentsContent() {
       )}
 
       {/* --- HEADER SECTION --- */}
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         <motion.div
           initial="hidden"
           animate="visible"
@@ -280,7 +363,10 @@ function PaymentsContent() {
               EXPORT LEDGER
             </button>
             <ProtectedAction routeName="payments">
-              <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button
+                onClick={() => setIsAdding(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
                 <CheckCircle size={14} />
                 Process Payment
               </button>
@@ -331,111 +417,117 @@ function PaymentsContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  console.log('Viewing payment:', row);
-                  
-                  const token = localStorage.getItem('token');
+                  console.log('Viewing payment:', row)
+
+                  const token = localStorage.getItem('token')
                   if (!token) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/payments/${row.id}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
-                      }
-                    }
-                  );
+                      },
+                    },
+                  )
 
-                  const result = await response.json();
+                  const result = await response.json()
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch payment details');
+                    throw new Error(
+                      result.message || 'Failed to fetch payment details',
+                    )
                   }
 
-                  console.log('Payment details fetched:', result);
-                  setViewingPayment(result);
-                  setIsViewing(true);
-
+                  console.log('Payment details fetched:', result)
+                  setViewingPayment(result)
+                  setIsViewing(true)
                 } catch (error) {
-                  console.error('Error fetching payment details:', error);
+                  console.error('Error fetching payment details:', error)
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch payment details'
-                  });
+                    message: error.message || 'Failed to fetch payment details',
+                  })
                 }
-              }
+              },
             },
             {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  console.log('Editing payment:', row);
-                  
-                  const token = localStorage.getItem('token');
+                  console.log('Editing payment:', row)
+
+                  const token = localStorage.getItem('token')
                   if (!token) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/payments/${row.id}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
-                      }
-                    }
-                  );
+                      },
+                    },
+                  )
 
-                  const result = await response.json();
+                  const result = await response.json()
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch payment details');
+                    throw new Error(
+                      result.message || 'Failed to fetch payment details',
+                    )
                   }
 
-                  console.log('Payment details fetched for editing:', result);
-                  setViewingPayment(result);
-                  setIsEditing(true);
-
+                  console.log('Payment details fetched for editing:', result)
+                  setViewingPayment(result)
+                  setIsEditing(true)
                 } catch (error) {
-                  console.error('Error fetching payment details for editing:', error);
+                  console.error('Error fetching payment details for editing:', error)
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch payment details'
-                  });
+                    message: error.message || 'Failed to fetch payment details',
+                  })
                 }
-              }
-            }
+              },
+            },
           ]}
           badgeColumns={[
             {
               column: 'status',
               values: {
-                'PAID': 'green',
-                'UNPAID': 'red',
-                'PARTIALLY PAID': 'yellow'
-              }
+                PAID: 'green',
+                UNPAID: 'red',
+                'PARTIALLY PAID': 'yellow',
+              },
             },
             {
               column: 'state',
               values: {
-                'PREPARED': 'orange',
-                'CHECKED': 'blue',
-                'APPROVED': 'green',
-                'REJECTED': 'red',
-                'CANCELLED': 'orange'
-              }
-            }
+                PREPARED: 'orange',
+                CHECKED: 'blue',
+                APPROVED: 'green',
+                REJECTED: 'red',
+                CANCELLED: 'orange',
+              },
+            },
           ]}
           checkboxActions={getFilteredCheckboxActions([])}
           checkboxActionsFilter={getFilteredCheckboxActions}
+          enableInfiniteScroll={true}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
+          onLoadMore={loadMore}
         />
       </motion.div>
     </div>
-  );
+  )
 }
 
 // Reusable SummaryCard (Same as used in other pages)
@@ -444,12 +536,16 @@ function SummaryCard({ icon, label, value, subText }) {
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }

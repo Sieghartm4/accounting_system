@@ -6,6 +6,7 @@ const {
   Query,
   Transaction,
 } = require('../database/util/queries.util')
+const { broadcastUpdates } = require('../startup/socket.startup')
 
 const {
   formatMemoryUsage,
@@ -244,6 +245,14 @@ const regenerateCollectionsJournalEntries = async (
 
 const getSales = async (req, res, next) => {
   try {
+    // pagination params
+    const { offset, limit } = req.query
+    const shouldPaginate = offset !== undefined && limit !== undefined
+    const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
+    const limitNum = shouldPaginate
+      ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
+      : null
+
     const query = sql
       .select([
         { col: Accounting.sales.selectOptionColumns.id, as: 'id' },
@@ -288,11 +297,15 @@ const getSales = async (req, res, next) => {
 
       .build()
 
-    let sales = await Query(
-      query,
-      [],
-      [Accounting.sales.prefix_, Master.customers.prefix_],
-    )
+    const queryParams = shouldPaginate ? [limitNum, offsetNum] : []
+    const paginatedQuery = shouldPaginate
+      ? `${query} ORDER BY ${Accounting.sales.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
+      : `${query} ORDER BY ${Accounting.sales.selectOptionColumns.id} DESC`
+
+    let sales = await Query(paginatedQuery, queryParams, [
+      Accounting.sales.prefix_,
+      Master.customers.prefix_,
+    ])
 
     // Apply optional date_due filtering from query params: date_from, date_to
     const { date_from, date_to } = req.query || {}
@@ -318,6 +331,12 @@ const getSales = async (req, res, next) => {
       data: sales,
 
       count: sales.length,
+
+      offset: offsetNum,
+
+      limit: limitNum,
+
+      hasMore: shouldPaginate ? sales.length === limitNum : false,
 
       timestamp: new Date().toISOString(),
     })
@@ -821,6 +840,50 @@ const createSales = async (req, res, next) => {
 
       await connection.commit()
 
+      const selectNewSalesQuery = sql
+        .select([
+          { col: Accounting.sales.selectOptionColumns.id, as: 'id' },
+          {
+            col: Accounting.sales.selectOptionColumns.customer_id,
+            as: 'customer_id',
+          },
+          { col: Master.customers.selectOptionColumns.name, as: 'customer' },
+          {
+            col: Accounting.sales.selectOptionColumns.document_reference,
+            as: 'doc_ref',
+          },
+          { col: Accounting.sales.selectOptionColumns.terms, as: 'terms' },
+          {
+            col: Accounting.sales.selectOptionColumns.date_delivered,
+            as: 'date_delivered',
+          },
+          { col: Accounting.sales.selectOptionColumns.date_due, as: 'date_due' },
+          { col: Accounting.sales.selectOptionColumns.remarks, as: 'remarks' },
+          {
+            col: Accounting.sales.selectOptionColumns.total_amount_due,
+            as: 'amount_due',
+          },
+          { col: Accounting.sales.selectOptionColumns.status, as: 'status' },
+          { col: Accounting.sales.selectOptionColumns.state, as: 'state' },
+        ])
+        .from(Accounting.sales.tablename)
+        .innerJoin(
+          Master.customers.tablename,
+          Accounting.sales.selectOptionColumns.customer_id,
+          Master.customers.selectOptionColumns.id,
+        )
+        .where(Accounting.sales.selectOptionColumns.id)
+        .build()
+
+      const createdSalesRows = await Query(
+        selectNewSalesQuery,
+        [salesId],
+        [Accounting.sales.prefix_, Master.customers.prefix_],
+      )
+      const createdSales = Array.isArray(createdSalesRows)
+        ? createdSalesRows[0]
+        : createdSalesRows
+
       // Audit trail for create
 
       const now = new Date()
@@ -863,6 +926,17 @@ const createSales = async (req, res, next) => {
         data: { id: salesId },
 
         timestamp: new Date().toISOString(),
+      })
+
+      // Broadcast after response (non-blocking)
+      setImmediate(() => {
+        try {
+          if (createdSales) {
+            broadcastUpdates({ sale: createdSales }, 'sales_created')
+          }
+        } catch (err) {
+          console.error('Error broadcasting sales creation:', err)
+        }
       })
     } catch (error) {
       if (connection) {

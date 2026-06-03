@@ -1,51 +1,97 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 const useCollections = () => {
-  const [collections, setCollections] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [collections, setCollections] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState(null)
+  const [hasMore, setHasMore] = useState(false)
 
-  const fetchCollections = useCallback(async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("token");
+  const collectionsRef = useRef([])
 
-      if (!token) {
-        throw new Error("No authorization token found");
+  const LIMIT = 50
+
+  const prependCollection = useCallback((collection) => {
+    if (!collection || !collection.id) return
+
+    setCollections((prev) => {
+      if (prev.some((row) => row.id === collection.id)) {
+        return prev
       }
+      const next = [collection, ...prev]
+      collectionsRef.current = next
+      return next
+    })
+  }, [])
+
+  const fetchCollections = useCallback(async (offset = 0, append = false) => {
+    if (!append) {
+      setLoading(true)
+      setError(null)
+    } else {
+      setLoadingMore(true)
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authorization token found')
+
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/collections`,
+        `${import.meta.env.VITE_SERVER_LINK}/collections?offset=${offset}&limit=${LIMIT}`,
         {
-          method: "GET",
+          method: 'GET',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-        }
-      );
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+        },
+      )
 
-      const result = await response.json();
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
 
-      if (result.success) {
-        setCollections(result.data);
+      const result = await response.json()
+
+      if (!result.success)
+        throw new Error(result.message || 'Failed to fetch collections')
+
+      const data = Array.isArray(result.data) ? result.data : []
+
+      if (append) {
+        const next = [...(collectionsRef.current || []), ...data]
+        collectionsRef.current = next
+        setCollections(next)
       } else {
-        setError(result.message || 'Failed to fetch collections');
+        collectionsRef.current = data
+        setCollections(data)
       }
+
+      setHasMore(Boolean(result.hasMore))
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Failed to fetch collections')
+      if (!append) setCollections([])
     } finally {
-      setLoading(false);
+      setLoading(false)
+      setLoadingMore(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    fetchCollections();
-  }, [fetchCollections]);
+    fetchCollections(0, false)
+  }, [fetchCollections])
 
-  return { collections, loading, error, refetchCollections: fetchCollections };
-};
+  const loadMore = async () =>
+    fetchCollections(collectionsRef.current.length || 0, true)
 
-export default useCollections;
+  return {
+    collections,
+    loading,
+    loadingMore,
+    hasMore,
+    error,
+    refetchCollections: fetchCollections,
+    loadMore,
+    prependCollection,
+  }
+}
+
+export default useCollections

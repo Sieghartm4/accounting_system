@@ -6,6 +6,7 @@ const {
   Query,
   Transaction,
 } = require('../database/util/queries.util')
+const { broadcastUpdates } = require('../startup/socket.startup')
 
 const {
   formatMemoryUsage,
@@ -27,6 +28,13 @@ require('dotenv').config()
 
 const getReceipts = async (req, res, next) => {
   try {
+    const { offset, limit } = req.query
+    const shouldPaginate = offset !== undefined && limit !== undefined
+    const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
+    const limitNum = shouldPaginate
+      ? Math.max(1, Math.min(100, parseInt(limit, 10) || 10))
+      : null
+
     const query = sql
       .select([
         { col: Accounting.receipts.selectOptionColumns.id, as: 'id' },
@@ -77,11 +85,15 @@ const getReceipts = async (req, res, next) => {
 
       .build()
 
-    let receipts = await Query(
-      query,
-      [],
-      [Accounting.receipts.prefix_, Master.customers.prefix_],
-    )
+    const queryParams = shouldPaginate ? [limitNum, offsetNum] : []
+    const paginatedQuery = shouldPaginate
+      ? `${query} ORDER BY ${Accounting.receipts.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
+      : `${query} ORDER BY ${Accounting.receipts.selectOptionColumns.id} DESC`
+
+    let receipts = await Query(paginatedQuery, queryParams, [
+      Accounting.receipts.prefix_,
+      Master.customers.prefix_,
+    ])
 
     res.status(200).json({
       success: true,
@@ -91,6 +103,12 @@ const getReceipts = async (req, res, next) => {
       data: receipts,
 
       count: receipts.length,
+
+      offset: offsetNum,
+
+      limit: limitNum,
+
+      hasMore: shouldPaginate ? receipts.length === limitNum : false,
 
       timestamp: new Date().toISOString(),
     })
@@ -1080,6 +1098,59 @@ const createReceipts = async (req, res, next) => {
 
       await connection.commit()
 
+      const selectNewReceiptQuery = sql
+        .select([
+          { col: Accounting.receipts.selectOptionColumns.id, as: 'id' },
+          {
+            col: Accounting.receipts.selectOptionColumns.customer_id,
+            as: 'customer_id',
+          },
+          { col: Master.customers.selectOptionColumns.name, as: 'customer' },
+          {
+            col: Accounting.receipts.selectOptionColumns.document_reference,
+            as: 'doc_ref',
+          },
+          {
+            col: Accounting.receipts.selectOptionColumns.collection_date,
+            as: 'collection_date',
+          },
+          {
+            col: Accounting.receipts.selectOptionColumns.mode_of_payment,
+            as: 'mode',
+          },
+          {
+            col: Accounting.receipts.selectOptionColumns.bank_name,
+            as: 'bank_name',
+          },
+          {
+            col: Accounting.receipts.selectOptionColumns.check_number,
+            as: 'check_number',
+          },
+          { col: Accounting.receipts.selectOptionColumns.remarks, as: 'remarks' },
+          {
+            col: Accounting.receipts.selectOptionColumns.total_amount_due,
+            as: 'amount_due',
+          },
+          { col: Accounting.receipts.selectOptionColumns.state, as: 'state' },
+        ])
+        .from(Accounting.receipts.tablename)
+        .innerJoin(
+          Master.customers.tablename,
+          Accounting.receipts.selectOptionColumns.customer_id,
+          Master.customers.selectOptionColumns.id,
+        )
+        .where(Accounting.receipts.selectOptionColumns.id)
+        .build()
+
+      const createdReceiptRows = await Query(
+        selectNewReceiptQuery,
+        [receiptId],
+        [Accounting.receipts.prefix_, Master.customers.prefix_],
+      )
+      const createdReceipt = Array.isArray(createdReceiptRows)
+        ? createdReceiptRows[0]
+        : createdReceiptRows
+
       // Audit trail for create
 
       const now = new Date()
@@ -1122,6 +1193,17 @@ const createReceipts = async (req, res, next) => {
         data: { id: receiptId },
 
         timestamp: new Date().toISOString(),
+      })
+
+      // Broadcast after response (non-blocking)
+      setImmediate(() => {
+        try {
+          if (createdReceipt) {
+            broadcastUpdates({ receipt: createdReceipt }, 'receipt_created')
+          }
+        } catch (err) {
+          console.error('Error broadcasting receipt creation:', err)
+        }
       })
     } catch (error) {
       if (connection) {

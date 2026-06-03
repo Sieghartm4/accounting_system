@@ -1,47 +1,96 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 export function useSales() {
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(null)
+  const [hasMore, setHasMore] = useState(false)
 
-  const refetchSales = async () => {
-    setLoading(true)
-    setError(null)
+  const salesRef = useRef([])
+
+  const prependSales = useCallback((sale) => {
+    if (!sale || !sale.id) return
+
+    setSales((prev) => {
+      if (prev.some((row) => row.id === sale.id)) {
+        return prev
+      }
+      const next = [sale, ...prev]
+      salesRef.current = next
+      return next
+    })
+  }, [])
+
+  const LIMIT = 50
+
+  const fetchSales = async (offset = 0, append = false) => {
+    if (!append) {
+      setLoading(true)
+      setError(null)
+    } else {
+      setLoadingMore(true)
+    }
 
     try {
       const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('No authorization token found')
-      }
+      if (!token) throw new Error('No authorization token found')
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/sales`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/sales?offset=${offset}&limit=${LIMIT}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
         },
-      })
+      )
 
       const result = await response.json()
       if (!response.ok || !result.success) {
         throw new Error(result.message || 'Failed to fetch sales')
       }
 
-      setSales(Array.isArray(result.data) ? result.data : [])
+      const data = Array.isArray(result.data) ? result.data : []
+
+      if (append) {
+        const next = [...(salesRef.current || []), ...data]
+        salesRef.current = next
+        setSales(next)
+      } else {
+        salesRef.current = data
+        setSales(data)
+      }
+
+      setHasMore(Boolean(result.hasMore))
     } catch (err) {
       setError(err.message || 'Failed to load sales')
-      setSales([])
+      if (!append) setSales([])
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }
+
+  const refetchSales = async () => fetchSales(0, false)
+
+  const loadMore = async () => fetchSales(salesRef.current.length || 0, true)
 
   useEffect(() => {
     refetchSales()
   }, [])
 
-  return { sales, loading, error, refetchSales }
+  return {
+    sales,
+    loading,
+    loadingMore,
+    hasMore,
+    error,
+    refetchSales,
+    loadMore,
+    prependSales,
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

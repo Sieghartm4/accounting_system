@@ -35,7 +35,16 @@ export default function Adjustments() {
 }
 
 function AdjustmentsContent() {
-  const { adjustments, loading, error, refetchAdjustments } = useAdjustments()
+  const {
+    adjustments,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    refetchAdjustments,
+    loadMore,
+    prependAdjustment,
+  } = useAdjustments()
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -101,6 +110,39 @@ function AdjustmentsContent() {
       navigate(location.pathname, { replace: true, state: {} })
     }
   }, [location.state, navigate, location.pathname])
+
+  useEffect(() => {
+    const serverLink = import.meta.env.VITE_SERVER_LINK
+    if (!serverLink) return
+
+    const protocol = serverLink.startsWith('https') ? 'wss' : 'ws'
+    const socketUrl = serverLink.replace(/^http/, protocol)
+    const socket = new WebSocket(socketUrl)
+
+    socket.addEventListener('message', (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        // Listen for adjustment creation
+        if (payload?.type === 'adjustment_created' && payload?.data?.adjustment) {
+          prependAdjustment(payload.data.adjustment)
+        }
+        // 🟢 ADDED: Also listen for journal entries creation to refresh if needed
+        if (payload?.type === 'journal_entries_created') {
+          refetchAdjustments()
+        }
+      } catch (err) {
+        console.error('Adjustments WebSocket message parse error', err)
+      }
+    })
+
+    socket.addEventListener('error', (err) => {
+      console.error('Adjustments WebSocket error', err)
+    })
+
+    return () => {
+      socket.close()
+    }
+  }, [prependAdjustment, refetchAdjustments])
 
   // Check if user has access to enable checkboxes
   const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -280,7 +322,7 @@ function AdjustmentsContent() {
       )}
 
       {/* --- HEADER SECTION --- */}
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         <motion.div
           initial="hidden"
           animate="visible"
@@ -511,6 +553,10 @@ function AdjustmentsContent() {
               },
             },
           ]}
+          enableInfiniteScroll={true}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
+          onLoadMore={loadMore}
         />
       </motion.div>
     </div>

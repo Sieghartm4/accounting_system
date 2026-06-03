@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -44,6 +44,36 @@ function AdvancesContent() {
     refreshAdvances,
     loadMore,
   } = useAdvances(startDate, endDate)
+
+  // 🟢 ADDED: Socket listener for journal entries creation
+  useEffect(() => {
+    const serverLink = import.meta.env.VITE_SERVER_LINK
+    if (!serverLink) return
+
+    const protocol = serverLink.startsWith('https') ? 'wss' : 'ws'
+    const socketUrl = serverLink.replace(/^http/, protocol)
+    const socket = new WebSocket(socketUrl)
+
+    socket.addEventListener('message', (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        if (payload?.type === 'journal_entries_created') {
+          // Refresh advances to show newly created entries
+          refreshAdvances()
+        }
+      } catch (err) {
+        console.error('Advances WebSocket message parse error', err)
+      }
+    })
+
+    socket.addEventListener('error', (err) => {
+      console.error('Advances WebSocket error', err)
+    })
+
+    return () => {
+      socket.close()
+    }
+  }, [refreshAdvances])
 
   const totalDebit = advances.reduce(
     (sum, entry) => (entry.type === 'DEBIT' ? sum + Number(entry.amount || 0) : sum),

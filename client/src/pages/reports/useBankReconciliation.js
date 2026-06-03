@@ -14,6 +14,19 @@ const getCurrentMonthRange = () => {
   return [formatLocalDate(start), formatLocalDate(end)]
 }
 
+const addDays = (dateString, days) => {
+  const date = new Date(dateString)
+  date.setDate(date.getDate() + days)
+  return formatLocalDate(date)
+}
+
+const isDateWithinRange = (dateString, startDate, endDate) => {
+  const date = new Date(dateString)
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  return date >= start && date <= end
+}
+
 const BANK_SECTION_ITEMS = [
   {
     value: 'deposits_in_transit',
@@ -469,37 +482,75 @@ export function useBankReconciliation(selectedReconciliation) {
     setTimeout(() => setShowToast(false), 3000)
   }
 
-  const buildDateQuery = (start = detailStartDate, end = detailEndDate) => {
+  const buildDateQuery = (start, end) => {
+    const effectiveStart = start === undefined ? detailStartDate : start
+    const effectiveEnd = end === undefined ? detailEndDate : end
     const params = new URLSearchParams()
 
-    if (start) params.append('start_date', start)
+    if (effectiveStart) params.append('start_date', effectiveStart)
 
-    if (end) params.append('end_date', end)
+    if (effectiveEnd) params.append('end_date', effectiveEnd)
 
     const queryString = params.toString()
 
     return queryString ? `?${queryString}` : ''
   }
 
-  const fetchJournalEntriesByCoa = async (
-    coaId,
-
+  const fetchJournalEntries = async (
     start = detailStartDate,
-
     end = detailEndDate,
   ) => {
     try {
       setJournalEntriesLoading(true)
+      setJournalEntries([])
 
       const token = localStorage.getItem('token')
-
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/journal_entries/coa/${coaId}${buildDateQuery(start, end)}`,
-
+        `${import.meta.env.VITE_SERVER_LINK}/journal_entries${buildDateQuery(start, end)}`,
         {
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
 
+      const result = await response.json()
+      if (result.success) {
+        setJournalEntries(result.data || [])
+      } else {
+        setJournalEntries([])
+        showToastMsg('Failed to load journal entries', 'error')
+      }
+    } catch {
+      setJournalEntries([])
+      showToastMsg('Failed to load journal entries', 'error')
+    } finally {
+      setJournalEntriesLoading(false)
+    }
+  }
+
+  const fetchJournalEntriesByCoa = async (
+    coaId,
+    start = detailStartDate,
+    end = detailEndDate,
+    allowFallback = true,
+  ) => {
+    if (!coaId) {
+      await fetchJournalEntries(start, end)
+      return
+    }
+
+    try {
+      setJournalEntriesLoading(true)
+      setJournalEntries([])
+
+      const token = localStorage.getItem('token')
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/journal_entries/coa/${coaId}${buildDateQuery(start, end)}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
         },
@@ -508,11 +559,23 @@ export function useBankReconciliation(selectedReconciliation) {
       const result = await response.json()
 
       if (result.success) {
-        setJournalEntries(result.data || [])
+        const entries = result.data || []
+        if (entries.length === 0 && allowFallback && start && end) {
+          console.warn(
+            'No COA-specific journal entries found, falling back to all journal entries in range',
+            start,
+            end,
+          )
+          await fetchJournalEntries(start, end)
+          return
+        }
+        setJournalEntries(entries)
       } else {
+        setJournalEntries([])
         showToastMsg('Failed to load journal entries', 'error')
       }
     } catch {
+      setJournalEntries([])
       showToastMsg('Failed to load journal entries', 'error')
     } finally {
       setJournalEntriesLoading(false)
@@ -547,10 +610,6 @@ export function useBankReconciliation(selectedReconciliation) {
         setItems(result.data.items || [])
 
         setReconData(result.data)
-
-        if (result.data.coa_id) {
-          fetchJournalEntriesByCoa(result.data.coa_id, startDate, endDate)
-        }
 
         // Fetch adjustments from backend
 
@@ -645,6 +704,21 @@ export function useBankReconciliation(selectedReconciliation) {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailStartDate, detailEndDate])
+
+  useEffect(() => {
+    const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
+
+    if (coaId && detailStartDate && detailEndDate) {
+      fetchJournalEntriesByCoa(coaId, detailStartDate, detailEndDate)
+    } else {
+      setJournalEntries([])
+    }
+  }, [
+    reconData?.coa_id,
+    selectedReconciliation?.coa_id,
+    detailStartDate,
+    detailEndDate,
+  ])
 
   const handleUpdateBankStatementBalance = async () => {
     const val = parseFloat(bankBalanceInput)
@@ -1218,9 +1292,115 @@ export function useBankReconciliation(selectedReconciliation) {
 
       const result = await response.json()
       if (result.success && result.data) {
-        setAvailableMonths(result.data)
-        if (result.data.length > 0) {
-          const first = result.data[0]
+        const now = formatLocalDate(new Date())
+        const savedMonths = [...result.data].sort(
+          (a, b) => new Date(b.start_date) - new Date(a.start_date),
+        )
+
+        const currentPeriod = savedMonths.find((month) =>
+          isDateWithinRange(now, month.start_date, month.end_date),
+        )
+
+        const latestSaved = savedMonths.reduce((latest, month) => {
+          if (!latest) return month
+          return new Date(month.end_date) > new Date(latest.end_date)
+            ? month
+            : latest
+        }, null)
+
+        let effectiveMonths = [...savedMonths]
+        let defaultRange = null
+
+        if (currentPeriod) {
+          defaultRange = {
+            start_date: currentPeriod.start_date,
+            end_date: currentPeriod.end_date,
+            label: `${new Date(currentPeriod.start_date).toLocaleDateString(
+              'en-US',
+              {
+                month: 'short',
+                day: 'numeric',
+              },
+            )} - ${new Date(currentPeriod.end_date).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}`,
+            isOpenPeriod: false,
+          }
+        } else if (
+          latestSaved &&
+          isDateWithinRange(now, latestSaved.start_date, latestSaved.end_date)
+        ) {
+          defaultRange = {
+            start_date: latestSaved.start_date,
+            end_date: latestSaved.end_date,
+            label: `${new Date(latestSaved.start_date).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+            })} - ${new Date(latestSaved.end_date).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}`,
+            isOpenPeriod: false,
+          }
+        } else if (latestSaved && now > latestSaved.end_date) {
+          const openStart = addDays(latestSaved.end_date, 1)
+          const openLabel = `Unreconciled ${new Date(openStart).toLocaleDateString(
+            'en-US',
+            {
+              month: 'short',
+              day: 'numeric',
+            },
+          )} - ${new Date(now).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })}`
+          const openPeriod = {
+            start_date: openStart,
+            end_date: now,
+            label: openLabel,
+            isOpenPeriod: true,
+          }
+          effectiveMonths = [openPeriod, ...savedMonths]
+          defaultRange = openPeriod
+        } else if (
+          latestSaved &&
+          now < savedMonths[savedMonths.length - 1].start_date
+        ) {
+          const openStart = formatLocalDate(
+            new Date(now.getFullYear(), now.getMonth(), 1),
+          )
+          const openLabel = `Unreconciled ${new Date(openStart).toLocaleDateString(
+            'en-US',
+            {
+              month: 'short',
+              day: 'numeric',
+            },
+          )} - ${new Date(now).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })}`
+          const openPeriod = {
+            start_date: openStart,
+            end_date: now,
+            label: openLabel,
+            isOpenPeriod: true,
+          }
+          effectiveMonths = [openPeriod, ...savedMonths]
+          defaultRange = openPeriod
+        }
+
+        setAvailableMonths(effectiveMonths)
+
+        if (defaultRange) {
+          setDetailStartDate(defaultRange.start_date)
+          setDetailEndDate(defaultRange.end_date)
+        } else if (savedMonths.length > 0) {
+          const first = savedMonths[0]
           setDetailStartDate(first.start_date)
           setDetailEndDate(first.end_date)
         }
@@ -1508,13 +1688,9 @@ export function useBankReconciliation(selectedReconciliation) {
 
   const unadjustedBookBalance = glDebits - glCredits
 
-  const parsedRunningBalance = parseFloat(reconData?.running_balance)
-  const endingBookBalance =
-    journalEntries.length > 0
-      ? unadjustedBookBalance
-      : Number.isFinite(parsedRunningBalance)
-        ? parsedRunningBalance
-        : 0
+  // Only compute ending book balance if journal entries exist for the date range
+  // If no journal entries, don't show book balance adjustments
+  const endingBookBalance = journalEntries.length > 0 ? unadjustedBookBalance : 0
 
   const bookAdditions = bookSectionItems
 

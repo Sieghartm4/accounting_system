@@ -582,10 +582,10 @@ export default function AdjustmentsForm({
 
   const handlePostTransaction = async () => {
     try {
-      if (!documentReference) {
-        setToast({ type: 'warning', message: 'Please enter document reference' })
-        return
-      }
+      // if (!documentReference) {
+      //   setToast({ type: 'warning', message: 'Please enter document reference' })
+      //   return
+      // }
 
       const token = localStorage.getItem('token')
       if (!token) {

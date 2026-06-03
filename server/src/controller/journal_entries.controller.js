@@ -13,6 +13,7 @@ const {
 const { Accounting } = require('../database/model/Accounting')
 const { Master } = require('../database/model/Master')
 const { getTenantPool } = require('../database/util/tenantConnection.util')
+const { broadcastUpdates } = require('../startup/socket.startup')
 
 const sql = new SQLQueryBuilder()
 
@@ -150,7 +151,7 @@ const getAdvances = async (req, res, next) => {
                    FROM ${Accounting.journal_entries.tablename} 
                    INNER JOIN ${Master.charts_of_accounts.tablename} ON ${Master.charts_of_accounts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.coa_id} 
                    WHERE ${whereConditions.join(' AND ')} 
-                   ORDER BY ${Accounting.journal_entries.selectOptionColumns.date} DESC`
+                   ORDER BY ${Accounting.journal_entries.selectOptionColumns.id} DESC`
 
     const queryValues = shouldPaginate ? [...values, limitNum, offsetNum] : values
     if (shouldPaginate) {
@@ -222,16 +223,14 @@ const getJournalEntriesByCoaId = async (req, res, next) => {
     console.log('Initial where condition:', whereConditions[0])
     console.log('Initial values:', values)
 
+    const dateColumn = `DATE(${Accounting.journal_entries.selectOptionColumns.date})`
+
     if (start_date) {
-      whereConditions.push(
-        `${Accounting.journal_entries.selectOptionColumns.date} >= ?`,
-      )
+      whereConditions.push(`${dateColumn} >= ?`)
       values.push(start_date)
     }
     if (end_date) {
-      whereConditions.push(
-        `${Accounting.journal_entries.selectOptionColumns.date} <= ?`,
-      )
+      whereConditions.push(`${dateColumn} <= ?`)
       values.push(end_date)
     }
 
@@ -385,6 +384,15 @@ const createJournalEntries = async (req, res, next) => {
     }
 
     await connection.commit()
+
+    // 🟢 ADDED: Broadcast socket event for journal entries creation
+    if (results.length > 0) {
+      broadcastUpdates(
+        { journal_entries: results, count: results.length },
+        'journal_entries_created',
+      )
+    }
+
     return res.status(201).json({
       success: true,
       message: 'Journal entries created successfully',

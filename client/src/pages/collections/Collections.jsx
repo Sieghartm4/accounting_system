@@ -1,42 +1,61 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Layers, CheckCircle, ShieldCheck, Wallet, ArrowRight, Download, Plus, FileText, Building } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import DynamicToast from '../../components/DynamicToast';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import useCollections from './useCollections';
-import CollectionsForm from './CollectionsForm';
-import { getAccessLevel } from '../../utils/routeProtection';
-import { generateCollectionPDF } from '../../utils/generateCollectionPDF';
+import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import {
+  Layers,
+  CheckCircle,
+  ShieldCheck,
+  Wallet,
+  ArrowRight,
+  Download,
+  Plus,
+  FileText,
+  Building,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import DynamicToast from '../../components/DynamicToast'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import useCollections from './useCollections'
+import CollectionsForm from './CollectionsForm'
+import { getAccessLevel } from '../../utils/routeProtection'
+import { generateCollectionPDF } from '../../utils/generateCollectionPDF'
 
 export default function Collections() {
   return (
     <RouteProtection routeName="collections">
       <CollectionsContent />
     </RouteProtection>
-  );
+  )
 }
 
 function CollectionsContent() {
-  const { collections, loading, error, refetchCollections } = useCollections();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [isAdding, setIsAdding] = useState(false);
-  const [isViewing, setIsViewing] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [viewingCollection, setViewingCollection] = useState(null);
-  const [editingCollection, setEditingCollection] = useState(null);
-  const [toast, setToast] = useState(null);
+  const {
+    collections,
+    loading,
+    loadingMore,
+    hasMore,
+    error,
+    refetchCollections,
+    loadMore,
+    prependCollection,
+  } = useCollections()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [isAdding, setIsAdding] = useState(false)
+  const [isViewing, setIsViewing] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [viewingCollection, setViewingCollection] = useState(null)
+  const [editingCollection, setEditingCollection] = useState(null)
+  const [toast, setToast] = useState(null)
 
   useEffect(() => {
-    const id = searchParams.get('id');
-    if (!id) return;
+    const id = searchParams.get('id')
+    if (!id) return
 
     const fetchCollection = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('No authentication token found');
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
           `${import.meta.env.VITE_SERVER_LINK}/collections/${Number(id)}`,
@@ -46,41 +65,80 @@ function CollectionsContent() {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-          }
-        );
+          },
+        )
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Failed to fetch collection details');
+        const result = await response.json()
+        if (!response.ok)
+          throw new Error(result.message || 'Failed to fetch collection details')
 
-        setViewingCollection(result);
-        setIsViewing(true);
-        setSearchParams(prev => {
-          const next = new URLSearchParams(prev);
-          next.delete('id');
-          return next;
-        }, { replace: true });
+        setViewingCollection(result)
+        setIsViewing(true)
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('id')
+            return next
+          },
+          { replace: true },
+        )
       } catch (err) {
-        setToast({ type: 'error', message: err.message || 'Failed to fetch collection details' });
+        setToast({
+          type: 'error',
+          message: err.message || 'Failed to fetch collection details',
+        })
       }
-    };
+    }
 
-    fetchCollection();
-  }, [searchParams, setSearchParams]);
+    fetchCollection()
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    const serverLink = import.meta.env.VITE_SERVER_LINK
+    if (!serverLink) return
+
+    const protocol = serverLink.startsWith('https') ? 'wss' : 'ws'
+    const socketUrl = serverLink.replace(/^http/, protocol)
+    const socket = new WebSocket(socketUrl)
+
+    socket.addEventListener('message', (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        if (payload?.type === 'collection_created' && payload?.data?.collection) {
+          prependCollection(payload.data.collection)
+        }
+      } catch (err) {
+        console.error('Collections WebSocket message parse error', err)
+      }
+    })
+
+    socket.addEventListener('error', (err) => {
+      console.error('Collections WebSocket error', err)
+    })
+
+    return () => {
+      socket.close()
+    }
+  }, [prependCollection])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const accessLevel = getAccessLevel('collections', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const accessLevel = getAccessLevel('collections', user)
+  const enableCheckboxes =
+    accessLevel === 'Check Access' ||
+    accessLevel === 'Approve Access' ||
+    accessLevel === 'Edit Access' ||
+    accessLevel === 'Full Access'
 
-  const checkboxCondition = null; // Always show checkboxes (match Receipts/Sales behavior)
+  const checkboxCondition = null // Always show checkboxes (match Receipts/Sales behavior)
 
   // ─── Helper: fetch full collection data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No authentication token found');
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
 
-      const collectionIds = selectedRows.map(row => row.id).join(',');
+      const collectionIds = selectedRows.map((row) => row.id).join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/collections/print/${collectionIds}?copyType=${copyType}`,
@@ -90,27 +148,29 @@ function CollectionsContent() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-        }
-      );
+        },
+      )
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Failed to fetch collections for printing');
+      const result = await response.json()
+      if (!response.ok)
+        throw new Error(result.message || 'Failed to fetch collections for printing')
 
-      const data = result.data || [];
-      console.log('PDF Data received:', data);
-      if (!Array.isArray(data)) throw new Error('Invalid data format received from server');
+      const data = result.data || []
+      console.log('PDF Data received:', data)
+      if (!Array.isArray(data))
+        throw new Error('Invalid data format received from server')
 
-      await generateCollectionPDF(data, copyType);
+      await generateCollectionPDF(data, copyType)
 
       setToast({
         type: 'success',
         message: `${data.length} collection PDF(s) downloaded (${copyType === 'customer' ? 'Customer' : 'Internal'} Copy)`,
-      });
+      })
     } catch (error) {
-      console.error('Error generating collection PDF:', error);
-      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' });
+      console.error('Error generating collection PDF:', error)
+      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' })
     }
-  };
+  }
 
   // Function to filter checkbox actions based on selected rows
   const getFilteredCheckboxActions = (selectedRows) => {
@@ -119,51 +179,52 @@ function CollectionsContent() {
         label: 'Approve Selected',
         onClick: async (selectedRows) => {
           try {
-            console.log('Approving collections:', selectedRows);
+            console.log('Approving collections:', selectedRows)
 
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token')
             if (!token) {
-              throw new Error('No authentication token found');
+              throw new Error('No authentication token found')
             }
 
-            const updates = selectedRows.map(row => ({
+            const updates = selectedRows.map((row) => ({
               id: row.id,
-              currentState: row.state
-            }));
+              currentState: row.state,
+            }))
 
             const response = await fetch(
               `${import.meta.env.VITE_SERVER_LINK}/collections/collection-state`,
               {
-                method: "PUT",
+                method: 'PUT',
                 headers: {
-                  "Content-Type": "application/json",
+                  'Content-Type': 'application/json',
                   Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ updates })
-              }
-            );
+                body: JSON.stringify({ updates }),
+              },
+            )
 
-            const result = await response.json();
+            const result = await response.json()
 
             if (!response.ok) {
-              throw new Error(result.message || 'Failed to approve collections');
+              throw new Error(result.message || 'Failed to approve collections')
             }
 
-            await refetchCollections();
+            await refetchCollections()
 
             setToast({
               type: 'success',
-              message: result.message || `${selectedRows.length} collection(s) approved successfully`
-            });
-
+              message:
+                result.message ||
+                `${selectedRows.length} collection(s) approved successfully`,
+            })
           } catch (error) {
-            console.error('Error approving collections:', error);
+            console.error('Error approving collections:', error)
             setToast({
               type: 'error',
-              message: error.message || 'Failed to approve collections'
-            });
+              message: error.message || 'Failed to approve collections',
+            })
           }
-        }
+        },
       },
       {
         label: 'Internal Copy',
@@ -177,70 +238,77 @@ function CollectionsContent() {
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
         style: 'orange',
       },
-    ];
+    ]
 
-    return allActions.filter(action => {
+    return allActions.filter((action) => {
       if (action.label === 'Approve Selected') {
-        return selectedRows.some(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+        return selectedRows.some(
+          (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+        )
       }
-      return true;
-    });
-  };
+      return true
+    })
+  }
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
 
-  if (isAdding) return (
-    <RouteProtection routeName="collections">
-      <CollectionsForm
-        onBack={() => setIsAdding(false)}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchCollections();
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isAdding)
+    return (
+      <RouteProtection routeName="collections">
+        <CollectionsForm
+          onBack={() => setIsAdding(false)}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchCollections()
+          }}
+        />
+      </RouteProtection>
+    )
 
-  if (isViewing) return (
-    <RouteProtection routeName="collections">
-      <CollectionsForm
-        isViewMode={true}
-        collectionData={viewingCollection}
-        onBack={() => {
-          setIsViewing(false);
-          setViewingCollection(null);
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isViewing)
+    return (
+      <RouteProtection routeName="collections">
+        <CollectionsForm
+          isViewMode={true}
+          collectionData={viewingCollection}
+          onBack={() => {
+            setIsViewing(false)
+            setViewingCollection(null)
+          }}
+        />
+      </RouteProtection>
+    )
 
-  if (isEditing) return (
-    <RouteProtection routeName="collections">
-      <CollectionsForm
-        isEditMode={true}
-        collectionData={editingCollection}
-        onBack={() => {
-          setIsEditing(false);
-          setEditingCollection(null);
-        }}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchCollections();
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isEditing)
+    return (
+      <RouteProtection routeName="collections">
+        <CollectionsForm
+          isEditMode={true}
+          collectionData={editingCollection}
+          onBack={() => {
+            setIsEditing(false)
+            setEditingCollection(null)
+          }}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchCollections()
+          }}
+        />
+      </RouteProtection>
+    )
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Retrieving Collections...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Retrieving Collections...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -251,12 +319,11 @@ function CollectionsContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-
       {toast && (
         <DynamicToast
           type={toast.type}
@@ -266,7 +333,7 @@ function CollectionsContent() {
       )}
 
       {/* --- HEADER SECTION --- */}
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
           <span>Treasury</span>
           <ArrowRight size={10} />
@@ -299,7 +366,10 @@ function CollectionsContent() {
               EXPORT LEDGER
             </button>
             <ProtectedAction routeName="collections">
-              <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button
+                onClick={() => setIsAdding(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
                 <CheckCircle size={14} />
                 Settle Account
               </button>
@@ -350,111 +420,120 @@ function CollectionsContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  console.log('Viewing collection:', row);
-                  
-                  const token = localStorage.getItem('token');
+                  console.log('Viewing collection:', row)
+
+                  const token = localStorage.getItem('token')
                   if (!token) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/collections/${row.id}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
-                      }
-                    }
-                  );
+                      },
+                    },
+                  )
 
-                  const result = await response.json();
+                  const result = await response.json()
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch collection details');
+                    throw new Error(
+                      result.message || 'Failed to fetch collection details',
+                    )
                   }
 
-                  console.log('Collection details fetched:', result);
-                  setViewingCollection(result);
-                  setIsViewing(true);
-
+                  console.log('Collection details fetched:', result)
+                  setViewingCollection(result)
+                  setIsViewing(true)
                 } catch (error) {
-                  console.error('Error fetching collection details:', error);
+                  console.error('Error fetching collection details:', error)
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch collection details'
-                  });
+                    message: error.message || 'Failed to fetch collection details',
+                  })
                 }
-              }
+              },
             },
             {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  console.log('Editing collection:', row);
-                  
-                  const token = localStorage.getItem('token');
+                  console.log('Editing collection:', row)
+
+                  const token = localStorage.getItem('token')
                   if (!token) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/collections/${row.id}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
-                      }
-                    }
-                  );
+                      },
+                    },
+                  )
 
-                  const result = await response.json();
+                  const result = await response.json()
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch collection details');
+                    throw new Error(
+                      result.message || 'Failed to fetch collection details',
+                    )
                   }
 
-                  console.log('Collection details fetched for editing:', result);
-                  setEditingCollection(result);
-                  setIsEditing(true);
-
+                  console.log('Collection details fetched for editing:', result)
+                  setEditingCollection(result)
+                  setIsEditing(true)
                 } catch (error) {
-                  console.error('Error fetching collection details for editing:', error);
+                  console.error(
+                    'Error fetching collection details for editing:',
+                    error,
+                  )
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch collection details'
-                  });
+                    message: error.message || 'Failed to fetch collection details',
+                  })
                 }
-              }
-            }
+              },
+            },
           ]}
           badgeColumns={[
             {
               column: 'status',
               values: {
-                'COLLECTED': 'green',
+                COLLECTED: 'green',
                 'NOT COLLECTED': 'red',
-                'PARTIALLY COLLECTED': 'yellow'
-              }
+                'PARTIALLY COLLECTED': 'yellow',
+              },
             },
             {
               column: 'state',
               values: {
-                'PREPARED': 'orange',
-                'CHECKED': 'blue',
-                'APPROVED': 'green',
-                'REJECTED': 'red',
-                'CANCELLED': 'orange'
-              }
-            }
+                PREPARED: 'orange',
+                CHECKED: 'blue',
+                APPROVED: 'green',
+                REJECTED: 'red',
+                CANCELLED: 'orange',
+              },
+            },
           ]}
           checkboxActions={getFilteredCheckboxActions([])}
           checkboxActionsFilter={getFilteredCheckboxActions}
+          enableInfiniteScroll={true}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
+          onLoadMore={loadMore}
         />
       </motion.div>
     </div>
-  );
+  )
 }
 
 // Reusable SummaryCard (Same as used in other pages)
@@ -463,12 +542,16 @@ function SummaryCard({ icon, label, value, subText }) {
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -1,40 +1,60 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Wallet, Banknote, ShieldCheck, History, ArrowRight, Download, Plus, Check, FileText, Building } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import DynamicToast from '../../components/DynamicToast';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import useDisbursements from './useDisbursements';
-import CashDisbursementForm from './CashDisbursementForm';
-import { getAccessLevel } from '../../utils/routeProtection';
-import { generateDisbursementPDF } from '../../utils/generateDisbursementPDF';
+import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import {
+  Wallet,
+  Banknote,
+  ShieldCheck,
+  History,
+  ArrowRight,
+  Download,
+  Plus,
+  Check,
+  FileText,
+  Building,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import DynamicToast from '../../components/DynamicToast'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import useDisbursements from './useDisbursements'
+import CashDisbursementForm from './CashDisbursementForm'
+import { getAccessLevel } from '../../utils/routeProtection'
+import { generateDisbursementPDF } from '../../utils/generateDisbursementPDF'
 
 export default function Disbursements() {
   return (
     <RouteProtection routeName="disbursement">
       <DisbursementsContent />
     </RouteProtection>
-  );
+  )
 }
 
 function DisbursementsContent() {
-  const { disbursements, loading, error, refetchDisbursements } = useDisbursements();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [isAdding, setIsAdding] = useState(false);
-  const [viewingDisbursement, setViewingDisbursement] = useState(null);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [toast, setToast] = useState(null);
+  const {
+    disbursements,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    refetchDisbursements,
+    loadMore,
+    prependDisbursement,
+  } = useDisbursements()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [isAdding, setIsAdding] = useState(false)
+  const [viewingDisbursement, setViewingDisbursement] = useState(null)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [toast, setToast] = useState(null)
 
   useEffect(() => {
-    const id = searchParams.get('id');
-    if (!id) return;
+    const id = searchParams.get('id')
+    if (!id) return
 
     const fetchDisbursement = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('No authentication token found');
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
           `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${Number(id)}`,
@@ -44,46 +64,88 @@ function DisbursementsContent() {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-          }
-        );
+          },
+        )
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Failed to fetch disbursement details');
+        const result = await response.json()
+        if (!response.ok)
+          throw new Error(result.message || 'Failed to fetch disbursement details')
 
-        setViewingDisbursement(result);
-        setIsEditMode(false);
-        setSearchParams(prev => {
-          const next = new URLSearchParams(prev);
-          next.delete('id');
-          return next;
-        }, { replace: true });
+        setViewingDisbursement(result)
+        setIsEditMode(false)
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('id')
+            return next
+          },
+          { replace: true },
+        )
       } catch (err) {
-        setToast({ type: 'error', message: err.message || 'Failed to fetch disbursement details' });
+        setToast({
+          type: 'error',
+          message: err.message || 'Failed to fetch disbursement details',
+        })
       }
-    };
+    }
 
-    fetchDisbursement();
-  }, [searchParams, setSearchParams]);
+    fetchDisbursement()
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    const serverLink = import.meta.env.VITE_SERVER_LINK
+    if (!serverLink) return
+
+    const protocol = serverLink.startsWith('https') ? 'wss' : 'ws'
+    const socketUrl = serverLink.replace(/^http/, protocol)
+    const socket = new WebSocket(socketUrl)
+
+    socket.addEventListener('message', (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        if (
+          payload?.type === 'disbursement_created' &&
+          payload?.data?.disbursement
+        ) {
+          prependDisbursement(payload.data.disbursement)
+        }
+      } catch (err) {
+        console.error('Disbursement WebSocket message parse error', err)
+      }
+    })
+
+    socket.addEventListener('error', (err) => {
+      console.error('Disbursement WebSocket error', err)
+    })
+
+    return () => {
+      socket.close()
+    }
+  }, [prependDisbursement])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const accessLevel = getAccessLevel('disbursement', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const accessLevel = getAccessLevel('disbursement', user)
+  const enableCheckboxes =
+    accessLevel === 'Check Access' ||
+    accessLevel === 'Approve Access' ||
+    accessLevel === 'Edit Access' ||
+    accessLevel === 'Full Access'
 
-  const checkboxCondition = null; // Always show checkboxes
+  const checkboxCondition = null // Always show checkboxes
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
 
   // ─── Helper: fetch full disbursement data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No authentication token found');
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
 
-      const disbursementIds = selectedRows.map(row => row.id).join(',');
+      const disbursementIds = selectedRows.map((row) => row.id).join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/print/${disbursementIds}?copyType=${copyType}`,
@@ -93,31 +155,35 @@ function DisbursementsContent() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-        }
-      );
+        },
+      )
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Failed to fetch disbursements for printing');
+      const result = await response.json()
+      if (!response.ok)
+        throw new Error(
+          result.message || 'Failed to fetch disbursements for printing',
+        )
 
       // Extract the actual disbursement data from the response
-      const data = result.data || [];
-      console.log('PDF Data received:', data);
-      console.log('First disbursement items:', data[0]?.items);
-      console.log('First disbursement journal:', data[0]?.journal);
-      if (!Array.isArray(data)) throw new Error('Invalid data format received from server');
+      const data = result.data || []
+      console.log('PDF Data received:', data)
+      console.log('First disbursement items:', data[0]?.items)
+      console.log('First disbursement journal:', data[0]?.journal)
+      if (!Array.isArray(data))
+        throw new Error('Invalid data format received from server')
 
       // Generate & auto-download PDFs (one per disbursement)
-      await generateDisbursementPDF(data, copyType);
+      await generateDisbursementPDF(data, copyType)
 
       setToast({
         type: 'success',
         message: `${data.length} disbursement PDF(s) downloaded (${copyType === 'vendor' ? 'Vendor' : 'Internal'} Copy)`,
-      });
+      })
     } catch (error) {
-      console.error('Error generating disbursement PDF:', error);
-      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' });
+      console.error('Error generating disbursement PDF:', error)
+      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' })
     }
-  };
+  }
 
   // Function to filter checkbox actions based on selected rows' states
   const getFilteredCheckboxActions = (selectedRows) => {
@@ -127,18 +193,26 @@ function DisbursementsContent() {
         icon: <Check size={14} />,
         onClick: async (selectedRows) => {
           try {
-            const token = localStorage.getItem('token');
-            if (!token) throw new Error('No authentication token found');
+            const token = localStorage.getItem('token')
+            if (!token) throw new Error('No authentication token found')
 
             // Filter to only include approvable rows (PREPARED or CHECKED)
-            const approvableRows = selectedRows.filter(row => row.state === 'PREPARED' || row.state === 'CHECKED');
-            
+            const approvableRows = selectedRows.filter(
+              (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+            )
+
             if (approvableRows.length === 0) {
-              setToast({ type: 'error', message: 'No disbursements are eligible for approval' });
-              return;
+              setToast({
+                type: 'error',
+                message: 'No disbursements are eligible for approval',
+              })
+              return
             }
 
-            const updates = approvableRows.map(row => ({ id: row.id, currentState: row.state }));
+            const updates = approvableRows.map((row) => ({
+              id: row.id,
+              currentState: row.state,
+            }))
 
             const response = await fetch(
               `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/disbursement-state`,
@@ -149,19 +223,25 @@ function DisbursementsContent() {
                   Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({ updates }),
-              }
-            );
+              },
+            )
 
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.message || 'Failed to approve disbursements');
+            const result = await response.json()
+            if (!response.ok)
+              throw new Error(result.message || 'Failed to approve disbursements')
 
-            await refetchDisbursements();
+            await refetchDisbursements()
             setToast({
               type: 'success',
-              message: result.message || `${approvableRows.length} disbursement(s) approved successfully`,
-            });
+              message:
+                result.message ||
+                `${approvableRows.length} disbursement(s) approved successfully`,
+            })
           } catch (error) {
-            setToast({ type: 'error', message: error.message || 'Failed to approve disbursements' });
+            setToast({
+              type: 'error',
+              message: error.message || 'Failed to approve disbursements',
+            })
           }
         },
       },
@@ -179,55 +259,61 @@ function DisbursementsContent() {
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'vendor'),
         style: 'orange', // Orange color for vendor copy
       },
-    ];
+    ]
 
     // Filter Approve Selected button - show if at least one selected row is PREPARED or CHECKED
-    return allActions.filter(action => {
+    return allActions.filter((action) => {
       if (action.label === 'Approve Selected') {
         // Show approve button if at least one selected row has state PREPARED or CHECKED
-        return selectedRows.some(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+        return selectedRows.some(
+          (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+        )
       }
-      return true; // Always show other actions
-    });
-  };
+      return true // Always show other actions
+    })
+  }
 
-  if (isAdding) return (
-    <RouteProtection routeName="disbursement">
-      <CashDisbursementForm
-        onBack={() => setIsAdding(false)}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchDisbursements();
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isAdding)
+    return (
+      <RouteProtection routeName="disbursement">
+        <CashDisbursementForm
+          onBack={() => setIsAdding(false)}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchDisbursements()
+          }}
+        />
+      </RouteProtection>
+    )
 
-  if (viewingDisbursement) return (
-    <RouteProtection routeName="disbursement">
-      <CashDisbursementForm
-        isViewMode={!isEditMode}
-        isEditMode={isEditMode}
-        disbursementData={viewingDisbursement}
-        onBack={() => {
-          setViewingDisbursement(null);
-          setIsEditMode(false);
-        }}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchDisbursements();
-        }}
-      />
-    </RouteProtection>
-  );
+  if (viewingDisbursement)
+    return (
+      <RouteProtection routeName="disbursement">
+        <CashDisbursementForm
+          isViewMode={!isEditMode}
+          isEditMode={isEditMode}
+          disbursementData={viewingDisbursement}
+          onBack={() => {
+            setViewingDisbursement(null)
+            setIsEditMode(false)
+          }}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchDisbursements()
+          }}
+        />
+      </RouteProtection>
+    )
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Processing Disbursements...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Processing Disbursements...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -238,12 +324,11 @@ function DisbursementsContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-
       {toast && (
         <DynamicToast
           type={toast.type}
@@ -253,7 +338,7 @@ function DisbursementsContent() {
       )}
 
       {/* --- HEADER SECTION --- */}
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         <motion.div
           initial="hidden"
           animate="visible"
@@ -277,7 +362,10 @@ function DisbursementsContent() {
               EXPORT VOUCHERS
             </button>
             <ProtectedAction routeName="disbursement">
-              <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button
+                onClick={() => setIsAdding(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
                 <Banknote size={14} />
                 New Disbursement
               </button>
@@ -327,116 +415,125 @@ function DisbursementsContent() {
             {
               column: 'status',
               values: {
-                'PAID': 'green',
-                'UNPAID': 'red',
-                'PARTIALLY PAID': 'yellow'
-              }
+                PAID: 'green',
+                UNPAID: 'red',
+                'PARTIALLY PAID': 'yellow',
+              },
             },
             {
               column: 'state',
               values: {
-                'PREPARED': 'orange',
-                'CHECKED': 'blue',
-                'APPROVED': 'green',
-                'REJECTED': 'red',
-                'CANCELLED': 'orange'
-              }
-            }
+                PREPARED: 'orange',
+                CHECKED: 'blue',
+                APPROVED: 'green',
+                REJECTED: 'red',
+                CANCELLED: 'orange',
+              },
+            },
           ]}
           actionButtons={[
             {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  console.log('View disbursement:', row);
+                  console.log('View disbursement:', row)
 
-                  const token = localStorage.getItem('token');
+                  const token = localStorage.getItem('token')
                   if (!token) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${Number(row.id)}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                       },
-                    }
-                  );
+                    },
+                  )
 
-                  const result = await response.json();
+                  const result = await response.json()
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch disbursement details');
+                    throw new Error(
+                      result.message || 'Failed to fetch disbursement details',
+                    )
                   }
 
-                  console.log('Disbursement details:', result);
+                  console.log('Disbursement details:', result)
 
                   // Set disbursement data for viewing
-                  setViewingDisbursement(result);
-                  setIsEditMode(false);
-
+                  setViewingDisbursement(result)
+                  setIsEditMode(false)
                 } catch (error) {
-                  console.error('Error fetching disbursement details:', error);
+                  console.error('Error fetching disbursement details:', error)
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch disbursement details'
-                  });
+                    message: error.message || 'Failed to fetch disbursement details',
+                  })
                 }
-              }
+              },
             },
             {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  console.log('Editing disbursement:', row);
+                  console.log('Editing disbursement:', row)
 
-                  const token = localStorage.getItem('token');
+                  const token = localStorage.getItem('token')
                   if (!token) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const response = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${Number(row.id)}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                       },
-                    }
-                  );
+                    },
+                  )
 
-                  const result = await response.json();
+                  const result = await response.json()
 
                   if (!response.ok) {
-                    throw new Error(result.message || 'Failed to fetch disbursement details');
+                    throw new Error(
+                      result.message || 'Failed to fetch disbursement details',
+                    )
                   }
 
-                  console.log('Disbursement details for editing:', result);
+                  console.log('Disbursement details for editing:', result)
 
                   // Set disbursement data for editing (edit mode)
-                  setViewingDisbursement(result);
-                  setIsEditMode(true);
-
+                  setViewingDisbursement(result)
+                  setIsEditMode(true)
                 } catch (error) {
-                  console.error('Error fetching disbursement details for editing:', error);
+                  console.error(
+                    'Error fetching disbursement details for editing:',
+                    error,
+                  )
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch disbursement details'
-                  });
+                    message: error.message || 'Failed to fetch disbursement details',
+                  })
                 }
-              }
-            }
+              },
+            },
           ]}
+          enableInfiniteScroll={true}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
+          onLoadMore={loadMore}
           checkboxActions={getFilteredCheckboxActions([])}
           checkboxActionsFilter={getFilteredCheckboxActions}
         />
       </motion.div>
     </div>
-  );
+  )
 }
 
 function SummaryCard({ icon, label, value, subText }) {
@@ -444,12 +541,16 @@ function SummaryCard({ icon, label, value, subText }) {
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }

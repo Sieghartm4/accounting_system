@@ -29,7 +29,16 @@ export default function Sales() {
 }
 
 function SalesContent() {
-  const { sales, loading, error, refetchSales } = useSales()
+  const {
+    sales,
+    loading,
+    loadingMore,
+    hasMore,
+    error,
+    refetchSales,
+    loadMore,
+    prependSales,
+  } = useSales()
   const [searchParams, setSearchParams] = useSearchParams()
   const [isAdding, setIsAdding] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -82,6 +91,34 @@ function SalesContent() {
 
     fetchSales()
   }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    const serverLink = import.meta.env.VITE_SERVER_LINK
+    if (!serverLink) return
+
+    const protocol = serverLink.startsWith('https') ? 'wss' : 'ws'
+    const socketUrl = serverLink.replace(/^http/, protocol)
+    const socket = new WebSocket(socketUrl)
+
+    socket.addEventListener('message', (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        if (payload?.type === 'sales_created' && payload?.data?.sale) {
+          prependSales(payload.data.sale)
+        }
+      } catch (err) {
+        console.error('Sales WebSocket message parse error', err)
+      }
+    })
+
+    socket.addEventListener('error', (err) => {
+      console.error('Sales WebSocket error', err)
+    })
+
+    return () => {
+      socket.close()
+    }
+  }, [prependSales])
 
   // Check if user has access to enable checkboxes
   const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -309,7 +346,7 @@ function SalesContent() {
       )}
 
       {/* --- HEADER SECTION --- */}
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
           <span>Commerce</span>
           <ArrowRight size={10} />
@@ -503,6 +540,10 @@ function SalesContent() {
           ]}
           checkboxActions={getFilteredCheckboxActions([])}
           checkboxActionsFilter={getFilteredCheckboxActions}
+          enableInfiniteScroll={true}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
+          onLoadMore={loadMore}
         />
       </motion.div>
     </div>

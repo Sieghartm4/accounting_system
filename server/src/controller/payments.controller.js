@@ -21,12 +21,21 @@ const { SQLQueryBuilder } = require('../util/helper.util')
 
 const { getTenantPool } = require('../database/util/tenantConnection.util')
 
+const { broadcastUpdates } = require('../startup/socket.startup')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
 
 const getPayments = async (req, res, next) => {
   try {
+    const { offset, limit } = req.query
+    const shouldPaginate = offset !== undefined && limit !== undefined
+    const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
+    const limitNum = shouldPaginate
+      ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
+      : null
+
     const query = sql
       .select([
         { col: Accounting.payments.selectOptionColumns.id, as: 'id' },
@@ -68,11 +77,15 @@ const getPayments = async (req, res, next) => {
 
       .build()
 
-    let payments = await Query(
-      query,
-      [],
-      [Accounting.payments.prefix_, Master.vendors.prefix_],
-    )
+    const queryParams = shouldPaginate ? [limitNum, offsetNum] : []
+    const paginatedQuery = shouldPaginate
+      ? `${query} ORDER BY ${Accounting.payments.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
+      : `${query} ORDER BY ${Accounting.payments.selectOptionColumns.id} DESC`
+
+    let payments = await Query(paginatedQuery, queryParams, [
+      Accounting.payments.prefix_,
+      Master.vendors.prefix_,
+    ])
 
     res.status(200).json({
       success: true,
@@ -82,6 +95,12 @@ const getPayments = async (req, res, next) => {
       data: payments,
 
       count: payments.length,
+
+      offset: offsetNum,
+
+      limit: limitNum,
+
+      hasMore: shouldPaginate ? payments.length === limitNum : false,
 
       timestamp: new Date().toISOString(),
     })
@@ -928,6 +947,61 @@ const createPayment = async (req, res, next) => {
         data: { id: paymentId },
 
         timestamp: new Date().toISOString(),
+      })
+
+      // Broadcast after response (non-blocking)
+      setImmediate(async () => {
+        try {
+          const selectNewPaymentQuery = sql
+            .select([
+              { col: Accounting.payments.selectOptionColumns.id, as: 'id' },
+              { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
+              {
+                col: Accounting.payments.selectOptionColumns.document_reference,
+                as: 'doc_ref',
+              },
+              {
+                col: Accounting.payments.selectOptionColumns.mode_of_payment,
+                as: 'mode_of_payment',
+              },
+              {
+                col: Accounting.payments.selectOptionColumns.bank_name,
+                as: 'bank_name',
+              },
+              {
+                col: Accounting.payments.selectOptionColumns.check_number,
+                as: 'check_number',
+              },
+              {
+                col: Accounting.payments.selectOptionColumns.payment_date,
+                as: 'payment_date',
+              },
+              { col: Accounting.payments.selectOptionColumns.state, as: 'state' },
+            ])
+            .from(Accounting.payments.tablename)
+            .innerJoin(
+              Master.vendors.tablename,
+              Accounting.payments.selectOptionColumns.vendor_id,
+              Master.vendors.selectOptionColumns.id,
+            )
+            .where(Accounting.payments.selectOptionColumns.id)
+            .build()
+
+          const createdPaymentRows = await Query(
+            selectNewPaymentQuery,
+            [paymentId],
+            [Accounting.payments.prefix_, Master.vendors.prefix_],
+          )
+          const createdPayment = Array.isArray(createdPaymentRows)
+            ? createdPaymentRows[0]
+            : createdPaymentRows
+
+          if (createdPayment) {
+            broadcastUpdates({ payment: createdPayment }, 'payment_created')
+          }
+        } catch (err) {
+          console.error('Error broadcasting payment creation:', err)
+        }
       })
     } catch (error) {
       if (connection) {

@@ -1,46 +1,64 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ShoppingCart, Package, ShieldCheck, TrendingDown, ArrowRight, Download, FileText, Building } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import DynamicToast from '../../components/DynamicToast';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import usePurchase from './usePurchase';
-import PurchaseForm from './PurchaseForm';
-import { getAccessLevel } from '../../utils/routeProtection';
-import { generatePurchasePDF } from '../../utils/generatePurchasePDF';
+import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import {
+  ShoppingCart,
+  Package,
+  ShieldCheck,
+  TrendingDown,
+  ArrowRight,
+  Download,
+  FileText,
+  Building,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import DynamicToast from '../../components/DynamicToast'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import usePurchase from './usePurchase'
+import PurchaseForm from './PurchaseForm'
+import { getAccessLevel } from '../../utils/routeProtection'
+import { generatePurchasePDF } from '../../utils/generatePurchasePDF'
 
 export default function Purchase() {
   return (
     <RouteProtection routeName="purchase">
       <PurchaseContent />
     </RouteProtection>
-  );
+  )
 }
 
 function PurchaseContent() {
-  const { purchases, loading, error, refetchPurchases } = usePurchase();
-  const [searchParams, setSearchParams] = useSearchParams();
-  
-  console.log('PurchaseContent - purchases:', purchases);
-  console.log('PurchaseContent - loading:', loading);
-  console.log('PurchaseContent - error:', error);
-  const [isAdding, setIsAdding] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingPurchase, setEditingPurchase] = useState(null);
-  const [isViewing, setIsViewing] = useState(false);
-  const [viewingPurchase, setViewingPurchase] = useState(null);
-  const [toast, setToast] = useState(null);
+  const {
+    purchases,
+    loading,
+    loadingMore,
+    hasMore,
+    error,
+    refetchPurchases,
+    loadMore,
+    prependPurchase,
+  } = usePurchase()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  console.log('PurchaseContent - purchases:', purchases)
+  console.log('PurchaseContent - loading:', loading)
+  console.log('PurchaseContent - error:', error)
+  const [isAdding, setIsAdding] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingPurchase, setEditingPurchase] = useState(null)
+  const [isViewing, setIsViewing] = useState(false)
+  const [viewingPurchase, setViewingPurchase] = useState(null)
+  const [toast, setToast] = useState(null)
 
   useEffect(() => {
-    const id = searchParams.get('id');
-    if (!id) return;
+    const id = searchParams.get('id')
+    if (!id) return
 
     const fetchPurchase = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('No authentication token found');
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
           `${import.meta.env.VITE_SERVER_LINK}/purchase/${Number(id)}`,
@@ -50,41 +68,80 @@ function PurchaseContent() {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-          }
-        );
+          },
+        )
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Failed to fetch purchase details');
+        const result = await response.json()
+        if (!response.ok)
+          throw new Error(result.message || 'Failed to fetch purchase details')
 
-        setViewingPurchase(result);
-        setIsViewing(true);
-        setSearchParams(prev => {
-          const next = new URLSearchParams(prev);
-          next.delete('id');
-          return next;
-        }, { replace: true });
+        setViewingPurchase(result)
+        setIsViewing(true)
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('id')
+            return next
+          },
+          { replace: true },
+        )
       } catch (err) {
-        setToast({ type: 'error', message: err.message || 'Failed to fetch purchase details' });
+        setToast({
+          type: 'error',
+          message: err.message || 'Failed to fetch purchase details',
+        })
       }
-    };
+    }
 
-    fetchPurchase();
-  }, [searchParams, setSearchParams]);
+    fetchPurchase()
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    const serverLink = import.meta.env.VITE_SERVER_LINK
+    if (!serverLink) return
+
+    const protocol = serverLink.startsWith('https') ? 'wss' : 'ws'
+    const socketUrl = serverLink.replace(/^http/, protocol)
+    const socket = new WebSocket(socketUrl)
+
+    socket.addEventListener('message', (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        if (payload?.type === 'purchase_created' && payload?.data?.purchase) {
+          prependPurchase(payload.data.purchase)
+        }
+      } catch (err) {
+        console.error('Purchase WebSocket message parse error', err)
+      }
+    })
+
+    socket.addEventListener('error', (err) => {
+      console.error('Purchase WebSocket error', err)
+    })
+
+    return () => {
+      socket.close()
+    }
+  }, [prependPurchase])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const accessLevel = getAccessLevel('purchase', user);
-  const enableCheckboxes = accessLevel === 'Check Access' || accessLevel === 'Approve Access' || accessLevel === 'Edit Access' || accessLevel === 'Full Access';
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const accessLevel = getAccessLevel('purchase', user)
+  const enableCheckboxes =
+    accessLevel === 'Check Access' ||
+    accessLevel === 'Approve Access' ||
+    accessLevel === 'Edit Access' ||
+    accessLevel === 'Full Access'
 
-  const checkboxCondition = null; // Always show checkboxes (match other pages)
+  const checkboxCondition = null // Always show checkboxes (match other pages)
 
   // ─── Helper: fetch full purchase data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No authentication token found');
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
 
-      const purchaseIds = selectedRows.map(row => row.id).join(',');
+      const purchaseIds = selectedRows.map((row) => row.id).join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/purchase/print/${purchaseIds}?copyType=${copyType}`,
@@ -94,27 +151,29 @@ function PurchaseContent() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-        }
-      );
+        },
+      )
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Failed to fetch purchases for printing');
+      const result = await response.json()
+      if (!response.ok)
+        throw new Error(result.message || 'Failed to fetch purchases for printing')
 
-      const data = result.data || [];
-      console.log('PDF Data received:', data);
-      if (!Array.isArray(data)) throw new Error('Invalid data format received from server');
+      const data = result.data || []
+      console.log('PDF Data received:', data)
+      if (!Array.isArray(data))
+        throw new Error('Invalid data format received from server')
 
-      await generatePurchasePDF(data, copyType);
+      await generatePurchasePDF(data, copyType)
 
       setToast({
         type: 'success',
         message: `${data.length} purchase PDF(s) downloaded (${copyType === 'customer' ? 'Vendor' : 'Internal'} Copy)`,
-      });
+      })
     } catch (error) {
-      console.error('Error generating purchase PDF:', error);
-      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' });
+      console.error('Error generating purchase PDF:', error)
+      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' })
     }
-  };
+  }
 
   // Function to filter checkbox actions based on selected rows
   const getFilteredCheckboxActions = (selectedRows) => {
@@ -123,51 +182,52 @@ function PurchaseContent() {
         label: 'Approve Selected',
         onClick: async (selectedRows) => {
           try {
-            console.log('Approving purchases:', selectedRows);
+            console.log('Approving purchases:', selectedRows)
 
-            const approveToken = localStorage.getItem('token');
+            const approveToken = localStorage.getItem('token')
             if (!approveToken) {
-              throw new Error('No authentication token found');
+              throw new Error('No authentication token found')
             }
 
-            const updates = selectedRows.map(row => ({
+            const updates = selectedRows.map((row) => ({
               id: row.id,
-              currentState: row.state
-            }));
+              currentState: row.state,
+            }))
 
             const approveResponse = await fetch(
               `${import.meta.env.VITE_SERVER_LINK}/purchase/purchase-state`,
               {
-                method: "PUT",
+                method: 'PUT',
                 headers: {
-                  "Content-Type": "application/json",
+                  'Content-Type': 'application/json',
                   Authorization: `Bearer ${approveToken}`,
                 },
-                body: JSON.stringify({ updates })
-              }
-            );
+                body: JSON.stringify({ updates }),
+              },
+            )
 
-            const approveResult = await approveResponse.json();
+            const approveResult = await approveResponse.json()
 
             if (!approveResponse.ok) {
-              throw new Error(approveResult.message || 'Failed to approve purchases');
+              throw new Error(approveResult.message || 'Failed to approve purchases')
             }
 
-            await refetchPurchases();
+            await refetchPurchases()
 
             setToast({
               type: 'success',
-              message: approveResult.message || `${selectedRows.length} purchase(s) approved successfully`
-            });
-
+              message:
+                approveResult.message ||
+                `${selectedRows.length} purchase(s) approved successfully`,
+            })
           } catch (error) {
-            console.error('Error approving purchases:', error);
+            console.error('Error approving purchases:', error)
             setToast({
               type: 'error',
-              message: error.message || 'Failed to approve purchases'
-            });
+              message: error.message || 'Failed to approve purchases',
+            })
           }
-        }
+        },
       },
       {
         label: 'Internal Copy',
@@ -181,71 +241,78 @@ function PurchaseContent() {
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
         style: 'orange',
       },
-    ];
+    ]
 
-    return allActions.filter(action => {
+    return allActions.filter((action) => {
       if (action.label === 'Approve Selected') {
-        return selectedRows.some(row => row.state === 'PREPARED' || row.state === 'CHECKED');
+        return selectedRows.some(
+          (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+        )
       }
-      return true;
-    });
-  };
+      return true
+    })
+  }
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
 
-  if (isAdding) return (
-    <RouteProtection routeName="purchase">
-      <PurchaseForm
-        onBack={() => setIsAdding(false)}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchPurchases();
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isAdding)
+    return (
+      <RouteProtection routeName="purchase">
+        <PurchaseForm
+          onBack={() => setIsAdding(false)}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchPurchases()
+          }}
+        />
+      </RouteProtection>
+    )
 
-  if (isEditing) return (
-    <RouteProtection routeName="purchase">
-      <PurchaseForm
-        isViewMode={false}
-        isEditMode={true}
-        purchaseData={editingPurchase}
-        onBack={() => setIsEditing(false)}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchPurchases();
-          setIsEditing(false);
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isEditing)
+    return (
+      <RouteProtection routeName="purchase">
+        <PurchaseForm
+          isViewMode={false}
+          isEditMode={true}
+          purchaseData={editingPurchase}
+          onBack={() => setIsEditing(false)}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchPurchases()
+            setIsEditing(false)
+          }}
+        />
+      </RouteProtection>
+    )
 
-  if (isViewing) return (
-    <RouteProtection routeName="purchase">
-      <PurchaseForm
-        isViewMode={true}
-        purchaseData={viewingPurchase}
-        onBack={() => setIsViewing(false)}
-        onSuccess={async (nextToast) => {
-          if (nextToast) setToast(nextToast);
-          await refetchPurchases();
-          setIsViewing(false);
-        }}
-      />
-    </RouteProtection>
-  );
+  if (isViewing)
+    return (
+      <RouteProtection routeName="purchase">
+        <PurchaseForm
+          isViewMode={true}
+          purchaseData={viewingPurchase}
+          onBack={() => setIsViewing(false)}
+          onSuccess={async (nextToast) => {
+            if (nextToast) setToast(nextToast)
+            await refetchPurchases()
+            setIsViewing(false)
+          }}
+        />
+      </RouteProtection>
+    )
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Loading Purchase Ledger...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Loading Purchase Ledger...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -256,12 +323,11 @@ function PurchaseContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-
       {toast && (
         <DynamicToast
           type={toast.type}
@@ -271,7 +337,7 @@ function PurchaseContent() {
       )}
 
       {/* --- HEADER SECTION --- */}
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
           <span>Commerce</span>
           <ArrowRight size={10} />
@@ -304,7 +370,10 @@ function PurchaseContent() {
               EXPORT REPORT
             </button>
             <ProtectedAction routeName="purchase">
-              <button onClick={() => setIsAdding(true)} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button
+                onClick={() => setIsAdding(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
                 <Package size={14} />
                 New Purchase
               </button>
@@ -356,128 +425,143 @@ function PurchaseContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  console.log('View purchase:', row);
+                  console.log('View purchase:', row)
 
-                  const authToken = localStorage.getItem('token');
+                  const authToken = localStorage.getItem('token')
                   if (!authToken) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const viewResponse = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/purchase/${Number(row.id)}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${authToken}`,
                       },
-                    }
-                  );
+                    },
+                  )
 
-                  const viewResult = await viewResponse.json();
+                  const viewResult = await viewResponse.json()
 
                   if (!viewResponse.ok) {
-                    throw new Error(viewResult.message || 'Failed to fetch purchase details');
+                    throw new Error(
+                      viewResult.message || 'Failed to fetch purchase details',
+                    )
                   }
 
-                  console.log('Purchase details:', viewResult);
+                  console.log('Purchase details:', viewResult)
 
                   // Set purchase data for viewing
-                  setViewingPurchase(viewResult);
-                  setIsViewing(true);
-
+                  setViewingPurchase(viewResult)
+                  setIsViewing(true)
                 } catch (error) {
-                  console.error('Error fetching purchase details:', error);
+                  console.error('Error fetching purchase details:', error)
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch purchase details'
-                  });
+                    message: error.message || 'Failed to fetch purchase details',
+                  })
                 }
-              }
+              },
             },
             {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  console.log('Editing purchase:', row);
+                  console.log('Editing purchase:', row)
 
-                  const authToken = localStorage.getItem('token');
+                  const authToken = localStorage.getItem('token')
                   if (!authToken) {
-                    throw new Error('No authentication token found');
+                    throw new Error('No authentication token found')
                   }
 
                   const editResponse = await fetch(
                     `${import.meta.env.VITE_SERVER_LINK}/purchase/${Number(row.id)}`,
                     {
-                      method: "GET",
+                      method: 'GET',
                       headers: {
-                        "Content-Type": "application/json",
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${authToken}`,
                       },
-                    }
-                  );
+                    },
+                  )
 
-                  const editResult = await editResponse.json();
+                  const editResult = await editResponse.json()
 
                   if (!editResponse.ok) {
-                    throw new Error(editResult.message || 'Failed to fetch purchase details');
+                    throw new Error(
+                      editResult.message || 'Failed to fetch purchase details',
+                    )
                   }
 
-                  console.log('Purchase details for editing:', editResult);
+                  console.log('Purchase details for editing:', editResult)
 
                   // Set purchase data for editing
-                  setEditingPurchase(editResult);
-                  setIsEditing(true);
-
+                  setEditingPurchase(editResult)
+                  setIsEditing(true)
                 } catch (error) {
-                  console.error('Error fetching purchase details for editing:', error);
+                  console.error(
+                    'Error fetching purchase details for editing:',
+                    error,
+                  )
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to fetch purchase details'
-                  });
+                    message: error.message || 'Failed to fetch purchase details',
+                  })
                 }
-              }
+              },
             },
           ]}
           badgeColumns={[
             {
               column: 'status',
               values: {
-                'PAID': 'green',
-                'UNPAID': 'red',
-                'REJECTED': 'yellow'
-              }
+                PAID: 'green',
+                UNPAID: 'red',
+                REJECTED: 'yellow',
+              },
             },
             {
               column: 'state',
               values: {
-                'PREPARED': 'orange',
-                'CHECKED': 'blue',
-                'APPROVED': 'green',
-                'REJECTED': 'red'
-              }
-            }
+                PREPARED: 'orange',
+                CHECKED: 'blue',
+                APPROVED: 'green',
+                REJECTED: 'red',
+              },
+            },
           ]}
           checkboxActions={getFilteredCheckboxActions([])}
           checkboxActionsFilter={getFilteredCheckboxActions}
+          enableInfiniteScroll={true}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
+          onLoadMore={loadMore}
         />
       </motion.div>
     </div>
-  );
+  )
 }
 
-{/* --- HELPER COMPONENT (Fixed: This was likely missing) --- */ }
+{
+  /* --- HELPER COMPONENT (Fixed: This was likely missing) --- */
+}
 function SummaryCard({ icon, label, value, subText }) {
   return (
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }

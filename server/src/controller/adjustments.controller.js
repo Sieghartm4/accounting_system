@@ -15,6 +15,7 @@ const { Master } = require('../database/model/Master')
 const { Accounting } = require('../database/model/Accounting')
 const { SQLQueryBuilder } = require('../util/helper.util')
 const { getTenantPool } = require('../database/util/tenantConnection.util')
+const { broadcastUpdates } = require('../startup/socket.startup')
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -71,7 +72,14 @@ const resolveChartOfAccountIds = async (connection, journalEntries) => {
 
 const getAdjustments = async (req, res, next) => {
   try {
-    const query = sql
+    const { offset, limit } = req.query
+    const shouldPaginate = offset !== undefined && limit !== undefined
+    const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
+    const limitNum = shouldPaginate
+      ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
+      : null
+
+    let query = sql
       .select([
         { col: Accounting.adjustments.selectOptionColumns.id, as: 'id' },
         {
@@ -95,12 +103,21 @@ const getAdjustments = async (req, res, next) => {
       .from(Accounting.adjustments.tablename)
       .build()
 
-    let result = await Query(query, [], [Accounting.adjustments.prefix_])
+    if (shouldPaginate) {
+      query += ` ORDER BY ${Accounting.adjustments.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
+    }
+
+    const queryParams = shouldPaginate ? [limitNum, offsetNum] : []
+    let result = await Query(query, queryParams, [Accounting.adjustments.prefix_])
+
     res.status(200).json({
       success: true,
       message: 'Adjustments retrieved successfully',
       data: result,
       count: result.length,
+      offset: offsetNum,
+      limit: limitNum,
+      hasMore: shouldPaginate ? result.length === limitNum : false,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
@@ -427,6 +444,53 @@ const createAdjustment = async (req, res, next) => {
         message: 'Adjustment created successfully',
         data: { id: adjustmentId },
         timestamp: new Date().toISOString(),
+      })
+
+      setImmediate(async () => {
+        try {
+          const selectNewAdjustmentQuery = sql
+            .select([
+              { col: Accounting.adjustments.selectOptionColumns.id, as: 'id' },
+              {
+                col: Accounting.adjustments.selectOptionColumns.document_reference,
+                as: 'document_reference',
+              },
+              {
+                col: Accounting.adjustments.selectOptionColumns.posting_date,
+                as: 'posting_date',
+              },
+              {
+                col: Accounting.adjustments.selectOptionColumns.total_amount,
+                as: 'total_amount',
+              },
+              {
+                col: Accounting.adjustments.selectOptionColumns.created_by,
+                as: 'prepared_by',
+              },
+              {
+                col: Accounting.adjustments.selectOptionColumns.status,
+                as: 'status',
+              },
+            ])
+            .from(Accounting.adjustments.tablename)
+            .where(Accounting.adjustments.selectOptionColumns.id)
+            .build()
+
+          const createdAdjustmentRows = await Query(
+            selectNewAdjustmentQuery,
+            [adjustmentId],
+            [Accounting.adjustments.prefix_],
+          )
+          const createdAdjustment = Array.isArray(createdAdjustmentRows)
+            ? createdAdjustmentRows[0]
+            : createdAdjustmentRows
+
+          if (createdAdjustment) {
+            broadcastUpdates({ adjustment: createdAdjustment }, 'adjustment_created')
+          }
+        } catch (err) {
+          console.error('Error broadcasting adjustment creation:', err)
+        }
       })
     } catch (error) {
       // Rollback transaction if error occurs
