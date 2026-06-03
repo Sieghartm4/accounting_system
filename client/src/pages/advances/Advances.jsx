@@ -45,13 +45,20 @@ function AdvancesContent() {
     loadMore,
   } = useAdvances(startDate, endDate)
 
-  // 🟢 ADDED: Socket listener for journal entries creation
+  // 🟢 ADDED: Socket listener for journal entries creation (use WSS when page is secure)
   useEffect(() => {
     const serverLink = import.meta.env.VITE_SERVER_LINK
     if (!serverLink) return
 
-    const protocol = serverLink.startsWith('https') ? 'wss' : 'ws'
-    const socketUrl = serverLink.replace(/^http/, protocol)
+    // Build robust socket URL: if the page is served over HTTPS prefer wss, otherwise match server scheme
+    const pageIsSecure = window.location.protocol === 'https:'
+    let socketUrl = serverLink
+    if (pageIsSecure) {
+      // ensure WSS endpoint
+      socketUrl = serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
+    } else {
+      socketUrl = serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
+    }
     const socket = new WebSocket(socketUrl)
 
     socket.addEventListener('message', (event) => {

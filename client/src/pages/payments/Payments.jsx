@@ -50,8 +50,10 @@ function PaymentsContent() {
   // WebSocket subscription for live payment updates
   useEffect(() => {
     const serverLink = import.meta.env.VITE_SERVER_LINK
-    const protocol = serverLink.startsWith('https') ? 'wss' : 'ws'
-    const wsUrl = serverLink.replace(/^https?/, protocol)
+    const pageIsSecure = window.location.protocol === 'https:'
+    const wsUrl = pageIsSecure
+      ? serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
+      : serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
 
     let ws
 

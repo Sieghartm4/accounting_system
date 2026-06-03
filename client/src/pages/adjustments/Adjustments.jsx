@@ -115,8 +115,13 @@ function AdjustmentsContent() {
     const serverLink = import.meta.env.VITE_SERVER_LINK
     if (!serverLink) return
 
-    const protocol = serverLink.startsWith('https') ? 'wss' : 'ws'
-    const socketUrl = serverLink.replace(/^http/, protocol)
+    const pageIsSecure = window.location.protocol === 'https:'
+    let socketUrl = serverLink
+    if (pageIsSecure) {
+      socketUrl = serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
+    } else {
+      socketUrl = serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
+    }
     const socket = new WebSocket(socketUrl)
 
     socket.addEventListener('message', (event) => {
