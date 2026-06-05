@@ -1,74 +1,401 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Table2, Download, DollarSign, ShieldCheck, Search, RefreshCcw } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react'
+import { motion } from 'framer-motion'
+import {
+  Table2,
+  Download,
+  DollarSign,
+  ShieldCheck,
+  Search,
+  RefreshCcw,
+} from 'lucide-react'
+import * as XLSX from 'xlsx'
+import useCompany from '../company/useCompany'
+import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 
 export default function TrialBalance() {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const { company } = useCompany()
 
-  useEffect(() => { fetchTrialBalance(); }, []);
   useEffect(() => {
-    const t = setTimeout(() => fetchTrialBalance(), 500);
-    return () => clearTimeout(t);
-  }, [startDate, endDate]);
+    fetchTrialBalance()
+  }, [])
+  useEffect(() => {
+    const t = setTimeout(() => fetchTrialBalance(), 500)
+    return () => clearTimeout(t)
+  }, [startDate, endDate])
 
   const fetchTrialBalance = async () => {
     try {
-      setLoading(true); setError('');
-      const token = localStorage.getItem('token');
-      const params = new URLSearchParams();
-      if (startDate) params.append('start_date', startDate);
-      if (endDate) params.append('end_date', endDate);
-      const url = `${import.meta.env.VITE_SERVER_LINK}/reports/trial-balance${params.toString() ? '?' + params : ''}`;
-      const res = await fetch(url, { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
-      const result = await res.json();
-      if (result.success) setData(result.data || []);
-      else setError(result.message || 'Failed to fetch trial balance');
+      setLoading(true)
+      setError('')
+      const token = localStorage.getItem('token')
+      const params = new URLSearchParams()
+      if (startDate) params.append('start_date', startDate)
+      if (endDate) params.append('end_date', endDate)
+      const url = `${import.meta.env.VITE_SERVER_LINK}/reports/trial-balance${params.toString() ? '?' + params : ''}`
+      const res = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      if (!res.ok) throw new Error(`Server responded with ${res.status}`)
+      const result = await res.json()
+      if (result.success) setData(result.data || [])
+      else setError(result.message || 'Failed to fetch trial balance')
     } catch (err) {
-      setError('Connection Error: ' + err.message);
+      setError('Connection Error: ' + err.message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const fmt = (n) => new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+  const fmt = (n) =>
+    new Intl.NumberFormat('en-PH', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n || 0)
+
+  const formatDate = (ds) => {
+    if (!ds) return ''
+    const d = new Date(ds)
+    return d.toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+    })
+  }
 
   const { filtered, totalDebit, totalCredit, isBalanced } = useMemo(() => {
-    const q = searchTerm.toLowerCase();
-    const f = data.filter(r =>
-      r['Account Name']?.toLowerCase().includes(q) ||
-      r['Account Code']?.toString().includes(q)
-    );
-    const td = f.reduce((s, i) => s + parseFloat(i.DEBIT || 0), 0);
-    const tc = f.reduce((s, i) => s + parseFloat(i.CREDIT || 0), 0);
-    return { filtered: f, totalDebit: td, totalCredit: tc, isBalanced: Math.abs(td - tc) < 0.01 };
-  }, [data, searchTerm]);
+    const q = searchTerm.toLowerCase()
+    const f = data.filter(
+      (r) =>
+        r['Account Name']?.toLowerCase().includes(q) ||
+        r['Account Code']?.toString().includes(q),
+    )
+    const td = f.reduce((s, i) => s + parseFloat(i.DEBIT || 0), 0)
+    const tc = f.reduce((s, i) => s + parseFloat(i.CREDIT || 0), 0)
+    return {
+      filtered: f,
+      totalDebit: td,
+      totalCredit: tc,
+      isBalanced: Math.abs(td - tc) < 0.01,
+    }
+  }, [data, searchTerm])
 
-  if (loading && data.length === 0) return (
-    <div className="h-full w-full flex flex-col items-center justify-center gap-4">
-      <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-      <p className="text-[10px] font-black uppercase tracking-[3px] text-gray-400">Loading Ledger...</p>
-    </div>
-  );
+  const handleExportExcel = () => {
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([])
 
-  if (error) return (
-    <div className="p-10">
-      <div className="bg-red-50 border-l-4 border-red-600 p-6 rounded-r-xl">
-        <h3 className="text-red-800 font-bold uppercase text-sm">Error</h3>
-        <p className="text-red-600 text-sm mt-1">{error}</p>
-        <button onClick={fetchTrialBalance} className="mt-3 px-4 py-2 bg-red-600 text-white text-xs font-black rounded-lg uppercase tracking-widest hover:bg-red-700">Retry</button>
+    const setCell = (ws, addr, value, style) => {
+      if (!ws[addr]) ws[addr] = {}
+      ws[addr].v = value
+      ws[addr].t = typeof value === 'number' ? 'n' : 's'
+      if (style) ws[addr].s = style
+    }
+
+    const BLACK_BG = { fgColor: { rgb: '111827' } }
+    const RED_BG = { fgColor: { rgb: 'DC2626' } }
+    const GRAY_BG = { fgColor: { rgb: 'F9FAFB' } }
+    const BORDER_GRAY = {
+      top: { style: 'thin', color: { rgb: 'E5E7EB' } },
+      bottom: { style: 'thin', color: { rgb: 'E5E7EB' } },
+      left: { style: 'thin', color: { rgb: 'E5E7EB' } },
+      right: { style: 'thin', color: { rgb: 'E5E7EB' } },
+    }
+    const BORDER_TOTAL = {
+      top: { style: 'thick', color: { rgb: 'DC2626' } },
+      bottom: { style: 'thin', color: { rgb: 'E5E7EB' } },
+      left: { style: 'thin', color: { rgb: 'E5E7EB' } },
+      right: { style: 'thin', color: { rgb: 'E5E7EB' } },
+    }
+
+    const whiteOnBlack = (bold = false) => ({
+      font: { bold, color: { rgb: 'FFFFFF' }, name: 'Calibri', sz: 10 },
+      fill: BLACK_BG,
+      alignment: { horizontal: 'left', vertical: 'center' },
+      border: { right: { style: 'thin', color: { rgb: '374151' } } },
+    })
+
+    const bodyCell = (fill = 'FFFFFF', align = 'left') => ({
+      font: { bold: false, color: { rgb: '111827' }, name: 'Calibri', sz: 10 },
+      fill: { fgColor: { rgb: fill } },
+      alignment: { horizontal: align, vertical: 'center' },
+      border: BORDER_GRAY,
+    })
+
+    const footStyle = (align = 'left') => ({
+      font: { bold: true, color: { rgb: 'FFFFFF' }, name: 'Calibri', sz: 10 },
+      fill: { fgColor: { rgb: '111827' } },
+      alignment: { horizontal: align, vertical: 'center' },
+      border: BORDER_TOTAL,
+    })
+
+    let r = 1
+
+    ;['A', 'B', 'C', 'D'].forEach((c) => {
+      setCell(ws, `${c}${r}`, c === 'A' ? 'TRIAL BALANCE' : '', {
+        font: { bold: true, color: { rgb: 'FFFFFF' }, name: 'Calibri', sz: 13 },
+        fill: BLACK_BG,
+        alignment: { horizontal: 'left', vertical: 'center' },
+      })
+    })
+    r++
+    ;['A', 'B', 'C', 'D'].forEach((c) => {
+      setCell(
+        ws,
+        `${c}${r}`,
+        c === 'A'
+          ? `Period: ${formatDate(startDate) || 'All'} — ${formatDate(endDate) || 'All'}`
+          : c === 'D'
+            ? `Generated: ${new Date().toLocaleDateString('en-PH')}`
+            : '',
+        {
+          font: { bold: false, color: { rgb: '6B7280' }, name: 'Calibri', sz: 9 },
+          fill: BLACK_BG,
+          alignment: {
+            horizontal: c === 'D' ? 'right' : 'left',
+            vertical: 'center',
+          },
+        },
+      )
+    })
+    r++
+
+    r++
+
+    setCell(ws, `A${r}`, 'ACCOUNT CODE', whiteOnBlack(true))
+    setCell(ws, `B${r}`, 'ACCOUNT NAME', whiteOnBlack(true))
+    setCell(ws, `C${r}`, 'DEBIT (₱)', whiteOnBlack(true))
+    setCell(ws, `D${r}`, 'CREDIT (₱)', whiteOnBlack(true))
+    r++
+
+    const fill = 'FFFFFF'
+    filtered.forEach((row, idx) => {
+      const rowFill = idx % 2 === 0 ? 'FFFFFF' : 'F9FAFB'
+      setCell(ws, `A${r}`, row['Account Code'], bodyCell(rowFill, 'left'))
+      setCell(ws, `B${r}`, row['Account Name'], bodyCell(rowFill, 'left'))
+      ws[`C${r}`] = {
+        v: parseFloat(row.DEBIT || 0),
+        t: 'n',
+        z: '#,##0.00',
+        s: bodyCell(rowFill, 'right'),
+      }
+      ws[`D${r}`] = {
+        v: parseFloat(row.CREDIT || 0),
+        t: 'n',
+        z: '#,##0.00',
+        s: bodyCell(rowFill, 'right'),
+      }
+      r++
+    })
+
+    setCell(ws, `A${r}`, 'TOTAL', footStyle('left'))
+    setCell(ws, `B${r}`, `${filtered.length} accounts`, footStyle('left'))
+    ws[`C${r}`] = {
+      v: totalDebit,
+      t: 'n',
+      z: '#,##0.00',
+      s: footStyle('right'),
+    }
+    ws[`D${r}`] = {
+      v: totalCredit,
+      t: 'n',
+      z: '#,##0.00',
+      s: {
+        ...footStyle('right'),
+        font: { bold: true, color: { rgb: 'FCA5A5' }, name: 'Calibri', sz: 10 },
+      },
+    }
+
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r, c: 3 } })
+    ws['!cols'] = [{ wch: 16 }, { wch: 36 }, { wch: 18 }, { wch: 18 }]
+    ws['!rows'] = [{ hpt: 24 }, { hpt: 16 }, { hpt: 6 }, { hpt: 18 }]
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } },
+    ]
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Trial Balance')
+    XLSX.writeFile(
+      wb,
+      `trial-balance-${new Date().toISOString().split('T')[0]}.xlsx`,
+    )
+    setExportMenuOpen(false)
+  }
+
+  const handleExportPDF = async () => {
+    try {
+      const { jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: 'letter',
+      })
+      const W = doc.internal.pageSize.getWidth()
+      const M = 36
+      let y = renderPDFCompanyHeader(doc, company, W, M)
+
+      const BLK = [17, 24, 39]
+      const RED = [220, 38, 38]
+      const GRY = [107, 114, 128]
+      const LGT = [229, 231, 235]
+      const WHT = [255, 255, 255]
+      const GRN = [74, 222, 128]
+      const LGRY = [249, 250, 251]
+
+      doc.setFillColor(...BLK)
+      doc.rect(M, y - 14, W - M * 2, 32, 'F')
+      doc
+        .setFont('helvetica', 'bold')
+        .setFontSize(13)
+        .setTextColor(...WHT)
+      doc.text('TRIAL BALANCE', M + 8, y + 6)
+      doc.setFontSize(8).setTextColor(...(isBalanced ? GRN : RED))
+      doc.text(isBalanced ? 'BALANCED' : 'UNBALANCED', W - M - 8, y + 6, {
+        align: 'right',
+      })
+      y += 32
+
+      doc.setFillColor(...BLK)
+      doc.rect(M, y - 2, W - M * 2, 18, 'F')
+      doc
+        .setFont('helvetica', 'normal')
+        .setFontSize(8)
+        .setTextColor(...GRY)
+      doc.text(
+        `Period: ${formatDate(startDate) || 'All Dates'} — ${formatDate(endDate) || 'All Dates'}`,
+        M + 8,
+        y + 10,
+      )
+      doc.text(
+        `Generated: ${new Date().toLocaleDateString('en-PH')}   ${filtered.length} accounts`,
+        W - M - 8,
+        y + 10,
+        { align: 'right' },
+      )
+      y += 22
+
+      const body = filtered.map((row) => [
+        row['Account Code'],
+        row['Account Name'],
+        fmt(parseFloat(row.DEBIT || 0)),
+        fmt(parseFloat(row.CREDIT || 0)),
+      ])
+
+      autoTable(doc, {
+        startY: y,
+        margin: { left: M, right: M },
+        tableWidth: W - M * 2,
+        didDrawPage: (data) => {},
+        head: [
+          [
+            { content: 'ACCOUNT CODE', styles: { halign: 'left' } },
+            { content: 'ACCOUNT NAME', styles: { halign: 'left' } },
+            { content: 'DEBIT (₱)', styles: { halign: 'right' } },
+            { content: 'CREDIT (₱)', styles: { halign: 'right' } },
+          ],
+        ],
+        body: body,
+        foot: [
+          [
+            {
+              content: 'TOTAL',
+              colSpan: 2,
+              styles: { halign: 'left', fontStyle: 'bold' },
+            },
+            {
+              content: fmt(totalDebit),
+              styles: { halign: 'right', fontStyle: 'bold' },
+            },
+            {
+              content: fmt(totalCredit),
+              styles: {
+                halign: 'right',
+                fontStyle: 'bold',
+                textColor: [252, 165, 165],
+              },
+            },
+          ],
+        ],
+        theme: 'plain',
+        headStyles: {
+          fillColor: BLK,
+          textColor: WHT,
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
+          lineColor: [55, 65, 81],
+          lineWidth: 0.5,
+        },
+        footStyles: {
+          fillColor: BLK,
+          textColor: WHT,
+          fontStyle: 'bold',
+          fontSize: 10,
+          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
+          lineColor: RED,
+          lineWidth: { top: 3, bottom: 0, left: 0, right: 0 },
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
+          textColor: [55, 65, 81],
+          lineColor: LGT,
+          lineWidth: 0.3,
+          valign: 'top',
+        },
+        columnStyles: {
+          0: { cellWidth: 45, halign: 'left' },
+          1: { cellWidth: 'auto', halign: 'left' },
+          2: { cellWidth: 50, halign: 'right', fontStyle: 'bold' },
+          3: { cellWidth: 50, halign: 'right', fontStyle: 'bold' },
+        },
+      })
+
+      doc.save(`trial-balance-${new Date().toISOString().split('T')[0]}.pdf`)
+      setExportMenuOpen(false)
+    } catch (err) {
+      console.error('PDF export error:', err)
+    }
+  }
+
+  if (loading && data.length === 0)
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center gap-4">
+        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-[10px] font-black uppercase tracking-[3px] text-gray-400">
+          Loading Ledger...
+        </p>
       </div>
-    </div>
-  );
+    )
+
+  if (error)
+    return (
+      <div className="p-10">
+        <div className="bg-red-50 border-l-4 border-red-600 p-6 rounded-r-xl">
+          <h3 className="text-red-800 font-bold uppercase text-sm">Error</h3>
+          <p className="text-red-600 text-sm mt-1">{error}</p>
+          <button
+            onClick={fetchTrialBalance}
+            className="mt-3 px-4 py-2 bg-red-600 text-white text-xs font-black rounded-lg uppercase tracking-widest hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
 
   return (
     <div className="flex flex-col gap-2 bg-[#F3F4F6] min-h-full custom-scrollbar">
-
       {/* HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
@@ -79,15 +406,42 @@ export default function TrialBalance() {
             <h1 className="text-3xl font-black text-black tracking-tighter leading-none">
               Trial <span className="text-red-600 italic">Balance</span>
             </h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[2px] mt-1">General Ledger Report</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[2px] mt-1">
+              General Ledger Report
+            </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-[11px] font-black text-black rounded-xl hover:bg-gray-50 uppercase tracking-widest">
-            <Download size={13} /> Export PDF
-          </button>
-          <button onClick={fetchTrialBalance}
-            className="w-10 h-10 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center justify-center transition-colors">
+        <div className="flex gap-2 items-center relative">
+          <div className="relative">
+            <button
+              onClick={() => setExportMenuOpen((p) => !p)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-[11px] font-black text-white rounded-xl hover:bg-emerald-700 uppercase tracking-widest transition-colors"
+            >
+              <Download size={13} /> Export
+            </button>
+            {exportMenuOpen && (
+              <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
+                <button
+                  type="button"
+                  onClick={handleExportPDF}
+                  className="w-full text-left px-4 py-3 text-[11px] font-black text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Export PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  className="w-full text-left px-4 py-3 text-[11px] font-black text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Export Excel
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={fetchTrialBalance}
+            className="w-10 h-10 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center justify-center transition-colors"
+          >
             <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
@@ -96,19 +450,31 @@ export default function TrialBalance() {
       {/* STAT CARDS — all 4 in one row */}
       <div className="grid grid-cols-4 gap-3">
         <StatCard
-          iconBg="bg-red-50" iconColor="text-red-600"
+          iconBg="bg-red-50"
+          iconColor="text-red-600"
           icon={<Table2 size={18} />}
-          label="Total Accounts" value={filtered.length} sub="Active Records"
+          label="Total Accounts"
+          value={filtered.length}
+          sub="Active Records"
         />
         <StatCard
-          iconBg="bg-gray-100" iconColor="text-black"
+          iconBg="bg-gray-100"
+          iconColor="text-black"
           icon={<DollarSign size={18} />}
-          label="Total Debit" value={`₱${fmt(totalDebit)}`} sub="PHP" small
+          label="Total Debit"
+          value={`₱${fmt(totalDebit)}`}
+          sub="PHP"
+          small
         />
         <StatCard
-          iconBg="bg-red-50" iconColor="text-red-600"
+          iconBg="bg-red-50"
+          iconColor="text-red-600"
           icon={<DollarSign size={18} />}
-          label="Total Credit" value={`₱${fmt(totalCredit)}`} sub="PHP" small valueClass="text-red-600"
+          label="Total Credit"
+          value={`₱${fmt(totalCredit)}`}
+          sub="PHP"
+          small
+          valueClass="text-red-600"
         />
         <StatCard
           iconBg={isBalanced ? 'bg-green-50' : 'bg-red-50'}
@@ -130,11 +496,16 @@ export default function TrialBalance() {
             type="text"
             placeholder="Search by account name or code..."
             value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 bg-transparent border-none outline-none text-[12px] font-bold text-black placeholder:text-gray-300 placeholder:font-semibold"
           />
           {searchTerm && (
-            <button onClick={() => setSearchTerm('')} className="text-gray-300 hover:text-red-500 text-lg leading-none transition-colors">×</button>
+            <button
+              onClick={() => setSearchTerm('')}
+              className="text-gray-300 hover:text-red-500 text-lg leading-none transition-colors"
+            >
+              ×
+            </button>
           )}
         </div>
 
@@ -142,43 +513,81 @@ export default function TrialBalance() {
 
         {/* Date filters */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">From</span>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all" />
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">To</span>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all" />
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
+            From
+          </span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
+          />
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
+            To
+          </span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
+          />
         </div>
 
-        <button onClick={() => { setStartDate(''); setEndDate(''); setSearchTerm(''); }}
-          className="px-4 py-2 border border-gray-900 rounded-xl text-[10px] font-black text-gray-900 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-all bg-white cursor-pointer">
+        <button
+          onClick={() => {
+            setStartDate('')
+            setEndDate('')
+            setSearchTerm('')
+          }}
+          className="px-4 py-2 border border-gray-900 rounded-xl text-[10px] font-black text-gray-900 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-all bg-white cursor-pointer"
+        >
           Reset
         </button>
-        <button onClick={() => { const t = new Date().toISOString().split('T')[0]; setStartDate(t); setEndDate(t); }}
-          className="px-4 py-2 bg-black rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-red-600 transition-all cursor-pointer">
+        <button
+          onClick={() => {
+            const t = new Date().toISOString().split('T')[0]
+            setStartDate(t)
+            setEndDate(t)
+          }}
+          className="px-4 py-2 bg-black rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-red-600 transition-all cursor-pointer"
+        >
           Today
         </button>
       </div>
 
       {/* TABLE CARD */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col custom-scrollbar">
-
         {/* Table header bar */}
         <div className="flex items-center gap-2 px-5 py-3 bg-black flex-shrink-0">
           <Table2 size={14} className="text-gray-500" />
-          <span className="text-[11px] font-black uppercase tracking-[3px] text-white">Account Ledger</span>
-          <span className="text-[10px] font-bold text-gray-600 ml-1">{filtered.length} records</span>
+          <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
+            Account Ledger
+          </span>
+          <span className="text-[10px] font-bold text-gray-600 ml-1">
+            {filtered.length} records
+          </span>
           <div className="ml-auto">
-            {isBalanced
-              ? <span className="px-2.5 py-1 bg-green-100 text-green-800 text-[9px] font-black uppercase rounded-md tracking-widest">Balanced</span>
-              : <span className="px-2.5 py-1 bg-red-100 text-red-800 text-[9px] font-black uppercase rounded-md tracking-widest">Unbalanced</span>
-            }
+            {isBalanced ? (
+              <span className="px-2.5 py-1 bg-green-100 text-green-800 text-[9px] font-black uppercase rounded-md tracking-widest">
+                Balanced
+              </span>
+            ) : (
+              <span className="px-2.5 py-1 bg-red-100 text-red-800 text-[9px] font-black uppercase rounded-md tracking-widest">
+                Unbalanced
+              </span>
+            )}
           </div>
         </div>
 
         {/* Scrollable body */}
-        <div className="overflow-y-auto overflow-x-auto custom-scrollbar" style={{ maxHeight: '570px' }}>
-          <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: '480px' }}>
+        <div
+          className="overflow-y-auto overflow-x-auto custom-scrollbar"
+          style={{ maxHeight: '570px' }}
+        >
+          <table
+            className="w-full border-collapse"
+            style={{ tableLayout: 'fixed', minWidth: '480px' }}
+          >
             <colgroup>
               <col style={{ width: '12%' }} />
               <col style={{ width: '46%' }} />
@@ -188,32 +597,61 @@ export default function TrialBalance() {
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 border-b border-gray-100">
                 {['Code', 'Account Name', 'Debit', 'Credit'].map((h, i) => (
-                  <th key={i} className={`py-3 px-4 text-[12px] font-black uppercase tracking-[1.5px] text-black ${i >= 2 ? 'text-right border-l border-gray-200' : 'text-left'}`}>{h}</th>
+                  <th
+                    key={i}
+                    className={`py-3 px-4 text-[12px] font-black uppercase tracking-[1.5px] text-black ${i >= 2 ? 'text-right border-l border-gray-200' : 'text-left'}`}
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
-                <tr><td colSpan={4} className="py-16 text-center text-[12px] font-bold text-gray-300">No accounts match your search</td></tr>
-              ) : filtered.map((row, i) => (
-                <tr key={i} className="hover:bg-red-50 transition-colors">
-                  <td className="py-3 px-4 text-[11px] font-bold text-gray-400">{row['Account Code']}</td>
-                  <td className="py-3 px-4 text-[13px] font-bold text-black">{row['Account Name']}</td>
-                  <td className="py-3 px-4 text-right font-mono text-[16px] font-black text-black border-l border-gray-200">
-                    {parseFloat(row.DEBIT) > 0 ? fmt(row.DEBIT) : <span className="text-gray-200">—</span>}
-                  </td>
-                  <td className="py-3 px-4 text-right font-mono text-[16px] font-black text-red-600 border-l border-gray-200">
-                    {parseFloat(row.CREDIT) > 0 ? fmt(row.CREDIT) : <span className="text-gray-200">—</span>}
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="py-16 text-center text-[12px] font-bold text-gray-300"
+                  >
+                    No accounts match your search
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filtered.map((row, i) => (
+                  <tr key={i} className="hover:bg-red-50 transition-colors">
+                    <td className="py-3 px-4 text-[11px] font-bold text-gray-400">
+                      {row['Account Code']}
+                    </td>
+                    <td className="py-3 px-4 text-[13px] font-bold text-black">
+                      {row['Account Name']}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono text-[16px] font-black text-black border-l border-gray-200">
+                      {parseFloat(row.DEBIT) > 0 ? (
+                        fmt(row.DEBIT)
+                      ) : (
+                        <span className="text-gray-200">—</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-right font-mono text-[16px] font-black text-red-600 border-l border-gray-200">
+                      {parseFloat(row.CREDIT) > 0 ? (
+                        fmt(row.CREDIT)
+                      ) : (
+                        <span className="text-gray-200">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Totals footer — outside scroll, always visible */}
         <div className="border-t-4 border-red-600 bg-black flex-shrink-0">
-          <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: '480px' }}>
+          <table
+            className="w-full border-collapse"
+            style={{ tableLayout: 'fixed', minWidth: '480px' }}
+          >
             <colgroup>
               <col style={{ width: '12%' }} />
               <col style={{ width: '46%' }} />
@@ -222,30 +660,55 @@ export default function TrialBalance() {
             </colgroup>
             <tbody>
               <tr>
-                <td colSpan="2" className="py-3 px-4 text-[11px] font-black text-white uppercase tracking-[3px]">Totals</td>
-                <td className="py-3 px-4 text-right font-mono text-[14px] font-black text-white border-l border-gray-600">PHP {fmt(totalDebit)}</td>
-                <td className="py-3 px-4 text-right font-mono text-[14px] font-black text-red-400 border-l border-gray-600">PHP {fmt(totalCredit)}</td>
+                <td
+                  colSpan="2"
+                  className="py-3 px-4 text-[11px] font-black text-white uppercase tracking-[3px]"
+                >
+                  Totals
+                </td>
+                <td className="py-3 px-4 text-right font-mono text-[14px] font-black text-white border-l border-gray-600">
+                  PHP {fmt(totalDebit)}
+                </td>
+                <td className="py-3 px-4 text-right font-mono text-[14px] font-black text-red-400 border-l border-gray-600">
+                  PHP {fmt(totalCredit)}
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
-
       </div>
     </div>
-  );
+  )
 }
 
-function StatCard({ iconBg, iconColor, icon, label, value, sub, small = false, valueClass = 'text-black' }) {
+function StatCard({
+  iconBg,
+  iconColor,
+  icon,
+  label,
+  value,
+  sub,
+  small = false,
+  valueClass = 'text-black',
+}) {
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-      <div className={`w-10 h-10 ${iconBg} ${iconColor} rounded-xl flex items-center justify-center flex-shrink-0`}>
+      <div
+        className={`w-10 h-10 ${iconBg} ${iconColor} rounded-xl flex items-center justify-center flex-shrink-0`}
+      >
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">{label}</p>
-        <h4 className={`font-black ${valueClass} leading-none truncate ${small ? 'text-[13px]' : 'text-xl'}`}>{value}</h4>
+        <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
+          {label}
+        </p>
+        <h4
+          className={`font-black ${valueClass} leading-none truncate ${small ? 'text-[13px]' : 'text-xl'}`}
+        >
+          {value}
+        </h4>
         <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">{sub}</p>
       </div>
     </div>
-  );
+  )
 }

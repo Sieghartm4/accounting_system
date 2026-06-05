@@ -8,6 +8,7 @@ const usePurchase = () => {
   const [hasMore, setHasMore] = useState(false)
 
   const purchasesRef = useRef([])
+  const filterRef = useRef({ dateFrom: null, dateTo: null })
 
   const LIMIT = 50
 
@@ -24,7 +25,7 @@ const usePurchase = () => {
     })
   }, [])
 
-  const fetchPurchase = async (offset = 0, append = false) => {
+  const fetchPurchase = async (offset = 0, append = false, filters = {}) => {
     if (!append) {
       setLoading(true)
       setError(null)
@@ -36,8 +37,18 @@ const usePurchase = () => {
       const token = localStorage.getItem('token')
       if (!token) throw new Error('No authorization token found')
 
+      const params = new URLSearchParams()
+      params.append('offset', offset)
+      params.append('limit', LIMIT)
+
+      const queryDateFrom = filters.dateFrom || filterRef.current.dateFrom
+      const queryDateTo = filters.dateTo || filterRef.current.dateTo
+
+      if (queryDateFrom) params.append('dateFrom', queryDateFrom)
+      if (queryDateTo) params.append('dateTo', queryDateTo)
+
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/purchase?offset=${offset}&limit=${LIMIT}`,
+        `${import.meta.env.VITE_SERVER_LINK}/purchase?${params.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -78,9 +89,19 @@ const usePurchase = () => {
     fetchPurchase(0, false)
   }, [])
 
-  const refetchPurchases = async () => fetchPurchase(0, false)
+  const refetchPurchases = useCallback(
+    (filters = {}) => {
+      fetchPurchase(0, false, filters)
+    },
+    [fetchPurchase],
+  )
 
-  const loadMore = async () => fetchPurchase(purchasesRef.current.length || 0, true)
+  const loadMore = useCallback(
+    (filters = {}) => {
+      fetchPurchase(purchasesRef.current.length || 0, true, filters)
+    },
+    [fetchPurchase],
+  )
 
   return {
     purchases,

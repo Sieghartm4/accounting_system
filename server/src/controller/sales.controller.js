@@ -253,7 +253,11 @@ const getSales = async (req, res, next) => {
       ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
       : null
 
-    const query = sql
+    const { dateFrom, dateTo, date_from, date_to } = req.query || {}
+    const salesDateFrom = dateFrom || date_from
+    const salesDateTo = dateTo || date_to
+
+    const baseQuery = sql
       .select([
         { col: Accounting.sales.selectOptionColumns.id, as: 'id' },
 
@@ -297,31 +301,37 @@ const getSales = async (req, res, next) => {
 
       .build()
 
-    const queryParams = shouldPaginate ? [limitNum, offsetNum] : []
+    let whereClause = ''
+    const queryParams = []
+
+    if (salesDateFrom) {
+      whereClause += ` WHERE ${Accounting.sales.selectOptionColumns.date_delivered} >= ?`
+      queryParams.push(salesDateFrom)
+    }
+
+    if (salesDateTo) {
+      if (whereClause) {
+        whereClause += ` AND ${Accounting.sales.selectOptionColumns.date_delivered} <= ?`
+      } else {
+        whereClause += ` WHERE ${Accounting.sales.selectOptionColumns.date_delivered} <= ?`
+      }
+      queryParams.push(salesDateTo)
+    }
+
+    const queryWithWhere = baseQuery + whereClause
     const paginatedQuery = shouldPaginate
-      ? `${query} ORDER BY ${Accounting.sales.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
-      : `${query} ORDER BY ${Accounting.sales.selectOptionColumns.id} DESC`
+      ? `${queryWithWhere} ORDER BY ${Accounting.sales.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
+      : `${queryWithWhere} ORDER BY ${Accounting.sales.selectOptionColumns.id} DESC`
+
+    if (shouldPaginate) {
+      queryParams.push(limitNum)
+      queryParams.push(offsetNum)
+    }
 
     let sales = await Query(paginatedQuery, queryParams, [
       Accounting.sales.prefix_,
       Master.customers.prefix_,
     ])
-
-    // Apply optional date_due filtering from query params: date_from, date_to
-    const { date_from, date_to } = req.query || {}
-    if (date_from || date_to) {
-      const from = date_from ? new Date(date_from) : null
-      const to = date_to ? new Date(date_to) : null
-
-      sales = (sales || []).filter((s) => {
-        if (!s || !s.date_due) return false
-        const due = new Date(s.date_due)
-        if (from && to) return due >= from && due <= to
-        if (from) return due >= from
-        if (to) return due <= to
-        return true
-      })
-    }
 
     res.status(200).json({
       success: true,

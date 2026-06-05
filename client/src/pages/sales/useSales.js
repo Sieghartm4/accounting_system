@@ -8,6 +8,7 @@ export function useSales() {
   const [hasMore, setHasMore] = useState(false)
 
   const salesRef = useRef([])
+  const filterRef = useRef({ dateFrom: null, dateTo: null })
 
   const prependSales = useCallback((sale) => {
     if (!sale || !sale.id) return
@@ -24,7 +25,7 @@ export function useSales() {
 
   const LIMIT = 50
 
-  const fetchSales = async (offset = 0, append = false) => {
+  const fetchSales = async (offset = 0, append = false, filters = {}) => {
     if (!append) {
       setLoading(true)
       setError(null)
@@ -36,8 +37,29 @@ export function useSales() {
       const token = localStorage.getItem('token')
       if (!token) throw new Error('No authorization token found')
 
+      const params = new URLSearchParams()
+      params.append('offset', offset)
+      params.append('limit', LIMIT)
+
+      let queryDateFrom =
+        filters.dateFrom !== undefined
+          ? filters.dateFrom
+          : filterRef.current.dateFrom
+      let queryDateTo =
+        filters.dateTo !== undefined ? filters.dateTo : filterRef.current.dateTo
+
+      if (filters.dateFrom !== undefined || filters.dateTo !== undefined) {
+        filterRef.current = {
+          dateFrom: queryDateFrom,
+          dateTo: queryDateTo,
+        }
+      }
+
+      if (queryDateFrom) params.append('dateFrom', queryDateFrom)
+      if (queryDateTo) params.append('dateTo', queryDateTo)
+
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/sales?offset=${offset}&limit=${LIMIT}`,
+        `${import.meta.env.VITE_SERVER_LINK}/sales?${params.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -73,9 +95,10 @@ export function useSales() {
     }
   }
 
-  const refetchSales = async () => fetchSales(0, false)
+  const refetchSales = async (filters = {}) => fetchSales(0, false, filters)
 
-  const loadMore = async () => fetchSales(salesRef.current.length || 0, true)
+  const loadMore = async (filters = {}) =>
+    fetchSales(salesRef.current.length || 0, true, filters)
 
   useEffect(() => {
     refetchSales()

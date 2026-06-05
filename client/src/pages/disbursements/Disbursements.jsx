@@ -46,6 +46,26 @@ function DisbursementsContent() {
   const [viewingDisbursement, setViewingDisbursement] = useState(null)
   const [isEditMode, setIsEditMode] = useState(false)
   const [toast, setToast] = useState(null)
+  const [pendingDateFrom, setPendingDateFrom] = useState('')
+  const [pendingDateTo, setPendingDateTo] = useState('')
+  const [activeDateFrom, setActiveDateFrom] = useState(null)
+  const [activeDateTo, setActiveDateTo] = useState(null)
+
+  const applyDateFilters = async () => {
+    const from = pendingDateFrom || null
+    const to = pendingDateTo || null
+    setActiveDateFrom(from)
+    setActiveDateTo(to)
+    await refetchDisbursements({ dateFrom: from, dateTo: to })
+  }
+
+  const clearDateFilters = async () => {
+    setPendingDateFrom('')
+    setPendingDateTo('')
+    setActiveDateFrom(null)
+    setActiveDateTo(null)
+    await refetchDisbursements({ dateFrom: null, dateTo: null })
+  }
 
   useEffect(() => {
     const id = searchParams.get('id')
@@ -358,7 +378,43 @@ function DisbursementsContent() {
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-gray-500">From</span>
+                <input
+                  type="date"
+                  value={pendingDateFrom}
+                  onChange={(e) => setPendingDateFrom(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                  aria-label="Filter disbursements from date"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-gray-500">To</span>
+                <input
+                  type="date"
+                  value={pendingDateTo}
+                  onChange={(e) => setPendingDateTo(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                  aria-label="Filter disbursements to date"
+                />
+              </div>
+            </div>
+            <button
+              onClick={applyDateFilters}
+              className="px-4 py-2 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-sm"
+              type="button"
+            >
+              Apply
+            </button>
+            <button
+              onClick={clearDateFilters}
+              className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition-all shadow-sm"
+              type="button"
+            >
+              Clear
+            </button>
             <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
               <Download size={14} />
               EXPORT VOUCHERS
@@ -529,7 +585,9 @@ function DisbursementsContent() {
           enableInfiniteScroll={true}
           hasMore={hasMore}
           isLoadingMore={loadingMore}
-          onLoadMore={loadMore}
+          onLoadMore={() =>
+            loadMore({ dateFrom: activeDateFrom, dateTo: activeDateTo })
+          }
           checkboxActions={getFilteredCheckboxActions([])}
           checkboxActionsFilter={getFilteredCheckboxActions}
         />

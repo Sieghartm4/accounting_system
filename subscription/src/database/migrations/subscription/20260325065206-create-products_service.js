@@ -10,7 +10,7 @@ module.exports = {
         autoIncrement: true
       },
       ps_code: {
-        type: Sequelize.STRING(20),
+        type: Sequelize.TEXT('long'),
         allowNull: false
       },
       ps_name: {

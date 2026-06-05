@@ -9,6 +9,8 @@ import {
   Hash,
   Search,
 } from 'lucide-react'
+import useCompany from '../company/useCompany'
+import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 
 export default function GeneralLedger() {
   const [ledgerEntries, setLedgerEntries] = useState([])
@@ -20,6 +22,7 @@ export default function GeneralLedger() {
   const [endDate, setEndDate] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const { company } = useCompany()
 
   useEffect(() => {
     fetchGeneralLedger()
@@ -413,7 +416,7 @@ export default function GeneralLedger() {
       })
       const W = doc.internal.pageSize.getWidth()
       const M = 36
-      let y = 38
+      let y = renderPDFCompanyHeader(doc, company, W, M)
 
       // Color palette
       const BLK = [17, 24, 39]

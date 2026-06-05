@@ -266,17 +266,42 @@ const getPurchase = async (req, res, next) => {
       .build()
 
     // pagination params
-    const { offset, limit } = req.query
+    const { offset, limit, dateFrom, dateTo, date_from, date_to } = req.query
+    const purchaseDateFrom = dateFrom || date_from
+    const purchaseDateTo = dateTo || date_to
     const shouldPaginate = offset !== undefined && limit !== undefined
     const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
     const limitNum = shouldPaginate
       ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
       : null
 
-    const queryParams = shouldPaginate ? [limitNum, offsetNum] : []
+    const purchaseDateColumn = `DATE(${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.date_delivered})`
+    let whereClause = ''
+    const queryParams = []
+
+    if (purchaseDateFrom) {
+      whereClause += ` WHERE ${purchaseDateColumn} >= ?`
+      queryParams.push(purchaseDateFrom)
+    }
+
+    if (purchaseDateTo) {
+      if (whereClause) {
+        whereClause += ` AND ${purchaseDateColumn} <= ?`
+      } else {
+        whereClause += ` WHERE ${purchaseDateColumn} <= ?`
+      }
+      queryParams.push(purchaseDateTo)
+    }
+
+    const queryWithWhere = query + whereClause
+    if (shouldPaginate) {
+      queryParams.push(limitNum)
+      queryParams.push(offsetNum)
+    }
+
     const paginatedQuery = shouldPaginate
-      ? `${query} ORDER BY ${Accounting.purchase.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
-      : `${query} ORDER BY ${Accounting.purchase.selectOptionColumns.id} DESC`
+      ? `${queryWithWhere} ORDER BY ${Accounting.purchase.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
+      : `${queryWithWhere} ORDER BY ${Accounting.purchase.selectOptionColumns.id} DESC`
 
     let purchases = await Query(paginatedQuery, queryParams, [
       Accounting.purchase.prefix_,

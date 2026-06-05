@@ -29,12 +29,32 @@ require('dotenv').config()
 
 const getPayments = async (req, res, next) => {
   try {
-    const { offset, limit } = req.query
+    const { offset, limit, dateFrom, dateTo, date_from, date_to } = req.query
+    const paymentsDateFrom = dateFrom || date_from
+    const paymentsDateTo = dateTo || date_to
     const shouldPaginate = offset !== undefined && limit !== undefined
     const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
     const limitNum = shouldPaginate
       ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
       : null
+
+    const paymentDateColumn = `DATE(${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.payment_date})`
+    let whereClause = ''
+    const queryParams = []
+
+    if (paymentsDateFrom) {
+      whereClause += ` WHERE ${paymentDateColumn} >= ?`
+      queryParams.push(paymentsDateFrom)
+    }
+
+    if (paymentsDateTo) {
+      if (whereClause) {
+        whereClause += ` AND ${paymentDateColumn} <= ?`
+      } else {
+        whereClause += ` WHERE ${paymentDateColumn} <= ?`
+      }
+      queryParams.push(paymentsDateTo)
+    }
 
     const query = sql
       .select([
@@ -77,10 +97,15 @@ const getPayments = async (req, res, next) => {
 
       .build()
 
-    const queryParams = shouldPaginate ? [limitNum, offsetNum] : []
+    const queryWithWhere = query + whereClause
+    if (shouldPaginate) {
+      queryParams.push(limitNum)
+      queryParams.push(offsetNum)
+    }
+
     const paginatedQuery = shouldPaginate
-      ? `${query} ORDER BY ${Accounting.payments.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
-      : `${query} ORDER BY ${Accounting.payments.selectOptionColumns.id} DESC`
+      ? `${queryWithWhere} ORDER BY ${Accounting.payments.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
+      : `${queryWithWhere} ORDER BY ${Accounting.payments.selectOptionColumns.id} DESC`
 
     let payments = await Query(paginatedQuery, queryParams, [
       Accounting.payments.prefix_,

@@ -28,14 +28,14 @@ require('dotenv').config()
 
 const getReceipts = async (req, res, next) => {
   try {
-    const { offset, limit } = req.query
+    const { offset, limit, dateFrom, dateTo } = req.query
     const shouldPaginate = offset !== undefined && limit !== undefined
     const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
     const limitNum = shouldPaginate
       ? Math.max(1, Math.min(100, parseInt(limit, 10) || 10))
       : null
 
-    const query = sql
+    let baseQuery = sql
       .select([
         { col: Accounting.receipts.selectOptionColumns.id, as: 'id' },
 
@@ -85,10 +85,36 @@ const getReceipts = async (req, res, next) => {
 
       .build()
 
-    const queryParams = shouldPaginate ? [limitNum, offsetNum] : []
+    // Build WHERE clause for date filters
+    let whereClause = ''
+    const dateParams = []
+
+    if (dateFrom) {
+      whereClause += ` WHERE ${Accounting.receipts.selectOptionColumns.collection_date} >= ?`
+      dateParams.push(dateFrom)
+    }
+
+    if (dateTo) {
+      if (whereClause) {
+        whereClause += ` AND ${Accounting.receipts.selectOptionColumns.collection_date} <= ?`
+      } else {
+        whereClause += ` WHERE ${Accounting.receipts.selectOptionColumns.collection_date} <= ?`
+      }
+      dateParams.push(dateTo)
+    }
+
+    const queryWithWhere = baseQuery + whereClause
+
+    // Build pagination params
+    const queryParams = [...dateParams]
+    if (shouldPaginate) {
+      queryParams.push(limitNum)
+      queryParams.push(offsetNum)
+    }
+
     const paginatedQuery = shouldPaginate
-      ? `${query} ORDER BY ${Accounting.receipts.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
-      : `${query} ORDER BY ${Accounting.receipts.selectOptionColumns.id} DESC`
+      ? `${queryWithWhere} ORDER BY ${Accounting.receipts.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
+      : `${queryWithWhere} ORDER BY ${Accounting.receipts.selectOptionColumns.id} DESC`
 
     let receipts = await Query(paginatedQuery, queryParams, [
       Accounting.receipts.prefix_,

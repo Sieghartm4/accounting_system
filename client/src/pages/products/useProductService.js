@@ -1,128 +1,215 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
 
 const useProductService = () => {
-  const [productService, setProductService] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [productService, setProductService] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const fetchProductService = async () => {
     try {
-      setLoading(true);
-      const token = localStorage.getItem("token");
+      setLoading(true)
+      const token = localStorage.getItem('token')
 
       if (!token) {
-        throw new Error("No authorization token found");
+        throw new Error('No authorization token found')
       }
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/product_service`,
         {
-          method: "GET",
+          method: 'GET',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-        }
-      );
+        },
+      )
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      const result = await response.json();
+      const result = await response.json()
 
       if (result.success) {
-        setProductService(result.data);
+        setProductService(result.data)
       } else {
-        setError(result.message || 'Failed to fetch product service');
+        setError(result.message || 'Failed to fetch product service')
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchProductService();
-  }, []);
+    fetchProductService()
+  }, [])
 
-  const createProductService = async (code, name, type, category, sales_price, purchase_price, unit) => {
+  const createProductService = async (
+    code,
+    name,
+    type,
+    category,
+    sales_price,
+    purchase_price,
+    unit,
+  ) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem('token')
 
       if (!token) {
-        throw new Error("No authorization token found");
+        throw new Error('No authorization token found')
       }
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/product_service`,
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ code, name, type, category, sales_price, purchase_price, unit })
-        }
-      );
+          body: JSON.stringify({
+            code,
+            name,
+            type,
+            category,
+            sales_price,
+            purchase_price,
+            unit,
+          }),
+        },
+      )
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      const result = await response.json();
+      const result = await response.json()
 
       if (result.success) {
         // Refresh the product service list
-        await fetchProductService();
-        return { success: true, data: result.data };
+        await fetchProductService()
+        return { success: true, data: result.data }
       } else {
-        return { success: false, message: result.message || "Failed to create product/service" };
+        return {
+          success: false,
+          message: result.message || 'Failed to create product/service',
+        }
       }
     } catch (err) {
-      console.error('Error creating product/service:', err.message);
-      return { success: false, message: err.message };
+      console.error('Error creating product/service:', err.message)
+      return { success: false, message: err.message }
     }
-  };
+  }
 
-  const updateProductService = async (id, code, name, type, category, sales_price, purchase_price, unit) => {
+  const updateProductService = async (
+    id,
+    code,
+    name,
+    type,
+    category,
+    sales_price,
+    purchase_price,
+    unit,
+  ) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem('token')
 
       if (!token) {
-        throw new Error("No authorization token found");
+        throw new Error('No authorization token found')
       }
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/product_service/${id}`,
         {
-          method: "PUT",
+          method: 'PUT',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ id, code, name, type, category, sales_price, purchase_price, unit })
-        }
-      );
+          body: JSON.stringify({
+            id,
+            code,
+            name,
+            type,
+            category,
+            sales_price,
+            purchase_price,
+            unit,
+          }),
+        },
+      )
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      const result = await response.json();
+      const result = await response.json()
 
       if (result.success) {
-        await fetchProductService();
-        return { success: true, data: result.data };
+        await fetchProductService()
+        return { success: true, data: result.data }
       }
 
-      return { success: false, message: result.message || "Failed to update product/service" };
+      return {
+        success: false,
+        message: result.message || 'Failed to update product/service',
+      }
     } catch (err) {
-      console.error('Error updating product/service:', err.message);
-      return { success: false, message: err.message };
+      console.error('Error updating product/service:', err.message)
+      return { success: false, message: err.message }
     }
-  };
+  }
 
-  return { productService, loading, error, createProductService, updateProductService };
-};
+  const syncProductService = async () => {
+    try {
+      const token = localStorage.getItem('token')
 
-export default useProductService;
+      if (!token) {
+        throw new Error('No authorization token found')
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/product_service/sync`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
+        await fetchProductService()
+        return { success: true, data: result.data, message: result.message }
+      }
+
+      return {
+        success: false,
+        message: result.message || 'Failed to sync product/service',
+      }
+    } catch (err) {
+      console.error('Error syncing product/service:', err.message)
+      return { success: false, message: err.message }
+    }
+  }
+
+  return {
+    productService,
+    loading,
+    error,
+    createProductService,
+    updateProductService,
+    syncProductService,
+  }
+}
+
+export default useProductService

@@ -1,26 +1,42 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Package, PlusSquare, ShieldCheck, Layers, ArrowRight, Download, Plus, Edit2 } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import RightSideModal from '../../components/RightSideModal';
-import DynamicToast from '../../components/DynamicToast';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import useProductService from './useProductService';
+import React, { useState } from 'react'
+import { motion } from 'framer-motion'
+import {
+  Package,
+  PlusSquare,
+  ShieldCheck,
+  Layers,
+  ArrowRight,
+  Download,
+  Plus,
+  Edit2,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import RightSideModal from '../../components/RightSideModal'
+import DynamicToast from '../../components/DynamicToast'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import useProductService from './useProductService'
 
 export default function ProductService() {
   return (
     <RouteProtection routeName="product_service">
       <ProductServiceContent />
     </RouteProtection>
-  );
+  )
 }
 
 function ProductServiceContent() {
-  const { productService, loading, error, createProductService, updateProductService } = useProductService();
+  const {
+    productService,
+    loading,
+    error,
+    createProductService,
+    updateProductService,
+    syncProductService,
+  } = useProductService()
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProductService, setEditingProductService] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingProductService, setEditingProductService] = useState(null)
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -28,54 +44,61 @@ function ProductServiceContent() {
     category: '',
     sales_price: '',
     purchase_price: '',
-    unit: ''
-  });
-  const [toast, setToast] = useState(null);
+    unit: '',
+  })
+  const [toast, setToast] = useState(null)
+  const [syncing, setSyncing] = useState(false)
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
 
   const handleAddProductClick = () => {
-    setEditingProductService(null);
-    setFormData({ 
-      code: '', 
-      name: '', 
-      type: '', 
-      category: '', 
-      sales_price: '', 
-      purchase_price: '', 
-      unit: '' 
-    });
-    setIsModalOpen(true);
-  };
+    setEditingProductService(null)
+    setFormData({
+      code: '',
+      name: '',
+      type: '',
+      category: '',
+      sales_price: '',
+      purchase_price: '',
+      unit: '',
+    })
+    setIsModalOpen(true)
+  }
 
   const handleEditProductClick = (row) => {
-    setEditingProductService(row);
+    setEditingProductService(row)
     setFormData({
       code: row.code || '',
       name: row.name || '',
       type: row.type ? String(row.type).toLowerCase() : '',
       category: row.category || '',
-      sales_price: row.sales_price !== undefined && row.sales_price !== null ? row.sales_price : '',
-      purchase_price: row.purchase_price !== undefined && row.purchase_price !== null ? row.purchase_price : '',
-      unit: row.unit || ''
-    });
-    setIsModalOpen(true);
-  };
+      sales_price:
+        row.sales_price !== undefined && row.sales_price !== null
+          ? row.sales_price
+          : '',
+      purchase_price:
+        row.purchase_price !== undefined && row.purchase_price !== null
+          ? row.purchase_price
+          : '',
+      unit: row.unit || '',
+    })
+    setIsModalOpen(true)
+  }
 
   const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingProductService(null);
-  };
+    setIsModalOpen(false)
+    setEditingProductService(null)
+  }
 
   const handleToastClose = () => {
-    setToast(null);
-  };
+    setToast(null)
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     try {
       const result = editingProductService
         ? await updateProductService(
@@ -86,7 +109,7 @@ function ProductServiceContent() {
             formData.category,
             formData.sales_price,
             formData.purchase_price,
-            formData.unit
+            formData.unit,
           )
         : await createProductService(
             formData.code,
@@ -95,37 +118,41 @@ function ProductServiceContent() {
             formData.category,
             formData.sales_price,
             formData.purchase_price,
-            formData.unit
-          );
-      
+            formData.unit,
+          )
+
       if (result.success) {
         setToast({
           type: 'success',
-          message: `Product/Service "${formData.name}" ${editingProductService ? 'updated' : 'created'} successfully!`
-        });
-        setIsModalOpen(false);
-        setEditingProductService(null);
+          message: `Product/Service "${formData.name}" ${editingProductService ? 'updated' : 'created'} successfully!`,
+        })
+        setIsModalOpen(false)
+        setEditingProductService(null)
       } else {
         setToast({
           type: 'error',
-          message: result.message || `Failed to ${editingProductService ? 'update' : 'create'} product/service`
-        });
+          message:
+            result.message ||
+            `Failed to ${editingProductService ? 'update' : 'create'} product/service`,
+        })
       }
     } catch (error) {
       setToast({
         type: 'error',
-        message: `Network error occurred while ${editingProductService ? 'updating' : 'creating'} product/service`
-      });
+        message: `Network error occurred while ${editingProductService ? 'updating' : 'creating'} product/service`,
+      })
     }
-  };
+  }
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Syncing Inventory & Services...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Syncing Inventory & Services...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -136,12 +163,11 @@ function ProductServiceContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-      
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
         {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -150,7 +176,7 @@ function ProductServiceContent() {
           <span className="text-black">Product & Service Masterlist</span>
         </nav> */}
 
-        <motion.div 
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -171,12 +197,36 @@ function ProductServiceContent() {
           </div>
 
           <div className="flex gap-3">
+            <button
+              onClick={async () => {
+                setSyncing(true)
+                const result = await syncProductService()
+                setSyncing(false)
+
+                setToast({
+                  type: result.success ? 'success' : 'error',
+                  message:
+                    result.message ||
+                    (result.success
+                      ? 'Sync completed successfully.'
+                      : 'Failed to sync inventory.'),
+                })
+              }}
+              disabled={syncing}
+              className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <ArrowRight size={14} />
+              {syncing ? 'Syncing...' : 'Sync Inventory'}
+            </button>
             <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
               <Download size={14} />
               EXPORT CATALOG
             </button>
             <ProtectedAction routeName="product_service">
-              <button onClick={handleAddProductClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button
+                onClick={handleAddProductClick}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
                 <PlusSquare size={14} />
                 Add New
               </button>
@@ -186,29 +236,29 @@ function ProductServiceContent() {
 
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard 
-            icon={<Package className="text-red-600" size={20} />} 
-            label="Total Items" 
-            value={productService?.length || 0} 
+          <SummaryCard
+            icon={<Package className="text-red-600" size={20} />}
+            label="Total Items"
+            value={productService?.length || 0}
             subText="SKUs / Services"
           />
-          <SummaryCard 
-            icon={<Layers className="text-black" size={20} />} 
-            label="Categories" 
-            value="8" 
+          <SummaryCard
+            icon={<Layers className="text-black" size={20} />}
+            label="Categories"
+            value="8"
             subText="Departmental Groups"
           />
-          <SummaryCard 
-            icon={<ShieldCheck className="text-gray-400" size={20} />} 
-            label="Inventory Status" 
-            value="Synced" 
+          <SummaryCard
+            icon={<ShieldCheck className="text-gray-400" size={20} />}
+            label="Inventory Status"
+            value="Synced"
             subText="Global Database"
           />
         </div>
       </div>
 
       {/* --- TABLE SECTION --- */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -223,17 +273,21 @@ function ProductServiceContent() {
             {
               label: 'Edit',
               onClick: (row) => handleEditProductClick(row),
-              icon: <Edit2 size={16} />
-            }
+              icon: <Edit2 size={16} />,
+            },
           ]}
         />
       </motion.div>
-      
+
       {/* Add Product/Service Modal */}
-      <RightSideModal 
-        isOpen={isModalOpen} 
-        onClose={handleCloseModal} 
-        title={editingProductService ? 'Edit Product/Service' : 'Create New Product/Service'}
+      <RightSideModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        title={
+          editingProductService
+            ? 'Edit Product/Service'
+            : 'Create New Product/Service'
+        }
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
@@ -244,13 +298,13 @@ function ProductServiceContent() {
               <input
                 type="text"
                 value={formData.code}
-                onChange={(e) => setFormData({...formData, code: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter product/service code..."
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Product/Service Name <span className="text-red-600">*</span>
@@ -258,20 +312,20 @@ function ProductServiceContent() {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter product/service name..."
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Type <span className="text-red-600">*</span>
               </label>
               <select
                 value={formData.type}
-                onChange={(e) => setFormData({...formData, type: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
@@ -280,7 +334,7 @@ function ProductServiceContent() {
                 <option value="service">Service</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Category <span className="text-red-600">*</span>
@@ -288,13 +342,15 @@ function ProductServiceContent() {
               <input
                 type="text"
                 value={formData.category}
-                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter category..."
                 required
               />
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
@@ -304,13 +360,15 @@ function ProductServiceContent() {
                   type="number"
                   step="0.01"
                   value={formData.sales_price}
-                  onChange={(e) => setFormData({...formData, sales_price: e.target.value})}
+                  onChange={(e) =>
+                    setFormData({ ...formData, sales_price: e.target.value })
+                  }
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                   placeholder="0.00"
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                   Purchase Price <span className="text-red-600">*</span>
@@ -319,21 +377,23 @@ function ProductServiceContent() {
                   type="number"
                   step="0.01"
                   value={formData.purchase_price}
-                  onChange={(e) => setFormData({...formData, purchase_price: e.target.value})}
+                  onChange={(e) =>
+                    setFormData({ ...formData, purchase_price: e.target.value })
+                  }
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                   placeholder="0.00"
                   required
                 />
               </div>
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Unit <span className="text-red-600">*</span>
               </label>
               <select
                 value={formData.unit}
-                onChange={(e) => setFormData({...formData, unit: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
@@ -349,7 +409,7 @@ function ProductServiceContent() {
               </select>
             </div>
           </div>
-          
+
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -368,7 +428,7 @@ function ProductServiceContent() {
           </div>
         </form>
       </RightSideModal>
-      
+
       {/* Toast Notification */}
       {toast && (
         <DynamicToast
@@ -379,7 +439,7 @@ function ProductServiceContent() {
         />
       )}
     </div>
-  );
+  )
 }
 
 function SummaryCard({ icon, label, value, subText }) {
@@ -387,12 +447,16 @@ function SummaryCard({ icon, label, value, subText }) {
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }

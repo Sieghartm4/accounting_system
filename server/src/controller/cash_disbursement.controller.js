@@ -29,14 +29,14 @@ require('dotenv').config()
 
 const getCashDisbursements = async (req, res, next) => {
   try {
-    const { offset, limit } = req.query
+    const { offset, limit, dateFrom, dateTo } = req.query
     const shouldPaginate = offset !== undefined && limit !== undefined
     const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
     const limitNum = shouldPaginate
       ? Math.max(1, Math.min(100, parseInt(limit, 10) || 15))
       : null
 
-    const query = sql
+    const baseQuery = sql
       .select([
         { col: Accounting.cash_disbursements.selectOptionColumns.id, as: 'id' },
 
@@ -98,10 +98,31 @@ const getCashDisbursements = async (req, res, next) => {
 
       .build()
 
-    const queryParams = shouldPaginate ? [limitNum, offsetNum] : []
+    let whereClause = ''
+    const queryParams = []
+
+    if (dateFrom) {
+      whereClause += ` WHERE ${Accounting.cash_disbursements.selectOptionColumns.payment_date} >= ?`
+      queryParams.push(dateFrom)
+    }
+
+    if (dateTo) {
+      whereClause = whereClause
+        ? `${whereClause} AND ${Accounting.cash_disbursements.selectOptionColumns.payment_date} <= ?`
+        : ` WHERE ${Accounting.cash_disbursements.selectOptionColumns.payment_date} <= ?`
+      queryParams.push(dateTo)
+    }
+
+    const query = baseQuery + whereClause
+
     const paginatedQuery = shouldPaginate
       ? `${query} ORDER BY ${Accounting.cash_disbursements.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
       : `${query} ORDER BY ${Accounting.cash_disbursements.selectOptionColumns.id} DESC`
+
+    if (shouldPaginate) {
+      queryParams.push(limitNum)
+      queryParams.push(offsetNum)
+    }
 
     let result = await Query(paginatedQuery, [
       ...queryParams,

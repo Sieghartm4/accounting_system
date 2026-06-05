@@ -70,18 +70,42 @@ const getCollections = async (req, res, next) => {
 
       .build()
 
-    // pagination params
-    const { offset, limit } = req.query
+    const { offset, limit, dateFrom, dateTo, date_from, date_to } = req.query
+    const collectionsDateFrom = dateFrom || date_from
+    const collectionsDateTo = dateTo || date_to
     const shouldPaginate = offset !== undefined && limit !== undefined
     const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
     const limitNum = shouldPaginate
       ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
       : null
 
-    const queryParams = shouldPaginate ? [limitNum, offsetNum] : []
+    const collectionDateColumn = `DATE(${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.collection_date})`
+    let whereClause = ''
+    const queryParams = []
+
+    if (collectionsDateFrom) {
+      whereClause += ` WHERE ${collectionDateColumn} >= ?`
+      queryParams.push(collectionsDateFrom)
+    }
+
+    if (collectionsDateTo) {
+      if (whereClause) {
+        whereClause += ` AND ${collectionDateColumn} <= ?`
+      } else {
+        whereClause += ` WHERE ${collectionDateColumn} <= ?`
+      }
+      queryParams.push(collectionsDateTo)
+    }
+
+    const queryWithWhere = query + whereClause
+    if (shouldPaginate) {
+      queryParams.push(limitNum)
+      queryParams.push(offsetNum)
+    }
+
     const paginatedQuery = shouldPaginate
-      ? `${query} ORDER BY ${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
-      : `${query} ORDER BY ${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id} DESC`
+      ? `${queryWithWhere} ORDER BY ${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
+      : `${queryWithWhere} ORDER BY ${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id} DESC`
 
     let collections = await Query(paginatedQuery, queryParams, [
       Accounting.collections.prefix_,

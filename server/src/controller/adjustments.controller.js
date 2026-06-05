@@ -72,12 +72,32 @@ const resolveChartOfAccountIds = async (connection, journalEntries) => {
 
 const getAdjustments = async (req, res, next) => {
   try {
-    const { offset, limit } = req.query
+    const { offset, limit, dateFrom, dateTo, date_from, date_to } = req.query
+    const adjustmentsDateFrom = dateFrom || date_from
+    const adjustmentsDateTo = dateTo || date_to
     const shouldPaginate = offset !== undefined && limit !== undefined
     const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
     const limitNum = shouldPaginate
       ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
       : null
+
+    const postingDateColumn = `DATE(${Accounting.adjustments.tablename}.${Accounting.adjustments.selectOptionColumns.posting_date})`
+    let whereClause = ''
+    const queryParams = []
+
+    if (adjustmentsDateFrom) {
+      whereClause += ` WHERE ${postingDateColumn} >= ?`
+      queryParams.push(adjustmentsDateFrom)
+    }
+
+    if (adjustmentsDateTo) {
+      if (whereClause) {
+        whereClause += ` AND ${postingDateColumn} <= ?`
+      } else {
+        whereClause += ` WHERE ${postingDateColumn} <= ?`
+      }
+      queryParams.push(adjustmentsDateTo)
+    }
 
     let query = sql
       .select([
@@ -103,12 +123,19 @@ const getAdjustments = async (req, res, next) => {
       .from(Accounting.adjustments.tablename)
       .build()
 
+    const queryWithWhere = query + whereClause
     if (shouldPaginate) {
-      query += ` ORDER BY ${Accounting.adjustments.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
+      queryParams.push(limitNum)
+      queryParams.push(offsetNum)
     }
 
-    const queryParams = shouldPaginate ? [limitNum, offsetNum] : []
-    let result = await Query(query, queryParams, [Accounting.adjustments.prefix_])
+    const paginatedQuery = shouldPaginate
+      ? `${queryWithWhere} ORDER BY ${Accounting.adjustments.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
+      : `${queryWithWhere} ORDER BY ${Accounting.adjustments.selectOptionColumns.id} DESC`
+
+    let result = await Query(paginatedQuery, queryParams, [
+      Accounting.adjustments.prefix_,
+    ])
 
     res.status(200).json({
       success: true,

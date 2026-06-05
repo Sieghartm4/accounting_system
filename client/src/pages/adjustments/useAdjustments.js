@@ -10,13 +10,14 @@ const useAdjustments = () => {
   const [adjustmentData, setAdjustmentData] = useState(null)
   const [adjustmentLoading, setAdjustmentLoading] = useState(false)
   const adjustmentsRef = useRef([])
+  const filterRef = useRef({ dateFrom: null, dateTo: null })
   const LIMIT = 50
 
   useEffect(() => {
     adjustmentsRef.current = adjustments
   }, [adjustments])
 
-  const fetchAdjustments = useCallback(async (isLoadMore = false) => {
+  const fetchAdjustments = useCallback(async (isLoadMore = false, filters = {}) => {
     try {
       if (isLoadMore) {
         setLoadingMore(true)
@@ -34,6 +35,16 @@ const useAdjustments = () => {
       const params = new URLSearchParams()
       params.append('offset', currentOffset)
       params.append('limit', LIMIT)
+
+      const queryDateFrom =
+        filters.dateFrom !== undefined
+          ? filters.dateFrom
+          : filterRef.current.dateFrom
+      const queryDateTo =
+        filters.dateTo !== undefined ? filters.dateTo : filterRef.current.dateTo
+
+      if (queryDateFrom) params.append('dateFrom', queryDateFrom)
+      if (queryDateTo) params.append('dateTo', queryDateTo)
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/adjustments?${params.toString()}`,
@@ -133,9 +144,23 @@ const useAdjustments = () => {
     })
   }, [])
 
-  const refetchAdjustments = useCallback(() => {
-    fetchAdjustments(false)
-  }, [fetchAdjustments])
+  const refetchAdjustments = useCallback(
+    (filters = {}) => {
+      if (filters.dateFrom !== undefined) {
+        filterRef.current.dateFrom = filters.dateFrom
+      }
+      if (filters.dateTo !== undefined) {
+        filterRef.current.dateTo = filters.dateTo
+      }
+      fetchAdjustments(false, filters)
+    },
+    [fetchAdjustments],
+  )
+
+  const loadMore = useCallback(
+    (filters = {}) => fetchAdjustments(true, filters),
+    [fetchAdjustments],
+  )
 
   useEffect(() => {
     fetchAdjustments(false)
@@ -153,7 +178,7 @@ const useAdjustments = () => {
     handleAdjustmentRowClick,
     prependAdjustment,
     refetchAdjustments,
-    loadMore: () => fetchAdjustments(true),
+    loadMore,
   }
 }
 

@@ -940,6 +940,7 @@ const useDisbursements = () => {
   const [error, setError] = useState(null)
   const [hasMore, setHasMore] = useState(true)
   const disbursementsRef = useRef([])
+  const filterRef = useRef({ dateFrom: null, dateTo: null })
   const LIMIT = 50
 
   useEffect(() => {
@@ -957,61 +958,84 @@ const useDisbursements = () => {
     })
   }, [])
 
-  const fetchDisbursements = useCallback(async (isLoadMore = false) => {
-    try {
-      if (isLoadMore) {
-        setLoadingMore(true)
-      } else {
-        setLoading(true)
-      }
-      setError(null)
-      const token = localStorage.getItem('token')
-      if (!token) throw new Error('No authorization token found')
+  const fetchDisbursements = useCallback(
+    async (isLoadMore = false, filters = {}) => {
+      try {
+        if (isLoadMore) {
+          setLoadingMore(true)
+        } else {
+          setLoading(true)
+        }
+        setError(null)
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authorization token found')
 
-      const params = new URLSearchParams()
-      params.append('offset', isLoadMore ? disbursementsRef.current.length : 0)
-      params.append('limit', LIMIT)
+        const params = new URLSearchParams()
+        params.append('offset', isLoadMore ? disbursementsRef.current.length : 0)
+        params.append('limit', LIMIT)
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements?${params.toString()}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+        const queryDateFrom =
+          filters.dateFrom !== undefined
+            ? filters.dateFrom
+            : filterRef.current.dateFrom
+        const queryDateTo =
+          filters.dateTo !== undefined ? filters.dateTo : filterRef.current.dateTo
+
+        if (filters.dateFrom !== undefined || filters.dateTo !== undefined) {
+          filterRef.current = {
+            dateFrom: queryDateFrom,
+            dateTo: queryDateTo,
+          }
+        }
+
+        if (queryDateFrom) params.append('dateFrom', queryDateFrom)
+        if (queryDateTo) params.append('dateTo', queryDateTo)
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements?${params.toString()}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
           },
-        },
-      )
+        )
 
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
-      const result = await response.json()
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to fetch disbursements')
-      }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+        const result = await response.json()
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to fetch disbursements')
+        }
 
-      if (isLoadMore) {
-        setDisbursements((prev) => [...prev, ...(result.data || [])])
-      } else {
-        setDisbursements(result.data || [])
+        if (isLoadMore) {
+          setDisbursements((prev) => [...prev, ...(result.data || [])])
+        } else {
+          setDisbursements(result.data || [])
+        }
+        setHasMore(result.hasMore || false)
+      } catch (err) {
+        setError(err.message)
+        if (!isLoadMore) {
+          setDisbursements([])
+        }
+      } finally {
+        if (isLoadMore) {
+          setLoadingMore(false)
+        } else {
+          setLoading(false)
+        }
       }
-      setHasMore(result.hasMore || false)
-    } catch (err) {
-      setError(err.message)
-      if (!isLoadMore) {
-        setDisbursements([])
-      }
-    } finally {
-      if (isLoadMore) {
-        setLoadingMore(false)
-      } else {
-        setLoading(false)
-      }
-    }
-  }, [])
+    },
+    [],
+  )
 
-  const refetchDisbursements = useCallback(() => {
-    fetchDisbursements(false)
-  }, [fetchDisbursements])
+  const refetchDisbursements = useCallback(
+    (filters = {}) => {
+      fetchDisbursements(false, filters)
+    },
+    [fetchDisbursements],
+  )
 
   useEffect(() => {
     refetchDisbursements()
@@ -1025,7 +1049,7 @@ const useDisbursements = () => {
     hasMore,
     refetchDisbursements,
     prependDisbursement,
-    loadMore: () => fetchDisbursements(true),
+    loadMore: (filters = {}) => fetchDisbursements(true, filters),
   }
 }
 

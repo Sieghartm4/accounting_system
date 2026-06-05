@@ -1013,6 +1013,7 @@ const useReceipts = () => {
   const [error, setError] = useState(null)
   const [hasMore, setHasMore] = useState(true)
   const receiptsRef = useRef([])
+  const filterRef = useRef({ dateFrom: null, dateTo: null })
   const LIMIT = 50
 
   useEffect(() => {
@@ -1030,7 +1031,7 @@ const useReceipts = () => {
     })
   }, [])
 
-  const fetchReceipts = useCallback(async (isLoadMore = false) => {
+  const fetchReceipts = useCallback(async (isLoadMore = false, filters = {}) => {
     try {
       if (isLoadMore) {
         setLoadingMore(true)
@@ -1046,6 +1047,23 @@ const useReceipts = () => {
       const params = new URLSearchParams()
       params.append('offset', offset)
       params.append('limit', LIMIT)
+
+      let queryDateFrom =
+        filters.dateFrom !== undefined
+          ? filters.dateFrom
+          : filterRef.current.dateFrom
+      let queryDateTo =
+        filters.dateTo !== undefined ? filters.dateTo : filterRef.current.dateTo
+
+      if (filters.dateFrom !== undefined || filters.dateTo !== undefined) {
+        filterRef.current = {
+          dateFrom: queryDateFrom,
+          dateTo: queryDateTo,
+        }
+      }
+
+      if (queryDateFrom) params.append('dateFrom', queryDateFrom)
+      if (queryDateTo) params.append('dateTo', queryDateTo)
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/receipt?${params.toString()}`,
@@ -1086,13 +1104,23 @@ const useReceipts = () => {
     }
   }, [])
 
-  const refetchReceipts = useCallback(() => {
-    fetchReceipts(false)
-  }, [fetchReceipts])
+  const refetchReceipts = useCallback(
+    (filters = {}) => {
+      fetchReceipts(false, filters)
+    },
+    [fetchReceipts],
+  )
+
+  const loadMore = useCallback(
+    (filters = {}) => {
+      fetchReceipts(true, filters)
+    },
+    [fetchReceipts],
+  )
 
   useEffect(() => {
-    refetchReceipts()
-  }, [refetchReceipts])
+    fetchReceipts(false)
+  }, [fetchReceipts])
 
   return {
     receipts,
@@ -1102,7 +1130,7 @@ const useReceipts = () => {
     hasMore,
     refetchReceipts,
     prependReceipt,
-    loadMore: () => fetchReceipts(true),
+    loadMore,
   }
 }
 
