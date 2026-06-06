@@ -1,12 +1,213 @@
 openapi: 3.0.0
 info:
-  title:
-  description:
+  title: 5L Systems Accounting API
+  description: API documentation for the purchase order and accounting services.
   version: 0.0.1
 
 security:
   - SessionAuth: []
 
 tags:
+  - name: Purchase Order
+    description: Endpoints for managing purchase orders.
+
+components:
+  securitySchemes:
+    SessionAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Bearer token authentication. Use the Authorize button or add the Authorization header as 'Bearer <token>'."
+  parameters:
+    TenantDbHeader:
+      name: x-tenant-db
+      in: header
+      description: 'Tenant database override. If omitted, the current tenant database from the request context or route is used. Example: 5lsolutions_accounting'
+      required: false
+      schema:
+        type: string
+        example: 5lsolutions_accounting
+    TenantDbAliasHeader:
+      name: x-tenant
+      in: header
+      description: 'Alias header for tenant database override. If omitted, the current tenant database from the request context or route is used.'
+      required: false
+      schema:
+        type: string
+    AccountingLinkHeader:
+      name: x-accounting-link
+      in: header
+      description: 'Optional accounting link override. If omitted, the current route link is used.'
+      required: false
+      schema:
+        type: string
+        format: uri
+  schemas:
+    PurchaseOrderRequest:
+      type: object
+      required:
+        - product
+        - quantity
+        - price
+      properties:
+        product:
+          type: string
+          description: Product name or code to lookup and create purchase order for
+          example: 'Office Chair or PROD-001'
+        quantity:
+          type: integer
+          example: 10
+        price:
+          type: number
+          format: float
+          example: 1299.5
+        responsibility_center:
+          type: string
+          nullable: true
+          example: Operations
+        status:
+          type: string
+          enum:
+            - PENDING
+            - APPROVED
+            - REJECTED
+          example: PENDING
+    PurchaseOrderResponseItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+          description: ID of the resolved product from products_service table
+        product_code:
+          type: string
+          description: Code of the resolved product
+        product_name:
+          type: string
+          description: Name of the resolved product
+        quantity:
+          type: integer
+        price:
+          type: number
+          format: float
+        responsibility_center:
+          type: string
+          nullable: true
+        status:
+          type: string
+    PurchaseOrderCreateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseOrderResponseItem'
+        count:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        error:
+          type: string
 
 paths:
+  /purchase_order:
+    post:
+      tags:
+        - Purchase Order
+      summary: Create one or more purchase orders
+      description: |
+        Creates purchase order records for the tenant database context.
+        Supports a single purchase order object or an array of purchase order objects.
+
+        **Product Lookup**: The `product` field accepts either a product name or product code.
+        The system will look up the product in the products_service table by matching either:
+        - Product name (ps_name)
+        - Product code (ps_code)
+
+        If a matching product is found, its ID is stored in the purchase_order. If no match is found,
+        the request returns a 404 error.
+
+        Use the Authorization header with a bearer token. Optionally override the tenant database with x-tenant-db or x-tenant.
+        Optionally provide x-accounting-link if you need an explicit accounting link; otherwise, the current route link is used.
+      security:
+        - SessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TenantDbHeader'
+        - $ref: '#/components/parameters/TenantDbAliasHeader'
+        - $ref: '#/components/parameters/AccountingLinkHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/PurchaseOrderRequest'
+                - type: array
+                  items:
+                    $ref: '#/components/schemas/PurchaseOrderRequest'
+            examples:
+              single:
+                summary: Single purchase order by product name
+                value:
+                  product: Office Chair
+                  quantity: 10
+                  price: 1299.5
+                  responsibility_center: Operations
+                  status: PENDING
+              batch:
+                summary: Multiple purchase orders by product code and name
+                value:
+                  - product: PROD-001
+                    quantity: 10
+                    price: 1299.5
+                    responsibility_center: Operations
+                    status: PENDING
+                  - product: Office Desk
+                    quantity: 5
+                    price: 2499.0
+                    responsibility_center: Operations
+                    status: PENDING
+      responses:
+        '201':
+          description: Purchase order(s) created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrderCreateResponse'
+        '400':
+          description: Bad request due to missing or invalid fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - authentication failed or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found with the provided name or code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

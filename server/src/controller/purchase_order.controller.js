@@ -144,39 +144,65 @@ const createPurchaseOrder = async (req, res, next) => {
     }
 
     const validatedPurchaseOrders = []
-
-    for (const [index, item] of purchaseOrdersPayload.entries()) {
-      const { product, quantity, price, responsibility_center, status } = item
-      const parsedQuantity = Number(quantity)
-      const parsedPrice = Number(price)
-
-      if (!product || quantity === undefined || price === undefined) {
-        return res.status(400).json({
-          success: false,
-          message: `Missing required fields on row ${index + 1}: product, quantity, price`,
-        })
-      }
-
-      if (Number.isNaN(parsedQuantity) || Number.isNaN(parsedPrice)) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid quantity or price on row ${index + 1}`,
-        })
-      }
-
-      validatedPurchaseOrders.push({
-        product: product || null,
-        quantity: parsedQuantity,
-        price: parsedPrice,
-        responsibility_center: responsibility_center || null,
-        status: status || 'PENDING',
-      })
-    }
-
     let connection
+
     try {
       connection = await getTenantPool().getConnection()
       await connection.beginTransaction()
+
+      // Validate and resolve products
+      for (const [index, item] of purchaseOrdersPayload.entries()) {
+        const { product, quantity, price, responsibility_center, status } = item
+        const parsedQuantity = Number(quantity)
+        const parsedPrice = Number(price)
+
+        if (!product || quantity === undefined || price === undefined) {
+          return res.status(400).json({
+            success: false,
+            message: `Missing required fields on row ${index + 1}: product (name or code), quantity, price`,
+          })
+        }
+
+        if (Number.isNaN(parsedQuantity) || Number.isNaN(parsedPrice)) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid quantity or price on row ${index + 1}`,
+          })
+        }
+
+        // Query to find product by name or code using raw SQL for OR support
+        const productQuery = `
+          SELECT ps_id as id, ps_code as code, ps_name as name 
+          FROM products_service 
+          WHERE ps_name = ? OR ps_code = ?
+          LIMIT 1
+        `
+
+        const [productResults] = await connection.execute(productQuery, [
+          product,
+          product,
+        ])
+
+        if (!productResults || productResults.length === 0) {
+          await connection.rollback()
+          return res.status(404).json({
+            success: false,
+            message: `Product with name or code "${product}" not found on row ${index + 1}`,
+          })
+        }
+
+        const foundProduct = productResults[0]
+
+        validatedPurchaseOrders.push({
+          productId: foundProduct.id,
+          productCode: foundProduct.code,
+          productName: foundProduct.name,
+          quantity: parsedQuantity,
+          price: parsedPrice,
+          responsibility_center: responsibility_center || null,
+          status: status || 'PENDING',
+        })
+      }
 
       const createdOrders = []
       const auditQueries = []
@@ -192,7 +218,7 @@ const createPurchaseOrder = async (req, res, next) => {
 
       for (const purchaseOrder of validatedPurchaseOrders) {
         const mainValues = [
-          purchaseOrder.product,
+          purchaseOrder.productId,
           purchaseOrder.quantity,
           purchaseOrder.price,
           purchaseOrder.responsibility_center,
@@ -204,7 +230,13 @@ const createPurchaseOrder = async (req, res, next) => {
 
         createdOrders.push({
           id: purchaseOrderId,
-          ...purchaseOrder,
+          product_id: purchaseOrder.productId,
+          product_code: purchaseOrder.productCode,
+          product_name: purchaseOrder.productName,
+          quantity: purchaseOrder.quantity,
+          price: purchaseOrder.price,
+          responsibility_center: purchaseOrder.responsibility_center,
+          status: purchaseOrder.status,
         })
 
         auditQueries.push({
@@ -221,7 +253,7 @@ const createPurchaseOrder = async (req, res, next) => {
             req.context?.username || null,
             now.toISOString().split('T')[0],
             now.toTimeString().split(' ')[0],
-            `CREATE: ID ${purchaseOrderId}`,
+            `CREATE: ID ${purchaseOrderId} - Product ID ${purchaseOrder.productId}`,
           ],
         })
       }
@@ -279,7 +311,7 @@ const updatePurchaseOrder = async (req, res, next) => {
     if (!product || quantity === undefined || price === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: product, quantity, price',
+        message: 'Missing required fields: product (name or code), quantity, price',
       })
     }
 
@@ -324,6 +356,29 @@ const updatePurchaseOrder = async (req, res, next) => {
         })
       }
 
+      // Query to find product by name or code using raw SQL for OR support
+      const productQuery = `
+        SELECT ps_id as id, ps_code as code, ps_name as name 
+        FROM products_service 
+        WHERE ps_name = ? OR ps_code = ?
+        LIMIT 1
+      `
+
+      const [productResults] = await connection.execute(productQuery, [
+        product,
+        product,
+      ])
+
+      if (!productResults || productResults.length === 0) {
+        await connection.rollback()
+        return res.status(404).json({
+          success: false,
+          message: `Product with name or code "${product}" not found`,
+        })
+      }
+
+      const foundProduct = productResults[0]
+
       const updateQuery = sql
         .update(Accounting.purchase_order.tablename)
         .set([
@@ -337,7 +392,7 @@ const updatePurchaseOrder = async (req, res, next) => {
         .build()
 
       const updateValues = [
-        product,
+        foundProduct.id,
         quantity,
         price,
         responsibility_center,
@@ -366,7 +421,7 @@ const updatePurchaseOrder = async (req, res, next) => {
           req.context?.username || null,
           now.toISOString().split('T')[0],
           now.toTimeString().split(' ')[0],
-          `UPDATE: ID ${purchaseOrderId}`,
+          `UPDATE: ID ${purchaseOrderId} - Product ID ${foundProduct.id}`,
         ],
       })
       await Transaction(auditQueries)
@@ -376,7 +431,9 @@ const updatePurchaseOrder = async (req, res, next) => {
         message: 'Purchase order updated successfully',
         data: {
           id: purchaseOrderId,
-          product,
+          product_id: foundProduct.id,
+          product_code: foundProduct.code,
+          product_name: foundProduct.name,
           quantity,
           price,
           responsibility_center,
