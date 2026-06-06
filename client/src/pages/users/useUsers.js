@@ -35,7 +35,7 @@ const useUsers = () => {
 
       const result = await response.json()
 
-      if (result.success) {
+      if (result.success) { 
         setUsers(result.data)
         setError(null)
       } else {
