@@ -19,6 +19,37 @@ const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
 
+const findProductByNameOrCode = async (connection, productValue) => {
+  const lookupValue = String(productValue).trim()
+
+  // Allow an existing numeric product ID to pass through.
+  if (/^\d+$/.test(lookupValue)) {
+    const [productById] = await connection.execute(
+      `SELECT ps_id as id, ps_code as code, ps_name as name FROM ${Master.products_service.tablename} WHERE ps_id = ? LIMIT 1`,
+      [Number(lookupValue)],
+    )
+
+    if (Array.isArray(productById) && productById.length > 0) {
+      return productById[0]
+    }
+  }
+
+  const productQuery = `
+    SELECT ps_id as id, ps_code as code, ps_name as name
+    FROM ${Master.products_service.tablename}
+    WHERE LOWER(ps_name) = LOWER(?) OR LOWER(ps_code) = LOWER(?)
+    LIMIT 1
+  `
+
+  const [productResults] = await connection.execute(productQuery, [
+    lookupValue,
+    lookupValue,
+  ])
+  return Array.isArray(productResults) && productResults.length > 0
+    ? productResults[0]
+    : null
+}
+
 const getPurchaseOrders = async (req, res, next) => {
   try {
     const query = sql
@@ -27,6 +58,10 @@ const getPurchaseOrders = async (req, res, next) => {
         {
           col: Accounting.purchase_order.selectOptionColumns.product,
           as: 'product',
+        },
+        {
+          col: `${Master.products_service.tablename}.${Master.products_service.selectOptionColumns.name}`,
+          as: 'product_name',
         },
         {
           col: Accounting.purchase_order.selectOptionColumns.quantity,
@@ -40,6 +75,11 @@ const getPurchaseOrders = async (req, res, next) => {
         { col: Accounting.purchase_order.selectOptionColumns.status, as: 'status' },
       ])
       .from(Accounting.purchase_order.tablename)
+      .leftJoin(
+        Master.products_service.tablename,
+        `${Accounting.purchase_order.tablename}.${Accounting.purchase_order.selectOptionColumns.product}`,
+        `${Master.products_service.tablename}.${Master.products_service.selectOptionColumns.id}`,
+      )
       .orderByDesc(Accounting.purchase_order.selectOptionColumns.id)
       .build()
 
@@ -85,6 +125,10 @@ const getPurchaseOrderById = async (req, res, next) => {
           as: 'product',
         },
         {
+          col: `${Master.products_service.tablename}.${Master.products_service.selectOptionColumns.name}`,
+          as: 'product_name',
+        },
+        {
           col: Accounting.purchase_order.selectOptionColumns.quantity,
           as: 'quantity',
         },
@@ -96,6 +140,11 @@ const getPurchaseOrderById = async (req, res, next) => {
         { col: Accounting.purchase_order.selectOptionColumns.status, as: 'status' },
       ])
       .from(Accounting.purchase_order.tablename)
+      .leftJoin(
+        Master.products_service.tablename,
+        `${Accounting.purchase_order.tablename}.${Accounting.purchase_order.selectOptionColumns.product}`,
+        `${Master.products_service.tablename}.${Master.products_service.selectOptionColumns.id}`,
+      )
       .where(Accounting.purchase_order.selectOptionColumns.id)
       .build()
 
@@ -170,28 +219,15 @@ const createPurchaseOrder = async (req, res, next) => {
           })
         }
 
-        // Query to find product by name or code using raw SQL for OR support
-        const productQuery = `
-          SELECT ps_id as id, ps_code as code, ps_name as name 
-          FROM products_service 
-          WHERE ps_name = ? OR ps_code = ?
-          LIMIT 1
-        `
+        const foundProduct = await findProductByNameOrCode(connection, product)
 
-        const [productResults] = await connection.execute(productQuery, [
-          product,
-          product,
-        ])
-
-        if (!productResults || productResults.length === 0) {
+        if (!foundProduct) {
           await connection.rollback()
           return res.status(404).json({
             success: false,
             message: `Product with name or code "${product}" not found on row ${index + 1}`,
           })
         }
-
-        const foundProduct = productResults[0]
 
         validatedPurchaseOrders.push({
           productId: foundProduct.id,
@@ -356,28 +392,15 @@ const updatePurchaseOrder = async (req, res, next) => {
         })
       }
 
-      // Query to find product by name or code using raw SQL for OR support
-      const productQuery = `
-        SELECT ps_id as id, ps_code as code, ps_name as name 
-        FROM products_service 
-        WHERE ps_name = ? OR ps_code = ?
-        LIMIT 1
-      `
+      const foundProduct = await findProductByNameOrCode(connection, product)
 
-      const [productResults] = await connection.execute(productQuery, [
-        product,
-        product,
-      ])
-
-      if (!productResults || productResults.length === 0) {
+      if (!foundProduct) {
         await connection.rollback()
         return res.status(404).json({
           success: false,
           message: `Product with name or code "${product}" not found`,
         })
       }
-
-      const foundProduct = productResults[0]
 
       const updateQuery = sql
         .update(Accounting.purchase_order.tablename)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ShoppingCart,
@@ -54,6 +54,18 @@ function PurchaseContent() {
   const [pendingDateTo, setPendingDateTo] = useState('')
   const [activeDateFrom, setActiveDateFrom] = useState(null)
   const [activeDateTo, setActiveDateTo] = useState(null)
+  const [prefillPurchaseData, setPrefillPurchaseData] = useState(null)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const incomingPrefill = location.state?.prefillPurchaseData
+    if (incomingPrefill) {
+      setPrefillPurchaseData(incomingPrefill)
+      setIsAdding(true)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state, navigate, location.pathname])
 
   useEffect(() => {
     const id = searchParams.get('id')
@@ -289,9 +301,14 @@ function PurchaseContent() {
     return (
       <RouteProtection routeName="purchase">
         <PurchaseForm
-          onBack={() => setIsAdding(false)}
+          purchaseData={prefillPurchaseData}
+          onBack={() => {
+            setIsAdding(false)
+            setPrefillPurchaseData(null)
+          }}
           onSuccess={async (nextToast) => {
             if (nextToast) setToast(nextToast)
+            setPrefillPurchaseData(null)
             await refetchPurchases()
           }}
         />

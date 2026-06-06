@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ShoppingCart,
@@ -47,6 +48,11 @@ function PurchaseOrderContent() {
   const [itemFormRows, setItemFormRows] = useState([{ ...emptyPurchaseOrderRow }])
   const [isSaving, setIsSaving] = useState(false)
   const [modalError, setModalError] = useState(null)
+  const [approvalModalOpen, setApprovalModalOpen] = useState(false)
+  const [approvalTargetRows, setApprovalTargetRows] = useState([])
+  const [approvalLoading, setApprovalLoading] = useState(false)
+  const [approvalError, setApprovalError] = useState(null)
+  const navigate = useNavigate()
 
   const resetItemForm = () => {
     setItemFormRows([{ ...emptyPurchaseOrderRow }])
@@ -64,6 +70,169 @@ function PurchaseOrderContent() {
     setShowItemModal(false)
     setEditingItem(null)
     resetItemForm()
+  }
+
+  const buildPurchaseFormPrefill = (rows) => ({
+    items: rows.map((row) => {
+      const productValue = row.product
+      const parsedProductId =
+        typeof productValue === 'number' ||
+        (typeof productValue === 'string' &&
+          String(productValue).trim() !== '' &&
+          /^\d+$/.test(productValue))
+          ? Number(productValue)
+          : null
+      const productLabel =
+        parsedProductId === null && productValue != null
+          ? String(productValue).trim()
+          : ''
+
+      return {
+        id: Date.now() + Math.random(),
+        product_service_id: parsedProductId,
+        product_service_name: productLabel,
+        coa: '',
+        coaSearch: '',
+        description: productLabel || '',
+        qty: Number(row.quantity) || 0,
+        price: Number(row.price) || 0,
+        discount: 0,
+        discountType: 'PERCENT',
+        vat: 0,
+        vatSearch: '',
+        vatRate: 0,
+        wht: 0,
+        whtSearch: '',
+        whtRate: 0,
+        responsibilityCenter: row.responsibility_center || '',
+        isOther: false,
+        isNew: true,
+      }
+    }),
+  })
+
+  const buildDisbursementFormPrefill = (rows) => ({
+    items: rows.map((row) => {
+      const productValue = row.product
+      const parsedProductId =
+        typeof productValue === 'number' ||
+        (typeof productValue === 'string' &&
+          String(productValue).trim() !== '' &&
+          /^\d+$/.test(productValue))
+          ? Number(productValue)
+          : null
+      const productLabel =
+        parsedProductId === null && productValue != null
+          ? String(productValue).trim()
+          : ''
+
+      return {
+        id: Date.now() + Math.random(),
+        product_service_id: parsedProductId,
+        product_service_name: productLabel,
+        coa: '',
+        coaSearch: '',
+        description: productLabel || '',
+        quantity: Number(row.quantity) || 0,
+        purchase_price: Number(row.price) || 0,
+        discount: 0,
+        discount_type: 'PERCENT',
+        vat_id: 0,
+        vat_code: '',
+        vat_name: '',
+        vat_rate: 0,
+        withholding_tax_id: 0,
+        withholding_tax_code: '',
+        withholding_tax_rate: 0,
+        responsibility_center: row.responsibility_center || '',
+        isOther: false,
+      }
+    }),
+    doc_ref: '',
+    mode: 'CASH',
+    modeSearch: 'CASH',
+    bank_name: '',
+    check_number: '',
+    payment_date: new Date().toISOString().slice(0, 10),
+    remarks: '',
+    vendor_id: null,
+    vendor: '',
+  })
+
+  const handleApprovalModalClose = () => {
+    if (approvalLoading) return
+    setApprovalModalOpen(false)
+    setApprovalTargetRows([])
+    setApprovalError(null)
+  }
+
+  const handleBulkApprove = (selectedRows) => {
+    const pendingRows = selectedRows.filter((row) => row.status === 'PENDING')
+
+    if (pendingRows.length === 0) {
+      setToastMessage('Please select pending purchase order(s) to approve')
+      setToastType('warning')
+      return
+    }
+
+    setApprovalTargetRows(pendingRows)
+    setApprovalModalOpen(true)
+  }
+
+  const handleApproveAndRedirect = async (paymentMethod) => {
+    try {
+      setApprovalLoading(true)
+      setApprovalError(null)
+
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const responses = await Promise.all(
+        approvalTargetRows.map((row) =>
+          fetch(`${import.meta.env.VITE_SERVER_LINK}/purchase_order/${row.id}`, {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ ...row, status: 'APPROVED' }),
+          }),
+        ),
+      )
+
+      const failedResponse = responses.find((res) => !res.ok)
+      if (failedResponse) {
+        const errorText = await failedResponse.text()
+        throw new Error(`Failed to approve purchase order(s): ${errorText}`)
+      }
+
+      setToastMessage(
+        `${approvalTargetRows.length} purchase order(s) approved successfully`,
+      )
+      setToastType('success')
+      await refreshPurchaseOrders()
+      setApprovalModalOpen(false)
+
+      const prefillData =
+        paymentMethod === 'CASH'
+          ? buildDisbursementFormPrefill(approvalTargetRows)
+          : buildPurchaseFormPrefill(approvalTargetRows)
+
+      if (paymentMethod === 'CASH') {
+        navigate('/disbursement', {
+          state: { prefillDisbursementData: prefillData },
+        })
+      } else {
+        navigate('/purchase', { state: { prefillPurchaseData: prefillData } })
+      }
+    } catch (err) {
+      const message = err.message || 'Failed to approve purchase orders'
+      setApprovalError(message)
+      setToastMessage(message)
+      setToastType('error')
+    } finally {
+      setApprovalLoading(false)
+    }
   }
 
   const updateItemFormRow = (index, field, value) => {
@@ -144,32 +313,10 @@ function PurchaseOrderContent() {
 
   const tableData = purchaseOrders.map((po) => ({
     ...po,
+    product: po.product_name || po.product,
     amount: `₱${fmt(po.price * po.quantity)}`,
     unit_price: `₱${fmt(po.price)}`,
   }))
-
-  const handleBulkApprove = async (selectedRows) => {
-    try {
-      const updatePromises = selectedRows
-        .filter((row) => row.status === 'PENDING')
-        .map((row) =>
-          updatePurchaseOrderStatus(row.id, {
-            ...row,
-            status: 'APPROVED',
-          }),
-        )
-
-      await Promise.all(updatePromises)
-      setToastMessage(
-        `${updatePromises.length} purchase order(s) approved successfully`,
-      )
-      setToastType('success')
-      await refreshPurchaseOrders()
-    } catch (err) {
-      setToastMessage(err.message || 'Failed to approve purchase orders')
-      setToastType('error')
-    }
-  }
 
   const handleBulkReject = async (selectedRows) => {
     try {
@@ -412,6 +559,56 @@ function PurchaseOrderContent() {
         </div>
       </RightSideModal>
 
+      <RightSideModal
+        title="Approve Purchase Orders"
+        isOpen={approvalModalOpen}
+        onClose={handleApprovalModalClose}
+        size="md"
+      >
+        <div className="pb-8">
+          <div className="p-4 space-y-4">
+            <p className="text-sm font-semibold text-gray-900">
+              Approve {approvalTargetRows.length} purchase order(s).
+            </p>
+            <p className="text-xs text-gray-500">
+              Choose the payment route. If you close this dialog, orders will remain
+              pending.
+            </p>
+            {approvalError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {approvalError}
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                disabled={approvalLoading}
+                onClick={() => handleApproveAndRedirect('CASH')}
+                className="inline-flex items-center justify-center px-4 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50"
+              >
+                Pay with Cash
+              </button>
+              <button
+                type="button"
+                disabled={approvalLoading}
+                onClick={() => handleApproveAndRedirect('GCASH')}
+                className="inline-flex items-center justify-center px-4 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+              >
+                Pay with Credit
+              </button>
+            </div>
+            <button
+              type="button"
+              disabled={approvalLoading}
+              onClick={handleApprovalModalClose}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 font-semibold hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </RightSideModal>
+
       <div className="grid grid-cols-5 gap-3">
         <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
           <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
@@ -520,6 +717,7 @@ function PurchaseOrderContent() {
               },
             },
           ]}
+          hiddenColumns={new Set(['product'])}
           checkboxActions={[
             {
               label: 'Approve Selected',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Wallet,
@@ -50,6 +50,18 @@ function DisbursementsContent() {
   const [pendingDateTo, setPendingDateTo] = useState('')
   const [activeDateFrom, setActiveDateFrom] = useState(null)
   const [activeDateTo, setActiveDateTo] = useState(null)
+  const [prefillDisbursementData, setPrefillDisbursementData] = useState(null)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const incomingPrefill = location.state?.prefillDisbursementData
+    if (incomingPrefill) {
+      setPrefillDisbursementData(incomingPrefill)
+      setIsAdding(true)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state, navigate, location.pathname])
 
   const applyDateFilters = async () => {
     const from = pendingDateFrom || null
@@ -299,9 +311,14 @@ function DisbursementsContent() {
     return (
       <RouteProtection routeName="disbursement">
         <CashDisbursementForm
-          onBack={() => setIsAdding(false)}
+          disbursementData={prefillDisbursementData}
+          onBack={() => {
+            setIsAdding(false)
+            setPrefillDisbursementData(null)
+          }}
           onSuccess={async (nextToast) => {
             if (nextToast) setToast(nextToast)
+            setPrefillDisbursementData(null)
             await refetchDisbursements()
           }}
         />

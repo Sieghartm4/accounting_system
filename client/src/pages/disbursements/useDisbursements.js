@@ -378,7 +378,7 @@ export function useDisbursementForm({
 
   // ── Populate form in view/edit mode ──
   useEffect(() => {
-    if ((isViewMode || isEditMode) && disbursementData) {
+    if (disbursementData) {
       const mainData = disbursementData.data
         ? disbursementData.data[0]
         : disbursementData
@@ -467,6 +467,56 @@ export function useDisbursementForm({
       }
     }
   }, [isViewMode, isEditMode, disbursementData])
+
+  useEffect(() => {
+    if (
+      disbursementItems.length === 0 ||
+      products.length === 0 ||
+      chartsOfAccounts.length === 0
+    )
+      return
+
+    const inventoryCoa = chartsOfAccounts.find((coa) => {
+      const label = (coa.name || coa.account_name || '').toLowerCase()
+      return label.includes('inventory')
+    })
+
+    let didUpdate = false
+    const updatedItems = disbursementItems.map((item) => {
+      let nextItem = item
+
+      if (item.productId && !item.productSearch) {
+        const matchedProduct = products.find((p) => p.id === item.productId)
+        if (matchedProduct) {
+          nextItem = {
+            ...nextItem,
+            productSearch: matchedProduct.name || matchedProduct.product_name || '',
+            description:
+              nextItem.description ||
+              matchedProduct.name ||
+              matchedProduct.product_name ||
+              '',
+          }
+          didUpdate = true
+        }
+      }
+
+      if ((!item.coa || item.coa === '') && inventoryCoa) {
+        nextItem = {
+          ...nextItem,
+          coa: inventoryCoa.id,
+          coaSearch: inventoryCoa.name || inventoryCoa.account_name || '',
+        }
+        didUpdate = true
+      }
+
+      return nextItem
+    })
+
+    if (didUpdate) {
+      setDisbursementItems(updatedItems)
+    }
+  }, [disbursementItems, products, chartsOfAccounts])
 
   // ── Disbursement Items CRUD ──
   const addDisbursementItem = (isOther = false) =>
