@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Login from './pages/login/Login'
 import Register from './pages/register/Register'
+import UserDocumentation from './pages/user_documentation/UserDocumentation'
 import Layout from './components/layout/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/dashboard/Dashboard'
@@ -42,6 +43,7 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/user_documentation" element={<UserDocumentation />} />
         <Route path="/" element={<Layout />}>
           <Route
             path="dashboard"

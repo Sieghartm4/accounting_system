@@ -1,0 +1,552 @@
+ACCOUNTING SYSTEM USER GUIDE
+
+Welcome
+=======
+This is a simple guide for users of the accounting website. It explains the main pages, what each page does, and how to use the system without technical terms.
+
+How the website works
+=====================
+The website is a business accounting system. It helps you record money coming in, money going out, sales, purchases, and financial reports. Some pages handle cash transactions, while others handle invoices and payments. The system also shows reports so you can check your accounting totals.
+
+Login and Register
+==================
+Login:
+- Use this page to sign in with your account.
+- After login, you see only the pages you are allowed to use.
+
+Register:
+- Use this page to create a new user account if registration is allowed.
+- After register, you usually go back to login.
+
+Dashboard
+=========
+The Dashboard is the home page after login.
+- It usually shows key information at a glance.
+- It may show totals, recent transactions, and quick links to the main pages.
+
+Search and top header tools
+===========================
+There is a search box in the top header.
+- Enter a text query and a date range.
+- Search can find sales, collections, receipts, purchases, disbursements, and adjustments.
+- Clicking a result opens the related page and record.
+
+User access
+===========
+Not every user sees every page.
+- The system checks your access rights and shows only pages you can use.
+- If you do not see a page, you may not have permission for it.
+
+Main pages and how to use them
+==============================
+1. Company Management
+- Use this page to view and update company settings.
+- It stores company details that appear on documents.
+
+2. Access Control
+- Use this page to set who can use which pages.
+- This is usually for administrators.
+
+3. User Management
+- Use this page to manage user accounts.
+- You can create or edit users and their roles.
+
+4. Charts of Accounts
+- This page shows all account categories used for reporting.
+- It is the list of accounts like cash, sales, expenses, and liabilities.
+
+5. Product & Service
+- Use this page to manage the products and services your business sells.
+- These items are used when creating sales records.
+
+6. Proforma Entries
+- Use this page to create and manage proforma invoices.
+- Proforma entries are draft sales or estimates before final bills.
+
+Customers and Vendors
+======================
+7. Customer Management
+- Use this page to manage customer records.
+- Add customer names, contact details, and information.
+
+8. Customer Transactions
+- Use this page to view all customer-related documents.
+- It shows sales, collections, and customer history.
+
+9. Vendor Management
+- Use this page to manage vendor or supplier records.
+- Add vendor names, contact details, and supplier information.
+
+10. Vendor Transactions
+- Use this page to view all purchase and payment history for vendors.
+
+VAT and Withholding Tax
+=======================
+11. VAT Management
+- Use this page to manage VAT settings and VAT-related records.
+- This is for recording tax on sales and purchases.
+
+12. Withholding Tax
+- Use this page for withholding tax details.
+- This helps track taxes that are held back for suppliers or contractors.
+
+Cash-only pages
+===============
+These pages handle cash transactions directly.
+They do not require a separate invoice first.
+
+13. Receipts
+- Use this page to record cash received.
+- Typical use: direct cash received, cash sales, miscellaneous income.
+- You can filter by date and view details of each receipt.
+- You can download receipt documents as PDF.
+
+14. Disbursements
+- Use this page to record cash paid out.
+- Typical use: petty cash payments and other direct cash expenses.
+- You can filter by date and view disbursement details.
+- You can also print disbursement documents.
+
+Sales and related pages
+=======================
+Sales and collections work together.
+Sales create customer invoices.
+Collections record payments received from customers.
+
+15. Sales
+- Use this page to record sales invoices.
+- Create, view, and manage sales records.
+- Sales usually go through states like prepared, checked, and approved.
+- You can print customer copies or internal copies of the sales document.
+
+16. Collections
+- Use this page to record customer payments.
+- Collections link payments to sales or customer balances.
+- You can also download payment documents.
+
+17. Aging Receivables
+- Use this page to see unpaid customer invoices.
+- It groups customer balances by age.
+- This helps you know which customer invoices are overdue.
+
+Purchase and related pages
+==========================
+Purchase and payments work together.
+Purchase creates vendor invoices.
+Payments record money paid to vendors.
+
+18. Purchase
+- Use this page to record vendor invoices.
+- Create, view, and manage purchase entries.
+- Purchase invoices often need approval and can be printed.
+
+19. Purchase Order
+- Use this page to create purchase order requests.
+- Purchase orders can be converted into purchase invoices or disbursements.
+- This is useful for ordering goods before paying for them.
+
+20. Payments
+- Use this page to record vendor payments.
+- Payments reduce what you owe to vendors.
+- You can also print payment documents.
+
+Accounting adjustments
+======================
+21. Adjustments
+- Use this page to record corrections, accruals, or any manual accounting entries.
+- These are changes made to keep the books accurate.
+- It may allow adding notes and explanations for each adjustment.
+
+22. Advances
+- Use this page for advance payments or prepayments.
+- Advances are money paid ahead of a purchase or service.
+- This page is linked to the adjustments and related approval process.
+
+Reports
+=======
+Reports show what is happening in the books.
+The system has several reports for different views of financial data.
+
+23. Trial Balance
+- Use this report to check that debit and credit totals match.
+- It shows account balances from the general ledger.
+- This is a key report for checking the accuracy of entries.
+
+24. Income Statement
+- Use this report to see profit or loss for a selected period.
+- It shows revenue and expenses.
+- Use it to understand whether the business is earning more than it spends.
+
+25. General Ledger
+- Use this report to see every posted accounting entry.
+- It shows transactions grouped by account.
+- This is the detailed record for all accounting activity.
+
+26. Balance Sheet
+- Use this report to see the business position at a point in time.
+- It shows assets, liabilities, and owner equity.
+- This is useful for knowing what the business owns and owes.
+
+27. Comprehensive Income
+- Use this report to see net income plus other comprehensive items.
+- It gives a broader view of total business performance.
+
+28. Journal Entries
+- Use this report to see the actual accounting journal entries.
+- It shows each entry that posts to the general ledger.
+
+29. Bank Reconciliation
+- Use this page to compare bank records with the company books.
+- It helps find missing or unmatched bank transactions.
+
+30. Audit Trail
+- Use this page to see the history of changes and actions.
+- It helps track who did what and when.
+
+Key flow points for users
+=========================
+- Receipts and Disbursements are separate from Sales and Purchase.
+- Receipts and Disbursements are for direct cash transactions.
+- Sales are invoices to customers.
+- Collections are payments received from customers.
+- Purchase is invoices from vendors.
+- Payments are money paid to vendors.
+- Adjustments are manual corrections or special accounting entries.
+
+How to use filters and date search
+==================================
+Most pages allow filtering by date.
+- Choose a start date and end date.
+- Apply the filter to see only records in that range.
+- Clear the filter to return to all records.
+
+What users can do on each page
+==============================
+- View records
+- Search by date or name
+- Add new records (if allowed)
+- Edit or approve records (if allowed)
+- Download documents as PDF
+- Open record details for review
+
+Important note
+==============
+Your screens and available pages depend on your access rights.
+If you do not see a page, ask your administrator for access.
+
+End of guide
+============
+This guide is made for users, not programmers. It explains the main pages and how the system works in simple terms.
+
+DETAILED PAGE REFERENCE (User-level)
+===================================
+Below are short, clear descriptions per page: what you enter (create/update), what you see (get/list), and what the system does automatically after you save.
+
+Receipts
+- Create / Update inputs: date, customer (optional), reference, payment method (cash/check), bank, amount, remarks, items (if any).
+- What you see (list/get): receipt date, reference number, customer/vendor name, amount, status, created by.
+- Automated effects: posting to Cash account, creates journal lines (Debit Cash, Credit Income/Other), appears in reports and bank reconciliation.
+
+Disbursements
+- Create / Update inputs: date, payee/vendor, reference, payment method, bank, amount, expense category, remarks.
+- What you see: payment date, reference, payee, amount, status, created by.
+- Automated effects: posts to Cash account and Expense account (Credit Cash, Debit Expense), appears in reports and bank reconciliation.
+
+Sales
+- Create / Update inputs: customer, invoice date, due date, items or services (description, qty, price), VAT (if applicable), discounts, terms, reference.
+- What you see: invoice list with date, customer, total amount, status (e.g., PREPARED, CHECKED, APPROVED), doc reference.
+- Automated effects: creates AR (accounts receivable) records, produces journal entries (Debit AR, Credit Revenue), reduces inventory if applicable; printable customer/internal copies.
+
+Collections
+- Create / Update inputs: collection date, customer, payment method, applied invoices (which invoices this payment settles), amount, bank/check info, remarks.
+- What you see: payment list with applied invoices, amounts, status.
+- Automated effects: reduces AR balances, posts Cash and AR journal lines (Debit Cash, Credit AR), updates invoice payment status.
+
+Purchase
+- Create / Update inputs: vendor, invoice date, due date, items/services, quantities, amounts, VAT, reference, terms.
+- What you see: purchase invoice list (date, vendor, amount, status).
+- Automated effects: creates AP (accounts payable) records, posts journal lines (Debit Expense/Inventory, Credit AP), triggers payment requests.
+
+Payments
+- Create / Update inputs: payment date, vendor, bank/check details, apply to invoice(s), amount, remarks.
+- What you see: payment list, applied invoices, check/bank reference.
+- Automated effects: reduces AP balances, posts Cash and AP journal lines (Debit AP, Credit Cash).
+
+Adjustments
+- Create / Update inputs: date, reference, account(s) to adjust, debit and credit amounts, explanation/notes.
+- What you see: list of adjustment entries with reference, date, amounts, and notes.
+- Automated effects: posts manual journal entries to GL; use this for accruals, corrections, and reclassifications.
+
+Advances
+- Create / Update inputs: date, payee/customer, purpose, amount, related document (optional), status.
+- What you see: advance list with amounts and linked documents.
+- Automated effects: records a prepaid (asset) or liability; may generate follow-up entries when settled or applied.
+
+Proforma Entries
+- Inputs: similar to a draft invoice (customer, items, prices); used as estimate only.
+- What you see: list of proforma records; not posted to accounting until converted.
+- Automated: can be converted into a Sales invoice.
+
+Purchase Order
+- Inputs: vendor, order date, items, quantities, expected delivery, reference.
+- What you see: list of POs and their statuses.
+- Automated: can prefill Purchase or Disbursement pages when converted/approved.
+
+Customers / Vendors
+- Inputs: name, contact info, billing address, tax IDs, payment terms.
+- What you see: master list and customer/vendor detail pages, transaction history.
+- Automated: new customers/vendors are used on Sales, Collections, Purchase, and Payments pages.
+
+Products & Services
+- Inputs: item name, code, description, unit price, VAT rate, inventory account.
+- What you see: product list, SKU/code, price.
+- Automated: used to build invoice lines, may affect inventory on sales/purchase postings.
+
+Charts of Accounts
+- Inputs: account code, name, type (Asset, Liability, Equity, Revenue, Expenses), normal balance.
+- What you see: full account listing used for reports and journal mapping.
+- Automated: new accounts are available immediately for mappings and journal entries.
+
+Users & Access Control
+- Inputs: user name, email, role, route access settings.
+- What you see: list of users and assigned rights.
+- Automated: access settings control which pages and actions a user can see or perform.
+
+Reports (how they work and where data comes from)
+- Trial Balance
+	- Purpose: quick check that total Debits = total Credits for a period.
+	- Data source: aggregates posted `journal_entries` joined with `charts_of_accounts`.
+	- How it is made: sums all DEBIT and CREDIT journal lines per account in the selected date range. It only uses posted entries (not drafts). If totals do not match, investigate missing or unposted entries.
+
+- Income Statement (Profit & Loss)
+	- Purpose: shows revenues and expenses for a period and net income.
+	- Data source: `journal_entries` filtered by account types (Revenue, Expenses) and COA mapping.
+	- How: sums credits minus debits for revenue accounts and debits minus credits for expense accounts, then computes net income.
+
+- Balance Sheet
+	- Purpose: snapshot of assets, liabilities, and equity at a point in time.
+	- Data source: ending balances from `journal_entries` aggregated by COA types (Assets, Liabilities, Equity).
+	- How: uses GL balances as of the chosen date or period end and presents Assets = Liabilities + Equity.
+
+- General Ledger
+	- Purpose: detailed account transaction history.
+	- Data source: `journal_entries` with full posting info (date, source doc, amount, type).
+	- How: lists each GL line and groups by account; users can drill into the source document for context.
+
+- Journal Entries
+	- Purpose: view every journal entry (useful for auditors and accountants).
+	- Data source: `journal_entries` table directly.
+	- How: shows all posted and manual journal entries with references and notes.
+
+- Statement of Comprehensive Income
+	- Purpose: net income plus other comprehensive income items.
+	- Data source: combination of revenue/expense GL balances and special OCI accounts (equity-related) from COA.
+	- How: collects P&L items and OCI lines, sums, and shows total comprehensive income.
+
+- Bank Reconciliation
+	- Purpose: match bank statement totals to book (GL) cash accounts.
+	- Data source: cash account GL transactions (Receipts, Collections, Payments, Disbursements) and user-provided bank statement items.
+	- How: marks GL items as cleared or outstanding; shows unreconciled checks/deposits and suggests reconciling entries.
+
+- Audit Trail
+	- Purpose: shows who did what and when for key actions.
+	- Data source: system `audit_trail` entries created when users perform create/update/delete/approve actions.
+	- How: filter by user/date/page to see a timeline of changes.
+
+Filters, Dates, and Search
+- Most pages let you pick start and end dates. Use these to limit results to a period.
+- Some pages (Sales, Receipts, Purchase, etc.) also let you click a record to open detailed view.
+- The search in the top header requires a text query and a date range; results include many document types and open the relevant page when clicked.
+
+Automations and posting flow (simple)
+- When you create Sales: system creates an invoice (AR) and posts journal entries to GL (Debit AR, Credit Revenue). Inventory may change.
+- When you record a Collection: system posts Cash and reduces AR (Debit Cash, Credit AR).
+- When you create a Purchase: system creates AP and posts (Debit Expense/Inventory, Credit AP).
+- When you record a Payment: system posts (Debit AP, Credit Cash).
+- Receipts/Disbursements: immediate cash postings and journal lines; no AR/AP lifecycle.
+
+Tips for users
+- Always ensure drafts/records are approved or posted before running reports.
+- Use the Trial Balance to check for out-of-balance situations before preparing final statements.
+- Use Bank Reconciliation to clear cash differences and create reconciling adjustments where needed.
+
+Where this file lives
+- This user guide is saved in the project as `USER_DOCUMENTATION.txt` at the project root. Share it with your staff or paste it into your knowledge base.
+
+MODULE ACTIONS, COMPUTATIONS, AND CONNECTED DATA
+===============================================
+Below is a clear, per-module list of actions you can take, what the system computes or posts when you do them, and which data or records get linked or created.
+
+Receipts
+--------
+- Actions: Create, Edit, Approve, View, Print/Download, Delete, Attach files, Add line items.
+- Computations and postings:
+  - If the receipt is a cash receipt: creates journal entries that Debit the chosen Cash/Bank account and Credit the Income or Other revenue account.
+  - If the receipt is a payment against a sales invoice: posts Debit Cash/Bank and Credit Accounts Receivable (reduces customer balance).
+  - Totals and tax amounts are summed from receipt line items; VAT is calculated if applicable.
+- Connected data created/updated:
+  - `receipt` record with reference number and dates.
+  - `receipt_items` lines for each item (description, qty, unit price, tax).
+  - `attachments` if you upload files (e.g., scanned receipt).
+  - `journal_entries` (posted when approved/posted) which appear in reports.
+  - `audit_trail` entry showing who created/approved the receipt.
+  - Customer balance (if linked to a customer) and bank/cash account balance for reconciliation.
+
+Disbursements
+-------------
+- Actions: Create, Edit, Approve, View, Print/Download, Delete, Attach files, Add expense lines.
+- Computations and postings:
+  - Creates journal entries that Credit Cash/Bank and Debit Expense or Asset accounts.
+  - VAT handling for purchases is computed on line items if applicable.
+- Connected data created/updated:
+  - `disbursement` record and `disbursement_items` lines.
+  - `attachments` if files uploaded (e.g., supplier invoice, receipt).
+  - `journal_entries` on approval/posting.
+  - `audit_trail` entry and bank reconciliation candidates.
+
+Sales (Invoices)
+----------------
+- Actions: Create (draft/proforma), Edit, Submit for approval, Approve/Post, View, Print/Download, Attach files, Add invoice lines.
+- Computations and postings:
+  - On approval/posting: creates Accounts Receivable (AR) record and posts journal entries: Debit Accounts Receivable, Credit Revenue (and VAT Payable if VAT applies). Inventory may be adjusted (if enabled).
+  - Totals: sums line items, discounts, taxes.
+- Connected data created/updated:
+  - `sales` or `invoice` record and `sales_items` lines.
+  - `attachments` (e.g., signed invoice PDFs).
+  - `journal_entries` (posted entries once approved).
+  - Customer balances / outstanding invoices.
+  - `audit_trail` entry.
+
+Collections (Customer Payments)
+-------------------------------
+- Actions: Create payment record, Apply to invoices, Edit, View, Attach files, Print/Download.
+- Computations and postings:
+  - Creates journal entries: Debit Cash/Bank, Credit Accounts Receivable for the applied amount(s).
+  - If overpayment, creates a credit balance or advance for the customer.
+- Connected data created/updated:
+  - `collection` or `payment` record with links to applied `sales` invoices.
+  - `attachments` (e.g., deposit slips, check images).
+  - Updates to customer outstanding invoices and balances.
+  - `journal_entries` and `audit_trail`.
+
+Purchase (Vendor Invoices)
+--------------------------
+- Actions: Create (draft), Edit, Submit for approval, Approve/Post, View, Print/Download, Attach files, Add purchase lines.
+- Computations and postings:
+  - On approval/posting: creates Accounts Payable (AP) and posts journal entries: Debit Expense/Inventory accounts, Credit Accounts Payable.
+  - VAT on purchases is calculated per line if configured.
+- Connected data created/updated:
+  - `purchase` record and `purchase_items` lines.
+  - `attachments` (supplier invoices).
+  - AP balances and vendor outstanding amounts.
+  - `journal_entries` and `audit_trail`.
+
+Payments (Vendor Payments)
+--------------------------
+- Actions: Create payment, Apply to AP invoices, Edit, View, Attach files, Print/Download.
+- Computations and postings:
+  - Creates journal entries: Debit Accounts Payable, Credit Cash/Bank.
+  - Bank charges or discounts can be applied and posted accordingly.
+- Connected data created/updated:
+  - `payment` record linked to vendor invoices.
+  - `attachments` (e.g., bank transfer evidence).
+  - Reduces AP outstanding balances and updates `journal_entries`.
+  - `audit_trail`.
+
+Adjustments
+-----------
+- Actions: Create manual adjustment, Edit, Approve/Post, View, Print, Attach files.
+- Computations and postings:
+  - Records manual journal entries (debits and credits) as specified by the user.
+  - Used for accruals, corrections, or reclassifications.
+- Connected data created/updated:
+  - `adjustment` record and direct `journal_entries`.
+  - `attachments` and `audit_trail`.
+
+Advances (Prepayments)
+----------------------
+- Actions: Create advance, Edit, Apply/Settle, View, Attach files.
+- Computations and postings:
+  - Records prepayment as an asset (Debit Advances/Prepaid account, Credit Cash/Bank).
+  - When applied to a purchase or expense, moves amounts from Advances to Expense or Inventory.
+- Connected data created/updated:
+  - `advance` record, linked `attachments`.
+  - `journal_entries` and `audit_trail`.
+
+Proforma Entries (Draft Invoices)
+---------------------------------
+- Actions: Create draft, Edit, Convert to Sales, View, Attach files.
+- Computations and postings:
+  - Proforma entries are drafts and do not create journal entries until converted and approved.
+- Connected data created/updated:
+  - `proforma` record and `proforma_items` lines.
+  - `attachments` and `audit_trail`.
+
+Purchase Orders
+---------------
+- Actions: Create PO, Edit, Approve, Convert to Purchase/Disbursement, View, Attach files.
+- Computations and postings:
+  - POs are requests and do not post to the ledger until converted to a purchase or disbursement.
+- Connected data created/updated:
+  - `purchase_order` record and item lines.
+  - `attachments` and `audit_trail`.
+
+Charts of Accounts (COA)
+------------------------
+- Actions: Add account, Edit account, Deactivate, View.
+- Computations and postings:
+  - Accounts are used to map transaction lines to the correct GL account when posting journal entries.
+- Connected data created/updated:
+  - `chart_of_accounts` entries and mappings used across receipts, sales, purchases, adjustments, and reports.
+
+Products & Services
+-------------------
+- Actions: Add item/service, Edit, Set prices and tax rates, View.
+- Computations and postings:
+  - Item prices and tax rates are used to compute line totals on sales and purchase documents.
+  - If inventory tracking is enabled, sales and purchases adjust stock levels.
+- Connected data created/updated:
+  - `products` records, SKU codes, pricing info, and links to sales/purchase lines.
+
+Customers & Vendors
+-------------------
+- Actions: Create contact, Edit, Set payment terms, View transaction history.
+- Computations and postings:
+  - Customer and vendor balances are updated when invoices, collections, purchases, or payments post to the ledger.
+- Connected data created/updated:
+  - `customer` and `vendor` records, linked transactions, contact info.
+
+Bank Reconciliation
+-------------------
+- Actions: Upload bank statement lines, Match/clear GL transactions, Create reconciliation adjustments, View, Finalize.
+- Computations and postings:
+  - Marks GL cash transactions as cleared and may create adjustment journal entries for bank differences.
+- Connected data created/updated:
+  - `bank_reconciliation` records and links to `journal_entries` and bank statement items.
+
+Journal Entries & Reports
+-------------------------
+- Actions: View posted journal entries, Filter by date/account, Export, Drill into source transactions.
+- Computations and postings:
+  - Journal entries are created by the system when transactions post (receipts, sales, purchases, payments) and can be created directly by adjustments.
+- Connected data created/updated:
+  - `journal_entries` table is the single source for most reports (Trial Balance, GL, P&L, Balance Sheet).
+
+Audit Trail
+-----------
+- Actions: View who changed what and when, Filter by user/date.
+- Computations and postings:
+  - The system records create, update, approve, and delete actions for important records.
+- Connected data created/updated:
+  - `audit_trail` records linked to the user action and the affected record.
+
+Notes and tips
+--------------
+- Most documents create line-item records and can include attachments; these are linked to the main record and saved for audit and reporting.
+- Only approved or posted documents create journal entries and affect reports and account balances.
+- The `journal_entries` table is central: many reports read from it to compute balances and totals.
+
+Where this file lives
+- This user guide is saved in the project as `USER_DOCUMENTATION.txt` at the project root. Share it with your staff or paste it into your knowledge base.
+
+End of detailed reference

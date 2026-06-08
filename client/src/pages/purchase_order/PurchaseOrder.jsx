@@ -167,15 +167,16 @@ function PurchaseOrderContent() {
   }
 
   const handleBulkApprove = (selectedRows) => {
-    const pendingRows = selectedRows.filter((row) => row.status === 'PENDING')
+    // Approve any rows that are not already APPROVED (allow approving PENDING or REJECTED)
+    const approvableRows = selectedRows.filter((row) => row.status !== 'APPROVED')
 
-    if (pendingRows.length === 0) {
-      setToastMessage('Please select pending purchase order(s) to approve')
+    if (approvableRows.length === 0) {
+      setToastMessage('No purchase order(s) available to approve')
       setToastType('warning')
       return
     }
 
-    setApprovalTargetRows(pendingRows)
+    setApprovalTargetRows(approvableRows)
     setApprovalModalOpen(true)
   }
 
@@ -320,14 +321,14 @@ function PurchaseOrderContent() {
 
   const handleBulkReject = async (selectedRows) => {
     try {
-      const updatePromises = selectedRows
-        .filter((row) => row.status === 'PENDING')
-        .map((row) =>
-          updatePurchaseOrderStatus(row.id, {
-            ...row,
-            status: 'REJECTED',
-          }),
-        )
+      // Reject any rows that are not already REJECTED (allow rejecting PENDING or APPROVED)
+      const rejectableRows = selectedRows.filter((row) => row.status !== 'REJECTED')
+      const updatePromises = rejectableRows.map((row) =>
+        updatePurchaseOrderStatus(row.id, {
+          ...row,
+          status: 'REJECTED',
+        }),
+      )
 
       await Promise.all(updatePromises)
       setToastMessage(
@@ -339,6 +340,48 @@ function PurchaseOrderContent() {
       setToastMessage(err.message || 'Failed to reject purchase orders')
       setToastType('error')
     }
+  }
+
+  // Filter which checkbox actions to show based on selection statuses
+  const checkboxActionsFilter = (selectedRows) => {
+    if (!selectedRows || selectedRows.length === 0) return []
+
+    const allApproved = selectedRows.every((r) => r.status === 'APPROVED')
+    const allRejected = selectedRows.every((r) => r.status === 'REJECTED')
+
+    if (allApproved) {
+      return [
+        {
+          label: 'Reject Selected',
+          onClick: handleBulkReject,
+          className: 'bg-red-600 hover:bg-red-700',
+        },
+      ]
+    }
+
+    if (allRejected) {
+      return [
+        {
+          label: 'Approve Selected',
+          onClick: handleBulkApprove,
+          className: 'bg-green-600 hover:bg-green-700',
+        },
+      ]
+    }
+
+    // Mixed or pending: show both actions
+    return [
+      {
+        label: 'Approve Selected',
+        onClick: handleBulkApprove,
+        className: 'bg-green-600 hover:bg-green-700',
+      },
+      {
+        label: 'Reject Selected',
+        onClick: handleBulkReject,
+        className: 'bg-red-600 hover:bg-red-700',
+      },
+    ]
   }
 
   if (loading && purchaseOrders.length === 0) {
@@ -718,6 +761,7 @@ function PurchaseOrderContent() {
             },
           ]}
           hiddenColumns={new Set(['product'])}
+          checkboxActionsFilter={checkboxActionsFilter}
           checkboxActions={[
             {
               label: 'Approve Selected',

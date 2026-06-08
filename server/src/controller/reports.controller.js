@@ -51,10 +51,16 @@ const getTrialBalance = async (req, res, next) => {
         Accounting.journal_entries.selectOptionColumns.coa_id,
         Master.charts_of_accounts.selectOptionColumns.id,
       )
-      .where(Master.charts_of_accounts.selectOptionColumns.status)
-      .whereNot(Accounting.journal_entries.selectOptionColumns.db_name)
-      .andWhereNot(Accounting.journal_entries.selectOptionColumns.db_id)
-      .andWhereNot(Accounting.journal_entries.selectOptionColumns.coa_id) 
+      .where(Master.charts_of_accounts.selectOptionColumns.status, '=', 'ACTIVE')
+      .andWhere(
+        `${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL`,
+      )
+      .andWhere(
+        `${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL`,
+      )
+      .andWhere(
+        `${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL`,
+      )
 
     if (start_date) {
       trial_balance_query.andWhere(
@@ -83,8 +89,8 @@ const getTrialBalance = async (req, res, next) => {
       .orderBy(Master.charts_of_accounts.selectOptionColumns.code)
       .build()
 
-    const trialBalance = await Query(builtQuery, ['ACTIVE','', '', ''], queryParams)
-console.log('Trial Balance Query:', trialBalance)
+    const trialBalance = await Query(builtQuery, queryParams)
+    console.log('Trial Balance Query:', builtQuery, queryParams)
     res.status(200).json({
       success: true,
       message: 'Trial Balance retrieved successfully',

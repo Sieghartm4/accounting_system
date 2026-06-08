@@ -1,0 +1,2469 @@
+================================================================================
+                    ACCOUNTING SYSTEM - DEVELOPER GUIDE
+                     Complete API & Frontend Mapping
+================================================================================
+
+This guide contains everything a developer needs to understand the system:
+- All API endpoints, parameters, and responses
+- Which frontend pages trigger which APIs
+- What data is affected when operations occur
+- Database tables and relationships
+- Complete data flow examples
+- Common patterns and best practices
+
+TABLE OF CONTENTS:
+==================
+1. PROJECT STRUCTURE
+2. AUTHENTICATION & AUTHORIZATION
+3. API ENDPOINTS BY MODULE
+4. FRONTEND-TO-BACKEND MAPPING
+5. COMMON DATA FLOWS
+6. DATABASE SCHEMA
+7. REQUEST/RESPONSE PATTERNS
+8. ERROR HANDLING
+9. DEVELOPER PATTERNS & EXAMPLES
+10. QUICK REFERENCE
+
+================================================================================
+1. PROJECT STRUCTURE
+================================================================================
+
+Backend:
+  server/
+    ├─ src/
+    │  ├─ controller/          [26 controller files - all business logic]
+    │  ├─ routes/              [26 route files - URL mappings]
+    │  ├─ database/            [Database connection & utilities]
+    │  │  ├─ util/queries.js   [Query() function for DB access]
+    │  │  └─ model/            [Schema definitions]
+    │  ├─ util/helper.util.js  [SQLQueryBuilder & DataModeling]
+    │  ├─ middlewares/         [Authentication, error handling]
+    │  └─ startup/             [Initialization]
+    └─ server.js              [Express app entry]
+
+Frontend:
+  client/
+    ├─ src/
+    │  ├─ pages/               [React pages by module]
+    │  │  ├─ sales/            [Sales invoice management]
+    │  │  ├─ collections/      [AR collections]
+    │  │  ├─ purchase/         [Purchase orders & invoices]
+    │  │  ├─ payments/         [AP payments]
+    │  │  ├─ receipts/         [Customer receipts]
+    │  │  ├─ disbursements/    [Vendor disbursements]
+    │  │  ├─ reports/          [Financial reports]
+    │  │  ├─ adjustments/      [GL adjustments]
+    │  │  ├─ customers/        [Customer master]
+    │  │  ├─ vendors/          [Vendor master]
+    │  │  └─ [... other pages]
+    │  ├─ components/          [Reusable components]
+    │  │  ├─ DynamicTable.jsx
+    │  │  ├─ DynamicToast.jsx
+    │  │  ├─ ProtectedRoute.jsx
+    │  │  └─ RightSideModal.jsx
+    │  ├─ utils/
+    │  │  ├─ api.js            [API utility - fetch wrapper, auth]
+    │  │  ├─ generateXXXPDF.js [PDF generation utilities]
+    │  │  └─ routeProtection.js
+    │  ├─ App.jsx              [Main router]
+    │  └─ main.jsx
+    └─ [configuration files]
+
+Key Utilities:
+  - Query(sql, params, prefixes, tenantPool) → Execute SQL with param binding
+  - SQLQueryBuilder → Build complex WHERE queries with placeholders
+  - DataModeling() → Remove SQL prefixes from result keys
+
+================================================================================
+2. AUTHENTICATION & AUTHORIZATION
+================================================================================
+
+Login Flow:
+-----------
+1. User submits credentials → POST /credentials
+2. Server validates → returns JWT token + user object
+3. Client stores token in localStorage
+4. All subsequent requests include: Authorization: Bearer {token}
+5. Token expires → 401 response → Client redirects to login
+
+Public Routes (NO Authentication Required):
+  - POST /credentials (login)
+  - GET /health
+  - GET /access, /company, /customers, /vendors, /product_service
+  - GET /charts_of_accounts, /vat, /withholding_tax, /proforma_entries
+  - GET /journal_entries, /adjustments, /reports/*
+  - GET /audit_trail
+
+Protected Routes (Authentication REQUIRED):
+  - All /sales endpoints
+  - All /receipt endpoints
+  - All /purchase endpoints
+  - All /payments endpoints
+  - All /collections endpoints
+  - All /cash_disbursements endpoints
+  - All /purchase_order endpoints
+  - All /users endpoints
+  - All /route_access endpoints
+
+Authorization Levels:
+  - Stored in master_route_access table
+  - Checked via user.access_id
+  - Additional role-based checks in some endpoints
+
+API Utility (client/src/utils/api.js):
+  - Global fetch wrapper with Bearer token injection
+  - Auto-logout on 401 (TOKEN_EXPIRED)
+  - WebSocket URL construction (ws/wss)
+  - HTTPS normalization
+
+================================================================================
+3. API ENDPOINTS BY MODULE
+================================================================================
+
+AUTHENTICATION & SYSTEM
+=======================
+
+POST /credentials
+  Purpose: Login - authenticate user and get JWT token
+  Auth: None (public)
+  Request:
+    {
+      "username": "john_doe",
+      "password": "password123"
+    }
+  Response (Success):
+    {
+      "success": true,
+      "data": {
+        "token": "eyJhbGc...",
+        "user": {
+          "id": 1,
+          "fullname": "John Doe",
+          "username": "john_doe",
+          "access_id": 2
+        }
+      }
+    }
+  Response (Error): 401 Unauthorized
+  Side Effects: Creates audit trail entry
+
+POST /credentials/logout
+  Purpose: Logout - invalidate session
+  Auth: Bearer token required
+  Response: { "success": true }
+
+GET /health
+  Purpose: System health check
+  Auth: None (public)
+  Response:
+    {
+      "success": true,
+      "database": "connected",
+      "status": "healthy",
+      "timestamp": "2024-06-08T15:00:00Z"
+    }
+
+
+MASTER DATA - CUSTOMERS
+=======================
+
+GET /customers
+  Purpose: List all customers with pagination
+  Auth: None (public)
+  Query Params: offset=0, limit=50, dateFrom=?, dateTo=?
+  Response:
+    {
+      "success": true,
+      "data": [
+        {
+          "id": 5,
+          "code": "CUST-001",
+          "name": "ABC Corporation",
+          "category": "RETAIL",
+          "type": "BUSINESS",
+          "status": "ACTIVE"
+        }
+      ],
+      "count": 1,
+      "hasMore": false
+    }
+
+GET /customers/:id
+  Purpose: Get customer detail with transaction summary
+  Response:
+    {
+      "success": true,
+      "data": {
+        "id": 5,
+        "code": "CUST-001",
+        "name": "ABC Corporation",
+        "category": "RETAIL",
+        "contact_person": "John Smith",
+        "phone": "555-0100",
+        "email": "john@abc.com",
+        "address": "123 Main St",
+        "transactions": [
+          {
+            "type": "SALES",
+            "date": "2024-06-08",
+            "amount": 1000.00,
+            "balance_due": 500.00
+          }
+        ]
+      }
+    }
+
+POST /customers
+  Purpose: Create new customer
+  Request:
+    {
+      "code": "CUST-002",
+      "name": "New Company",
+      "category": "WHOLESALE",
+      "type": "BUSINESS",
+      "contact_person": "Jane Doe",
+      "phone": "555-0101",
+      "email": "jane@newco.com",
+      "address": "456 Oak Ave"
+    }
+  Response: { "success": true, "data": { "id": 6, ... } }
+  Side Effects: Audit trail entry created
+
+PUT /customers/:id
+  Purpose: Update customer info
+  Request: [same as POST, partial fields OK]
+  Response: { "success": true, "data": { ... } }
+  Side Effects: Audit trail entry created
+
+
+MASTER DATA - VENDORS
+=======================
+
+GET /vendor
+  List all vendors (same structure as customers)
+
+GET /vendor/:id
+  Get vendor detail with transaction summary
+
+POST /vendor
+  Create new vendor (same fields as customer)
+
+PUT /vendor/:id
+  Update vendor (same as customer)
+
+
+MASTER DATA - PRODUCTS & SERVICES
+==================================
+
+GET /product_service
+  Purpose: List all products/services
+  Response:
+    {
+      "data": [
+        {
+          "id": 12,
+          "code": "PROD-001",
+          "name": "Widget A",
+          "category": "HARDWARE",
+          "unit": "PCS",
+          "status": "ACTIVE"
+        }
+      ]
+    }
+
+POST /product_service
+  Request:
+    {
+      "code": "PROD-002",
+      "name": "Widget B",
+      "category": "HARDWARE",
+      "unit": "PCS",
+      "status": "ACTIVE"
+    }
+  Side Effects: Syncs with external inventory API
+
+PUT /product_service/:id
+  Update product info
+
+
+MASTER DATA - CHARTS OF ACCOUNTS
+=================================
+
+GET /charts_of_accounts
+  Purpose: List all GL accounts
+  Response:
+    {
+      "data": [
+        {
+          "id": 10,
+          "code": "1000",
+          "name": "Cash in Bank",
+          "type": "ASSET",
+          "description": "Main cash account"
+        },
+        {
+          "id": 20,
+          "code": "1100",
+          "name": "Accounts Receivable",
+          "type": "ASSET"
+        },
+        {
+          "id": 45,
+          "code": "4000",
+          "name": "Sales Revenue",
+          "type": "REVENUE"
+        }
+      ]
+    }
+
+POST /charts_of_accounts
+  Request:
+    {
+      "code": "5000",
+      "name": "Cost of Goods Sold",
+      "type": "EXPENSE",
+      "description": "Direct product costs"
+    }
+
+PUT /charts_of_accounts/:id
+  Update account details
+
+
+MASTER DATA - VAT & WITHHOLDING TAX
+===================================
+
+GET /vat
+  List VAT configurations
+
+POST /vat
+  Create VAT config: { "name": "VAT 12%", "rate": 12 }
+
+GET /withholding_tax
+  List withholding tax configurations
+
+POST /withholding_tax
+  Create WHT config: { "name": "WHT 5%", "rate": 5 }
+
+
+TRANSACTIONS - SALES
+====================
+
+GET /sales
+  Purpose: List sales invoices with pagination & date filters
+  Auth: Bearer token required
+  Query Params: offset=0, limit=50, dateFrom=YYYY-MM-DD, dateTo=YYYY-MM-DD
+  Response:
+    {
+      "success": true,
+      "data": [
+        {
+          "id": 125,
+          "customer": "ABC Corporation",
+          "doc_ref": "INV-2024-001",
+          "amount_due": 1136.40,
+          "state": "PENDING",
+          "date_delivered": "2024-06-08"
+        }
+      ],
+      "count": 1,
+      "hasMore": false
+    }
+
+GET /sales/:id
+  Purpose: Get sales invoice detail with all items
+  Response:
+    {
+      "success": true,
+      "data": {
+        "id": 125,
+        "customer_id": 5,
+        "document_reference": "INV-2024-001",
+        "terms": "NET_30",
+        "date_delivered": "2024-06-08",
+        "date_due": "2024-07-08",
+        "total_amount_due": 1136.40,
+        "state": "PENDING",
+        "items": [
+          {
+            "id": 401,
+            "product_service": 12,
+            "product_name": "Widget A",
+            "charts_of_accounts": 45,
+            "quantity": 10,
+            "sales_price": 100,
+            "discount": 5,
+            "discountType": "PERCENT",
+            "gross": 1000,
+            "discount_amount": 50,
+            "taxable": 950,
+            "vat": 114,
+            "wht": 28.50,
+            "net": 1035.50,
+            "responsibility_center": "SALES_DEPT"
+          }
+        ],
+        "created_by": "john_doe",
+        "created_date": "2024-06-08T10:15:30Z"
+      }
+    }
+
+POST /sales
+  Purpose: Create new sales invoice
+  Auth: Bearer token required
+  Request:
+    {
+      "customer_id": 5,
+      "document_reference": "INV-2024-001",
+      "terms": "NET_30",
+      "date_delivered": "2024-06-08",
+      "date_due": "2024-07-08",
+      "remarks": "Standard order",
+      "items": [
+        {
+          "product_service": 12,
+          "charts_of_accounts": 45,
+          "quantity": 10,
+          "sales_price": 100,
+          "discount": 5,
+          "discountType": "PERCENT",
+          "vatRate": 12,
+          "whtRate": 3,
+          "responsibility_center": "SALES_DEPT"
+        }
+      ],
+      "created_by": "john_doe"
+    }
+  Response:
+    {
+      "success": true,
+      "data": {
+        "id": 125,
+        "customer_id": 5,
+        "total_amount_due": 1136.40,
+        "state": "PENDING",
+        "created_date": "2024-06-08T10:15:30Z"
+      }
+    }
+  Side Effects:
+    1. INSERT into sales table (state='PENDING')
+    2. INSERT into sales_items table (per item)
+    3. Calculate totals (gross → discount → taxable → VAT → WHT → net)
+    4. Create audit trail entry
+    5. NO journal entries yet (wait for approval)
+
+PUT /sales/:sales_id
+  Purpose: Update sales invoice (only if PENDING)
+  Request: [same as POST, partial fields OK]
+  Response: { "success": true, "data": { ... } }
+  Side Effects: Update audit trail
+
+PUT /sales/sales-state
+  Purpose: Update sales state (PENDING → APPROVED) - TRIGGERS JOURNAL POSTING
+  Auth: Bearer token required
+  Request:
+    {
+      "updates": [
+        {
+          "id": 125,
+          "state": "APPROVED",
+          "checked_by": "manager_id",
+          "approved_by": "controller_id"
+        }
+      ]
+    }
+  Response:
+    {
+      "success": true,
+      "data": {
+        "updated": 1,
+        "generated_journal_entries": 2
+      }
+    }
+  Side Effects:
+    1. Update sales.state = 'APPROVED'
+    2. Query sales_items for all items
+    3. For each item:
+       - Get charts_of_accounts COA ID
+       - INSERT journal_entries: type='CREDIT', amount=item_net
+    4. INSERT journal_entries: type='DEBIT', amount=total_net (to AR account)
+    5. Example journal entries for INV-2024-001:
+       - CREDIT 4000 (Sales Revenue): 950.00
+       - DEBIT 1100 (Accounts Receivable): 1136.40
+    6. Create audit trail entries
+    7. Broadcast WebSocket update to all clients
+    8. Return with count of generated journal entries
+
+GET /sales/print/:sales_id
+  Purpose: Generate PDF for printing
+  Query Params: copyType=internal|customer
+  Response: PDF file download
+  Side Effects: Creates PDF with company header, invoice details, items
+
+
+TRANSACTIONS - COLLECTIONS (AR Settlement)
+===========================================
+
+GET /collections
+  Purpose: List AR collection records
+  Auth: Bearer token required
+  Query Params: offset=0, limit=50, dateFrom=?, dateTo=?
+
+GET /collections/:collection_id
+  Purpose: Get collection detail with applied sales
+
+GET /collections/sales-collection
+  Purpose: Get sales invoices available for collection
+  Response: List of unpaid/partially paid sales
+
+GET /collections/sales-items-collection
+  Purpose: Get items from selected sales (for collection detail)
+
+POST /collections
+  Purpose: Create new collection (AR settlement)
+  Auth: Bearer token required
+  Request:
+    {
+      "customer_id": 5,
+      "document_reference": "COL-2024-001",
+      "collection_date": "2024-06-15",
+      "mode_of_payment": "BANK_TRANSFER",
+      "bank_name": "Bank of America",
+      "check_number": "CHK12345",
+      "items": [
+        {
+          "sale_id": 125,
+          "amount": 1136.40
+        }
+      ],
+      "created_by": "john_doe"
+    }
+  Response:
+    {
+      "success": true,
+      "data": {
+        "id": 42,
+        "customer_id": 5,
+        "total_amount_due": 1136.40,
+        "state": "PENDING"
+      }
+    }
+  Side Effects:
+    1. INSERT into collections table (state='PENDING')
+    2. INSERT into collection_items table (links sale_id)
+    3. NO journal entries yet (wait for approval)
+
+PUT /collections/:collection_id
+  Purpose: Update collection (only if PENDING)
+
+PUT /collections/collection-state
+  Purpose: Approve collection - TRIGGERS JOURNAL POSTING
+  Request:
+    {
+      "updates": [
+        {
+          "id": 42,
+          "state": "APPROVED"
+        }
+      ]
+    }
+  Side Effects:
+    1. Update collections.state = 'APPROVED'
+    2. Query collection_items for all items
+    3. For each item: INSERT journal_entries CREDIT to AR
+    4. INSERT journal_entries DEBIT to Cash/Bank (combined)
+    5. Example:
+       - CREDIT 1100 (AR): 1136.40
+       - DEBIT 1000 (Cash in Bank): 1136.40
+    6. Broadcast WebSocket update
+
+GET /collections/print/:collection_id
+  Purpose: Generate PDF receipt
+
+
+TRANSACTIONS - RECEIPTS (Customer Payments for Sales)
+======================================================
+
+GET /receipt, GET /receipt/:id, POST /receipt, PUT /receipt/:id
+  Similar to collections but simpler (no linking to sales)
+  Used for one-off customer payments not tied to specific invoices
+
+PUT /receipt/receipt-state
+  Approve receipt - generates journal entries (DEBIT Cash, CREDIT Income)
+
+
+TRANSACTIONS - PURCHASE
+=======================
+
+GET /purchase
+  Purpose: List purchase invoices
+  Auth: Bearer token required
+
+GET /purchase/:id
+  Purpose: Get purchase detail with all items
+
+POST /purchase
+  Purpose: Create new purchase invoice
+  Request:
+    {
+      "vendor_id": 10,
+      "document_reference": "PO-2024-001",
+      "purchase_order_id": 1,
+      "terms": "NET_30",
+      "date_received": "2024-06-08",
+      "date_due": "2024-07-08",
+      "items": [
+        {
+          "product_service": 12,
+          "charts_of_accounts": 50,
+          "quantity": 5,
+          "purchase_price": 50,
+          "discount": 10,
+          "discountType": "PERCENT",
+          "vatRate": 12,
+          "whtRate": 3,
+          "responsibility_center": "PROCUREMENT"
+        }
+      ],
+      "created_by": "jane_doe"
+    }
+  Response:
+    {
+      "success": true,
+      "data": {
+        "id": 75,
+        "vendor_id": 10,
+        "total_amount_due": 234.80,
+        "state": "PENDING"
+      }
+    }
+  Side Effects:
+    1. INSERT into purchase table (state='PENDING')
+    2. INSERT into purchase_items table (per item)
+    3. Calculate totals (same as sales)
+    4. NO journal entries yet
+
+PUT /purchase/purchase-state
+  Purpose: Approve purchase - TRIGGERS JOURNAL POSTING
+  Side Effects:
+    1. Query purchase_items
+    2. For each item: INSERT journal_entries DEBIT to Expense/Inventory account
+    3. INSERT journal_entries CREDIT to AP (combined)
+    4. Example:
+       - DEBIT 5000 (Expense): 225.00
+       - CREDIT 2000 (AP): 234.80
+
+
+TRANSACTIONS - PAYMENTS (AP Settlement)
+========================================
+
+GET /payments
+  Purpose: List payments
+
+GET /payments/:payment_id
+  Purpose: Get payment detail
+
+GET /payments/purchase-payment
+  Purpose: List purchases available for payment
+
+GET /payments/purchase-items-payment
+  Purpose: Get items from selected purchases
+
+POST /payments
+  Purpose: Create new payment (AP settlement)
+  Request:
+    {
+      "vendor_id": 10,
+      "document_reference": "PMT-2024-001",
+      "payment_date": "2024-06-22",
+      "mode_of_payment": "CHECK",
+      "bank_name": "Bank of America",
+      "check_number": "CHK54321",
+      "items": [
+        {
+          "purchase_id": 75,
+          "amount": 234.80
+        }
+      ],
+      "created_by": "controller"
+    }
+
+PUT /payments/payment-state
+  Purpose: Approve payment - TRIGGERS JOURNAL POSTING
+  Side Effects:
+    1. Query payment_items
+    2. For each item: INSERT journal_entries DEBIT to AP
+    3. INSERT journal_entries CREDIT to Cash/Bank (combined)
+    4. AP balance reduced, Cash balance reduced
+
+
+TRANSACTIONS - CASH DISBURSEMENT (Direct Vendor Payments)
+==========================================================
+
+POST /cash_disbursements
+  Purpose: Create direct cash disbursement (bypass AP)
+  Request:
+    {
+      "vendor_id": 10,
+      "document_reference": "DISB-2024-001",
+      "payment_date": "2024-06-22",
+      "mode_of_payment": "CASH",
+      "amount": 500.00,
+      "category": "MAINTENANCE",
+      "remarks": "Office maintenance",
+      "created_by": "manager"
+    }
+
+PUT /cash_disbursements/disbursement-state
+  Purpose: Approve disbursement - TRIGGERS JOURNAL POSTING
+  Side Effects:
+    1. INSERT journal_entries DEBIT to category expense account
+    2. INSERT journal_entries CREDIT to Cash/Bank
+    3. Example:
+       - DEBIT 5100 (Maintenance Expense): 500.00
+       - CREDIT 1000 (Cash): 500.00
+
+
+TRANSACTIONS - ADJUSTMENTS (Manual GL Entries)
+===============================================
+
+GET /adjustments
+  Purpose: List GL adjustments
+
+GET /adjustments/:adjustment_id
+  Purpose: Get adjustment detail
+
+POST /adjustments
+  Purpose: Create manual GL adjustment
+  Request:
+    {
+      "document_reference": "ADJ-2024-001",
+      "adjustment_date": "2024-06-30",
+      "remarks": "Month-end accrual",
+      "items": [
+        {
+          "charts_of_accounts": 60,
+          "debit_amount": 0,
+          "credit_amount": 1000.00,
+          "responsibility_center": "ACCOUNTING"
+        },
+        {
+          "charts_of_accounts": 65,
+          "debit_amount": 1000.00,
+          "credit_amount": 0,
+          "responsibility_center": "ACCOUNTING"
+        }
+      ],
+      "created_by": "accountant"
+    }
+  Side Effects:
+    1. INSERT into adjustments table (state='PENDING')
+    2. INSERT into adjustment_items table (per item)
+
+PUT /adjustments/adjustment-state
+  Purpose: Approve adjustment - TRIGGERS JOURNAL POSTING
+  Side Effects:
+    1. Query adjustment_items
+    2. For each item: INSERT journal_entries with debit/credit amounts
+    3. Creates balanced journal entries directly
+
+
+TRANSACTIONS - PURCHASE ORDER
+==============================
+
+GET /purchase_order
+  Purpose: List purchase orders
+
+POST /purchase_order
+  Purpose: Create PO (requisition)
+  Request:
+    {
+      "vendor_id": 10,
+      "product": 12,
+      "quantity": 10,
+      "price": 50,
+      "responsibility_center": "PROCUREMENT"
+    }
+
+PUT /purchase_order/:id
+  Purpose: Update PO
+
+DELETE /purchase_order/:id
+  Purpose: Delete PO (if not converted to purchase)
+
+
+ACCOUNTING - JOURNAL ENTRIES
+=============================
+
+GET /journal_entries
+  Purpose: List all journal entries (GL posting records)
+  Response:
+    {
+      "data": [
+        {
+          "id": 501,
+          "db_name": "SALES",
+          "db_id": 125,
+          "coa_id": 45,
+          "coa_code": "4000",
+          "coa_name": "Sales Revenue",
+          "type": "CREDIT",
+          "amount": 950.00,
+          "date": "2024-06-08",
+          "responsibility_center": "SALES_DEPT"
+        }
+      ]
+    }
+
+GET /journal_entries/coa/:coa_id
+  Purpose: Get journal entries for specific account
+  Response: List of JE filtered by coa_id
+
+POST /journal_entries
+  Purpose: Create journal entry (usually auto-generated, rarely called directly)
+
+
+ACCOUNTING - BANK RECONCILIATION
+=================================
+
+GET /bank_reconciliation
+  Purpose: List reconciliation records
+
+POST /bank_reconciliation
+  Purpose: Create reconciliation header
+  Request:
+    {
+      "bank_account": "001234567",
+      "coa_id": 10,
+      "statement_balance": 10000.00
+    }
+
+POST /bank_reconciliation/item/add
+  Purpose: Add transaction to reconciliation
+
+PUT /bank_reconciliation/item/:id
+  Purpose: Mark item as cleared/outstanding
+
+PUT /bank_reconciliation/:id/balance
+  Purpose: Update running balance
+
+POST /bank_reconciliation/adjustment
+  Purpose: Add reconciling adjustment
+
+GET /bank_reconciliation/summary/:id
+  Purpose: Get reconciliation summary
+
+
+REPORTS
+=======
+
+GET /reports/trial-balance
+  Purpose: Trial Balance Report
+  Query Params: start_date=YYYY-MM-DD, end_date=YYYY-MM-DD
+  Response:
+    {
+      "success": true,
+      "data": [
+        {
+          "account_id": 10,
+          "account_code": "1000",
+          "account_name": "Cash in Bank",
+          "account_type": "ASSET",
+          "debit": 50000.00,
+          "credit": 0.00,
+          "balance": 50000.00
+        },
+        {
+          "account_id": 20,
+          "account_code": "1100",
+          "account_name": "Accounts Receivable",
+          "account_type": "ASSET",
+          "debit": 45000.00,
+          "credit": 5000.00,
+          "balance": 40000.00
+        }
+      ],
+      "totals": {
+        "total_debits": 95000.00,
+        "total_credits": 95000.00,
+        "balanced": true
+      }
+    }
+  How It Works:
+    1. Query journal_entries filtered by date range
+    2. Group by coa_id, sum debits/credits
+    3. Join with charts_of_accounts
+    4. Calculate balance = debit - credit
+    5. Verify total_debits = total_credits
+
+GET /reports/income-statement
+  Purpose: Income Statement (P&L)
+  Query Params: start_date=?, end_date=?
+  How It Works:
+    1. Query journal_entries filtered by account type (REVENUE/EXPENSE)
+    2. Sum by account
+    3. Calculate: Revenue - Expenses = Net Income
+
+GET /reports/balance-sheet
+  Purpose: Balance Sheet
+  Query Params: as_of_date=YYYY-MM-DD (or end of period)
+  How It Works:
+    1. Query journal_entries for ASSET/LIABILITY/EQUITY accounts
+    2. Sum to get ending balances
+    3. Present: Assets = Liabilities + Equity
+
+GET /reports/general-ledger
+  Purpose: Detailed GL by account
+  Query Params: start_date=?, end_date=?, coa_id=?
+  How It Works:
+    1. Query journal_entries
+    2. Group by account
+    3. Show each GL line with source document
+
+GET /reports/journal-entries
+  Purpose: All journal entries listing
+  How It Works:
+    1. Query all journal_entries
+    2. Sort by date
+    3. Show all GL lines
+
+GET /reports/bank-reconciliation
+  Purpose: Bank reconciliation report
+
+GET /reports/statement-of-comprehensive-income
+  Purpose: Net income + comprehensive income items
+
+GET /dashboard
+  Purpose: Financial KPIs
+  Query Params: from_date=?, to_date=?
+  Response:
+    {
+      "data": {
+        "total_revenue": 100000.00,
+        "total_expenses": 60000.00,
+        "net_income": 40000.00,
+        "current_ratio": 1.5,
+        "ar_balance": 45000.00,
+        "ap_balance": 20000.00
+      }
+    }
+
+
+ACCESS CONTROL
+==============
+
+GET /users/profile
+  Purpose: Get current logged-in user profile
+  Auth: Bearer token required
+
+GET /users
+  Purpose: List all users
+  Auth: Bearer token required
+
+POST /users
+  Purpose: Create new user
+  Request:
+    {
+      "fullname": "New User",
+      "username": "newuser",
+      "password": "password123",
+      "access_id": 2
+    }
+
+PUT /users/:id
+  Purpose: Update user
+
+DELETE /users/:id
+  Purpose: Delete user
+
+GET /route_access
+  Purpose: Get route permissions for user's access level
+  Auth: Bearer token required
+
+PUT /route_access
+  Purpose: Update access permissions
+  Request:
+    {
+      "access_id": 2,
+      "route_name": "/sales",
+      "status": "ACTIVE"
+    }
+
+
+AUDIT TRAIL
+===========
+
+GET /audit_trail
+  Purpose: List audit entries
+  Query Params: table_name=?, user=?, dateFrom=?, dateTo=?
+
+GET /audit_trail/:id
+  Purpose: Get audit entry detail
+
+
+================================================================================
+4. FRONTEND-TO-BACKEND MAPPING
+================================================================================
+
+SALES MODULE
+============
+
+Files:
+  client/src/pages/sales/Sales.jsx        [Main page]
+  client/src/pages/sales/SalesForm.jsx    [Create/Edit form]
+  client/src/pages/sales/useSales.js      [React hook with API calls]
+
+API Calls Made:
+
+When page loads:
+  → GET /sales?offset=0&limit=50 → Fetch list
+
+When user clicks date filter:
+  → GET /sales?offset=0&limit=50&dateFrom=...&dateTo=... → Update list
+
+When user clicks search/filter:
+  → GET /sales?offset=0&limit=50&[filters] → Update list
+
+When user clicks a row to open detail:
+  → GET /sales/:id → Get full invoice with items
+
+When user clicks Create button:
+  → Shows SalesForm (empty form)
+  → User fills: customer, items, date_delivered, date_due, terms, remarks
+  → User clicks Save
+    → POST /sales → Create invoice
+    → Response with id
+    → Shows created record in detail
+    → Broadcasts WebSocket update (other users see new invoice)
+
+When user clicks Edit on pending invoice:
+  → Shows SalesForm (pre-filled)
+  → User changes fields
+  → User clicks Save
+    → PUT /sales/:id → Update invoice
+    → Updates list
+
+When user clicks Approve (checkmark icon):
+  → Shows confirmation modal
+  → User selects checked_by and approved_by
+  → PUT /sales/sales-state with state='APPROVED'
+  → Server generates journal entries
+  → Response shows generated_journal_entries count
+  → List updates state to APPROVED
+  → WebSocket broadcast (other users see status change)
+
+When user clicks Print:
+  → GET /sales/print/:id?copyType=internal → PDF download
+  → Browser shows print dialog
+
+When user scrolls to bottom of list (pagination):
+  → GET /sales?offset=50&limit=50&[filters] → Load next page
+  → Appends results to existing list
+
+
+COLLECTIONS MODULE
+==================
+
+Files:
+  client/src/pages/collections/Collections.jsx
+  client/src/pages/collections/CollectionsForm.jsx
+  client/src/pages/collections/useCollections.js
+
+API Calls Made:
+
+When page loads:
+  → GET /collections?offset=0&limit=50 → Fetch list
+
+When user clicks Create:
+  → GET /collections/sales-collection → Get unpaid sales for customer selection
+  → Shows CollectionsForm
+
+When user selects a customer:
+  → GET /collections/sales-items-collection?customer_id=5 → Get unpaid items
+
+When user fills form and clicks Save:
+  → POST /collections → Create collection
+  → Response with id
+
+When user clicks Approve:
+  → PUT /collections/collection-state with state='APPROVED'
+  → Server generates journal entries (CR AR, DR Cash)
+  → Collection AR is reduced, Cash is increased
+
+
+PURCHASE MODULE
+===============
+
+Files:
+  client/src/pages/purchase/Purchase.jsx
+  client/src/pages/purchase/PurchaseForm.jsx
+  client/src/pages/purchase/usePurchase.js
+
+API Calls Made:
+
+Similar to Sales:
+  → GET /purchase?offset=0&limit=50 → List
+  → POST /purchase → Create
+  → PUT /purchase/:id → Update
+  → PUT /purchase/purchase-state with state='APPROVED' → Approve (generates JE)
+  → GET /purchase/print/:id → PDF
+
+
+PAYMENTS MODULE
+===============
+
+Files:
+  client/src/pages/payments/Payments.jsx
+  client/src/pages/payments/PaymentsForm.jsx
+  client/src/pages/payments/usePayments.js
+
+API Calls Made:
+
+When user clicks Create:
+  → GET /payments/purchase-payment → Get unpaid purchases
+
+When user selects items:
+  → GET /payments/purchase-items-payment?purchase_id=75 → Get items
+
+When user saves payment:
+  → POST /payments → Create payment
+
+When user approves payment:
+  → PUT /payments/payment-state with state='APPROVED'
+  → Server generates JE (DEBIT AP, CREDIT Cash)
+
+
+REPORTS MODULE
+==============
+
+Files:
+  client/src/pages/reports/TrialBalance.jsx
+  client/src/pages/reports/IncomeStatement.jsx
+  client/src/pages/reports/BalanceSheet.jsx
+  etc.
+
+API Calls Made:
+
+When page loads:
+  → GET /reports/trial-balance?start_date=TODAY&end_date=TODAY → Get report
+  → Renders table with accounts and balances
+
+When user changes date range:
+  → GET /reports/trial-balance?start_date=2024-06-01&end_date=2024-06-30 → Update report
+
+When user clicks on account row:
+  → GET /journal_entries/coa/:coa_id?date_range=... → Get GL detail
+  → Shows detail modal
+
+
+MASTER DATA MODULES
+===================
+
+Files:
+  client/src/pages/customers/Customers.jsx
+  client/src/pages/vendors/Vendors.jsx
+  client/src/pages/charts/ChartsOfAccounts.jsx
+  etc.
+
+API Calls Made:
+
+Similar pattern for all master modules:
+  → GET /{module} → List all
+  → GET /{module}/:id → Get detail
+  → POST /{module} → Create
+  → PUT /{module}/:id → Update
+
+
+DASHBOARD
+=========
+
+Files:
+  client/src/pages/dashboard/Dashboard.jsx
+  client/src/pages/dashboard/useDashboard.js
+
+API Calls Made:
+
+When page loads:
+  → GET /dashboard?from_date=MONTH_START&to_date=TODAY → Fetch KPIs
+  → Shows: Total Revenue, Total Expenses, Net Income, AR, AP, Ratios, etc.
+
+When user changes date range:
+  → GET /dashboard?from_date=...&to_date=... → Update KPIs
+
+
+================================================================================
+5. COMMON DATA FLOWS
+================================================================================
+
+FLOW 1: CREATE & SETTLE AN INVOICE (Sales + Collection)
+========================================================
+
+Step 1: Create Sales Invoice
+─────────────────────────────
+User Action:  Sales.jsx → Click "Create"
+Frontend:     POST /sales with customer, items, dates
+Backend:      sales.controller.js → createSales()
+  - Validate customer_id exists
+  - Validate items & COA mappings
+  - INSERT sales table: state='PENDING'
+  - INSERT sales_items: per item with qty, price, discount, VAT, WHT
+  - Calculate totals: gross → discount → taxable → VAT → WHT → net
+  - INSERT audit_trail: operation='CREATE'
+  - Return: { id: 125, total: 1136.40, state: 'PENDING' }
+
+Result: sales table has record with state='PENDING'
+        NO journal entries created yet
+
+
+Step 2: Approve Invoice (Trigger Journal Posting)
+──────────────────────────────────────────────────
+User Action:  Sales.jsx → Click Approve icon
+Frontend:     PUT /sales/sales-state with id=125, state='APPROVED'
+Backend:      sales.controller.js → updateSalesState()
+  - Query sales_items for sales_id=125
+  - For item 1 (qty=10, price=100, VAT=120, WHT=30, net=1035.50):
+    * charts_of_accounts ID = 45 (Sales Revenue)
+    * INSERT journal_entries:
+      - type='CREDIT', coa_id=45, amount=1035.50
+  - INSERT journal_entries for AR:
+    * type='DEBIT', coa_id=10 (Accounts Receivable), amount=1136.40
+  - UPDATE sales: state='APPROVED'
+  - INSERT audit_trail: operation='UPDATE'
+  - Broadcast WebSocket update
+
+Result: journal_entries table now has:
+  ├─ JE 501: type=CREDIT, coa_id=45, amount=1035.50  (Sales Revenue)
+  ├─ JE 502: type=DEBIT, coa_id=10, amount=1136.40   (AR)
+
+Reports now show:
+  └─ Trial Balance: AR debited 1136.40, Sales Revenue credited 1035.50
+  └─ Income Statement: Sales Revenue = 1035.50
+  └─ Balance Sheet: AR = 1136.40 (Asset)
+
+
+Step 3: Customer Makes Payment (Create Collection)
+───────────────────────────────────────────────────
+User Action:  Collections.jsx → Click "Create"
+Frontend:     
+  - GET /collections/sales-collection → Get unpaid sales (shows INV-2024-001)
+  - User selects it
+  - POST /collections with items: [{sale_id: 125, amount: 1136.40}]
+Backend:      collections.controller.js → createCollection()
+  - INSERT collections table: state='PENDING'
+  - INSERT collection_items: sale_id=125, amount=1136.40
+  - INSERT audit_trail
+
+Result: collections table has record with state='PENDING'
+        NO journal entries created yet
+
+
+Step 4: Approve Collection (Trigger Journal Posting)
+─────────────────────────────────────────────────────
+User Action:  Collections.jsx → Click Approve
+Frontend:     PUT /collections/collection-state with id=42, state='APPROVED'
+Backend:      collection.controller.js → updateCollectionState()
+  - Query collection_items for collection_id=42
+  - For item 1 (sale_id=125, amount=1136.40):
+    * INSERT journal_entries:
+      - type='CREDIT', coa_id=10 (AR), amount=1136.40
+  - INSERT journal_entries for Cash:
+    * Get bank account COA from mode_of_payment & bank_name
+    * type='DEBIT', coa_id=10 (Cash in Bank), amount=1136.40
+  - UPDATE collections: state='APPROVED'
+  - Broadcast WebSocket update
+
+Result: journal_entries table now has ADDITIONAL entries:
+  ├─ JE 503: type=CREDIT, coa_id=10 (AR), amount=1136.40      (reduces AR)
+  ├─ JE 504: type=DEBIT, coa_id=1000 (Cash), amount=1136.40   (increases Cash)
+
+Now reports show:
+  └─ Trial Balance:
+      AR:   DEBIT 1136.40 - CREDIT 1136.40 = 0 (settled)
+      Cash: DEBIT 1136.40 = 1136.40 (received)
+  └─ Balance Sheet: AR = 0, Cash = 1136.40
+  └─ Bank Reconciliation: This cash entry can be matched to bank deposit
+
+
+FLOW 2: PURCHASE & PAYMENT (Purchase + Payment)
+================================================
+
+Step 1: Create Purchase Invoice
+─────────────────────────────────
+User Action:  Purchase.jsx → Click "Create"
+Frontend:     POST /purchase with vendor, items, dates
+Backend:      purchase.controller.js → createPurchase()
+  - INSERT purchase table: state='PENDING'
+  - INSERT purchase_items: per item
+  - Calculate totals (same as sales)
+
+Result: purchase table has record, NO journal entries yet
+
+
+Step 2: Approve Purchase (Trigger Journal Posting)
+───────────────────────────────────────────────────
+User Action:  Purchase.jsx → Click Approve
+Frontend:     PUT /purchase/purchase-state with id=75, state='APPROVED'
+Backend:      purchase.controller.js → updatePurchaseState()
+  - Query purchase_items
+  - For each item:
+    * charts_of_accounts = 50 (Maintenance Expense)
+    * INSERT journal_entries: type='DEBIT', coa_id=50, amount=item_net
+  - INSERT journal_entries: type='CREDIT', coa_id=20 (AP), amount=total_net
+
+Result: journal_entries table:
+  ├─ JE X: type=DEBIT, coa_id=50 (Expense), amount=225.00
+  ├─ JE Y: type=CREDIT, coa_id=20 (AP), amount=234.80
+
+Reports now show:
+  └─ Trial Balance: Expense increased, AP increased
+  └─ Income Statement: Maintenance Expense = 225.00
+  └─ Balance Sheet: AP = 234.80 (Liability)
+
+
+Step 3: Pay Vendor (Create Payment)
+────────────────────────────────────
+User Action:  Payments.jsx → Click "Create"
+Frontend:     
+  - GET /payments/purchase-payment → Get unpaid purchases (shows PO-2024-001)
+  - POST /payments with items: [{purchase_id: 75, amount: 234.80}]
+Backend:      payments.controller.js → createPayment()
+  - INSERT payments table: state='PENDING'
+  - INSERT payment_items: purchase_id=75
+
+
+Step 4: Approve Payment (Trigger Journal Posting)
+──────────────────────────────────────────────────
+User Action:  Payments.jsx → Click Approve
+Frontend:     PUT /payments/payment-state with id=???, state='APPROVED'
+Backend:      payments.controller.js → updatePaymentState()
+  - Query payment_items
+  - INSERT journal_entries: type='DEBIT', coa_id=20 (AP), amount=234.80
+  - INSERT journal_entries: type='CREDIT', coa_id=1000 (Cash), amount=234.80
+
+Result: journal_entries:
+  ├─ JE Z: type=DEBIT, coa_id=20 (AP), amount=234.80   (reduces AP)
+  ├─ JE W: type=CREDIT, coa_id=1000 (Cash), amount=234.80 (reduces Cash)
+
+Now reports show:
+  └─ Trial Balance: AP = 0, Cash reduced by 234.80
+  └─ Balance Sheet: AP = 0, Cash = (original - 234.80)
+
+
+FLOW 3: ADJUSTMENT & RECONCILIATION
+====================================
+
+Step 1: Create Adjustment
+──────────────────────────
+User Action:  Adjustments.jsx → Click "Create"
+Frontend:     POST /adjustments with items: [debit/credit pairs]
+Backend:      adjustments.controller.js → createAdjustment()
+  - INSERT adjustments table: state='PENDING'
+  - INSERT adjustment_items: per item
+
+Example: Month-end accrual
+  Item 1: Debit 60 (Accrued Expense) 1000
+  Item 2: Credit 65 (Expense Reserve) 1000
+
+
+Step 2: Approve Adjustment (Trigger Journal Posting)
+─────────────────────────────────────────────────────
+User Action:  Adjustments.jsx → Click Approve
+Frontend:     PUT /adjustments/adjustment-state with state='APPROVED'
+Backend:      adjustments.controller.js → updateAdjustmentState()
+  - Query adjustment_items
+  - For each item:
+    * INSERT journal_entries: type='DEBIT/CREDIT', coa_id, amount
+
+Result: Two balanced journal entries created
+  ├─ JE: DEBIT 60, amount=1000
+  ├─ JE: CREDIT 65, amount=1000
+
+
+Step 3: Bank Reconciliation
+────────────────────────────
+User Action:  BankReconciliation.jsx → Load reconciliation
+Frontend:     GET /bank_reconciliation
+Backend:      Returns reconciliation records
+
+User Action:  Add items from GL to reconciliation
+Frontend:     
+  - GET /journal_entries?coa_id=1000 → Get cash transactions
+  - POST /bank_reconciliation/item/add with transactions
+  - Mark items as cleared/outstanding
+  - Compare to bank statement balance
+
+Result: Reconciliation shows:
+  ├─ Book balance: X
+  ├─ Bank statement balance: Y
+  ├─ Differences explained
+  └─ Create reconciling entries if needed
+
+
+================================================================================
+6. DATABASE SCHEMA
+================================================================================
+
+MASTER DATA TABLES (Static/Slowly changing)
+==============================================
+
+charts_of_accounts
+  ├─ id: int (PK)
+  ├─ code: varchar (unique)
+  ├─ name: varchar
+  ├─ type: enum (ASSET/LIABILITY/EQUITY/REVENUE/EXPENSE)
+  ├─ description: text
+  └─ status: varchar
+
+customers
+  ├─ id: int (PK)
+  ├─ code: varchar (unique)
+  ├─ name: varchar
+  ├─ category: varchar
+  ├─ type: varchar
+  ├─ contact_person: varchar
+  ├─ phone: varchar
+  ├─ email: varchar
+  ├─ address: text
+  ├─ status: varchar (ACTIVE/INACTIVE)
+  └─ created_date: datetime
+
+vendors
+  ├─ id: int (PK)
+  ├─ code: varchar (unique)
+  ├─ name: varchar
+  ├─ category: varchar
+  ├─ status: varchar
+  └─ [same as customers]
+
+products_services
+  ├─ id: int (PK)
+  ├─ code: varchar (unique)
+  ├─ name: varchar
+  ├─ category: varchar
+  ├─ unit: varchar (PCS/KG/BOX/etc)
+  ├─ status: varchar
+  └─ created_date: datetime
+
+vat_configurations
+  ├─ id: int (PK)
+  ├─ name: varchar (VAT 12%)
+  ├─ rate: decimal (12.00)
+  └─ status: varchar
+
+withholding_tax_configurations
+  ├─ id: int (PK)
+  ├─ name: varchar (WHT 5%)
+  ├─ rate: decimal (5.00)
+  └─ status: varchar
+
+master_user
+  ├─ id: int (PK)
+  ├─ fullname: varchar
+  ├─ username: varchar (unique)
+  ├─ password: varchar (bcrypt hash)
+  ├─ access_id: int (FK → master_access.id)
+  ├─ status: varchar
+  └─ created_date: datetime
+
+master_access
+  ├─ id: int (PK)
+  ├─ access_name: varchar (Admin/Manager/Staff)
+  └─ status: varchar
+
+master_route_access
+  ├─ id: int (PK)
+  ├─ access_id: int (FK → master_access.id)
+  ├─ route_name: varchar (/sales, /purchase, etc)
+  └─ status: varchar
+
+master_company
+  ├─ id: int (PK)
+  ├─ company_name: varchar
+  ├─ owner_name: varchar
+  ├─ tin: varchar (Tax ID)
+  ├─ address: text
+  ├─ email: varchar
+  ├─ phone: varchar
+  ├─ website: varchar
+  └─ logo: blob
+
+
+TRANSACTION TABLES (Main business records)
+==============================================
+
+sales
+  ├─ id: int (PK)
+  ├─ customer_id: int (FK → customers.id)
+  ├─ document_reference: varchar (unique)
+  ├─ terms: varchar (NET_30/NET_60/COD)
+  ├─ date_delivered: date
+  ├─ date_due: date
+  ├─ total_amount_due: decimal
+  ├─ state: varchar (PENDING/APPROVED)
+  ├─ created_by: varchar
+  ├─ created_date: datetime
+  └─ updated_date: datetime
+
+sales_items
+  ├─ id: int (PK)
+  ├─ sales_id: int (FK → sales.id)
+  ├─ product_service: int (FK → products_services.id)
+  ├─ charts_of_accounts: int (FK → charts_of_accounts.id)
+  ├─ quantity: decimal
+  ├─ sales_price: decimal
+  ├─ discount: decimal
+  ├─ discountType: varchar (FIXED/PERCENT)
+  ├─ vatRate: decimal
+  ├─ whtRate: decimal
+  ├─ responsibility_center: varchar (SALES_DEPT/etc)
+  └─ [calculated fields: gross, discount_amount, taxable, vat, wht, net]
+
+collections
+  ├─ id: int (PK)
+  ├─ customer_id: int (FK → customers.id)
+  ├─ document_reference: varchar (unique)
+  ├─ collection_date: date
+  ├─ mode_of_payment: varchar (CASH/CHECK/BANK_TRANSFER)
+  ├─ bank_name: varchar
+  ├─ check_number: varchar
+  ├─ total_amount_due: decimal
+  ├─ state: varchar (PENDING/APPROVED)
+  ├─ created_date: datetime
+  └─ updated_date: datetime
+
+collection_items
+  ├─ id: int (PK)
+  ├─ collection_id: int (FK → collections.id)
+  ├─ sale_id: int (FK → sales.id)
+  └─ amount: decimal
+
+receipts
+  ├─ id: int (PK)
+  ├─ customer_id: int (FK → customers.id)
+  ├─ document_reference: varchar (unique)
+  ├─ collection_date: date
+  ├─ mode_of_payment: varchar
+  ├─ bank_name: varchar
+  ├─ total_amount_due: decimal
+  ├─ state: varchar (PENDING/APPROVED)
+  └─ [same structure as collections but simpler, not tied to sales]
+
+purchase
+  ├─ id: int (PK)
+  ├─ vendor_id: int (FK → vendors.id)
+  ├─ document_reference: varchar (unique)
+  ├─ purchase_order_id: int (FK → purchase_order.id, optional)
+  ├─ terms: varchar
+  ├─ date_received: date
+  ├─ date_due: date
+  ├─ total_amount_due: decimal
+  ├─ state: varchar (PENDING/APPROVED)
+  └─ [same timestamp fields]
+
+purchase_items
+  ├─ id: int (PK)
+  ├─ purchase_id: int (FK → purchase.id)
+  ├─ product_service: int (FK → products_services.id)
+  ├─ charts_of_accounts: int (FK → charts_of_accounts.id)
+  ├─ quantity: decimal
+  ├─ purchase_price: decimal
+  ├─ discount: decimal
+  ├─ discountType: varchar
+  ├─ vatRate: decimal
+  ├─ whtRate: decimal
+  └─ responsibility_center: varchar
+
+payments
+  ├─ id: int (PK)
+  ├─ vendor_id: int (FK → vendors.id)
+  ├─ document_reference: varchar (unique)
+  ├─ payment_date: date
+  ├─ mode_of_payment: varchar
+  ├─ bank_name: varchar
+  ├─ check_number: varchar
+  ├─ total_amount_due: decimal
+  ├─ state: varchar (PENDING/APPROVED)
+  └─ [same timestamp fields]
+
+payment_items
+  ├─ id: int (PK)
+  ├─ payment_id: int (FK → payments.id)
+  ├─ purchase_id: int (FK → purchase.id)
+  └─ amount: decimal
+
+cash_disbursements
+  ├─ id: int (PK)
+  ├─ vendor_id: int (FK → vendors.id)
+  ├─ document_reference: varchar (unique)
+  ├─ payment_date: date
+  ├─ mode_of_payment: varchar
+  ├─ bank_name: varchar
+  ├─ amount: decimal
+  ├─ category: varchar (Maintenance/Office/etc)
+  ├─ state: varchar (PENDING/APPROVED)
+  └─ [same timestamp fields]
+
+adjustments
+  ├─ id: int (PK)
+  ├─ document_reference: varchar (unique)
+  ├─ adjustment_date: date
+  ├─ total_amount_due: decimal
+  ├─ state: varchar (PENDING/APPROVED)
+  └─ [same timestamp fields]
+
+adjustment_items
+  ├─ id: int (PK)
+  ├─ adjustment_id: int (FK → adjustments.id)
+  ├─ charts_of_accounts: int (FK → charts_of_accounts.id)
+  ├─ debit_amount: decimal
+  ├─ credit_amount: decimal
+  └─ responsibility_center: varchar
+
+purchase_order
+  ├─ id: int (PK)
+  ├─ vendor_id: int (optional, FK → vendors.id)
+  ├─ product: int (FK → products_services.id)
+  ├─ quantity: decimal
+  ├─ price: decimal
+  ├─ responsibility_center: varchar
+  ├─ status: varchar (PENDING/APPROVED/REJECTED)
+  └─ created_date: datetime
+
+
+CORE ACCOUNTING TABLE (Single source of truth)
+================================================
+
+journal_entries
+  ├─ id: int (PK)
+  ├─ db_name: varchar (SALES/RECEIPT/PURCHASE/PAYMENT/DISBURSEMENT/COLLECTION/ADJUSTMENTS)
+  ├─ db_id: int (ID from source transaction)
+  ├─ coa_id: int (FK → charts_of_accounts.id)
+  ├─ type: varchar (DEBIT/CREDIT)
+  ├─ amount: decimal
+  ├─ date: date
+  ├─ responsibility_center: varchar
+  ├─ created_date: datetime
+  └─ [note: no FK constraints on db_id - tracked via db_name + db_id]
+
+Purpose: ALL financial reports query this table only
+  - Trial Balance groups by coa_id, sums debits/credits
+  - Income Statement filters by account type REVENUE/EXPENSE
+  - Balance Sheet filters by account type ASSET/LIABILITY/EQUITY
+  - General Ledger lists by coa_id
+  - Bank Reconciliation filters by cash account
+
+IMPORTANT: journal_entries is the SINGLE SOURCE OF TRUTH
+  - No direct posting to ledger from transactions
+  - All transactions auto-generate JE entries when approved
+  - Reports are ONLY as good as this table's data
+
+
+AUDIT & RECONCILIATION TABLES
+==============================
+
+audit_trail
+  ├─ id: int (PK)
+  ├─ table_name: varchar (sales, purchase, collections, etc)
+  ├─ record_id: int (ID in source table)
+  ├─ operation: varchar (CREATE/UPDATE/DELETE)
+  ├─ changed_fields: json ({"state": "PENDING→APPROVED", "amount": "100→120"})
+  ├─ user: varchar (username)
+  ├─ timestamp: datetime
+  └─ remarks: text
+
+bank_reconciliation
+  ├─ id: int (PK)
+  ├─ bank_account: varchar
+  ├─ coa_id: int (FK → charts_of_accounts.id)
+  ├─ running_balance: decimal
+  ├─ statement_balance: decimal
+  ├─ status: varchar (PENDING/RECONCILED)
+  ├─ created_date: datetime
+  └─ reconciled_date: datetime
+
+bank_reconciliation_items
+  ├─ id: int (PK)
+  ├─ br_id: int (FK → bank_reconciliation.id)
+  ├─ type: varchar (RECEIPT/PAYMENT/DISBURSEMENT)
+  ├─ reference: varchar (CHK123, TRANS456, etc)
+  ├─ amount: decimal
+  ├─ status: varchar (CLEARED/OUTSTANDING)
+  └─ matched_date: datetime
+
+
+TABLE RELATIONSHIPS
+===================
+
+customers ──1──┬─→ many ─→ sales
+               ├─→ many ─→ receipts
+               └─→ many ─→ collections
+
+vendors ──1──┬─→ many ─→ purchase
+             ├─→ many ─→ payments
+             └─→ many ─→ cash_disbursements
+
+sales ──1──┬─→ many ─→ sales_items
+           └─→ many ─→ collection_items (via collection → amount from sales)
+
+purchase ──1──┬─→ many ─→ purchase_items
+              └─→ many ─→ payment_items (via payment → amount from purchase)
+
+purchase_order ──1──→ many ─→ purchase (optional link)
+
+charts_of_accounts ──1──┬─→ many ─→ sales_items
+                        ├─→ many ─→ purchase_items
+                        ├─→ many ─→ adjustment_items
+                        ├─→ many ─→ journal_entries
+                        └─→ many ─→ bank_reconciliation
+
+journal_entries ← created from all transaction approvals (no FK)
+
+
+================================================================================
+7. REQUEST/RESPONSE PATTERNS
+================================================================================
+
+STANDARD SUCCESS RESPONSE
+==========================
+{
+  "success": true,
+  "message": "Operation completed successfully",
+  "data": [
+    { "id": 1, "name": "Record 1", ... },
+    { "id": 2, "name": "Record 2", ... }
+  ],
+  "count": 2,
+  "offset": 0,
+  "limit": 50,
+  "hasMore": false,
+  "timestamp": "2024-06-08T15:00:00Z"
+}
+
+Fields:
+  - success: boolean (true = success)
+  - message: string (user-friendly message)
+  - data: array or object (main response payload)
+  - count: int (for list endpoints: number of records returned)
+  - offset: int (for list endpoints: pagination starting position)
+  - limit: int (for list endpoints: records per page)
+  - hasMore: boolean (for list endpoints: true if more records exist)
+  - timestamp: ISO datetime (when response was created)
+
+
+STANDARD ERROR RESPONSE
+========================
+{
+  "success": false,
+  "message": "Customer not found",
+  "error": "Customer with id 999 does not exist",
+  "validation_errors": {
+    "customer_id": "Invalid customer reference",
+    "date_due": "Must be after date_delivered"
+  },
+  "timestamp": "2024-06-08T15:00:00Z"
+}
+
+Fields:
+  - success: false (error flag)
+  - message: string (brief error summary)
+  - error: string (detailed error explanation)
+  - validation_errors: object (field-level validation issues)
+  - timestamp: ISO datetime
+
+
+PAGINATION PARAMETERS
+======================
+
+All list endpoints support:
+  - offset: int (0-based, default=0, start position)
+  - limit: int (1-100, default=50, records per page)
+
+Example:
+  GET /sales?offset=0&limit=50        → Records 1-50
+  GET /sales?offset=50&limit=50       → Records 51-100
+  GET /sales?offset=100&limit=50      → Records 101-150
+
+Response includes:
+  - count: 50 (records returned this request)
+  - hasMore: true/false (more records exist)
+
+
+DATE FILTER PARAMETERS
+======================
+
+Different endpoints use different names (normalize when possible):
+
+Format: YYYY-MM-DD
+
+Option 1: dateFrom / dateTo (used by most endpoints)
+  GET /sales?dateFrom=2024-06-01&dateTo=2024-06-30
+
+Option 2: start_date / end_date (used by reports)
+  GET /reports/trial-balance?start_date=2024-06-01&end_date=2024-06-30
+
+Option 3: from_date / to_date (used by dashboard)
+  GET /dashboard?from_date=2024-06-01&to_date=2024-06-30
+
+
+SPECIAL PARAMETERS
+===================
+
+copyType (for print endpoints):
+  GET /sales/print/:id?copyType=internal → Internal copy (no shipping)
+  GET /sales/print/:id?copyType=customer → Customer copy (with shipping address)
+
+Note: If not specified, defaults to internal
+
+
+================================================================================
+8. ERROR HANDLING
+================================================================================
+
+HTTP STATUS CODES
+==================
+
+200 OK
+  Success - request completed successfully
+  Example: GET /sales returned list
+
+201 Created
+  Success - resource created
+  Example: POST /sales returned new invoice
+
+400 Bad Request
+  Client error - invalid input or malformed request
+  Example: Missing required field in POST request
+  Response includes validation_errors
+
+401 Unauthorized
+  Authentication failed or token missing/invalid
+  - Missing Authorization header
+  - Invalid/expired JWT token
+  - Token expired (code: TOKEN_EXPIRED)
+  Frontend auto-redirects to login
+
+403 Forbidden
+  Authenticated but not authorized
+  - User's access level doesn't allow this route
+  - Insufficient permissions for operation
+  Example: Access level 1 (User) trying to approve sales
+
+404 Not Found
+  Resource doesn't exist
+  Example: GET /sales/999 (when sales 999 doesn't exist)
+
+422 Unprocessable Entity
+  Validation failed - data structure valid but business rules violated
+  Example: customer_id references non-existent customer
+  Response includes validation_errors with specific field issues
+
+500 Internal Server Error
+  Server error - usually database/unexpected error
+  Example: Database connection lost, unhandled exception
+  Frontend shows generic error message with timestamp for logging
+
+
+COMMON ERROR SCENARIOS
+======================
+
+Missing Required Field:
+  Request: POST /sales { customer_id: null, ... }
+  Status: 400 Bad Request
+  Response:
+    {
+      "success": false,
+      "message": "Validation failed",
+      "validation_errors": {
+        "customer_id": "Customer is required"
+      }
+    }
+
+
+Invalid Foreign Key:
+  Request: POST /sales { customer_id: 999, ... }
+  Status: 422 Unprocessable Entity
+  Response:
+    {
+      "success": false,
+      "message": "Validation failed",
+      "validation_errors": {
+        "customer_id": "Customer with id 999 does not exist"
+      }
+    }
+
+
+Invalid State Transition:
+  Request: PUT /sales/sales-state { id: 125, state: 'PENDING' }
+           (trying to change from APPROVED back to PENDING)
+  Status: 422 Unprocessable Entity
+  Response:
+    {
+      "success": false,
+      "message": "Invalid state transition",
+      "error": "Cannot transition from APPROVED to PENDING"
+    }
+
+
+Token Expired:
+  Any request with expired token
+  Status: 401 Unauthorized
+  Response:
+    {
+      "success": false,
+      "message": "Unauthorized",
+      "error": "JWT token expired",
+      "code": "TOKEN_EXPIRED"
+    }
+  Frontend: Auto-redirects to login page
+
+
+Access Denied:
+  Request: POST /sales with access_id=1 (limited user)
+  Status: 403 Forbidden
+  Response:
+    {
+      "success": false,
+      "message": "Forbidden",
+      "error": "Your access level does not permit this action"
+    }
+
+
+================================================================================
+9. DEVELOPER PATTERNS & EXAMPLES
+================================================================================
+
+ADDING A NEW TRANSACTION TYPE
+==============================
+
+Example: Add a new "Commission" transaction type
+
+Step 1: Create Controller (server/src/controller/commission.controller.js)
+
+  // GET - List commissions
+  exports.getCommissions = async (req, res) => {
+    const { offset = 0, limit = 50, dateFrom, dateTo } = req.query
+    
+    let sql = 'SELECT * FROM commissions WHERE 1=1'
+    let params = []
+    
+    if (dateFrom) {
+      sql += ' AND commission_date >= ?'
+      params.push(dateFrom)
+    }
+    if (dateTo) {
+      sql += ' AND commission_date <= ?'
+      params.push(dateTo)
+    }
+    
+    sql += ' ORDER BY id DESC LIMIT ? OFFSET ?'
+    params.push(limit, offset)
+    
+    const data = await Query(sql, params)
+    const countResult = await Query('SELECT COUNT(*) as cnt FROM commissions WHERE 1=1', [])
+    
+    res.json({
+      success: true,
+      data: data,
+      count: data.length,
+      total: countResult[0].cnt,
+      hasMore: (offset + limit) < countResult[0].cnt
+    })
+  }
+
+  // POST - Create commission
+  exports.createCommission = async (req, res) => {
+    const { salesman_id, commission_date, amount, sales_amount, remarks } = req.body
+    
+    // Validate
+    if (!salesman_id || !amount || !commission_date) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        validation_errors: {
+          salesman_id: salesman_id ? null : "Salesman is required",
+          amount: amount ? null : "Amount is required",
+          commission_date: commission_date ? null : "Date is required"
+        }
+      })
+    }
+    
+    // Check salesman exists
+    const salesman = await Query('SELECT id FROM users WHERE id = ?', [salesman_id])
+    if (salesman.length === 0) {
+      return res.status(422).json({
+        success: false,
+        validation_errors: {
+          salesman_id: "Salesman does not exist"
+        }
+      })
+    }
+    
+    // Insert
+    const sql = 'INSERT INTO commissions (salesman_id, commission_date, amount, sales_amount, remarks, state, created_date) VALUES (?, ?, ?, ?, ?, ?, NOW())'
+    const params = [salesman_id, commission_date, amount, sales_amount, remarks, 'PENDING']
+    
+    await Query(sql, params)
+    
+    // Get inserted record
+    const result = await Query('SELECT * FROM commissions ORDER BY id DESC LIMIT 1', [])
+    
+    // Audit trail
+    await Query('INSERT INTO audit_trail (table_name, record_id, operation, user, timestamp) VALUES (?, ?, ?, ?, NOW())', ['commissions', result[0].id, 'CREATE', req.user.username])
+    
+    res.status(201).json({
+      success: true,
+      data: result[0],
+      message: "Commission created successfully"
+    })
+  }
+
+  // PUT - Update state (approve, which triggers journal posting)
+  exports.updateCommissionState = async (req, res) => {
+    const { updates } = req.body
+    
+    let generated_entries = 0
+    
+    for (const update of updates) {
+      const { id, state } = update
+      
+      // Update state
+      await Query('UPDATE commissions SET state = ? WHERE id = ?', [state, id])
+      
+      if (state === 'APPROVED') {
+        // Get commission details
+        const commission = await Query('SELECT * FROM commissions WHERE id = ?', [id])
+        const comm = commission[0]
+        
+        // Find COA for commission expense
+        const coa = await Query('SELECT id FROM charts_of_accounts WHERE name LIKE ? LIMIT 1', ['%Commission%'])
+        const commissionAcctId = coa[0].id
+        
+        // Create journal entries
+        // DEBIT Commission Expense, CREDIT Commission Payable
+        const debit_coa = commissionAcctId
+        const credit_coa = 25 // Commission Payable account
+        
+        await Query('INSERT INTO journal_entries (db_name, db_id, coa_id, type, amount, date, created_date) VALUES (?, ?, ?, ?, ?, ?, NOW())', 
+          ['COMMISSION', id, debit_coa, 'DEBIT', comm.amount, comm.commission_date])
+        
+        await Query('INSERT INTO journal_entries (db_name, db_id, coa_id, type, amount, date, created_date) VALUES (?, ?, ?, ?, ?, ?, NOW())', 
+          ['COMMISSION', id, credit_coa, 'CREDIT', comm.amount, comm.commission_date])
+        
+        generated_entries += 2
+      }
+      
+      // Audit trail
+      await Query('INSERT INTO audit_trail (table_name, record_id, operation, changed_fields, user, timestamp) VALUES (?, ?, ?, ?, ?, NOW())', 
+        ['commissions', id, 'UPDATE', JSON.stringify({ state: state }), req.user.username])
+    }
+    
+    res.json({
+      success: true,
+      data: { updated: updates.length, generated_journal_entries: generated_entries }
+    })
+  }
+
+
+Step 2: Create Routes (server/src/routes/commission.routes.js)
+
+  const express = require('express')
+  const router = express.Router()
+  const { getCommissions, createCommission, updateCommissionState } = require('../controller/commission.controller')
+  const { verifyToken } = require('../middlewares/auth.middleware')
+  
+  router.get('/commissions', verifyToken, getCommissions)
+  router.post('/commissions', verifyToken, createCommission)
+  router.put('/commissions/commission-state', verifyToken, updateCommissionState)
+  
+  module.exports = router
+
+
+Step 3: Register Route in server.js
+
+  const commissionRoutes = require('./routes/commission.routes')
+  app.use(commissionRoutes)
+
+
+Step 4: Create Frontend Hook (client/src/pages/commissions/useCommissions.js)
+
+  import { useState, useEffect } from 'react'
+  
+  export function useCommissions() {
+    const [data, setData] = useState([])
+    const [loading, setLoading] = useState(true)
+    
+    const fetchCommissions = async (offset = 0, filters = {}) => {
+      const token = localStorage.getItem('token')
+      const params = new URLSearchParams()
+      params.append('offset', offset)
+      params.append('limit', 50)
+      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom)
+      if (filters.dateTo) params.append('dateTo', filters.dateTo)
+      
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SERVER_LINK}/commissions?${params.toString()}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+        
+        const result = await response.json()
+        if (!response.ok || !result.success) {
+          throw new Error(result.message)
+        }
+        
+        setData(result.data)
+        setLoading(false)
+        return result
+      } catch (error) {
+        console.error('Error fetching commissions:', error)
+        setLoading(false)
+        throw error
+      }
+    }
+    
+    const createCommission = async (formData) => {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/commissions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      })
+      
+      const result = await response.json()
+      if (!result.success) throw new Error(result.message)
+      
+      await fetchCommissions(0)
+      return result
+    }
+    
+    const approveCommission = async (id) => {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/commissions/commission-state`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ updates: [{ id, state: 'APPROVED' }] })
+      })
+      
+      const result = await response.json()
+      if (!result.success) throw new Error(result.message)
+      
+      await fetchCommissions(0)
+      return result
+    }
+    
+    useEffect(() => {
+      fetchCommissions()
+    }, [])
+    
+    return { data, loading, fetchCommissions, createCommission, approveCommission }
+  }
+
+
+Step 5: Create React Component (client/src/pages/commissions/Commissions.jsx)
+
+  import React, { useState } from 'react'
+  import { useCommissions } from './useCommissions'
+  import DynamicTable from '../../components/DynamicTable'
+  import RightSideModal from '../../components/RightSideModal'
+  
+  export default function Commissions() {
+    const { data, createCommission, approveCommission } = useCommissions()
+    const [showModal, setShowModal] = useState(false)
+    
+    const columns = [
+      { key: 'id', label: 'ID' },
+      { key: 'salesman_id', label: 'Salesman' },
+      { key: 'commission_date', label: 'Date' },
+      { key: 'amount', label: 'Amount' },
+      { key: 'state', label: 'State' }
+    ]
+    
+    const handleApprove = async (id) => {
+      try {
+        await approveCommission(id)
+        alert('Commission approved')
+      } catch (error) {
+        alert('Error: ' + error.message)
+      }
+    }
+    
+    return (
+      <div>
+        <button onClick={() => setShowModal(true)}>Create Commission</button>
+        
+        <DynamicTable 
+          columns={columns}
+          data={data}
+          onApprove={handleApprove}
+        />
+        
+        {showModal && (
+          <RightSideModal onClose={() => setShowModal(false)}>
+            {/* Commission form component */}
+          </RightSideModal>
+        )}
+      </div>
+    )
+  }
+
+
+UPDATING REPORTS
+================
+
+When new transactions are added, reports automatically include them because they query journal_entries table.
+
+Example: Add Commission to Trial Balance Report
+
+In reports.controller.js → getTrialBalance():
+  [No changes needed! Already queries journal_entries]
+  
+The code already does:
+  1. Query journal_entries
+  2. Group by coa_id
+  3. Sum debits/credits
+  
+So when Commission is approved and generates JE entries, Trial Balance will automatically show:
+  - Commission Expense account (debited)
+  - Commission Payable account (credited)
+
+
+ADDING A NEW MASTER TABLE
+==========================
+
+Example: Add "Department" master
+
+Step 1: Create table (MySQL)
+  CREATE TABLE departments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(10) UNIQUE,
+    name VARCHAR(100),
+    manager_id INT,
+    budget_amount DECIMAL(15,2),
+    status VARCHAR(20),
+    created_date DATETIME,
+    FOREIGN KEY (manager_id) REFERENCES users(id)
+  )
+
+
+Step 2: Create Controller (server/src/controller/department.controller.js)
+  exports.getDepartments = async (req, res) => { ... }
+  exports.createDepartment = async (req, res) => { ... }
+  exports.updateDepartment = async (req, res) => { ... }
+
+
+Step 3: Create Route (server/src/routes/department.routes.js)
+  router.get('/departments', getDepartments)
+  router.post('/departments', createDepartment)
+  router.put('/departments/:id', updateDepartment)
+
+
+Step 4: Frontend (client/src/pages/departments/...)
+  - Create useD epartments hook
+  - Create Departments.jsx component
+  - Add to App.jsx routes
+
+
+================================================================================
+10. QUICK REFERENCE
+================================================================================
+
+COMMON FLOWS AT A GLANCE
+========================
+
+Create Invoice + Approve → Journal Entries Generated
+  1. POST /sales              ← creates sales table record (state=PENDING)
+  2. PUT /sales/sales-state   ← generates journal_entries (DR AR, CR Revenue)
+
+Create Collection + Approve → AR Settled
+  1. POST /collections              ← creates collections table record
+  2. PUT /collections/collection-state ← generates journal_entries (CR AR, DR Cash)
+
+Create Purchase + Approve → Journal Entries Generated
+  1. POST /purchase             ← creates purchase table record
+  2. PUT /purchase/purchase-state ← generates journal_entries (DR Expense, CR AP)
+
+Create Payment + Approve → AP Settled
+  1. POST /payments          ← creates payments table record
+  2. PUT /payments/payment-state ← generates journal_entries (DR AP, CR Cash)
+
+
+TRACE A TRANSACTION TO REPORTS
+===============================
+
+Question: Where did $1000 in Sales Revenue come from?
+
+Answer:
+  1. Find in reports/income-statement: Sales Revenue = $1000
+  2. Query journal_entries for coa_id of Sales Revenue account
+     → SELECT * FROM journal_entries WHERE coa_id = 45 AND type = 'CREDIT'
+  3. See records: db_name='SALES', db_id=125
+  4. Query sales table: SELECT * FROM sales WHERE id = 125
+  5. See: Invoice INV-2024-001, customer ABC Corp, date 2024-06-08
+  6. View detail: GET /sales/125
+  7. See all items and verify calculation
+
+
+COMMON SQL QUERIES FOR DEBUGGING
+=================================
+
+Find all unposted transactions:
+  SELECT * FROM sales WHERE state = 'PENDING' ORDER BY created_date DESC
+
+Find all journal entries for a customer (e.g., ABC Corp):
+  SELECT je.* FROM journal_entries je
+  JOIN sales s ON je.db_name = 'SALES' AND je.db_id = s.id
+  WHERE s.customer_id = 5
+
+Verify Trial Balance balanced:
+  SELECT 
+    SUM(CASE WHEN type = 'DEBIT' THEN amount ELSE 0 END) as total_debits,
+    SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE 0 END) as total_credits
+  FROM journal_entries
+  WHERE date BETWEEN '2024-06-01' AND '2024-06-30'
+
+Find AR balance for a customer:
+  SELECT SUM(amount) as ar_balance
+  FROM journal_entries
+  WHERE coa_id = 10 AND db_name IN ('SALES', 'COLLECTION')
+    AND date <= '2024-06-30'
+
+Get all transactions needing approval:
+  SELECT 'SALES' as type, id, customer_id as party_id, state, created_date FROM sales WHERE state = 'PENDING'
+  UNION ALL
+  SELECT 'PURCHASE', id, vendor_id, state, created_date FROM purchase WHERE state = 'PENDING'
+  UNION ALL
+  SELECT 'COLLECTION', id, customer_id, state, created_date FROM collections WHERE state = 'PENDING'
+  ORDER BY created_date DESC
+
+
+API REQUEST TEMPLATES
+=====================
+
+Create Sales Invoice (cURL):
+  curl -X POST http://localhost:3000/sales \
+    -H "Authorization: Bearer {token}" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "customer_id": 5,
+      "document_reference": "INV-2024-001",
+      "terms": "NET_30",
+      "date_delivered": "2024-06-08",
+      "date_due": "2024-07-08",
+      "items": [
+        {
+          "product_service": 12,
+          "charts_of_accounts": 45,
+          "quantity": 10,
+          "sales_price": 100,
+          "vatRate": 12,
+          "whtRate": 3
+        }
+      ],
+      "created_by": "john_doe"
+    }'
+
+Get Trial Balance:
+  curl -X GET "http://localhost:3000/reports/trial-balance?start_date=2024-06-01&end_date=2024-06-30" \
+    -H "Content-Type: application/json"
+
+Get Sales with Date Filter:
+  curl -X GET "http://localhost:3000/sales?offset=0&limit=50&dateFrom=2024-06-01&dateTo=2024-06-30" \
+    -H "Authorization: Bearer {token}" \
+    -H "Content-Type: application/json"
+
+Approve Invoice:
+  curl -X PUT http://localhost:3000/sales/sales-state \
+    -H "Authorization: Bearer {token}" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "updates": [
+        {
+          "id": 125,
+          "state": "APPROVED",
+          "checked_by": "manager_id",
+          "approved_by": "controller_id"
+        }
+      ]
+    }'
+
+
+IMPORTANT NOTES FOR DEVELOPERS
+==============================
+
+1. ALWAYS check that transactions are APPROVED before querying reports
+   - PENDING transactions do NOT generate journal entries
+   - Reports will be incomplete/incorrect if transactions not approved
+
+2. ALL reports query journal_entries table ONLY
+   - Don't query sales, purchase, collections directly for reporting
+   - Journal entries is the single source of truth
+
+3. When creating new transaction types:
+   - Create header table + items table (like sales/sales_items)
+   - Create state-change endpoint that generates journal entries
+   - Use db_name = 'YOURTYPE' in journal_entries for tracking
+
+4. Audit trail should be created for ALL create/update/delete operations
+   - Compliance requirement
+   - Use INSERT INTO audit_trail... after operation
+
+5. Authentication:
+   - Check Authorization header on protected routes
+   - Verify JWT token validity
+   - Return 401 if invalid/expired
+   - Auto-redirect frontend to login on 401
+
+6. Validation:
+   - Always validate foreign key references
+   - Return 422 for business rule violations
+   - Return 400 for missing required fields
+   - Include field-level validation_errors in response
+
+7. Pagination:
+   - Always implement for list endpoints
+   - Default limit=50, max limit=100
+   - Return hasMore flag
+
+8. Date Filters:
+   - Always implement for transaction lists
+   - Normalize parameter names if possible
+   - Filter is INCLUSIVE (>= dateFrom AND <= dateTo)
+
+9. WebSocket:
+   - Broadcast updates when records created/approved
+   - Allows real-time UI refresh for all connected clients
+
+10. Performance:
+    - Use LIMIT/OFFSET for pagination (don't load all records)
+    - Create indexes on commonly filtered columns (date, state, customer_id)
+    - Use SUM(CASE WHEN) instead of multiple queries for aggregates
+
+================================================================================
+END OF DEVELOPER GUIDE
+================================================================================
+
+This comprehensive guide should provide developers with everything they need to:
+- Understand all API endpoints and their purposes
+- See which frontend pages trigger which APIs
+- Trace data flows from UI → API → Database
+- Understand automatic journal posting and financial reporting
+- Know the database schema and relationships
+- Follow patterns for adding new transaction types or reports
+- Debug issues by querying the database directly
+
+For questions about specific modules, start with section 3 (API Endpoints)
+and section 6 (Database Schema), then reference section 5 (Data Flows)
+to see the complete lifecycle.
+
+================================================================================

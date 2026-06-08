@@ -614,11 +614,13 @@ const DynamicTable = ({
                 key={i}
                 onClick={() => action.onClick(selectedRows)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black rounded-lg hover:cursor-pointer transition-all uppercase tracking-widest ${
-                  action.style === 'blue'
-                    ? 'bg-blue-600 border border-blue-600 text-white hover:bg-blue-200 hover:text-blue-700 hover:border-blue-300'
-                    : action.style === 'orange'
-                      ? 'bg-orange-600 border border-orange-600 text-white hover:bg-orange-200 hover:text-orange-700 hover:border-orange-300'
-                      : 'bg-green-600 border border-green-600 text-white hover:bg-green-200 hover:text-green-700 hover:border-green-300'
+                  action.className
+                    ? `${action.className}${/\btext-/.test(action.className) ? '' : ' text-white'}`
+                    : action.style === 'blue'
+                      ? 'bg-blue-600 border border-blue-600 text-white hover:bg-blue-200 hover:text-blue-700 hover:border-blue-300'
+                      : action.style === 'orange'
+                        ? 'bg-orange-600 border border-orange-600 text-white hover:bg-orange-200 hover:text-orange-700 hover:border-orange-300'
+                        : 'bg-green-600 border border-green-600 text-white hover:bg-green-200 hover:text-green-700 hover:border-green-300'
                 }`}
               >
                 {action.icon && <span className="w-3 h-3">{action.icon}</span>}

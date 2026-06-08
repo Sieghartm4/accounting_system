@@ -1,0 +1,1361 @@
+================================================================================
+                     ACCOUNTING SYSTEM — COMPLETE USER GUIDE
+================================================================================
+Version: 1.0  |  Audience: All system users  |  Language: Non-technical
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+  PART 1 — GETTING STARTED
+    1.1  What this system does
+    1.2  Login and Register
+    1.3  Dashboard
+    1.4  Search and top-header tools
+    1.5  User access and permissions
+
+  PART 2 — ADMINISTRATION PAGES
+    2.1  Company Management
+    2.2  Access Control
+    2.3  User Management
+    2.4  Charts of Accounts (COA)
+    2.5  Products & Services
+    2.6  Proforma Entries
+
+  PART 3 — CUSTOMERS AND VENDORS
+    3.1  Customer Management
+    3.2  Customer Transactions
+    3.3  Vendor Management
+    3.4  Vendor Transactions
+
+  PART 4 — TAX PAGES
+    4.1  VAT Management
+    4.2  Withholding Tax
+
+  PART 5 — CASH TRANSACTIONS
+    5.1  Receipts
+    5.2  Disbursements
+
+  PART 6 — SALES CYCLE
+    6.1  Sales (Invoices)
+    6.2  Collections (Customer Payments)
+    6.3  Aging Receivables
+
+  PART 7 — PURCHASE CYCLE
+    7.1  Purchase (Vendor Invoices)
+    7.2  Purchase Orders
+    7.3  Payments (Vendor Payments)
+
+  PART 8 — ACCOUNTING ADJUSTMENTS
+    8.1  Adjustments
+    8.2  Advances
+
+  PART 9 — REPORTS
+    9.1  Trial Balance
+    9.2  Income Statement (Profit & Loss)
+    9.3  General Ledger
+    9.4  Balance Sheet
+    9.5  Statement of Comprehensive Income
+    9.6  Journal Entries
+    9.7  Bank Reconciliation
+    9.8  Audit Trail
+
+  PART 10 — TIPS AND REFERENCE
+    10.1  Key transaction flows explained simply
+    10.2  How to use filters and date search
+    10.3  What users can do on every page
+    10.4  Automation and posting flow
+    10.5  General tips for users
+
+
+================================================================================
+PART 1 — GETTING STARTED
+================================================================================
+
+1.1  WHAT THIS SYSTEM DOES
+---------------------------
+This is a business accounting system accessible through a web browser. It helps
+you record and track:
+
+  • Money coming in   — sales, receipts, and customer payments
+  • Money going out   — purchases, disbursements, and vendor payments
+  • Tax records       — VAT and withholding tax
+  • Financial reports — trial balance, income statement, balance sheet, and more
+
+Some pages handle cash directly (no invoice needed first). Other pages manage the
+full invoice-and-payment cycle. Reports pull everything together so you can check
+the accuracy and health of your books at any time.
+
+────────────────────────────────────────────────────────────────────────────────
+
+1.2  LOGIN AND REGISTER
+------------------------
+LOGIN PAGE
+  • Enter your username and password to sign in.
+  • After a successful login you are taken to the Dashboard.
+  • After login the system loads only the pages your account is allowed to use.
+  • If you forget your password, contact your administrator.
+
+REGISTER PAGE
+  • Use this page to create a new user account (only if registration is enabled
+    by your administrator).
+  • Fill in your name, email, and a password.
+  • After registering you are usually redirected to the Login page to sign in.
+
+────────────────────────────────────────────────────────────────────────────────
+
+1.3  DASHBOARD
+--------------
+The Dashboard is the home page you see immediately after login.
+
+What it shows:
+  • Key financial totals at a glance (cash balances, outstanding invoices, etc.)
+  • Recent transactions and activity
+  • Quick links to the main pages you use most often
+
+The Dashboard gives you a snapshot of where the business stands right now without
+having to run a full report. Think of it as the front page of your accounting
+records.
+
+────────────────────────────────────────────────────────────────────────────────
+
+1.4  SEARCH AND TOP-HEADER TOOLS
+----------------------------------
+There is a search box in the top header bar that is available on every page.
+
+How to use it:
+  Step 1.  Type a keyword (for example a customer name, reference number,
+           or description).
+  Step 2.  Select a start date and an end date for the search range.
+  Step 3.  Press Enter or click the Search button.
+  Step 4.  A list of matching results appears. Results can include:
+             – Sales invoices
+             – Collections (customer payments)
+             – Receipts
+             – Purchases
+             – Disbursements
+             – Adjustments
+  Step 5.  Click any result to open that record's page directly.
+
+The search is useful when you remember a reference number or name but are not
+sure which module it belongs to.
+
+────────────────────────────────────────────────────────────────────────────────
+
+1.5  USER ACCESS AND PERMISSIONS
+----------------------------------
+Not every user sees every page. The system checks your role and shows only the
+pages and actions you are allowed to use.
+
+  • If you do not see a page listed in the menu, you do not have permission
+    for it. Ask your administrator to grant you access.
+  • Some pages are visible but certain buttons (approve, delete, edit) may be
+    hidden depending on your role.
+  • Administrators manage these settings in the Access Control page (Part 2.2).
+
+
+================================================================================
+PART 2 — ADMINISTRATION PAGES
+================================================================================
+
+2.1  COMPANY MANAGEMENT
+------------------------
+PURPOSE:  Store and update your company's details. These details appear on
+          printed documents such as invoices, receipts, and payments.
+
+WHAT YOU CAN DO:
+  • View current company settings (name, address, tax ID, logo, etc.)
+  • Edit and save updated company information
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  • Updated company details appear on all newly printed documents immediately.
+
+TYPICAL USER:  Administrator or accounting manager.
+
+────────────────────────────────────────────────────────────────────────────────
+
+2.2  ACCESS CONTROL
+--------------------
+PURPOSE:  Define which pages and actions each user role can access.
+
+WHAT YOU CAN DO:
+  • View existing access rules per role
+  • Grant or remove access to specific pages and actions (create, edit, approve,
+    delete, print)
+  • Assign roles to users
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  • Changes take effect the next time the affected user logs in or refreshes.
+
+TYPICAL USER:  Administrators only.
+NOTE:  Be careful when removing access — users will lose the ability to see or
+       act on those pages immediately.
+
+────────────────────────────────────────────────────────────────────────────────
+
+2.3  USER MANAGEMENT
+---------------------
+PURPOSE:  Create and manage user accounts for everyone who needs to use the
+          system.
+
+WHAT YOU CAN DO:
+  • View the list of all user accounts
+  • Create a new user account (name, email, password, role)
+  • Edit an existing user's details or role
+  • Deactivate or delete accounts that are no longer needed
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  • When a new user is created, the system applies access rights based on their
+    assigned role.
+  • Changes to a user's role update their page access automatically.
+
+TYPICAL USER:  Administrators or HR/IT staff.
+
+────────────────────────────────────────────────────────────────────────────────
+
+2.4  CHARTS OF ACCOUNTS (COA)
+-------------------------------
+PURPOSE:  This is the master list of every financial account category used in the
+          system. All accounting entries (journal entries) must be mapped to an
+          account from this list.
+
+Common account types:
+  • Assets         — what the business owns (cash, receivables, inventory)
+  • Liabilities    — what the business owes (payables, loans)
+  • Equity         — owner's share of the business
+  • Revenue        — income from sales and services
+  • Expenses       — costs of running the business
+
+WHAT YOU CAN DO:
+  • View the full list of accounts with their codes and types
+  • Add a new account (code, name, type, normal balance)
+  • Edit an existing account's details
+  • Deactivate accounts no longer in use
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  • New accounts become available immediately for use in transactions and
+    journal entries.
+  • Account balances are updated in real time whenever transactions are posted.
+  • Reports (Trial Balance, Income Statement, Balance Sheet) read directly from
+    this account structure.
+
+IMPORTANT:  Changing an account type after transactions have been posted can
+            affect your reports. Consult your accountant before making changes.
+
+────────────────────────────────────────────────────────────────────────────────
+
+2.5  PRODUCTS & SERVICES
+-------------------------
+PURPOSE:  Maintain the catalog of products and services your business sells or
+          buys. These items appear as line items on invoices, purchase orders,
+          and receipts.
+
+WHAT YOU CAN DO:
+  • View the full product/service list
+  • Add a new product or service (name, code/SKU, description, unit price,
+    VAT rate, linked account)
+  • Edit prices, descriptions, or tax rates
+  • Deactivate items no longer offered
+
+INPUTS WHEN CREATING / EDITING:
+  • Item name and code (SKU)
+  • Description
+  • Unit price (selling price)
+  • VAT rate (if taxable)
+  • Inventory account (if stock is tracked)
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  • When you add a product to a sales invoice or purchase, the system pulls in
+    the price, tax rate, and computes the line total automatically.
+  • If inventory tracking is enabled, sales reduce stock quantities and purchases
+    increase them.
+  • Inventory account balances update in the General Ledger automatically.
+
+CONNECTED DATA:
+  • products table — item master records
+  • Links to sales_items and purchase_items when used on documents
+
+────────────────────────────────────────────────────────────────────────────────
+
+2.6  PROFORMA ENTRIES
+----------------------
+PURPOSE:  Create draft invoices (estimates or quotations) for customers before
+          issuing a final invoice. Proforma records do not affect the books.
+
+WHAT YOU CAN DO:
+  • Create a proforma (draft) invoice for a customer
+  • Edit the proforma before conversion
+  • Convert a proforma into a real Sales invoice
+  • View and print proforma documents for customer approval
+
+INPUTS WHEN CREATING:
+  • Customer name
+  • Date and reference
+  • Line items (products/services, quantity, price)
+  • Notes or terms
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  • Proforma entries do NOT create journal entries or affect account balances
+    until they are converted to a Sales invoice and approved.
+  • After conversion, the document becomes a standard sales invoice (see Part 6.1)
+    and follows the normal sales posting process.
+
+CONNECTED DATA:
+  • proforma table and proforma_items lines
+  • On conversion, creates a sales record
+
+
+================================================================================
+PART 3 — CUSTOMERS AND VENDORS
+================================================================================
+
+3.1  CUSTOMER MANAGEMENT
+-------------------------
+PURPOSE:  Store and maintain records for all customers your business sells to.
+
+WHAT YOU CAN DO:
+  • View the customer list
+  • Add a new customer (name, contact details, billing address, tax ID,
+    payment terms)
+  • Edit existing customer information
+  • View the full transaction history for any customer
+
+INPUTS WHEN CREATING / EDITING:
+  • Customer name and contact person
+  • Email, phone, address
+  • Tax identification number (TIN)
+  • Payment terms (e.g., 30 days net)
+  • Credit limit (if applicable)
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  • New customers immediately become available for selection on Sales, Collections,
+    and Receipt pages.
+  • Customer balances (how much they owe) update automatically whenever invoices
+    are posted and payments are received.
+
+CONNECTED DATA:
+  • customer records linked to sales, collections, and receipts
+
+────────────────────────────────────────────────────────────────────────────────
+
+3.2  CUSTOMER TRANSACTIONS
+---------------------------
+PURPOSE:  See the complete financial history for one or all customers in one
+          place.
+
+WHAT YOU CAN DO:
+  • View all customer-related documents: sales invoices, collections, receipts
+  • Filter by customer name, date range, or document type
+  • Click any record to open the full document detail
+  • Check outstanding balances per customer
+
+This page is useful for answering customer queries like "what do I owe?" or for
+your team to review payment history before extending credit.
+
+────────────────────────────────────────────────────────────────────────────────
+
+3.3  VENDOR MANAGEMENT
+-----------------------
+PURPOSE:  Store and maintain records for all suppliers and vendors your business
+          buys from.
+
+WHAT YOU CAN DO:
+  • View the vendor list
+  • Add a new vendor (name, contact details, address, tax ID, payment terms)
+  • Edit existing vendor information
+  • View the full transaction history for any vendor
+
+INPUTS WHEN CREATING / EDITING:
+  • Vendor / supplier name and contact person
+  • Email, phone, address
+  • Tax identification number (TIN)
+  • Payment terms (e.g., 60 days net)
+  • Bank details for payment processing
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  • New vendors are available immediately on Purchase, Payments, and Disbursement
+    pages.
+  • Vendor balances (how much you owe them) update automatically whenever
+    purchase invoices are posted and payments are made.
+
+CONNECTED DATA:
+  • vendor records linked to purchases, payments, and disbursements
+
+────────────────────────────────────────────────────────────────────────────────
+
+3.4  VENDOR TRANSACTIONS
+-------------------------
+PURPOSE:  See the complete financial history for one or all vendors in one place.
+
+WHAT YOU CAN DO:
+  • View all vendor-related documents: purchase invoices, payments, disbursements
+  • Filter by vendor name, date range, or document type
+  • Click any record to open the full document detail
+  • Check outstanding payable balances per vendor
+
+Useful when reviewing how much you owe a supplier before making a payment run,
+or when reconciling a supplier statement.
+
+
+================================================================================
+PART 4 — TAX PAGES
+================================================================================
+
+4.1  VAT MANAGEMENT
+--------------------
+PURPOSE:  Manage VAT (Value Added Tax) settings and view VAT-related records
+          across sales and purchases.
+
+WHAT YOU CAN DO:
+  • View VAT rates configured in the system
+  • Add or update VAT rate settings
+  • View VAT records applied to sales and purchase transactions
+  • Generate summaries of VAT collected (output tax) and VAT paid (input tax)
+
+HOW VAT WORKS IN THE SYSTEM:
+  • When you add a product or service to a sales invoice, VAT is computed
+    automatically from the rate set on the product.
+  • Similarly, VAT on purchase invoices is computed per line.
+  • VAT amounts post to the VAT Payable or VAT Creditable accounts in the
+    General Ledger automatically.
+
+USE THIS PAGE FOR:  Setting up correct VAT rates before you start creating
+invoices. Incorrect VAT rates will require adjustment entries later.
+
+────────────────────────────────────────────────────────────────────────────────
+
+4.2  WITHHOLDING TAX
+---------------------
+PURPOSE:  Record and track withholding taxes deducted from supplier payments or
+          collected from customers.
+
+WHAT YOU CAN DO:
+  • View withholding tax entries linked to purchases or payments
+  • Add withholding tax details to a payment or purchase record
+  • Generate summaries for withholding tax compliance reporting
+
+HOW IT WORKS:
+  • When you pay a vendor and are required to withhold a percentage of the
+    payment as tax, you record it here.
+  • The withheld amount is posted to a Withholding Tax Payable account in the
+    General Ledger.
+  • The vendor receives the net amount, and the withheld tax is remitted to the
+    tax authority separately.
+
+
+================================================================================
+PART 5 — CASH TRANSACTIONS
+================================================================================
+
+These two pages handle cash directly. They do NOT require creating an invoice
+first. Use them for immediate cash in / cash out situations.
+
+────────────────────────────────────────────────────────────────────────────────
+
+5.1  RECEIPTS
+--------------
+PURPOSE:  Record cash or check received by the business — without a sales invoice.
+          Use for direct cash sales, miscellaneous income, donations, or any money
+          received that does not go through the sales invoice cycle.
+
+WHAT YOU CAN DO:
+  • Create a new receipt
+  • Edit a draft receipt before approval
+  • Approve / post a receipt to the books
+  • View the list of all receipts (filter by date or status)
+  • Click a receipt to see full detail
+  • Print or download the receipt as a PDF
+
+INPUTS WHEN CREATING:
+  • Receipt date
+  • Customer (optional — leave blank for non-customer cash receipts)
+  • Reference number
+  • Payment method (cash or check)
+  • Bank or cash account receiving the funds
+  • Amount received
+  • Remarks or notes
+  • Line items (description, quantity, amount) if needed
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  Posting effects (when approved):
+    Debit   →  Cash / Bank account (increases your cash balance)
+    Credit  →  Income / Revenue account (or AR if applied to a customer invoice)
+
+  • Creates journal entry lines in the General Ledger
+  • Updates the cash account balance available in Bank Reconciliation
+  • Creates an audit trail entry showing who created and approved the receipt
+
+CONNECTED DATA CREATED OR UPDATED:
+  • receipt record with reference number and date
+  • receipt_items lines for each item
+  • journal_entries (posted when approved)
+  • Customer balance if linked to a customer
+  • Bank / cash account balance for reconciliation
+  • attachments if you upload supporting files (e.g., scanned cash voucher)
+  • audit_trail entry
+
+KEY RULE:  Only approved / posted receipts affect the books. Draft receipts do
+not appear in reports.
+
+────────────────────────────────────────────────────────────────────────────────
+
+5.2  DISBURSEMENTS
+------------------
+PURPOSE:  Record cash or check paid out by the business — without a purchase
+          invoice. Use for petty cash payments, miscellaneous expenses, or any
+          direct cash payment that does not go through the purchase invoice cycle.
+
+WHAT YOU CAN DO:
+  • Create a new disbursement
+  • Edit a draft before approval
+  • Approve / post to the books
+  • View the list of all disbursements (filter by date, payee, or status)
+  • Click any disbursement to see full detail
+  • Print or download as a PDF
+
+INPUTS WHEN CREATING:
+  • Payment date
+  • Payee / vendor name
+  • Reference number
+  • Payment method (cash or check)
+  • Bank or cash account the funds are coming from
+  • Amount paid
+  • Expense category / account
+  • Remarks or notes
+  • Line items (description, expense account, amount) if needed
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  Posting effects (when approved):
+    Credit  →  Cash / Bank account (decreases your cash balance)
+    Debit   →  Expense or Asset account (records what the money was spent on)
+
+  • Creates journal entry lines in the General Ledger
+  • Updates the cash account balance visible in Bank Reconciliation
+  • Creates an audit trail entry
+
+CONNECTED DATA CREATED OR UPDATED:
+  • disbursement record and disbursement_items lines
+  • journal_entries (posted when approved)
+  • Bank / cash account balance for reconciliation
+  • attachments if you upload supporting files (e.g., supplier receipt)
+  • audit_trail entry
+
+KEY RULE:  Disbursements are for direct cash payments. If you have a vendor
+invoice that needs to go through the approval process, use the Purchase page
+instead (Part 7.1).
+
+
+================================================================================
+PART 6 — SALES CYCLE
+================================================================================
+
+The Sales cycle has three related pages that work together:
+  Sales → creates a customer invoice (an amount the customer owes you)
+  Collections → records a payment received against that invoice
+  Aging Receivables → shows which invoices are still unpaid and how old they are
+
+────────────────────────────────────────────────────────────────────────────────
+
+6.1  SALES (INVOICES)
+----------------------
+PURPOSE:  Create and manage customer sales invoices. When you sell something to a
+          customer on credit (they will pay later), you record it here first.
+
+TYPICAL WORKFLOW:
+  Step 1.  Create a new sales invoice (status: PREPARED / DRAFT)
+  Step 2.  A supervisor or checker reviews it (status: CHECKED)
+  Step 3.  An authorized user approves and posts it (status: APPROVED / POSTED)
+  Step 4.  The customer pays → record in Collections (Part 6.2)
+
+WHAT YOU CAN DO:
+  • Create a new sales invoice
+  • Edit a draft invoice (before approval)
+  • Submit for checking / approval
+  • Approve and post to the books
+  • View the list of all sales invoices (filter by date, customer, or status)
+  • Click any invoice to see full line-item detail
+  • Print the customer copy or an internal copy as a PDF
+  • Attach supporting files (e.g., signed delivery receipts)
+
+INPUTS WHEN CREATING:
+  • Customer name
+  • Invoice date and due date
+  • Line items: product/service, description, quantity, unit price
+  • Discounts (if any)
+  • VAT (applied automatically from the product rate; editable if needed)
+  • Payment terms (e.g., 30 days)
+  • Reference number or PO number
+  • Notes or special instructions
+
+WHAT THE SYSTEM COMPUTES AUTOMATICALLY:
+  • Line totals = quantity × unit price
+  • Discounts deducted per line
+  • VAT computed on each taxable line
+  • Grand total = subtotal + VAT − discounts
+
+WHAT THE SYSTEM DOES AUTOMATICALLY (ON APPROVAL / POSTING):
+  Posting effects:
+    Debit   →  Accounts Receivable (AR) — the customer now owes you this amount
+    Credit  →  Revenue account — you have earned income
+    Credit  →  VAT Payable account — if VAT applies
+
+  • Creates AR record showing the customer's outstanding balance
+  • Inventory reduced if stock tracking is enabled
+  • Produces a printable invoice document (customer copy and internal copy)
+
+CONNECTED DATA CREATED OR UPDATED:
+  • sales or invoice record and sales_items lines
+  • AR balance for the customer
+  • journal_entries (Debit AR, Credit Revenue, Credit VAT Payable)
+  • Inventory stock levels (if applicable)
+  • attachments
+  • audit_trail entry
+
+────────────────────────────────────────────────────────────────────────────────
+
+6.2  COLLECTIONS (CUSTOMER PAYMENTS)
+--------------------------------------
+PURPOSE:  Record a payment received from a customer and apply it to one or more
+          outstanding sales invoices. This clears the customer's debt.
+
+TYPICAL WORKFLOW:
+  Step 1.  Customer sends payment (cash, check, or bank transfer).
+  Step 2.  Open the Collections page and create a new collection record.
+  Step 3.  Select the customer and choose which invoices this payment settles.
+  Step 4.  Save and approve — the invoice balances are reduced.
+
+WHAT YOU CAN DO:
+  • Create a new collection / payment receipt
+  • Apply the payment to one or multiple outstanding invoices
+  • Edit a draft collection before posting
+  • View the list of all collections (filter by date or customer)
+  • Click any collection to see applied invoices and detail
+  • Print or download a payment acknowledgment / official receipt as a PDF
+
+INPUTS WHEN CREATING:
+  • Collection date
+  • Customer name
+  • Payment method (cash, check, bank transfer)
+  • Bank or check details (check number, bank name, date)
+  • Amount received
+  • Invoice(s) this payment is applied to
+  • Remarks
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  Posting effects (when approved):
+    Debit   →  Cash / Bank account (your cash goes up)
+    Credit  →  Accounts Receivable (AR) — the customer's balance goes down
+
+  • Marks the applied invoices as partially or fully paid
+  • If the payment exceeds the invoice total, the excess becomes a credit balance
+    or advance for the customer
+  • Updates the customer's outstanding balance
+
+CONNECTED DATA CREATED OR UPDATED:
+  • collection or customer payment record
+  • Links to the applied sales invoices
+  • AR balance reduced for the customer
+  • journal_entries (Debit Cash/Bank, Credit AR)
+  • Customer outstanding invoice status updated
+  • attachments (e.g., deposit slips, check scans)
+  • audit_trail entry
+
+────────────────────────────────────────────────────────────────────────────────
+
+6.3  AGING RECEIVABLES
+-----------------------
+PURPOSE:  A report-style page that shows all unpaid customer invoices grouped by
+          how overdue they are. Use this to know which customers need to be
+          followed up for payment.
+
+HOW IT WORKS:
+  The system takes all posted sales invoices that have not been fully collected
+  and groups them into age buckets based on their due date. Typical groupings:
+    • Current (not yet due)
+    • 1–30 days overdue
+    • 31–60 days overdue
+    • 61–90 days overdue
+    • Over 90 days overdue
+
+WHAT YOU CAN DO:
+  • View the aging summary by customer
+  • Filter by date to see aging as of a specific day
+  • Click a customer row to see the individual overdue invoices
+  • Export or print for collection follow-up
+
+USE THIS PAGE TO:
+  • Prioritize collection calls
+  • Identify customers with long-overdue balances
+  • Support credit limit decisions
+
+
+================================================================================
+PART 7 — PURCHASE CYCLE
+================================================================================
+
+The Purchase cycle has three related pages that work together:
+  Purchase → records a vendor invoice (an amount you owe the vendor)
+  Purchase Orders → formal requests to a vendor before the invoice arrives
+  Payments → records money paid to a vendor, clearing the debt
+
+────────────────────────────────────────────────────────────────────────────────
+
+7.1  PURCHASE (VENDOR INVOICES)
+---------------------------------
+PURPOSE:  Record vendor invoices for goods or services received. Use this page
+          when you have received a supplier invoice and need to record what you
+          owe.
+
+TYPICAL WORKFLOW:
+  Step 1.  Receive a vendor invoice.
+  Step 2.  Create a new purchase record (status: DRAFT / PREPARED).
+  Step 3.  Reviewer checks the details (status: CHECKED).
+  Step 4.  Authorized user approves and posts it (status: APPROVED / POSTED).
+  Step 5.  When you pay the vendor → record in Payments (Part 7.3).
+
+WHAT YOU CAN DO:
+  • Create a new purchase / vendor invoice
+  • Edit a draft before approval
+  • Submit for checking / approval
+  • Approve and post to the books
+  • View the list of all purchase records (filter by date, vendor, or status)
+  • Click any record to see full detail
+  • Print or download as a PDF
+  • Attach supporting files (e.g., supplier invoice scan)
+
+INPUTS WHEN CREATING:
+  • Vendor name
+  • Invoice date and due date
+  • Line items: description, quantity, unit price, expense / asset account
+  • VAT (if applicable)
+  • Reference number (vendor's invoice number)
+  • Payment terms
+  • Notes or remarks
+
+WHAT THE SYSTEM COMPUTES AUTOMATICALLY:
+  • Line totals = quantity × unit price
+  • VAT computed per line if applicable
+  • Grand total = subtotal + VAT
+
+WHAT THE SYSTEM DOES AUTOMATICALLY (ON APPROVAL / POSTING):
+  Posting effects:
+    Debit   →  Expense account or Inventory account (the cost is recorded)
+    Credit  →  Accounts Payable (AP) — you now owe the vendor this amount
+
+  • Creates AP record showing your outstanding balance with the vendor
+  • Inventory increased if stock tracking is enabled
+  • May trigger a payment request notification
+
+CONNECTED DATA CREATED OR UPDATED:
+  • purchase record and purchase_items lines
+  • AP balance for the vendor
+  • journal_entries (Debit Expense/Inventory, Credit AP)
+  • Inventory stock levels (if applicable)
+  • attachments
+  • audit_trail entry
+
+────────────────────────────────────────────────────────────────────────────────
+
+7.2  PURCHASE ORDERS (PO)
+--------------------------
+PURPOSE:  Create a formal purchase order (request to buy) before receiving the
+          vendor's invoice. A PO documents what you intend to buy, at what price,
+          and from whom.
+
+WHEN TO USE:
+  Use Purchase Orders when your business requires formal approval before ordering
+  goods or services. The PO is sent to the vendor; when the goods arrive and the
+  vendor invoice comes, you convert the PO to a Purchase record.
+
+TYPICAL WORKFLOW:
+  Step 1.  Create a Purchase Order and get it approved.
+  Step 2.  Send PO to the vendor.
+  Step 3.  Goods / services are received.
+  Step 4.  Vendor invoice arrives → convert the PO to a Purchase invoice
+           (or to a Disbursement for immediate cash payment).
+
+WHAT YOU CAN DO:
+  • Create a new PO
+  • Edit before approval
+  • Approve the PO
+  • Convert an approved PO into a Purchase invoice or a Disbursement
+  • View the list of POs and their statuses
+  • Print or download the PO document
+  • Attach supporting files
+
+INPUTS WHEN CREATING:
+  • Vendor name
+  • Order date and expected delivery date
+  • Line items: items to order, quantities, unit prices
+  • Reference number
+  • Notes or delivery instructions
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  • Purchase Orders do NOT post to the General Ledger — they are not yet expenses.
+  • When converted to a Purchase invoice, the PO details pre-fill the new
+    purchase record so you do not need to re-enter everything.
+  • When converted to a Disbursement, the PO details pre-fill the disbursement
+    for immediate cash payment.
+  • Each conversion and approval is recorded in the audit trail.
+
+CONNECTED DATA CREATED OR UPDATED:
+  • purchase_order record and item lines
+  • Links to purchase or disbursement records when converted
+  • attachments
+  • audit_trail entry
+
+────────────────────────────────────────────────────────────────────────────────
+
+7.3  PAYMENTS (VENDOR PAYMENTS)
+---------------------------------
+PURPOSE:  Record a payment made to a vendor and apply it to one or more
+          outstanding purchase invoices. This reduces what you owe the vendor.
+
+TYPICAL WORKFLOW:
+  Step 1.  You are ready to pay a vendor.
+  Step 2.  Open the Payments page and create a new payment record.
+  Step 3.  Select the vendor and choose which purchase invoice(s) this payment
+           covers.
+  Step 4.  Save and approve — the AP balance is reduced.
+
+WHAT YOU CAN DO:
+  • Create a new vendor payment record
+  • Apply the payment to one or multiple outstanding purchase invoices
+  • Edit a draft before posting
+  • View the list of all payments (filter by date or vendor)
+  • Click any payment to see applied invoices and full detail
+  • Print or download a payment voucher or remittance slip as a PDF
+
+INPUTS WHEN CREATING:
+  • Payment date
+  • Vendor name
+  • Payment method (check, bank transfer, cash)
+  • Bank or check details (check number, bank, date)
+  • Amount paid
+  • Purchase invoice(s) this payment is applied to
+  • Bank charges or discounts (if any)
+  • Remarks
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  Posting effects (when approved):
+    Debit   →  Accounts Payable (AP) — your balance owed to vendor goes down
+    Credit  →  Cash / Bank account — your cash goes down
+
+  • Marks the applied purchase invoices as partially or fully paid
+  • Bank charges are posted to the relevant expense account if entered
+  • Updates the vendor's outstanding AP balance
+
+CONNECTED DATA CREATED OR UPDATED:
+  • payment record linked to vendor invoices
+  • AP balance reduced for the vendor
+  • journal_entries (Debit AP, Credit Cash/Bank)
+  • Vendor outstanding invoice status updated
+  • attachments (e.g., bank transfer confirmation)
+  • audit_trail entry
+
+
+================================================================================
+PART 8 — ACCOUNTING ADJUSTMENTS
+================================================================================
+
+8.1  ADJUSTMENTS
+-----------------
+PURPOSE:  Make manual corrections or special accounting entries that do not
+          belong to a standard sales, purchase, receipt, or disbursement. Use
+          this page for accruals, reclassifications, corrections, and
+          period-end entries.
+
+COMMON USES:
+  • Correct a wrong account that was used on a posted entry
+  • Record an accrual (an expense or income that belongs in this period but
+    has not yet been invoiced)
+  • Reclassify an amount from one account to another
+  • Record depreciation or amortization entries
+  • Reverse a prior period entry
+
+WHAT YOU CAN DO:
+  • Create a new adjustment entry
+  • Specify any combination of debit and credit accounts and amounts
+  • Add explanatory notes for each entry
+  • Edit a draft adjustment before approval
+  • Approve / post to the books
+  • View the list of all adjustments
+  • Print or download adjustment vouchers
+  • Attach supporting documentation
+
+INPUTS WHEN CREATING:
+  • Date of the adjustment
+  • Reference number
+  • Account to be debited (and amount)
+  • Account to be credited (and amount)
+  • Explanation or notes (required — always explain why you are making
+    an adjustment)
+
+IMPORTANT RULE:  Total debits must equal total credits. The system will not allow
+you to post an unbalanced entry.
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  • Posts the manual journal entry directly to the General Ledger
+  • Account balances are updated immediately
+  • The entry appears in the Trial Balance, General Ledger, and all reports
+
+CONNECTED DATA CREATED OR UPDATED:
+  • adjustment record
+  • direct journal_entries in the GL
+  • attachments
+  • audit_trail entry
+
+────────────────────────────────────────────────────────────────────────────────
+
+8.2  ADVANCES (PREPAYMENTS)
+-----------------------------
+PURPOSE:  Record money paid in advance — before a purchase or service is received
+          — or money received from a customer before you have invoiced them.
+          Advances are temporary balances that are later applied to the proper
+          invoice or expense.
+
+COMMON USES:
+  • Down payment to a vendor before goods are delivered
+  • Customer deposit received before a project starts
+  • Employee cash advance for a business trip
+
+TYPICAL WORKFLOW (Vendor Advance):
+  Step 1.  Pay the vendor a deposit → record as an Advance (cash goes out,
+           Advances/Prepaid asset goes up).
+  Step 2.  Goods are received and the vendor invoice arrives → create a Purchase.
+  Step 3.  Apply the advance to the purchase invoice → the Advances account goes
+           down, AP goes down, or the cash owed to the vendor is reduced.
+
+WHAT YOU CAN DO:
+  • Create a new advance record
+  • Edit a draft advance
+  • Apply / settle an advance against a purchase or sales invoice
+  • View the list of outstanding advances
+  • Attach supporting files
+
+INPUTS WHEN CREATING:
+  • Date
+  • Payee or customer name
+  • Purpose of the advance
+  • Amount
+  • Related document or reference (optional)
+  • Status
+
+WHAT THE SYSTEM DOES AUTOMATICALLY:
+  On initial advance payment:
+    Debit   →  Advances / Prepaid account (asset — money is now owed to you)
+    Credit  →  Cash / Bank account
+
+  When applied / settled:
+    Debit   →  Expense or Inventory account (the actual cost is now recorded)
+    Credit  →  Advances / Prepaid account (the prepaid balance is removed)
+
+CONNECTED DATA CREATED OR UPDATED:
+  • advance record
+  • journal_entries for initial payment and for settlement
+  • Links to purchase or sales records when applied
+  • attachments
+  • audit_trail entry
+
+
+================================================================================
+PART 9 — REPORTS
+================================================================================
+
+Reports pull data from posted journal entries and present it in standard
+accounting formats. IMPORTANT: Only approved / posted transactions appear in
+reports. Drafts are excluded.
+
+────────────────────────────────────────────────────────────────────────────────
+
+9.1  TRIAL BALANCE
+-------------------
+PURPOSE:  A fundamental accuracy check. Shows the balance of every account in
+          the system for a selected period. Total debits must equal total credits.
+
+HOW TO READ IT:
+  • Every account in the Chart of Accounts appears as a row.
+  • The Debit column shows total debits posted to that account.
+  • The Credit column shows total credits posted to that account.
+  • The bottom totals must match — if they don't, there is an error somewhere.
+
+DATA SOURCE:
+  Aggregates posted journal_entries joined with charts_of_accounts.
+  Only POSTED entries (not drafts) are included.
+
+HOW TO USE IT:
+  Step 1.  Select a date range.
+  Step 2.  Run the report.
+  Step 3.  Check that the total Debit line equals the total Credit line.
+  Step 4.  If they do not match, investigate for missing entries, unposted
+           records, or adjustment errors.
+
+USEFUL FOR:  Month-end and year-end closing checks before preparing financial
+statements.
+
+────────────────────────────────────────────────────────────────────────────────
+
+9.2  INCOME STATEMENT (PROFIT & LOSS)
+---------------------------------------
+PURPOSE:  Shows whether the business made a profit or a loss during a selected
+          period. Compares revenue earned against expenses incurred.
+
+STRUCTURE:
+  Revenue                              xxx
+  Less: Cost of Sales                  (xx)
+  Gross Profit                         xxx
+  Less: Operating Expenses             (xx)
+  Net Income / (Loss)                  xxx
+
+DATA SOURCE:
+  journal_entries filtered by account types Revenue and Expenses from the COA.
+
+HOW THE SYSTEM COMPUTES IT:
+  • Revenue = sum of credits minus debits on Revenue-type accounts
+  • Expenses = sum of debits minus credits on Expense-type accounts
+  • Net Income = Revenue − Expenses
+
+HOW TO USE IT:
+  • Select a start date and end date (usually a month or the full financial year).
+  • Run the report to see revenue, expenses, and net income for that period.
+  • Compare periods to track business performance over time.
+
+────────────────────────────────────────────────────────────────────────────────
+
+9.3  GENERAL LEDGER
+--------------------
+PURPOSE:  The detailed record of every posted transaction, organized by account.
+          Think of it as the complete transaction diary for each account.
+
+DATA SOURCE:
+  journal_entries with full posting information (date, source document,
+  amount, debit/credit type).
+
+HOW IT WORKS:
+  • Select an account (or all accounts) and a date range.
+  • The report lists every journal line that touched that account during the
+    period, with the source document reference.
+  • Running balances are shown so you can trace how an account moved over time.
+  • You can drill into any line to open the original source document (sales
+    invoice, receipt, disbursement, etc.)
+
+USEFUL FOR:  Detailed account analysis, investigating unusual balances,
+reconciling specific accounts, and supporting audit inquiries.
+
+────────────────────────────────────────────────────────────────────────────────
+
+9.4  BALANCE SHEET
+-------------------
+PURPOSE:  A snapshot of the business's financial position on a specific date.
+          Shows what the business owns (assets), what it owes (liabilities),
+          and the owner's share (equity).
+
+STRUCTURE:
+  Assets
+    Current Assets: Cash, AR, Inventory        xxx
+    Non-Current Assets: Equipment, Property    xxx
+  Total Assets                                 xxx
+
+  Liabilities
+    Current Liabilities: AP, VAT Payable       xxx
+    Long-Term Liabilities: Loans               xxx
+  Total Liabilities                            xxx
+
+  Equity
+    Owner's Capital and Retained Earnings      xxx
+  Total Liabilities + Equity                   xxx
+  (must equal Total Assets)
+
+DATA SOURCE:
+  Ending balances from journal_entries aggregated by COA account types
+  (Assets, Liabilities, Equity) as of the selected date.
+
+HOW TO USE IT:
+  • Select a "as of" date (e.g., the last day of the month).
+  • The system uses all GL balances up to and including that date.
+  • Total Assets must equal Total Liabilities plus Equity. If not, investigate.
+
+────────────────────────────────────────────────────────────────────────────────
+
+9.5  STATEMENT OF COMPREHENSIVE INCOME
+----------------------------------------
+PURPOSE:  An extended version of the Income Statement that includes not only
+          operating profit or loss but also other comprehensive income (OCI)
+          items — items that affect equity but are not part of normal operations.
+
+COMMON OCI ITEMS:
+  • Unrealized gains or losses on certain investments
+  • Foreign currency translation adjustments
+  • Revaluation surplus on property
+
+DATA SOURCE:
+  Combination of revenue / expense GL balances and special OCI accounts from
+  the Chart of Accounts.
+
+HOW IT WORKS:
+  Net Income (from P&L)                   xxx
+  + Other Comprehensive Income items      xxx
+  = Total Comprehensive Income            xxx
+
+USEFUL FOR:  Businesses that follow full IFRS / PFRS reporting requirements.
+
+────────────────────────────────────────────────────────────────────────────────
+
+9.6  JOURNAL ENTRIES
+---------------------
+PURPOSE:  View every journal entry posted to the system. Useful for accountants,
+          auditors, or anyone who needs to verify the raw accounting data.
+
+DATA SOURCE:
+  journal_entries table directly — all posted and manually created entries.
+
+WHAT YOU CAN DO:
+  • View the full list of journal entries in date order
+  • Filter by date range, account, or reference number
+  • Click any entry to see the full debit / credit detail and source document
+  • Export for external use or audit submission
+
+HOW IT DIFFERS FROM THE GL:
+  • General Ledger (Part 9.3) groups by account and shows running balances.
+  • Journal Entries shows each complete entry (all lines together) in
+    chronological order.
+
+────────────────────────────────────────────────────────────────────────────────
+
+9.7  BANK RECONCILIATION
+-------------------------
+PURPOSE:  Compare your bank statement to your accounting books. The goal is to
+          confirm that every transaction in the bank is also recorded in the
+          system, and vice versa.
+
+WHY IT MATTERS:
+  Bank statements and your books can differ because of timing (checks not yet
+  cleared, deposits in transit) or errors. Reconciling regularly catches
+  mistakes early and ensures your cash balance is accurate.
+
+HOW IT WORKS:
+  Step 1.  Upload or enter the bank statement transactions for the period.
+  Step 2.  The system matches bank transactions against your GL cash entries
+           (Receipts, Collections, Payments, Disbursements).
+  Step 3.  Mark transactions as "cleared" when they appear on both sides.
+  Step 4.  Outstanding items (in the books but not on the bank statement, or
+           vice versa) are listed separately.
+  Step 5.  Create reconciling adjustment entries for any genuine differences
+           (bank charges, interest, errors).
+  Step 6.  Finalize the reconciliation when GL balance matches bank balance.
+
+DATA SOURCE:
+  Cash account GL transactions (Receipts, Collections, Payments, Disbursements)
+  and user-provided bank statement lines.
+
+CONNECTED DATA:
+  • bank_reconciliation records
+  • Links to journal_entries and bank statement items
+  • Reconciling adjustment entries
+
+────────────────────────────────────────────────────────────────────────────────
+
+9.8  AUDIT TRAIL
+-----------------
+PURPOSE:  A complete log of who did what and when in the system. Shows every
+          create, edit, approve, and delete action on important records.
+
+DATA SOURCE:
+  system audit_trail entries generated automatically whenever a user takes
+  an action on a record.
+
+WHAT YOU CAN DO:
+  • View the audit log
+  • Filter by user, date, page, or record
+  • See the before and after values for changes (where recorded)
+  • Export for compliance or investigation purposes
+
+USEFUL FOR:
+  • Investigating discrepancies ("who changed this entry?")
+  • Compliance with internal controls
+  • External audits
+  • Detecting unauthorized changes
+
+
+================================================================================
+PART 10 — TIPS AND REFERENCE
+================================================================================
+
+10.1  KEY TRANSACTION FLOWS EXPLAINED SIMPLY
+---------------------------------------------
+
+  CASH IN (no invoice):
+    Customer or other party pays you cash directly.
+    → Use RECEIPTS (Part 5.1)
+    → Effect: Cash goes up, Income is recorded
+
+  CASH OUT (no invoice):
+    You pay something in cash directly (petty cash, minor expenses).
+    → Use DISBURSEMENTS (Part 5.2)
+    → Effect: Cash goes down, Expense is recorded
+
+  CREDIT SALE (invoice first, payment later):
+    You sell to a customer who will pay you in the future.
+    → Step 1: Create SALES invoice (Part 6.1)   → AR goes up, Revenue recorded
+    → Step 2: Customer pays → COLLECTIONS (Part 6.2) → Cash up, AR goes down
+
+  CREDIT PURCHASE (invoice received, payment later):
+    You receive goods or services and will pay the vendor later.
+    → Step 1: Create PURCHASE invoice (Part 7.1) → Expense recorded, AP goes up
+    → Step 2: You pay vendor → PAYMENTS (Part 7.3) → AP goes down, Cash down
+
+  PURCHASE ORDER (request before ordering):
+    You need approval before ordering from a vendor.
+    → Step 1: Create PURCHASE ORDER (Part 7.2) → No ledger effect
+    → Step 2: Receive goods, get invoice → Convert PO to PURCHASE (Part 7.1)
+    → Step 3: Pay vendor → PAYMENTS (Part 7.3)
+
+  CORRECTIONS:
+    Something was posted incorrectly.
+    → Use ADJUSTMENTS (Part 8.1)
+    → Effect: Manual journal entry directly to GL
+
+  PREPAYMENTS:
+    You or a customer pays before the invoice is issued.
+    → Use ADVANCES (Part 8.2)
+    → Effect: Prepaid / Advance account records the money; settled when invoice
+      arrives
+
+────────────────────────────────────────────────────────────────────────────────
+
+10.2  HOW TO USE FILTERS AND DATE SEARCH
+------------------------------------------
+Almost every page in the system allows you to filter records by date.
+
+  • Date filter:
+      1.  Select a Start Date and an End Date.
+      2.  Apply the filter — only records within that date range are shown.
+      3.  Clear the filter to return to the full list.
+
+  • Additional filters available on most pages:
+      – Customer or vendor name
+      – Status (Draft, Approved, Posted)
+      – Reference number
+      – Amount range
+
+  • Top-header search:
+      – Searches across multiple modules at once
+      – Requires a keyword AND a date range
+      – Click a result to jump directly to that record
+
+  • Clicking a record:
+      – On most list pages you can click any row to open the full detail view
+        of that record.
+
+────────────────────────────────────────────────────────────────────────────────
+
+10.3  WHAT USERS CAN DO ON EVERY PAGE
+----------------------------------------
+Depending on your access rights, you may be able to do some or all of the
+following on each page:
+
+  ✓  View and browse records
+  ✓  Search by date, name, or reference
+  ✓  Add a new record (if you have Create permission)
+  ✓  Edit a draft record (if you have Edit permission)
+  ✓  Submit for checking or approval (if applicable)
+  ✓  Approve and post to the books (if you have Approve permission)
+  ✓  Download or print documents as PDF
+  ✓  Attach supporting files
+  ✓  Open and review full record details
+
+  Note: If a button is not visible, you do not have permission for that action.
+  Contact your administrator to request access.
+
+────────────────────────────────────────────────────────────────────────────────
+
+10.4  AUTOMATION AND POSTING FLOW (SUMMARY)
+---------------------------------------------
+The system automates the accounting work so you only need to enter the business
+event. Here is what happens behind the scenes:
+
+  When you CREATE A SALES INVOICE (and approve it):
+    → AR record created (customer owes you)
+    → Journal: Debit AR / Credit Revenue / Credit VAT Payable
+    → Inventory may be reduced
+
+  When you RECORD A COLLECTION:
+    → Journal: Debit Cash / Credit AR
+    → Customer's outstanding balance decreases
+    → Invoice marked as paid
+
+  When you CREATE A PURCHASE INVOICE (and approve it):
+    → AP record created (you owe the vendor)
+    → Journal: Debit Expense/Inventory / Credit AP
+    → Inventory may be increased
+
+  When you RECORD A PAYMENT TO A VENDOR:
+    → Journal: Debit AP / Credit Cash
+    → Vendor's outstanding balance decreases
+    → Purchase invoice marked as paid
+
+  When you CREATE A RECEIPT:
+    → Journal: Debit Cash / Credit Income
+    → No AR/AP lifecycle — direct cash posting
+
+  When you CREATE A DISBURSEMENT:
+    → Journal: Debit Expense / Credit Cash
+    → No AR/AP lifecycle — direct cash posting
+
+  When you POST AN ADJUSTMENT:
+    → Manual journal entry goes directly to GL
+    → Account balances updated immediately
+
+────────────────────────────────────────────────────────────────────────────────
+
+10.5  GENERAL TIPS FOR USERS
+------------------------------
+  1.  ALWAYS APPROVE BEFORE RUNNING REPORTS
+      Draft records are not included in any report. Make sure all records are
+      approved / posted before checking your Trial Balance or financial
+      statements.
+
+  2.  USE TRIAL BALANCE FIRST
+      Before preparing month-end reports, run the Trial Balance to check that
+      debits equal credits. An out-of-balance Trial Balance means there is a
+      data entry or posting error somewhere.
+
+  3.  RECONCILE REGULARLY
+      Run Bank Reconciliation at least once a month. This catches missing entries,
+      bank errors, and timing differences before they become hard to trace.
+
+  4.  ALWAYS ADD NOTES TO ADJUSTMENTS
+      The Notes field on Adjustments is very important. In 6 months, you (or
+      your auditor) will need to understand why the entry was made. Always write
+      a clear explanation.
+
+  5.  PROFORMAS DO NOT AFFECT THE BOOKS
+      Proforma entries and Purchase Orders are planning documents. They do not
+      post to the General Ledger. Only converted and approved documents affect
+      your accounts.
+
+  6.  KNOW YOUR ROLE
+      If you cannot see a page or a button, your role does not have permission
+      for it. Ask your administrator — do not try to work around it.
+
+  7.  DATES MATTER
+      Always enter the correct transaction date, not today's date, unless
+      today is the actual transaction date. Reports are date-based; wrong dates
+      put transactions in the wrong reporting period.
+
+  8.  PDF DOWNLOADS ARE FINAL COPIES
+      Downloaded PDFs reflect the data at the time of download. If you edit a
+      record after downloading, download a fresh copy.
+
+  9.  THE AUDIT TRAIL RECORDS EVERYTHING
+      Every action you take in the system is logged. This is for your protection
+      as much as for controls. Always work accurately and honestly.
+
+  10. WHEN IN DOUBT, ASK
+      If you are unsure whether to use Receipts or Collections, Disbursements or
+      Payments, or any other module — ask your supervisor or accountant before
+      entering data. A wrong posting is harder to fix than an un-posted draft.
+
+================================================================================
+END OF USER GUIDE
+File: USER_DOCUMENTATION.txt
+================================================================================
