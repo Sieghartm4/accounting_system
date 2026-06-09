@@ -50,6 +50,7 @@ export default function BankReconciliationDetail({
     itemFormData,
     setItemFormData,
     itemFormRows,
+    setItemFormRows,
     detailStartDate,
     setDetailStartDate,
     detailEndDate,
@@ -63,7 +64,9 @@ export default function BankReconciliationDetail({
     showToast,
     setShowToast,
     toastMessage,
+    setToastMessage,
     toastType,
+    setToastType,
     bankSectionFilter,
     setBankSectionFilter,
     editingBankBalance,
@@ -130,6 +133,281 @@ export default function BankReconciliationDetail({
     bookCardDeductions,
     bookCardErrors,
   } = useBankReconciliation(selectedReconciliation)
+
+  const [ocrLoading, setOcrLoading] = React.useState(false)
+  const [ocrError, setOcrError] = React.useState('')
+  const ocrFileInputRef = React.useRef(null)
+
+  const parseOcrRows = (rows) => {
+    if (!rows) return []
+
+    let normalizedRows = Array.isArray(rows) ? rows : [rows]
+
+    if (normalizedRows.length > 0 && Array.isArray(normalizedRows[0])) {
+      const headerRow = normalizedRows[0].map((value) =>
+        value?.toString().trim().toLowerCase(),
+      )
+      normalizedRows = normalizedRows.slice(1).map((row) => {
+        if (!Array.isArray(row)) return {}
+        return row.reduce((acc, value, index) => {
+          acc[headerRow[index] || `col_${index}`] = value
+          return acc
+        }, {})
+      })
+    }
+
+    const mapValue = (row, keys) => {
+      for (const key of keys) {
+        const found = row[key]
+        if (found !== undefined && found !== null) {
+          const value = found?.toString?.().trim?.()
+          if (value !== '') return value
+        }
+      }
+      return ''
+    }
+
+    const normalizeDate = (value) => {
+      if (!value) return ''
+      const stringValue = value.toString().trim()
+      const date = new Date(stringValue)
+      if (!Number.isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0]
+      }
+      return stringValue
+    }
+
+    const parseNumber = (value) => {
+      if (value === undefined || value === null) return NaN
+      const stringValue = value.toString().trim()
+      if (!stringValue) return NaN
+      const normalized = stringValue
+        .replace(/[₱,$]/g, '')
+        .replace(/\(/g, '-')
+        .replace(/\)/g, '')
+        .replace(/\s+/g, '')
+      return parseFloat(normalized)
+    }
+
+    const normalizeRow = (rawRow) => {
+      const row = Object.entries(rawRow || {}).reduce((acc, [key, value]) => {
+        acc[key.toString().trim().toLowerCase()] = value
+        return acc
+      }, {})
+
+      const details =
+        mapValue(row, [
+          'details',
+          'description',
+          'particulars',
+          'account',
+          'account_name',
+          'narration',
+          'remarks',
+          'memo',
+          'note',
+        ]) || ''
+
+      const date = normalizeDate(
+        mapValue(row, [
+          'date',
+          'transaction_date',
+          'posting_date',
+          'value_date',
+          'doc_date',
+          'due_date',
+          'dated',
+        ]),
+      )
+
+      const reference_number = mapValue(row, [
+        'reference_number',
+        'reference',
+        'ref',
+        'check_no',
+        'check_number',
+        'voucher',
+      ])
+
+      const description = mapValue(row, [
+        'description',
+        'details',
+        'particulars',
+        'remarks',
+        'memo',
+        'note',
+      ])
+
+      const debitInput = mapValue(row, [
+        'debit',
+        'dr',
+        'debit_amount',
+        'debit amount',
+        'withdrawal',
+        'amount_dr',
+      ])
+      const creditInput = mapValue(row, [
+        'credit',
+        'cr',
+        'credit_amount',
+        'credit amount',
+        'deposit',
+        'amount_cr',
+      ])
+      const amountInput = mapValue(row, [
+        'amount',
+        'amt',
+        'value',
+        'total',
+        'transaction_amount',
+      ])
+      const direction = mapValue(row, [
+        'type',
+        'direction',
+        'side',
+        'dr_cr',
+        'debit_credit',
+        'txn_type',
+      ]).toLowerCase()
+
+      let debit = ''
+      let credit = ''
+
+      const parsedDebit = parseNumber(debitInput)
+      const parsedCredit = parseNumber(creditInput)
+      const parsedAmount = parseNumber(amountInput)
+
+      if (!Number.isNaN(parsedDebit) && parsedDebit > 0) {
+        debit = parsedDebit.toString()
+      }
+
+      if (!Number.isNaN(parsedCredit) && parsedCredit > 0) {
+        credit = parsedCredit.toString()
+      }
+
+      if (!debit && !credit && !Number.isNaN(parsedAmount) && parsedAmount !== 0) {
+        if (parsedAmount < 0) {
+          debit = Math.abs(parsedAmount).toString()
+        } else if (/(debit|dr|withdrawal|deduct|minus)/.test(direction)) {
+          debit = parsedAmount.toString()
+        } else {
+          credit = parsedAmount.toString()
+        }
+      }
+
+      if (debit && credit) {
+        if (debitInput && !creditInput) {
+          credit = ''
+        } else if (creditInput && !debitInput) {
+          debit = ''
+        } else {
+          credit = ''
+        }
+      }
+
+      return {
+        details,
+        date,
+        reference_number,
+        description,
+        debit,
+        credit,
+      }
+    }
+
+    return normalizedRows
+      .map(normalizeRow)
+      .filter(
+        (row) =>
+          row.date ||
+          row.details ||
+          row.description ||
+          row.reference_number ||
+          row.debit ||
+          row.credit,
+      )
+  }
+
+  const openOcrFilePicker = () => {
+    setOcrError('')
+    ocrFileInputRef.current?.click()
+  }
+
+  const handleOcrFileSelected = async (event) => {
+    const file = event.target?.files?.[0]
+    if (!file) return
+
+    setOcrError('')
+    setOcrLoading(true)
+
+    try {
+      console.debug('[OCR] env values:', {
+        OCR_API_raw: import.meta.env._OCR_API,
+        VITE_OCR_API: import.meta.env.VITE_OCR_API,
+      })
+
+      const ocrBaseRaw =
+        import.meta.env._OCR_API || import.meta.env.VITE_OCR_API || ''
+      const ocrBase = ocrBaseRaw
+        .toString()
+        .trim()
+        .replace(/^['"]|['"]$/g, '')
+
+      console.debug('[OCR] resolved base URL:', ocrBase)
+      if (!ocrBase) {
+        console.error(
+          '[OCR] server URL not configured, please set VITE_OCR_API in your .env',
+        )
+        throw new Error('OCR server URL is not configured.')
+      }
+
+      const ocrUrl = new URL('/ocr', ocrBase)
+      ocrUrl.searchParams.set('format', 'auto')
+      ocrUrl.searchParams.set('header', '1')
+      ocrUrl.searchParams.set('row_tol', '0.6')
+
+      console.debug('[OCR] request URL:', ocrUrl.toString())
+
+      const formData = new FormData()
+      formData.append('image', file)
+
+      const response = await fetch(ocrUrl.toString(), {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[OCR] request failed:', response.status, errorText)
+        throw new Error(
+          errorText || `OCR request failed with status ${response.status}`,
+        )
+      }
+
+      const result = await response.json()
+      console.debug('[OCR] response payload:', result)
+      const rows = result.rows || result.data?.rows || result.data || []
+      const parsedRows = parseOcrRows(rows)
+
+      if (parsedRows.length === 0) {
+        throw new Error('OCR returned no usable rows.')
+      }
+
+      setItemFormRows(parsedRows)
+      setShowToast(true)
+      setToastType('success')
+      setToastMessage(`Imported ${parsedRows.length} OCR row(s).`)
+    } catch (error) {
+      console.error('[OCR] error:', error)
+      setOcrError(error?.message || 'Failed to import OCR rows.')
+      setShowToast(true)
+      setToastType('error')
+      setToastMessage(error?.message || 'Failed to import OCR rows.')
+    } finally {
+      setOcrLoading(false)
+      if (event.target) event.target.value = ''
+    }
+  }
 
   return (
     <motion.div
@@ -1628,170 +1906,196 @@ export default function BankReconciliationDetail({
               </div>
             ) : (
               <div className="space-y-3">
-                <div>
-                  <p className="text-xs font-black text-gray-900 uppercase tracking-wider">
-                    Batch Reconciling Items
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Add multiple items in one save. Each row is one reconciling
-                    entry.
-                  </p>
-                </div>
-
                 <div className="space-y-2">
-                  {itemFormRows.map((row, index) => {
-                    const meta = getItemMeta(row.details)
-                    return (
-                      <div
-                        key={index}
-                        className={`border rounded-xl p-3 bg-white ${meta.borderColor}`}
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                    <div>
+                      <p className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                        Batch Reconciling Items
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Add multiple items in one save. Each row is one reconciling
+                        entry.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={openOcrFilePicker}
+                        disabled={ocrLoading}
+                        className="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <div className="grid grid-cols-1 md:grid-cols-13 gap-2 items-end">
-                          <div className="md:col-span-2">
-                            <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                              Details *
-                            </label>
-                            <input
-                              type="text"
-                              value={row.details}
-                              onChange={(e) =>
-                                updateItemFormRow(index, 'details', e.target.value)
-                              }
-                              placeholder="Enter details"
-                              className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-xs"
-                            />
-                          </div>
+                        {ocrLoading ? 'Uploading...' : 'Upload Image'}
+                      </button>
+                      <input
+                        ref={ocrFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleOcrFileSelected}
+                      />
+                    </div>
+                  </div>
+                  {ocrError && <p className="text-xs text-red-600">{ocrError}</p>}
 
-                          <div className="md:col-span-2">
-                            <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                              Date *
-                            </label>
-                            <input
-                              type="date"
-                              value={row.date}
-                              onChange={(e) =>
-                                updateItemFormRow(index, 'date', e.target.value)
-                              }
-                              className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm"
-                            />
-                          </div>
-
-                          <div className="md:col-span-2">
-                            <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                              Reference No.
-                            </label>
-                            <input
-                              type="text"
-                              value={row.reference_number}
-                              onChange={(e) =>
-                                updateItemFormRow(
-                                  index,
-                                  'reference_number',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="Check no."
-                              className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm outline-none"
-                            />
-                          </div>
-
-                          <div className="md:col-span-3">
-                            <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                              Description
-                            </label>
-                            <input
-                              type="text"
-                              value={row.description}
-                              onChange={(e) =>
-                                updateItemFormRow(
-                                  index,
-                                  'description',
-                                  e.target.value,
-                                )
-                              }
-                              placeholder="Description details"
-                              className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm outline-none"
-                            />
-                          </div>
-
-                          <div className="md:col-span-3 grid grid-cols-2 gap-2">
-                            <div>
+                  <div className="space-y-2">
+                    {itemFormRows.map((row, index) => {
+                      const meta = getItemMeta(row.details)
+                      return (
+                        <div
+                          key={index}
+                          className={`border rounded-xl p-3 bg-white ${meta.borderColor}`}
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-13 gap-2 items-end">
+                            <div className="md:col-span-2">
                               <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                                Debit
+                                Details *
                               </label>
-                              <div className="relative">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                                  ₱
-                                </span>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={row.debit}
-                                  onChange={(e) => {
-                                    updateItemFormRow(index, 'debit', e.target.value)
-                                    if (e.target.value) {
-                                      updateItemFormRow(index, 'credit', '')
-                                    }
-                                  }}
-                                  placeholder="0.00"
-                                  className="w-full pl-5 pr-2 py-2 border border-gray-300 rounded-lg text-sm outline-none"
-                                />
+                              <input
+                                type="text"
+                                value={row.details}
+                                onChange={(e) =>
+                                  updateItemFormRow(index, 'details', e.target.value)
+                                }
+                                placeholder="Enter details"
+                                className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-xs"
+                              />
+                            </div>
+
+                            <div className="md:col-span-2">
+                              <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                                Date *
+                              </label>
+                              <input
+                                type="date"
+                                value={row.date}
+                                onChange={(e) =>
+                                  updateItemFormRow(index, 'date', e.target.value)
+                                }
+                                className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm"
+                              />
+                            </div>
+
+                            <div className="md:col-span-2">
+                              <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                                Reference No.
+                              </label>
+                              <input
+                                type="text"
+                                value={row.reference_number}
+                                onChange={(e) =>
+                                  updateItemFormRow(
+                                    index,
+                                    'reference_number',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Check no."
+                                className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm outline-none"
+                              />
+                            </div>
+
+                            <div className="md:col-span-3">
+                              <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                                Description
+                              </label>
+                              <input
+                                type="text"
+                                value={row.description}
+                                onChange={(e) =>
+                                  updateItemFormRow(
+                                    index,
+                                    'description',
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Description details"
+                                className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm outline-none"
+                              />
+                            </div>
+
+                            <div className="md:col-span-3 grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                                  Debit
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                                    ₱
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={row.debit}
+                                    onChange={(e) => {
+                                      updateItemFormRow(
+                                        index,
+                                        'debit',
+                                        e.target.value,
+                                      )
+                                      if (e.target.value) {
+                                        updateItemFormRow(index, 'credit', '')
+                                      }
+                                    }}
+                                    placeholder="0.00"
+                                    className="w-full pl-5 pr-2 py-2 border border-gray-300 rounded-lg text-sm outline-none"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                                  Credit
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                                    ₱
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={row.credit}
+                                    onChange={(e) => {
+                                      updateItemFormRow(
+                                        index,
+                                        'credit',
+                                        e.target.value,
+                                      )
+                                      if (e.target.value) {
+                                        updateItemFormRow(index, 'debit', '')
+                                      }
+                                    }}
+                                    placeholder="0.00"
+                                    className="w-full pl-5 pr-2 py-2 border border-gray-300 rounded-lg text-sm outline-none"
+                                  />
+                                </div>
                               </div>
                             </div>
-                            <div>
-                              <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
-                                Credit
-                              </label>
-                              <div className="relative">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                                  ₱
-                                </span>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={row.credit}
-                                  onChange={(e) => {
-                                    updateItemFormRow(
-                                      index,
-                                      'credit',
-                                      e.target.value,
-                                    )
-                                    if (e.target.value) {
-                                      updateItemFormRow(index, 'debit', '')
-                                    }
-                                  }}
-                                  placeholder="0.00"
-                                  className="w-full pl-5 pr-2 py-2 border border-gray-300 rounded-lg text-sm outline-none"
-                                />
-                              </div>
-                            </div>
-                          </div>
 
-                          <div className="md:col-span-1 flex items-end justify-end">
-                            <button
-                              type="button"
-                              onClick={() => removeItemFormRow(index)}
-                              disabled={itemFormRows.length === 1}
-                              className="w-9 h-9 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition"
-                              aria-label="Delete row"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            <div className="md:col-span-1 flex items-end justify-end">
+                              <button
+                                type="button"
+                                onClick={() => removeItemFormRow(index)}
+                                disabled={itemFormRows.length === 1}
+                                className="w-9 h-9 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition"
+                                aria-label="Delete row"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
 
-                <div className="pt-2 flex justify-start">
-                  <button
-                    type="button"
-                    onClick={addItemFormRow}
-                    className="px-4 py-2 border border-gray-900 text-gray-900 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-gray-50 transition flex items-center gap-1.5"
-                  >
-                    <Plus size={13} /> Add Row
-                  </button>
+                  <div className="pt-2 flex justify-start">
+                    <button
+                      type="button"
+                      onClick={addItemFormRow}
+                      className="px-4 py-2 border border-gray-900 text-gray-900 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-gray-50 transition flex items-center gap-1.5"
+                    >
+                      <Plus size={13} /> Add Row
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

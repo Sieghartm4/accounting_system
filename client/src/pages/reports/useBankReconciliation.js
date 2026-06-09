@@ -1859,6 +1859,8 @@ export function useBankReconciliation(selectedReconciliation) {
 
     itemFormRows,
 
+    setItemFormRows,
+
     detailStartDate,
 
     setDetailStartDate,
@@ -1885,7 +1887,11 @@ export function useBankReconciliation(selectedReconciliation) {
 
     toastMessage,
 
+    setToastMessage,
+
     toastType,
+
+    setToastType,
 
     bankSectionFilter,
 

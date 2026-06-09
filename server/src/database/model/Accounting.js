@@ -554,6 +554,7 @@ const Accounting = {
     prefix: 'po',
     prefix_: 'po_',
     insertColumns: [
+      'procurement_id',
       'product',
       'quantity',
       'price',
@@ -562,6 +563,7 @@ const Accounting = {
     ],
     selectColumns: [
       'po_id',
+      'po_procurement_id',
       'po_product',
       'po_quantity',
       'po_price',
@@ -570,6 +572,7 @@ const Accounting = {
     ],
     selectOptionColumns: {
       id: 'po_id',
+      procurement_id: 'po_procurement_id',
       product: 'po_product',
       quantity: 'po_quantity',
       price: 'po_price',
@@ -578,6 +581,7 @@ const Accounting = {
     },
     updateOptionColumns: {
       id: 'id',
+      procurement_id: 'procurement_id',
       product: 'product',
       quantity: 'quantity',
       price: 'price',
@@ -588,6 +592,7 @@ const Accounting = {
     selectMiscColumns: {},
     columnDataTypes: {
       id: 'INTEGER',
+      procurement_id: 'STRING',
       product: 'STRING',
       quantity: 'INTEGER',
       price: 'DECIMAL',

@@ -95,13 +95,12 @@ const syncProductService = async (req, res, next) => {
       })
     }
 
-    const inventoryUrl =
-      process.env._INVENTORY_PRODUCT_URL ||
-      'http://172.16.3.18:3010/accounting/company'
-    const companies = await fetchJsonFromUrl(inventoryUrl, {
-      accept: 'application/json',
-      'x-api-key': inventoryApiKey,
-    })
+const inventoryUrl = `${process.env._INVENTORY_PRODUCT_URL}/accounting/company`;
+
+const companies = await fetchJsonFromUrl(inventoryUrl, {
+  accept: 'application/json',
+  'x-api-key': inventoryApiKey,
+});
 
     if (!Array.isArray(companies)) {
       throw new Error('Inventory company API returned an unexpected response format')
@@ -118,7 +117,7 @@ const syncProductService = async (req, res, next) => {
       // fetch inventories for this company
       let inventories = []
       try {
-        const invUrl = `${baseOrigin}/accounting/inventories/${companyId}`
+        const invUrl = `${process.env._INVENTORY_PRODUCT_URL}/accounting/inventories/${companyId}`
         const invRes = await fetchJsonFromUrl(invUrl, {
           accept: 'application/json',
           'x-api-key': inventoryApiKey,

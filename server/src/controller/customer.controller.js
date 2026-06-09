@@ -117,10 +117,10 @@ const createCustomer = async (req, res, next) => {
   try {
     const { code, name, category, type, status } = req.body
 
-    if (!code || !name || !category || !type || !status) {
+    if (!code || !name || !status) {
       return res.status(400).json({
         success: false,
-        message: 'Customer code, name, category, type and status are required',
+        message: 'Customer code, name, and status are required',
       })
     }
 
@@ -207,10 +207,10 @@ const updateCustomer = async (req, res, next) => {
     const { id: idFromParams } = req.params
     const id = Number(idFromParams || idFromBody)
 
-    if (!id || !code || !name || !category || !type || !status) {
+    if (!id || !code || !name || !status) {
       return res.status(400).json({
         success: false,
-        message: 'All fields are required',
+        message: 'ID, customer code, name, and status are required',
       })
     }
 

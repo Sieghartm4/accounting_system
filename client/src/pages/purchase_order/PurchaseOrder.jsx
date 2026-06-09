@@ -29,6 +29,7 @@ const emptyPurchaseOrderRow = {
   product: '',
   quantity: '',
   price: '',
+  procurement_id: '',
   responsibility_center: '',
 }
 
@@ -263,6 +264,7 @@ function PurchaseOrderContent() {
         product: row.product?.trim(),
         quantity: Number(row.quantity),
         price: Number(row.price),
+        procurement_id: row.procurement_id?.trim() || null,
         responsibility_center: row.responsibility_center?.trim() || null,
         status: 'PENDING',
       }))
@@ -315,6 +317,7 @@ function PurchaseOrderContent() {
   const tableData = purchaseOrders.map((po) => ({
     ...po,
     product: po.product_name || po.product,
+    procurement_id: po.procurement_id || null,
     amount: `₱${fmt(po.price * po.quantity)}`,
     unit_price: `₱${fmt(po.price)}`,
   }))
@@ -538,7 +541,22 @@ function PurchaseOrderContent() {
                       </div>
                     </div>
 
-                    <div className="md:col-span-5">
+                    <div className="md:col-span-3">
+                      <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
+                        Procurement ID
+                      </label>
+                      <input
+                        type="text"
+                        value={row.procurement_id}
+                        onChange={(e) =>
+                          updateItemFormRow(index, 'procurement_id', e.target.value)
+                        }
+                        placeholder="Optional"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none"
+                      />
+                    </div>
+
+                    <div className="md:col-span-4">
                       <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-wider">
                         Responsibility Center
                       </label>

@@ -1,4 +1,6 @@
 const os = require('os')
+const http = require('http')
+const https = require('https')
 const {
   checkConnection,
   SelectAll,
@@ -18,6 +20,98 @@ const { getTenantPool } = require('../database/util/tenantConnection.util')
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
+
+const fetchJsonFromUrl = (url, headers = {}, body = null, method = 'POST') => {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(url)
+    const client = parsedUrl.protocol === 'https:' ? https : http
+    const options = {
+      method,
+      headers,
+    }
+
+    let requestBody = null
+    if (body) {
+      const contentType = (
+        headers['content-type'] ||
+        headers['Content-Type'] ||
+        ''
+      ).toLowerCase()
+
+      if (
+        contentType === 'application/x-www-form-urlencoded' &&
+        typeof body === 'object'
+      ) {
+        requestBody = Object.entries(body)
+          .map(
+            ([key, value]) =>
+              `${encodeURIComponent(key)}=${encodeURIComponent(value ?? '')}`,
+          )
+          .join('&')
+      } else if (typeof body === 'string') {
+        requestBody = body
+      } else {
+        requestBody = JSON.stringify(body)
+      }
+
+      if (
+        requestBody !== null &&
+        !headers['Content-Length'] &&
+        !headers['content-length']
+      ) {
+        options.headers = {
+          ...options.headers,
+          'Content-Length': Buffer.byteLength(requestBody),
+        }
+      }
+    }
+
+    console.log('[fetchJsonFromUrl] request details', {
+      url: parsedUrl.toString(),
+      method,
+      headers: options.headers,
+      body: requestBody,
+    })
+
+    const request = client.request(parsedUrl, options, (response) => {
+      let responseBody = ''
+      response.on('data', (chunk) => {
+        responseBody += chunk
+      })
+      response.on('end', () => {
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          return reject(
+            new Error(
+              `External API request failed with status ${response.statusCode}: ${responseBody}`,
+            ),
+          )
+        }
+
+        if (!responseBody) {
+          return resolve(null)
+        }
+
+        try {
+          resolve(JSON.parse(responseBody))
+        } catch (parseError) {
+          reject(
+            new Error(
+              `Failed to parse external API response: ${parseError.message}`,
+            ),
+          )
+        }
+      })
+    })
+
+    request.on('error', reject)
+
+    if (requestBody !== null) {
+      request.write(requestBody)
+    }
+
+    request.end()
+  })
+}
 
 const findProductByNameOrCode = async (connection, productValue) => {
   const lookupValue = String(productValue).trim()
@@ -55,6 +149,10 @@ const getPurchaseOrders = async (req, res, next) => {
     const query = sql
       .select([
         { col: Accounting.purchase_order.selectOptionColumns.id, as: 'id' },
+        {
+          col: Accounting.purchase_order.selectOptionColumns.procurement_id,
+          as: 'procurement_id',
+        },
         {
           col: Accounting.purchase_order.selectOptionColumns.product,
           as: 'product',
@@ -120,6 +218,10 @@ const getPurchaseOrderById = async (req, res, next) => {
     const query = sql
       .select([
         { col: Accounting.purchase_order.selectOptionColumns.id, as: 'id' },
+        {
+          col: Accounting.purchase_order.selectOptionColumns.procurement_id,
+          as: 'procurement_id',
+        },
         {
           col: Accounting.purchase_order.selectOptionColumns.product,
           as: 'product',
@@ -201,7 +303,14 @@ const createPurchaseOrder = async (req, res, next) => {
 
       // Validate and resolve products
       for (const [index, item] of purchaseOrdersPayload.entries()) {
-        const { product, quantity, price, responsibility_center, status } = item
+        const {
+          product,
+          quantity,
+          price,
+          procurement_id,
+          responsibility_center,
+          status,
+        } = item
         const parsedQuantity = Number(quantity)
         const parsedPrice = Number(price)
 
@@ -235,6 +344,7 @@ const createPurchaseOrder = async (req, res, next) => {
           productName: foundProduct.name,
           quantity: parsedQuantity,
           price: parsedPrice,
+          procurement_id: procurement_id || null,
           responsibility_center: responsibility_center || null,
           status: status || 'PENDING',
         })
@@ -254,6 +364,7 @@ const createPurchaseOrder = async (req, res, next) => {
 
       for (const purchaseOrder of validatedPurchaseOrders) {
         const mainValues = [
+          purchaseOrder.procurement_id,
           purchaseOrder.productId,
           purchaseOrder.quantity,
           purchaseOrder.price,
@@ -266,6 +377,7 @@ const createPurchaseOrder = async (req, res, next) => {
 
         createdOrders.push({
           id: purchaseOrderId,
+          procurement_id: purchaseOrder.procurement_id,
           product_id: purchaseOrder.productId,
           product_code: purchaseOrder.productCode,
           product_name: purchaseOrder.productName,
@@ -333,7 +445,14 @@ const createPurchaseOrder = async (req, res, next) => {
 const updatePurchaseOrder = async (req, res, next) => {
   try {
     const { po_id } = req.params
-    const { product, quantity, price, responsibility_center, status } = req.body
+    const {
+      product,
+      quantity,
+      price,
+      procurement_id,
+      responsibility_center,
+      status,
+    } = req.body
 
     const purchaseOrderId = Number(po_id)
     if (!po_id || isNaN(purchaseOrderId)) {
@@ -362,6 +481,10 @@ const updatePurchaseOrder = async (req, res, next) => {
           {
             col: Accounting.purchase_order.selectOptionColumns.product,
             as: 'product',
+          },
+          {
+            col: Accounting.purchase_order.selectOptionColumns.procurement_id,
+            as: 'procurement_id',
           },
           {
             col: Accounting.purchase_order.selectOptionColumns.quantity,
@@ -406,6 +529,7 @@ const updatePurchaseOrder = async (req, res, next) => {
         .update(Accounting.purchase_order.tablename)
         .set([
           Accounting.purchase_order.selectOptionColumns.product,
+          Accounting.purchase_order.selectOptionColumns.procurement_id,
           Accounting.purchase_order.selectOptionColumns.quantity,
           Accounting.purchase_order.selectOptionColumns.price,
           Accounting.purchase_order.selectOptionColumns.responsibility_center,
@@ -414,8 +538,12 @@ const updatePurchaseOrder = async (req, res, next) => {
         .where(Accounting.purchase_order.selectOptionColumns.id)
         .build()
 
+      const updatedProcurementId =
+        procurement_id !== undefined ? procurement_id : currentData[0].procurement_id
+
       const updateValues = [
         foundProduct.id,
+        updatedProcurementId,
         quantity,
         price,
         responsibility_center,
@@ -426,6 +554,54 @@ const updatePurchaseOrder = async (req, res, next) => {
       await connection.execute(updateQuery, updateValues)
 
       await connection.commit()
+
+      // Notify external approval service when the order becomes APPROVED or REJECTED
+      const inventoryApiKey = process.env._INVENTORY_API_KEY
+      const inventoryProductUrl = process.env._INVENTORY_PRODUCT_URL
+      const normalizedStatus = String(status || 'PENDING').toUpperCase()
+
+      if (
+        ['APPROVED', 'REJECTED'].includes(normalizedStatus) &&
+        updatedProcurementId &&
+        inventoryApiKey &&
+        inventoryProductUrl
+      ) {
+        const endpoint =
+          normalizedStatus === 'APPROVED'
+            ? '/accounting/approve'
+            : '/accounting/reject'
+        const actionLabel = normalizedStatus === 'APPROVED' ? 'approve' : 'reject'
+
+        try {
+          const webhookUrl = new URL(endpoint, inventoryProductUrl).toString()
+          console.log(`[PurchaseOrder] calling external ${actionLabel} webhook`, {
+            inventoryProductUrl,
+            webhookUrl,
+            procurementId: updatedProcurementId,
+            inventoryApiKeySet: Boolean(inventoryApiKey),
+          })
+
+          const webhookResponse = await fetchJsonFromUrl(
+            webhookUrl,
+            {
+              accept: 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'x-api-key': inventoryApiKey,
+            },
+            {
+              procurementId: updatedProcurementId,
+              notes: '',
+            },
+          )
+
+          console.log(
+            `[PurchaseOrder] external ${actionLabel} webhook response`,
+            webhookResponse,
+          )
+        } catch (webhookError) {
+          console.error(`External ${actionLabel} API call failed:`, webhookError)
+        }
+      }
 
       // Audit trail for update
       const now = new Date()
@@ -454,6 +630,7 @@ const updatePurchaseOrder = async (req, res, next) => {
         message: 'Purchase order updated successfully',
         data: {
           id: purchaseOrderId,
+          procurement_id: updatedProcurementId,
           product_id: foundProduct.id,
           product_code: foundProduct.code,
           product_name: foundProduct.name,

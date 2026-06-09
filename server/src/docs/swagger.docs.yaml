@@ -61,6 +61,10 @@ components:
           type: number
           format: float
           example: 1299.5
+        procurement_id:
+          type: string
+          nullable: true
+          example: PR-2026-001
         responsibility_center:
           type: string
           nullable: true
@@ -91,6 +95,9 @@ components:
         price:
           type: number
           format: float
+        procurement_id:
+          type: string
+          nullable: true
         responsibility_center:
           type: string
           nullable: true
@@ -163,6 +170,7 @@ paths:
                 summary: Single purchase order by product name
                 value:
                   product: Office Chair
+                  procurement_id: PR-2026-001
                   quantity: 10
                   price: 1299.5
                   responsibility_center: Operations
@@ -171,11 +179,13 @@ paths:
                 summary: Multiple purchase orders by product code and name
                 value:
                   - product: PROD-001
+                    procurement_id: PR-2026-002
                     quantity: 10
                     price: 1299.5
                     responsibility_center: Operations
                     status: PENDING
                   - product: Office Desk
+                    procurement_id: PR-2026-003
                     quantity: 5
                     price: 2499.0
                     responsibility_center: Operations

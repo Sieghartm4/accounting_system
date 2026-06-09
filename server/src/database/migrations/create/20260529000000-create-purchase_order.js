@@ -8,6 +8,10 @@ module.exports = {
         autoIncrement: true,
         primaryKey: true,
       },
+      po_procurement_id: {
+        type: Sequelize.TEXT('long'),
+        allowNull: true,
+      },
       po_product: {
         type: Sequelize.STRING(300),
         allowNull: false,

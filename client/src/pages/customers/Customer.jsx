@@ -256,7 +256,7 @@ function CustomerContent() {
 
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                Category <span className="text-red-600">*</span>
+                Category
               </label>
               <input
                 type="text"
@@ -266,19 +266,17 @@ function CustomerContent() {
                 }
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter category..."
-                required
               />
             </div>
 
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                Type <span className="text-red-600">*</span>
+                Type
               </label>
               <select
                 value={formData.type}
                 onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
-                required
               >
                 <option value="">Select type...</option>
                 <option value="individual">Individual</option>

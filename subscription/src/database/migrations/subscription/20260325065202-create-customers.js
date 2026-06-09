@@ -19,11 +19,11 @@ module.exports = {
       },
       c_category: {
         type: Sequelize.STRING(120),
-        allowNull: false
+        allowNull: true
       },
       c_type: {
         type: Sequelize.STRING(120),
-        allowNull: false
+        allowNull: true
       },
       c_status: {
         type: Sequelize.ENUM("ACTIVE","INACTIVE"),
