@@ -344,7 +344,7 @@ const createPurchaseOrder = async (req, res, next) => {
           productName: foundProduct.name,
           quantity: parsedQuantity,
           price: parsedPrice,
-          procurement_id: procurement_id || null,
+          procurement_id: procurementId || null,
           responsibility_center: responsibility_center || null,
           status: status || 'PENDING',
         })
@@ -364,7 +364,7 @@ const createPurchaseOrder = async (req, res, next) => {
 
       for (const purchaseOrder of validatedPurchaseOrders) {
         const mainValues = [
-          purchaseOrder.procurement_id,
+          purchaseOrder.procurementId,
           purchaseOrder.productId,
           purchaseOrder.quantity,
           purchaseOrder.price,
@@ -377,7 +377,7 @@ const createPurchaseOrder = async (req, res, next) => {
 
         createdOrders.push({
           id: purchaseOrderId,
-          procurement_id: purchaseOrder.procurement_id,
+          procurement_id: purchaseOrder.procurementId,
           product_id: purchaseOrder.productId,
           product_code: purchaseOrder.productCode,
           product_name: purchaseOrder.productName,
