@@ -345,7 +345,7 @@ const createPurchaseOrder = async (req, res, next) => {
           productName: foundProduct.name,
           quantity: parsedQuantity,
           price: parsedPrice,
-          procurement_id: procurementId || null,
+          procurementId: procurementId || null,
           responsibility_center: responsibility_center || null,
           status: status || 'PENDING',
         })
