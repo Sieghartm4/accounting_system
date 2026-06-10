@@ -340,7 +340,7 @@ const createPurchaseOrder = async (req, res, next) => {
 
         console.log('Found product', foundProduct)
         validatedPurchaseOrders.push({
-          product: foundProduct.product,
+          product: foundProduct.id,
           productCode: foundProduct.code,
           productName: foundProduct.name,
           quantity: parsedQuantity,
@@ -363,7 +363,7 @@ const createPurchaseOrder = async (req, res, next) => {
         })
         .build()
 
-      console.log('Purchase order', purchaseOrder)
+      console.log('Purchase order', validatedPurchaseOrders)
       for (const purchaseOrder of validatedPurchaseOrders) {
         const mainValues = [
           purchaseOrder.procurementId,
