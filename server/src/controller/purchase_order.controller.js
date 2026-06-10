@@ -286,7 +286,7 @@ const getPurchaseOrderById = async (req, res, next) => {
 const createPurchaseOrder = async (req, res, next) => {
   try {
     const purchaseOrdersPayload = Array.isArray(req.body) ? req.body : [req.body]
-
+console.log('Received purchase order payload:', purchaseOrdersPayload)
     if (!purchaseOrdersPayload.length) {
       return res.status(400).json({
         success: false,

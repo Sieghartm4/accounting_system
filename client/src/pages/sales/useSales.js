@@ -517,7 +517,17 @@ export default function useSalesForm({
   }
 
   // ── Item / entry / attachment mutators ────────────────────────────────────
-  const addSalesItem = (isOther = false) =>
+  const addSalesItem = (isOther = false) => {
+    if (vatOptions.length === 0 && !vatLoading) {
+      loadVatOnDemand()
+    }
+    if (whtOptions.length === 0 && !whtLoading) {
+      loadWhtOnDemand()
+    }
+
+    const defaultVat = findDefaultVatOption(vatOptions)
+    const defaultWht = findDefaultWhtOption(whtOptions)
+
     setSalesItems((prev) => [
       ...prev,
       {
@@ -531,17 +541,18 @@ export default function useSalesForm({
         price: 0,
         discount: 0,
         discountType: 'PERCENT',
-        vat: 0,
-        vatSearch: '',
-        vatRate: 0,
-        wht: 0,
-        whtSearch: '',
-        whtRate: 0,
+        vat: defaultVat?.value || 0,
+        vatSearch: defaultVat?.label || '',
+        vatRate: defaultVat?.rate || 0,
+        wht: defaultWht?.value || 0,
+        whtSearch: defaultWht?.label || '',
+        whtRate: defaultWht?.rate || 0,
         responsibilityCenter: '',
         isOther,
         isNew: true,
       },
     ])
+  }
 
   const addJournalEntry = () =>
     setJournalEntries((prev) => [
@@ -608,6 +619,22 @@ export default function useSalesForm({
       reader.onload = () => resolve(reader.result)
       reader.onerror = (error) => reject(error)
     })
+
+  const findDefaultVatOption = (vatOptionsList) =>
+    vatOptionsList.find(
+      (opt) =>
+        opt.code === 'No VAT' ||
+        opt.name === 'No VAT%' ||
+        opt.label?.includes('No VAT'),
+    )
+
+  const findDefaultWhtOption = (whtOptionsList) =>
+    whtOptionsList.find(
+      (opt) =>
+        opt.code === 'NON-WHT' ||
+        opt.name === 'NON-WHT' ||
+        opt.label?.includes('NON-WHT'),
+    )
 
   const buildAutoJournalEntries = () => {
     const entries = []
@@ -916,7 +943,50 @@ export default function useSalesForm({
     fetchCustomers()
     fetchChartsOfAccounts()
     fetchProducts()
+    fetchVat()
+    fetchWht()
   }, [])
+
+  useEffect(() => {
+    if (salesItems.length === 0) return
+
+    let didUpdate = false
+    const updatedItems = salesItems.map((item) => {
+      let nextItem = item
+
+      if ((item.vat === 0 || item.vat === '') && item.vatSearch === '') {
+        const matchedVat = findDefaultVatOption(vatOptions)
+        if (matchedVat) {
+          nextItem = {
+            ...nextItem,
+            vat: matchedVat.value,
+            vatSearch: matchedVat.label,
+            vatRate: matchedVat.rate,
+          }
+          didUpdate = true
+        }
+      }
+
+      if ((item.wht === 0 || item.wht === '') && item.whtSearch === '') {
+        const matchedWht = findDefaultWhtOption(whtOptions)
+        if (matchedWht) {
+          nextItem = {
+            ...nextItem,
+            wht: matchedWht.value,
+            whtSearch: matchedWht.label,
+            whtRate: matchedWht.rate,
+          }
+          didUpdate = true
+        }
+      }
+
+      return nextItem
+    })
+
+    if (didUpdate) {
+      setSalesItems(updatedItems)
+    }
+  }, [salesItems, vatOptions, whtOptions])
 
   useEffect(() => {
     if ((isViewMode || isEditMode) && salesData) {

@@ -725,10 +725,28 @@ export default function PurchaseForm({
     }
   }
 
+  const findDefaultVatOption = (vatOptionsList) =>
+    vatOptionsList.find(
+      (opt) =>
+        opt.code === 'No VAT' ||
+        opt.name === 'No VAT%' ||
+        opt.label?.includes('No VAT'),
+    )
+
+  const findDefaultWhtOption = (whtOptionsList) =>
+    whtOptionsList.find(
+      (opt) =>
+        opt.code === 'NON-WHT' ||
+        opt.name === 'NON-WHT' ||
+        opt.label?.includes('NON-WHT'),
+    )
+
   useEffect(() => {
     fetchVendors()
     fetchChartsOfAccounts()
     fetchProducts()
+    fetchVat()
+    fetchWht()
   }, [])
 
   // Populate form data when purchaseData is provided
@@ -865,6 +883,47 @@ export default function PurchaseForm({
   }, [isViewMode, isEditMode, purchaseData])
 
   useEffect(() => {
+    if (purchaseItems.length === 0) return
+
+    let didUpdate = false
+    const updatedItems = purchaseItems.map((item) => {
+      let nextItem = item
+
+      if ((item.vat === 0 || item.vat === '') && item.vatSearch === '') {
+        const matchedVat = findDefaultVatOption(vatOptions)
+        if (matchedVat) {
+          nextItem = {
+            ...nextItem,
+            vat: matchedVat.value,
+            vatSearch: matchedVat.label,
+            vatRate: matchedVat.rate,
+          }
+          didUpdate = true
+        }
+      }
+
+      if ((item.wht === 0 || item.wht === '') && item.whtSearch === '') {
+        const matchedWht = findDefaultWhtOption(whtOptions)
+        if (matchedWht) {
+          nextItem = {
+            ...nextItem,
+            wht: matchedWht.value,
+            whtSearch: matchedWht.label,
+            whtRate: matchedWht.rate,
+          }
+          didUpdate = true
+        }
+      }
+
+      return nextItem
+    })
+
+    if (didUpdate) {
+      setPurchaseItems(updatedItems)
+    }
+  }, [purchaseItems, vatOptions, whtOptions])
+
+  useEffect(() => {
     if (
       purchaseItems.length === 0 ||
       products.length === 0 ||
@@ -914,7 +973,17 @@ export default function PurchaseForm({
     }
   }, [purchaseItems, products, chartsOfAccounts])
 
-  const addPurchaseItem = (isOther = false) =>
+  const addPurchaseItem = (isOther = false) => {
+    if (vatOptions.length === 0 && !vatLoading) {
+      loadVatOnDemand()
+    }
+    if (whtOptions.length === 0 && !whtLoading) {
+      loadWhtOnDemand()
+    }
+
+    const defaultVat = findDefaultVatOption(vatOptions)
+    const defaultWht = findDefaultWhtOption(whtOptions)
+
     setPurchaseItems((prev) => [
       ...prev,
       {
@@ -928,17 +997,18 @@ export default function PurchaseForm({
         price: 0,
         discount: 0,
         discountType: 'PERCENT',
-        vat: 0,
-        vatSearch: '',
-        vatRate: 0,
-        wht: 0,
-        whtSearch: '',
-        whtRate: 0,
+        vat: defaultVat?.value || 0,
+        vatSearch: defaultVat?.label || '',
+        vatRate: defaultVat?.rate || 0,
+        wht: defaultWht?.value || 0,
+        whtSearch: defaultWht?.label || '',
+        whtRate: defaultWht?.rate || 0,
         responsibilityCenter: '',
         isOther,
         isNew: true,
       },
     ])
+  }
   const addJournalEntry = () =>
     setJournalEntries((prev) => [
       ...prev,

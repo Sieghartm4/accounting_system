@@ -18,6 +18,10 @@ import RouteProtection from '../../components/RouteProtection'
 import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
 import usePurchaseOrder from './usePurchaseOrder'
+import {
+  findDefaultVatOption,
+  findDefaultWhtOption,
+} from '../disbursements/useDisbursements'
 
 const fmt = (value) =>
   new Intl.NumberFormat('en-PH', {
@@ -139,11 +143,11 @@ function PurchaseOrderContent() {
         discount: 0,
         discount_type: 'PERCENT',
         vat_id: 0,
-        vat_code: '',
-        vat_name: '',
+        vat_code: 'No VAT',
+        vat_name: 'No VAT%',
         vat_rate: 0,
         withholding_tax_id: 0,
-        withholding_tax_code: '',
+        withholding_tax_code: 'NON-WHT',
         withholding_tax_rate: 0,
         responsibility_center: row.responsibility_center || '',
         isOther: false,

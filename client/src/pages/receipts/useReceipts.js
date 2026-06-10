@@ -150,6 +150,24 @@ export function fileToBase64(file) {
   })
 }
 
+export function findDefaultVatOption(vatOptions) {
+  return vatOptions.find(
+    (opt) =>
+      opt.code === 'No VAT' ||
+      opt.name === 'No VAT%' ||
+      opt.label?.includes('No VAT'),
+  )
+}
+
+export function findDefaultWhtOption(whtOptions) {
+  return whtOptions.find(
+    (opt) =>
+      opt.code === 'NON-WHT' ||
+      opt.name === 'NON-WHT' ||
+      opt.label?.includes('NON-WHT'),
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // useReceiptsForm — main hook for ReceiptsForm state & logic
 // ─────────────────────────────────────────────────────────────────────────────
@@ -451,8 +469,59 @@ export function useReceiptsForm({
     }
   }, [isViewMode, receiptData])
 
+  useEffect(() => {
+    if (receiptItems.length === 0) return
+
+    let didUpdate = false
+    const updatedItems = receiptItems.map((item) => {
+      let nextItem = item
+
+      if ((item.vat === 0 || item.vat === '') && item.vatSearch === '') {
+        const matchedVat = findDefaultVatOption(vatOptions)
+        if (matchedVat) {
+          nextItem = {
+            ...nextItem,
+            vat: matchedVat.value,
+            vatRate: matchedVat.rate,
+            vatSearch: matchedVat.label,
+          }
+          didUpdate = true
+        }
+      }
+
+      if ((item.wht === 0 || item.wht === '') && item.whtSearch === '') {
+        const matchedWht = findDefaultWhtOption(whtOptions)
+        if (matchedWht) {
+          nextItem = {
+            ...nextItem,
+            wht: matchedWht.value,
+            whtRate: matchedWht.rate,
+            whtSearch: matchedWht.label,
+          }
+          didUpdate = true
+        }
+      }
+
+      return nextItem
+    })
+
+    if (didUpdate) {
+      setReceiptItems(updatedItems)
+    }
+  }, [receiptItems, vatOptions, whtOptions])
+
   // ── Receipt Items CRUD ──
-  const addReceiptItem = (isOther = false) =>
+  const addReceiptItem = (isOther = false) => {
+    if (vatOptions.length === 0 && !vatLoading) {
+      loadVatOnDemand()
+    }
+    if (whtOptions.length === 0 && !whtLoading) {
+      loadWhtOnDemand()
+    }
+
+    const defaultVat = findDefaultVatOption(vatOptions)
+    const defaultWht = findDefaultWhtOption(whtOptions)
+
     setReceiptItems((prev) => [
       ...prev,
       {
@@ -466,17 +535,18 @@ export function useReceiptsForm({
         price: 0,
         discount: 0,
         discountType: 'PERCENT',
-        vat: 0,
-        vatSearch: '',
-        vatRate: 0,
-        wht: 0,
-        whtSearch: '',
-        whtRate: 0,
+        vat: defaultVat?.value || 0,
+        vatSearch: defaultVat?.label || '',
+        vatRate: defaultVat?.rate || 0,
+        wht: defaultWht?.value || 0,
+        whtSearch: defaultWht?.label || '',
+        whtRate: defaultWht?.rate || 0,
         responsibilityCenter: '',
         isOther,
         isNew: true,
       },
     ])
+  }
 
   const removeReceiptItem = (id) =>
     setReceiptItems((prev) => prev.filter((i) => i.id !== id))

@@ -130,6 +130,27 @@ export const fmt = (n) =>
   n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Helper functions to find default VAT and WHT options
+// ─────────────────────────────────────────────────────────────────────────────
+export function findDefaultVatOption(vatOptions) {
+  return vatOptions.find(
+    (opt) =>
+      opt.code === 'No VAT' ||
+      opt.name === 'No VAT%' ||
+      opt.label?.includes('No VAT'),
+  )
+}
+
+export function findDefaultWhtOption(whtOptions) {
+  return whtOptions.find(
+    (opt) =>
+      opt.code === 'NON-WHT' ||
+      opt.name === 'NON-WHT' ||
+      opt.label?.includes('NON-WHT'),
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // fileToBase64 utility
 // ─────────────────────────────────────────────────────────────────────────────
 export function fileToBase64(file) {
@@ -374,6 +395,8 @@ export function useDisbursementForm({
     fetchVendors()
     fetchChartsOfAccounts()
     fetchProducts()
+    fetchVat()
+    fetchWht()
   }, [])
 
   // ── Populate form in view/edit mode ──
@@ -415,9 +438,12 @@ export function useDisbursementForm({
             vat: parseFloat(item.vat_id) || 0,
             vatSearch: `${item.vat_code || ''} - ${item.vat_name || ''}`,
             vatRate: parseFloat(item.vat_rate) || 0,
+            vat_code: item.vat_code,
+            vat_name: item.vat_name,
             wht: parseFloat(item.withholding_tax_id) || 0,
             whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
             whtRate: parseFloat(item.withholding_tax_rate) || 0,
+            withholding_tax_code: item.withholding_tax_code,
             responsibilityCenter: item.responsibility_center,
             isOther: false,
           })),
@@ -518,8 +544,95 @@ export function useDisbursementForm({
     }
   }, [disbursementItems, products, chartsOfAccounts])
 
+  // ── Match prefilled VAT/WHT codes with loaded options ──
+  useEffect(() => {
+    if (
+      disbursementItems.length === 0 ||
+      (vatOptions.length === 0 && whtOptions.length === 0)
+    )
+      return
+
+    let didUpdate = false
+    const updatedItems = disbursementItems.map((item) => {
+      let nextItem = item
+
+      // Match VAT by code/name
+      if (
+        (item.vat === 0 || item.vat === '') &&
+        (item.vat_code || item.vatSearch === '')
+      ) {
+        const matchedVat = vatOptions.find(
+          (opt) =>
+            opt.code === item.vat_code ||
+            opt.name === item.vat_name ||
+            opt.label?.includes(item.vat_code) ||
+            // For new items added before options loaded, match default "No VAT"
+            (item.vatSearch === '' &&
+              (opt.code === 'No VAT' || opt.name === 'No VAT%')),
+        )
+        if (matchedVat) {
+          nextItem = {
+            ...nextItem,
+            vat: matchedVat.value,
+            vatRate: matchedVat.rate,
+            vatSearch: matchedVat.label,
+            vat_code: matchedVat.code,
+            vat_name: matchedVat.name,
+          }
+          didUpdate = true
+        }
+      }
+
+      // Match WHT by code/name
+      if (
+        (item.wht === 0 || item.wht === '') &&
+        (item.withholding_tax_code || item.whtSearch === '')
+      ) {
+        const matchedWht = whtOptions.find(
+          (opt) =>
+            opt.code === item.withholding_tax_code ||
+            opt.name === item.withholding_tax_code ||
+            opt.label?.includes(item.withholding_tax_code) ||
+            // For new items added before options loaded, match default "NON-WHT"
+            (item.whtSearch === '' &&
+              (opt.code === 'NON-WHT' || opt.name === 'NON-WHT')),
+        )
+        if (matchedWht) {
+          nextItem = {
+            ...nextItem,
+            wht: matchedWht.value,
+            whtRate: matchedWht.rate,
+            whtSearch: matchedWht.label,
+            withholding_tax_code: matchedWht.code,
+          }
+          didUpdate = true
+        }
+      }
+
+      return nextItem
+    })
+
+    if (didUpdate) {
+      setDisbursementItems(updatedItems)
+    }
+  }, [disbursementItems, vatOptions, whtOptions])
+
   // ── Disbursement Items CRUD ──
-  const addDisbursementItem = (isOther = false) =>
+  const addDisbursementItem = (
+    isOther = false,
+    defaultVatOpt = null,
+    defaultWhtOpt = null,
+  ) => {
+    if (vatOptions.length === 0 && !vatLoading) {
+      loadVatOnDemand()
+    }
+    if (whtOptions.length === 0 && !whtLoading) {
+      loadWhtOnDemand()
+    }
+
+    const defaultVat = defaultVatOpt || findDefaultVatOption(vatOptions)
+    const defaultWht = defaultWhtOpt || findDefaultWhtOption(whtOptions)
+
     setDisbursementItems((prev) => [
       ...prev,
       {
@@ -533,17 +646,18 @@ export function useDisbursementForm({
         price: 0,
         discount: 0,
         discountType: 'PERCENT',
-        vat: 0,
-        vatSearch: '',
-        vatRate: 0,
-        wht: 0,
-        whtSearch: '',
-        whtRate: 0,
+        vat: defaultVat?.value || 0,
+        vatSearch: defaultVat?.label || '',
+        vatRate: defaultVat?.rate || 0,
+        wht: defaultWht?.value || 0,
+        whtSearch: defaultWht?.label || '',
+        whtRate: defaultWht?.rate || 0,
         responsibilityCenter: '',
         isOther,
         isNew: true,
       },
     ])
+  }
 
   const removeDisbursementItem = (id) =>
     setDisbursementItems((prev) => prev.filter((i) => i.id !== id))
