@@ -541,7 +541,7 @@ export default function PurchaseForm({
   }))
   const productOptions = products.map((p) => ({
     label: p.name || p.product_name,
-    sublabel: p.code || p.product_code,
+    sublabel: p.type || p.product_type || p.code || p.product_code,
     value: p.id,
   }))
 

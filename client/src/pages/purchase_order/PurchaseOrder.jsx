@@ -103,11 +103,25 @@ function PurchaseOrderContent() {
         price: Number(row.price) || 0,
         discount: 0,
         discountType: 'PERCENT',
+        // Provide VAT fields using the same keys PurchaseForm expects so
+        // the Purchase form populates the visible label immediately.
         vat: 0,
-        vatSearch: '',
+        vat_id: 0,
+        vat_code: 'No VAT',
+        vat_name: 'No VAT%',
+        vat_rate: 0,
+        vatSearch: 'No VAT - No VAT%',
         vatRate: 0,
+        // Withholding tax defaults (include both correct and misspelled keys)
         wht: 0,
-        whtSearch: '',
+        withholding_tax_id: 0,
+        withholding_tax_code: 'NON-WHT',
+        withholding_tax_name: 'NON-WHT',
+        withholding_tax_rate: 0,
+        // Some existing code uses a misspelled key `witholding_tax_*`, include it too
+        witholding_tax_id: 0,
+        witholding_tax: 0,
+        whtSearch: 'NON-WHT - NON-WHT',
         whtRate: 0,
         responsibilityCenter: row.responsibility_center || '',
         isOther: false,
