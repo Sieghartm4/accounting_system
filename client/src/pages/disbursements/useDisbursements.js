@@ -527,7 +527,8 @@ export function useDisbursementForm({
         }
       }
 
-      if ((!item.coa || item.coa === '') && inventoryCoa) {
+      // Only auto-assign inventory when loading existing data, not for new items
+      if (!item.isNew && (!item.coa || item.coa === '') && inventoryCoa) {
         nextItem = {
           ...nextItem,
           coa: inventoryCoa.id,
@@ -561,14 +562,12 @@ export function useDisbursementForm({
         (item.vat === 0 || item.vat === '') &&
         (item.vat_code || item.vatSearch === '')
       ) {
+        // Only try to match VAT when the item contains a code/name/search value.
         const matchedVat = vatOptions.find(
           (opt) =>
             opt.code === item.vat_code ||
             opt.name === item.vat_name ||
-            opt.label?.includes(item.vat_code) ||
-            // For new items added before options loaded, match default "No VAT"
-            (item.vatSearch === '' &&
-              (opt.code === 'No VAT' || opt.name === 'No VAT%')),
+            opt.label?.includes(item.vat_code),
         )
         if (matchedVat) {
           nextItem = {
@@ -588,14 +587,12 @@ export function useDisbursementForm({
         (item.wht === 0 || item.wht === '') &&
         (item.withholding_tax_code || item.whtSearch === '')
       ) {
+        // Only try to match WHT when the item contains a code/name/search value.
         const matchedWht = whtOptions.find(
           (opt) =>
             opt.code === item.withholding_tax_code ||
             opt.name === item.withholding_tax_code ||
-            opt.label?.includes(item.withholding_tax_code) ||
-            // For new items added before options loaded, match default "NON-WHT"
-            (item.whtSearch === '' &&
-              (opt.code === 'NON-WHT' || opt.name === 'NON-WHT')),
+            opt.label?.includes(item.withholding_tax_code),
         )
         if (matchedWht) {
           nextItem = {
@@ -630,9 +627,7 @@ export function useDisbursementForm({
       loadWhtOnDemand()
     }
 
-    const defaultVat = defaultVatOpt || findDefaultVatOption(vatOptions)
-    const defaultWht = defaultWhtOpt || findDefaultWhtOption(whtOptions)
-
+    // Leave VAT/WHT blank on new rows; defaults will be applied on submit only
     setDisbursementItems((prev) => [
       ...prev,
       {
@@ -646,12 +641,12 @@ export function useDisbursementForm({
         price: 0,
         discount: 0,
         discountType: 'PERCENT',
-        vat: defaultVat?.value || 0,
-        vatSearch: defaultVat?.label || '',
-        vatRate: defaultVat?.rate || 0,
-        wht: defaultWht?.value || 0,
-        whtSearch: defaultWht?.label || '',
-        whtRate: defaultWht?.rate || 0,
+        vat: '',
+        vatSearch: '',
+        vatRate: 0,
+        wht: '',
+        whtSearch: '',
+        whtRate: 0,
         responsibilityCenter: '',
         isOther,
         isNew: true,
@@ -921,6 +916,10 @@ export function useDisbursementForm({
 
       const summary = computeSummary(disbursementItems)
 
+      // Apply defaults for VAT/WHT only at submit time if item value is blank
+      const defaultVatOpt = findDefaultVatOption(vatOptions)
+      const defaultWhtOpt = findDefaultWhtOption(whtOptions)
+
       const preparedDisbursementItems = disbursementItems.map((item) => ({
         product_id: item.isOther ? null : item.productId || null,
         account_id: item.coa || item.accountId,
@@ -929,8 +928,18 @@ export function useDisbursementForm({
         price: parseFloat(item.price) || 0,
         discount: parseFloat(item.discount) || 0,
         discount_type: item.discountType || 'PERCENT',
-        vat: parseFloat(item.vat) || 0,
-        wtax: parseFloat(item.wht) || 0,
+        vat:
+          parseFloat(
+            item.vat === '' || item.vat === null || item.vat === undefined
+              ? defaultVatOpt?.value || 0
+              : item.vat,
+          ) || 0,
+        wtax:
+          parseFloat(
+            item.wht === '' || item.wht === null || item.wht === undefined
+              ? defaultWhtOpt?.value || 0
+              : item.wht,
+          ) || 0,
         responsibility_center: item.responsibilityCenter || '',
       }))
 

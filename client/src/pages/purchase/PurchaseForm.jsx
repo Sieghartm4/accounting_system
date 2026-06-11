@@ -334,6 +334,29 @@ function computeSummary(items) {
 const fmt = (n) =>
   n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+// Format price for display (always shows .00)
+const formatPriceDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return ''
+  const num = typeof value === 'string' ? parseFloat(value) : value
+  if (isNaN(num)) return ''
+  return num.toLocaleString('en-PH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+// Parse price input - extract numeric value from user input
+const parsePriceInput = (input) => {
+  if (input === '' || input === null || input === undefined) return ''
+  // Extract digits and decimal point only
+  const cleaned = input.replace(/[^0-9.]/g, '')
+  // Prevent multiple decimals
+  const parts = cleaned.split('.')
+  if (parts.length > 2) return parseFloat(parts[0] + '.' + parts[1]) || 0
+  const parsed = parseFloat(cleaned) || 0
+  return parsed
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
@@ -883,44 +906,8 @@ export default function PurchaseForm({
   }, [isViewMode, isEditMode, purchaseData])
 
   useEffect(() => {
-    if (purchaseItems.length === 0) return
-
-    let didUpdate = false
-    const updatedItems = purchaseItems.map((item) => {
-      let nextItem = item
-
-      if ((item.vat === 0 || item.vat === '') && item.vatSearch === '') {
-        const matchedVat = findDefaultVatOption(vatOptions)
-        if (matchedVat) {
-          nextItem = {
-            ...nextItem,
-            vat: matchedVat.value,
-            vatSearch: matchedVat.label,
-            vatRate: matchedVat.rate,
-          }
-          didUpdate = true
-        }
-      }
-
-      if ((item.wht === 0 || item.wht === '') && item.whtSearch === '') {
-        const matchedWht = findDefaultWhtOption(whtOptions)
-        if (matchedWht) {
-          nextItem = {
-            ...nextItem,
-            wht: matchedWht.value,
-            whtSearch: matchedWht.label,
-            whtRate: matchedWht.rate,
-          }
-          didUpdate = true
-        }
-      }
-
-      return nextItem
-    })
-
-    if (didUpdate) {
-      setPurchaseItems(updatedItems)
-    }
+    // Intentionally not auto-applying default VAT/WHT here. Defaults are
+    // applied only when the user submits the transaction if the fields are blank.
   }, [purchaseItems, vatOptions, whtOptions])
 
   useEffect(() => {
@@ -956,7 +943,8 @@ export default function PurchaseForm({
         }
       }
 
-      if ((!item.coa || item.coa === '') && inventoryCoa) {
+      // Only auto-assign inventory when loading existing data, not for new items
+      if (!item.isNew && (!item.coa || item.coa === '') && inventoryCoa) {
         nextItem = {
           ...nextItem,
           coa: inventoryCoa.id,
@@ -981,9 +969,7 @@ export default function PurchaseForm({
       loadWhtOnDemand()
     }
 
-    const defaultVat = findDefaultVatOption(vatOptions)
-    const defaultWht = findDefaultWhtOption(whtOptions)
-
+    // Leave VAT/WHT blank for new rows; defaults applied only on submit
     setPurchaseItems((prev) => [
       ...prev,
       {
@@ -997,12 +983,12 @@ export default function PurchaseForm({
         price: 0,
         discount: 0,
         discountType: 'PERCENT',
-        vat: defaultVat?.value || 0,
-        vatSearch: defaultVat?.label || '',
-        vatRate: defaultVat?.rate || 0,
-        wht: defaultWht?.value || 0,
-        whtSearch: defaultWht?.label || '',
-        whtRate: defaultWht?.rate || 0,
+        vat: '',
+        vatSearch: '',
+        vatRate: 0,
+        wht: '',
+        whtSearch: '',
+        whtRate: 0,
         responsibilityCenter: '',
         isOther,
         isNew: true,
@@ -1297,6 +1283,10 @@ export default function PurchaseForm({
         return
       }
 
+      // Apply defaults for VAT/WHT only at submit time if item value is blank
+      const defaultVatOpt = findDefaultVatOption(vatOptions)
+      const defaultWhtOpt = findDefaultWhtOption(whtOptions)
+
       const preparedPurchaseItems = purchaseItems
         .filter((item) => !item.isOther)
         .map((item) => ({
@@ -1308,8 +1298,18 @@ export default function PurchaseForm({
           purchase_price: parseFloat(item.price) || 0,
           discount: parseFloat(item.discount) || 0,
           discount_type: item.discountType || 'PERCENT',
-          vat: parseFloat(item.vat) || 0,
-          witholding_tax: parseFloat(item.wht) || 0,
+          vat:
+            parseFloat(
+              item.vat === '' || item.vat === null || item.vat === undefined
+                ? defaultVatOpt?.value || 0
+                : item.vat,
+            ) || 0,
+          witholding_tax:
+            parseFloat(
+              item.wht === '' || item.wht === null || item.wht === undefined
+                ? defaultWhtOpt?.value || 0
+                : item.wht,
+            ) || 0,
           responsibility_center: item.responsibilityCenter || '',
         }))
 
@@ -1881,20 +1881,14 @@ export default function PurchaseForm({
                             <input
                               disabled={isViewMode}
                               className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              type="number"
-                              min="0"
-                              step="0.01"
+                              type="text"
                               placeholder="0.00"
-                              value={item.price || ''}
-                              onChange={(e) =>
-                                updatePurchaseItem(
-                                  item.id,
-                                  'price',
-                                  e.target.value === ''
-                                    ? ''
-                                    : parseFloat(e.target.value) || 0,
-                                )
-                              }
+                              inputMode="decimal"
+                              value={formatPriceDisplay(item.price)}
+                              onChange={(e) => {
+                                const parsed = parsePriceInput(e.target.value)
+                                updatePurchaseItem(item.id, 'price', parsed)
+                              }}
                             />
                           </td>
                           <td className="py-1 px-1">

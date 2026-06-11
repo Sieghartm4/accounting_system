@@ -470,44 +470,9 @@ export function useReceiptsForm({
   }, [isViewMode, receiptData])
 
   useEffect(() => {
-    if (receiptItems.length === 0) return
-
-    let didUpdate = false
-    const updatedItems = receiptItems.map((item) => {
-      let nextItem = item
-
-      if ((item.vat === 0 || item.vat === '') && item.vatSearch === '') {
-        const matchedVat = findDefaultVatOption(vatOptions)
-        if (matchedVat) {
-          nextItem = {
-            ...nextItem,
-            vat: matchedVat.value,
-            vatRate: matchedVat.rate,
-            vatSearch: matchedVat.label,
-          }
-          didUpdate = true
-        }
-      }
-
-      if ((item.wht === 0 || item.wht === '') && item.whtSearch === '') {
-        const matchedWht = findDefaultWhtOption(whtOptions)
-        if (matchedWht) {
-          nextItem = {
-            ...nextItem,
-            wht: matchedWht.value,
-            whtRate: matchedWht.rate,
-            whtSearch: matchedWht.label,
-          }
-          didUpdate = true
-        }
-      }
-
-      return nextItem
-    })
-
-    if (didUpdate) {
-      setReceiptItems(updatedItems)
-    }
+    // Previously this effect auto-filled VAT/WHT defaults when options loaded.
+    // We intentionally do not auto-apply defaults here to keep VAT/WHT blank
+    // while the user edits the items. Defaults will be applied only on submit.
   }, [receiptItems, vatOptions, whtOptions])
 
   // ── Receipt Items CRUD ──
@@ -519,8 +484,9 @@ export function useReceiptsForm({
       loadWhtOnDemand()
     }
 
-    const defaultVat = findDefaultVatOption(vatOptions)
-    const defaultWht = findDefaultWhtOption(whtOptions)
+    // Do not auto-assign default VAT/WHT when creating a new row — leave blank
+    const defaultVat = null
+    const defaultWht = null
 
     setReceiptItems((prev) => [
       ...prev,
@@ -535,12 +501,12 @@ export function useReceiptsForm({
         price: 0,
         discount: 0,
         discountType: 'PERCENT',
-        vat: defaultVat?.value || 0,
-        vatSearch: defaultVat?.label || '',
-        vatRate: defaultVat?.rate || 0,
-        wht: defaultWht?.value || 0,
-        whtSearch: defaultWht?.label || '',
-        whtRate: defaultWht?.rate || 0,
+        vat: '',
+        vatSearch: '',
+        vatRate: 0,
+        wht: '',
+        whtSearch: '',
+        whtRate: 0,
         responsibilityCenter: '',
         isOther,
         isNew: true,
@@ -894,6 +860,10 @@ export function useReceiptsForm({
 
       const summary = computeSummary(receiptItems)
 
+      // Apply defaults for VAT/WHT only at submit time if item value is blank
+      const defaultVatOpt = findDefaultVatOption(vatOptions)
+      const defaultWhtOpt = findDefaultWhtOption(whtOptions)
+
       const preparedReceiptItems = receiptItems.map((item) => ({
         id: item.id && !item.isNew ? item.id : null,
         product_id: item.isOther ? null : item.productId || null,
@@ -903,8 +873,18 @@ export function useReceiptsForm({
         price: parseFloat(item.price) || 0,
         discount: parseFloat(item.discount) || 0,
         discount_type: item.discountType || 'PERCENT',
-        vat: parseFloat(item.vat) || 0,
-        wtax: parseFloat(item.wht) || 0,
+        vat:
+          parseFloat(
+            item.vat === '' || item.vat === null || item.vat === undefined
+              ? defaultVatOpt?.value || 0
+              : item.vat,
+          ) || 0,
+        wtax:
+          parseFloat(
+            item.wht === '' || item.wht === null || item.wht === undefined
+              ? defaultWhtOpt?.value || 0
+              : item.wht,
+          ) || 0,
         responsibility_center: item.responsibilityCenter || '',
       }))
 

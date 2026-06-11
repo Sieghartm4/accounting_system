@@ -525,9 +525,7 @@ export default function useSalesForm({
       loadWhtOnDemand()
     }
 
-    const defaultVat = findDefaultVatOption(vatOptions)
-    const defaultWht = findDefaultWhtOption(whtOptions)
-
+    // Leave VAT/WHT blank for new rows; defaults applied only on submit
     setSalesItems((prev) => [
       ...prev,
       {
@@ -541,12 +539,12 @@ export default function useSalesForm({
         price: 0,
         discount: 0,
         discountType: 'PERCENT',
-        vat: defaultVat?.value || 0,
-        vatSearch: defaultVat?.label || '',
-        vatRate: defaultVat?.rate || 0,
-        wht: defaultWht?.value || 0,
-        whtSearch: defaultWht?.label || '',
-        whtRate: defaultWht?.rate || 0,
+        vat: '',
+        vatSearch: '',
+        vatRate: 0,
+        wht: '',
+        whtSearch: '',
+        whtRate: 0,
         responsibilityCenter: '',
         isOther,
         isNew: true,
@@ -829,6 +827,10 @@ export default function useSalesForm({
         return
       }
 
+      // Apply defaults for VAT/WHT only at submit time if item value is blank
+      const defaultVatOpt = findDefaultVatOption(vatOptions)
+      const defaultWhtOpt = findDefaultWhtOption(whtOptions)
+
       const preparedSalesItems = salesItems.map((item) => ({
         id: item.isNew ? undefined : item.id,
         product_id: item.isOther ? null : item.productId || null,
@@ -838,8 +840,18 @@ export default function useSalesForm({
         price: parseFloat(item.price) || 0,
         discount: parseFloat(item.discount) || 0,
         discount_type: item.discountType || 'PERCENT',
-        vat: parseInt(item.vat) || 0,
-        wtax: parseInt(item.wht) || 0,
+        vat:
+          parseInt(
+            item.vat === '' || item.vat === null || item.vat === undefined
+              ? defaultVatOpt?.value || 0
+              : item.vat,
+          ) || 0,
+        wtax:
+          parseInt(
+            item.wht === '' || item.wht === null || item.wht === undefined
+              ? defaultWhtOpt?.value || 0
+              : item.wht,
+          ) || 0,
         responsibility_center: item.responsibilityCenter || '',
       }))
 
@@ -948,44 +960,8 @@ export default function useSalesForm({
   }, [])
 
   useEffect(() => {
-    if (salesItems.length === 0) return
-
-    let didUpdate = false
-    const updatedItems = salesItems.map((item) => {
-      let nextItem = item
-
-      if ((item.vat === 0 || item.vat === '') && item.vatSearch === '') {
-        const matchedVat = findDefaultVatOption(vatOptions)
-        if (matchedVat) {
-          nextItem = {
-            ...nextItem,
-            vat: matchedVat.value,
-            vatSearch: matchedVat.label,
-            vatRate: matchedVat.rate,
-          }
-          didUpdate = true
-        }
-      }
-
-      if ((item.wht === 0 || item.wht === '') && item.whtSearch === '') {
-        const matchedWht = findDefaultWhtOption(whtOptions)
-        if (matchedWht) {
-          nextItem = {
-            ...nextItem,
-            wht: matchedWht.value,
-            whtSearch: matchedWht.label,
-            whtRate: matchedWht.rate,
-          }
-          didUpdate = true
-        }
-      }
-
-      return nextItem
-    })
-
-    if (didUpdate) {
-      setSalesItems(updatedItems)
-    }
+    // Intentionally not auto-applying default VAT/WHT here. Defaults are
+    // applied only when the user submits the transaction if the fields are blank.
   }, [salesItems, vatOptions, whtOptions])
 
   useEffect(() => {

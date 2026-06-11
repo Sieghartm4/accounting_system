@@ -186,6 +186,32 @@ function SearchableDropdown({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Helper Functions
+// ─────────────────────────────────────────────────────────────────────────────
+// Format price for display (always shows .00)
+const formatPriceDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return ''
+  const num = typeof value === 'string' ? parseFloat(value) : value
+  if (isNaN(num)) return ''
+  return num.toLocaleString('en-PH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+// Parse price input - extract numeric value from user input
+const parsePriceInput = (input) => {
+  if (input === '' || input === null || input === undefined) return ''
+  // Extract digits and decimal point only
+  const cleaned = input.replace(/[^0-9.]/g, '')
+  // Prevent multiple decimals
+  const parts = cleaned.split('.')
+  if (parts.length > 2) return parseFloat(parts[0] + '.' + parts[1]) || 0
+  const parsed = parseFloat(cleaned) || 0
+  return parsed
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CashDisbursementForm({
@@ -706,20 +732,14 @@ export default function CashDisbursementForm({
                             <input
                               disabled={isViewMode}
                               className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              type="number"
-                              min="0"
-                              step="0.01"
+                              type="text"
                               placeholder="0.00"
-                              value={item.price || ''}
-                              onChange={(e) =>
-                                updateDisbursementItem(
-                                  item.id,
-                                  'price',
-                                  e.target.value === ''
-                                    ? ''
-                                    : parseFloat(e.target.value) || 0,
-                                )
-                              }
+                              inputMode="decimal"
+                              value={formatPriceDisplay(item.price)}
+                              onChange={(e) => {
+                                const parsed = parsePriceInput(e.target.value)
+                                updateDisbursementItem(item.id, 'price', parsed)
+                              }}
                             />
                           </td>
                           <td className="py-1 px-1">
