@@ -15,6 +15,7 @@ const useLogin = () => {
       const subscriptionUrl =
         import.meta.env.VITE_SUBSCRIPTION_LINK ||
         `http://${import.meta.env.VITE_SUBSCRIPTION_URL || 'localhost'}:${import.meta.env.VITE_SUBSCRIPTION_PORT || '5051'}`
+        console.log('SUBSCRIPTION_URL:', subscriptionUrl)
       const response = await fetch(`${subscriptionUrl}/credentials/login`, {
         method: 'POST',
         headers: {

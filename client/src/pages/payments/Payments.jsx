@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
+  FilePlus,
   Layers,
   CheckCircle,
   ShieldCheck,
@@ -381,54 +382,59 @@ function PaymentsContent() {
 
           <div className="flex flex-col md:flex-row md:items-center gap-3">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-gray-500">From</span>
-                  <input
-                    type="date"
-                    value={pendingDateFrom}
-                    onChange={(e) => setPendingDateFrom(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                    aria-label="Filter payments from date"
-                  />
+              <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
+                <div className="flex flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-gray-500">From</span>
+                    <input
+                      type="date"
+                      value={pendingDateFrom}
+                      onChange={(e) => setPendingDateFrom(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                      aria-label="Filter receipts from date"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-gray-500">To</span>
+                    <input
+                      type="date"
+                      value={pendingDateTo}
+                      onChange={(e) => setPendingDateTo(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                      aria-label="Filter receipts to date"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-gray-500">To</span>
-                  <input
-                    type="date"
-                    value={pendingDateTo}
-                    onChange={(e) => setPendingDateTo(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                    aria-label="Filter payments to date"
-                  />
+
+                <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={applyDateFilters}
+                    className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-sm"
+                    type="button"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    onClick={clearDateFilters}
+                    className="px-4 py-2 bg-gray-900 text-gray-100 text-xs font-bold rounded-xl hover:bg-gray-800 transition-all shadow-sm"
+                    type="button"
+                  >
+                    Clear
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={applyDateFilters}
-                className="px-4 py-2 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-sm"
-                type="button"
-              >
-                Apply
-              </button>
-              <button
-                onClick={clearDateFilters}
-                className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition-all shadow-sm"
-                type="button"
-              >
-                Clear
-              </button>
             </div>
             <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
               <Download size={14} />
-              EXPORT LEDGER
+              EXPORT DATA
             </button>
-            <ProtectedAction routeName="payments">
+            <ProtectedAction routeName="receipts">
               <button
                 onClick={() => setIsAdding(true)}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
-                <CheckCircle size={14} />
-                Process Payment
+                <FilePlus size={14} />
+                New Receipt
               </button>
             </ProtectedAction>
           </div>

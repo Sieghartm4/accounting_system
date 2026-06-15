@@ -2,6 +2,8 @@ const { auth } = require('../middlewares/auth.middleware')
 
 const { healthRouter } = require('../routes/health.routes')
 
+const { developerRouter } = require('../routes/developer.routes')
+
 const { usersRouter } = require('../routes/users.routes')
 
 const { credentialsRouter } = require('../routes/credentials.routes')
@@ -56,6 +58,8 @@ const initRoutes = (app) => {
   app.use('/credentials', credentialsRouter)
 
   app.use('/health', healthRouter)
+
+  app.use('/developer', developerRouter)
 
   app.use(auth)
 

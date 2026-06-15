@@ -315,7 +315,7 @@ export default function Sidebar({ isCollapsed }) {
           <img
             src={company.logo}
             alt={company.company_name || 'Company Logo'}
-            className="w-12 h-12 rounded-lg object-cover shadow-inner"
+            className="w-12 h-12 rounded-lg object-contain bg-white/5 p-1 shadow-inner"
           />
         ) : (
           <div className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-black text-2xl shadow-inner">
@@ -324,11 +324,11 @@ export default function Sidebar({ isCollapsed }) {
         )}
 
         {!isCollapsed && (
-          <div className="ml-3">
-            <span className="font-bold tracking-tight text-white text-2xl block">
+          <div className="ml-3 min-w-0">
+            <span className="font-bold tracking-tight text-white text-2xl block truncate">
               {company?.company_name || '\u00A0'}
             </span>
-            <span className="text-[11px] text-red-600 font-bold tracking-[0.2em] block">
+            <span className="text-[11px] text-red-600 font-bold tracking-[0.2em] block truncate">
               {company?.email || '\u00A0'}
             </span>
           </div>
