@@ -4,6 +4,7 @@ const Accounting = {
     prefix: 'cd',
     prefix_: 'cd_',
     insertColumns: [
+      'id',
       'vendor_id',
       'document_reference',
       'payment_date',
@@ -69,7 +70,7 @@ const Accounting = {
     selectDateFormatColumns: {},
     selectMiscColumns: {},
     columnDataTypes: {
-      id: 'INTEGER',
+      id: 'STRING',
       vendor_id: 'INTEGER',
       document_reference: 'STRING',
       payment_date: 'STRING',
@@ -90,6 +91,7 @@ const Accounting = {
     prefix: 'r',
     prefix_: 'r_',
     insertColumns: [
+      'id',
       'customer_id',
       'document_reference',
       'collection_date',
@@ -155,7 +157,7 @@ const Accounting = {
     selectDateFormatColumns: {},
     selectMiscColumns: {},
     columnDataTypes: {
-      id: 'INTEGER',
+      id: 'STRING',
       customer_id: 'INTEGER',
       document_reference: 'STRING',
       collection_date: 'STRING',
@@ -176,6 +178,7 @@ const Accounting = {
     prefix: 's',
     prefix_: 's_',
     insertColumns: [
+      'id',
       'customer_id',
       'document_reference',
       'terms',
@@ -241,7 +244,7 @@ const Accounting = {
     selectDateFormatColumns: {},
     selectMiscColumns: {},
     columnDataTypes: {
-      id: 'INTEGER',
+      id: 'STRING',
       customer_id: 'INTEGER',
       document_reference: 'STRING',
       terms: 'ENUM',
@@ -341,6 +344,7 @@ const Accounting = {
     prefix: 'p',
     prefix_: 'p_',
     insertColumns: [
+      'id',
       'vendor_id',
       'document_reference',
       'terms',
@@ -406,7 +410,7 @@ const Accounting = {
     selectDateFormatColumns: {},
     selectMiscColumns: {},
     columnDataTypes: {
-      id: 'INTEGER',
+      id: 'STRING',
       vendor_id: 'INTEGER',
       document_reference: 'STRING',
       terms: 'ENUM',
@@ -485,7 +489,7 @@ const Accounting = {
     selectMiscColumns: {},
     columnDataTypes: {
       id: 'INTEGER',
-      purchase_id: 'INTEGER',
+      purchase_id: 'STRING',
       product_service: 'STRING',
       charts_of_accounts: 'INTEGER',
       description: 'TEXT',
@@ -541,7 +545,7 @@ const Accounting = {
     selectMiscColumns: {},
     columnDataTypes: {
       id: 'INTEGER',
-      purchase_id: 'INTEGER',
+      purchase_id: 'STRING',
       file: 'TEXT',
       name: 'STRING',
       remarks: 'TEXT',
@@ -663,7 +667,7 @@ const Accounting = {
     selectMiscColumns: {},
     columnDataTypes: {
       id: 'INTEGER',
-      cash_disbursement_id: 'INTEGER',
+      cash_disbursement_id: 'STRING',
       product_service: 'STRING',
       charts_of_accounts: 'INTEGER',
       description: 'TEXT',
@@ -739,7 +743,7 @@ const Accounting = {
     selectMiscColumns: {},
     columnDataTypes: {
       id: 'INTEGER',
-      receipts_id: 'INTEGER',
+      receipts_id: 'STRING',
       product_service: 'STRING',
       charts_of_accounts: 'INTEGER',
       description: 'TEXT',
@@ -815,7 +819,7 @@ const Accounting = {
     selectMiscColumns: {},
     columnDataTypes: {
       id: 'INTEGER',
-      sales_id: 'INTEGER',
+      sales_id: 'STRING',
       product_service: 'STRING',
       charts_of_accounts: 'INTEGER',
       description: 'TEXT',
@@ -907,7 +911,7 @@ const Accounting = {
     selectMiscColumns: {},
     columnDataTypes: {
       id: 'INTEGER',
-      cash_disburssement_id: 'INTEGER',
+      cash_disburssement_id: 'STRING',
       file: 'TEXT',
       name: 'STRING',
       remarks: 'TEXT',
@@ -958,7 +962,7 @@ const Accounting = {
     selectMiscColumns: {},
     columnDataTypes: {
       id: 'INTEGER',
-      receipt_id: 'INTEGER',
+      receipt_id: 'STRING',
       file: 'TEXT',
       name: 'STRING',
       remarks: 'TEXT',
@@ -1009,7 +1013,7 @@ const Accounting = {
     selectMiscColumns: {},
     columnDataTypes: {
       id: 'INTEGER',
-      sales_id: 'INTEGER',
+      sales_id: 'STRING',
       file: 'TEXT',
       name: 'STRING',
       remarks: 'TEXT',
@@ -1116,7 +1120,7 @@ const Accounting = {
     columnDataTypes: {
       id: 'INTEGER',
       db_name: 'STRING',
-      db_id: 'INTEGER',
+      db_id: 'STRING',
       coa_id: 'INTEGER',
       responsibility_center: 'STRING',
       type: 'ENUM',
@@ -1236,7 +1240,7 @@ const Accounting = {
     columnDataTypes: {
       id: 'INTEGER',
       payment_id: 'INTEGER',
-      purchase_id: 'INTEGER',
+      purchase_id: 'STRING',
       amount: 'DECIMAL',
       witholding_tax: 'DECIMAL',
     },

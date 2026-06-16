@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
@@ -7,40 +7,40 @@ module.exports = {
       sa_id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
       },
       sa_sales_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(30),
         allowNull: false,
         references: {
           model: 'sales',
-          key: 's_id'
-        }
+          key: 's_id',
+        },
       },
       sa_file: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: false,
       },
       sa_name: {
         type: Sequelize.TEXT('medium'),
-        allowNull: false
+        allowNull: false,
       },
       sa_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: true,
       },
       sa_uploaded_by: {
         type: Sequelize.STRING(300),
-        allowNull: false
+        allowNull: false,
       },
       sa_uploaded_date: {
         type: Sequelize.STRING(30),
-        allowNull: false
-      }
-    });
+        allowNull: false,
+      },
+    })
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('sales_attachments');
-  }
-};
+    await queryInterface.dropTable('sales_attachments')
+  },
+}

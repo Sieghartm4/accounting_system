@@ -26,6 +26,30 @@ const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
 
+const generateSalesId = async (connection) => {
+  const now = new Date()
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  const yy = String(now.getFullYear()).slice(-2)
+  const datePart = `${mm}${dd}${yy}`
+  const idPrefix = `SO-${datePart}-`
+
+  const [existing] = await connection.execute(
+    `SELECT s_id FROM ${Accounting.sales.tablename} WHERE s_id LIKE ? ORDER BY s_id DESC LIMIT 1`,
+    [`${idPrefix}%`],
+  )
+
+  let seq = 1
+  if (existing && existing.length > 0) {
+    const lastId = existing[0].s_id
+    const parts = lastId.split('-')
+    const lastSeq = parseInt(parts[parts.length - 1], 10) || 0
+    seq = lastSeq + 1
+  }
+
+  return `${idPrefix}${String(seq).padStart(4, '0')}`
+}
+
 const resolveCollectionPaymentAccountId = async (
   connection,
   modeOfPayment,
@@ -369,9 +393,9 @@ const getSales = async (req, res, next) => {
 const getAllSales = async (req, res, next) => {
   const { id } = req.params
 
-  const salesId = Number(id)
+  const salesId = String(id)
 
-  console.log('Converted sales_id:', salesId, 'type:', typeof salesId)
+  console.log('Fetching sales_id:', salesId, 'type:', typeof salesId)
 
   try {
     const sales_query = sql
@@ -700,6 +724,8 @@ const createSales = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      const salesId = await generateSalesId(connection)
+
       const mainQuery = sql
         .insert(Accounting.sales.tablename, {
           columns: Accounting.sales.insertColumns,
@@ -711,6 +737,8 @@ const createSales = async (req, res, next) => {
         .build()
 
       const mainValues = [
+        salesId,
+
         customer_id || null,
 
         document_reference || ' ',
@@ -738,9 +766,7 @@ const createSales = async (req, res, next) => {
         approved_by || null,
       ]
 
-      const [mainResult] = await connection.execute(mainQuery, mainValues)
-
-      const salesId = mainResult.insertId
+      await connection.execute(mainQuery, mainValues)
 
       if (sales_items && sales_items.length > 0) {
         for (const item of sales_items) {
@@ -1121,7 +1147,7 @@ const updateSalesState = async (req, res, next) => {
         data: {
           updatedCount: results.length,
 
-          updates: results.map((result) => ({ id: result.insertId })),
+          updates: validUpdates.map((update) => ({ id: update.id })),
         },
 
         timestamp: new Date().toISOString(),
@@ -1156,7 +1182,7 @@ const updateSalesState = async (req, res, next) => {
 const updateSale = async (req, res, next) => {
   const { sales_id } = req.params
 
-  const salesId = Number(sales_id)
+  const salesId = String(sales_id)
 
   console.log('Updating sales_id:', salesId, 'type:', typeof salesId)
 
@@ -2554,10 +2580,10 @@ const getPrintSales = async (req, res, next) => {
 
   const salesIds = sales_id
     .split(',')
-    .map((id) => Number(id.trim()))
-    .filter((id) => !isNaN(id))
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0)
 
-  console.log('Converted sales_ids:', salesIds, 'type:', typeof salesIds)
+  console.log('Parsed sales_ids:', salesIds, 'type:', typeof salesIds)
 
   console.log('Copy type:', copyType)
 

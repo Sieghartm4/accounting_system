@@ -14,7 +14,7 @@ module.exports = {
         allowNull: true,
       },
       je_db_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(50),
         allowNull: true,
       },
       je_coa_id: {

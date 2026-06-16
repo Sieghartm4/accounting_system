@@ -62,7 +62,7 @@ function SalesContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/sales/${Number(id)}`,
+          `${import.meta.env.VITE_SERVER_LINK}/sales/${id}`,
           {
             method: 'GET',
             headers: {
@@ -507,7 +507,7 @@ function SalesContent() {
                   }
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/sales/${Number(row.id)}`,
+                    `${import.meta.env.VITE_SERVER_LINK}/sales/${row.id}`,
                     {
                       method: 'GET',
                       headers: {
@@ -551,7 +551,7 @@ function SalesContent() {
                   }
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/sales/${Number(row.id)}`,
+                    `${import.meta.env.VITE_SERVER_LINK}/sales/${row.id}`,
                     {
                       method: 'GET',
                       headers: {

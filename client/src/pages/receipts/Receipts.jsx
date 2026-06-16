@@ -76,7 +76,7 @@ function ReceiptsContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(id)}`,
+          `${import.meta.env.VITE_SERVER_LINK}/receipt/${id}`,
           {
             method: 'GET',
             headers: {
@@ -496,7 +496,7 @@ function ReceiptsContent() {
                   if (!token) throw new Error('No authentication token found')
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(row.id)}`,
+                    `${import.meta.env.VITE_SERVER_LINK}/receipt/${row.id}`,
                     {
                       method: 'GET',
                       headers: {
@@ -530,7 +530,7 @@ function ReceiptsContent() {
                   if (!token) throw new Error('No authentication token found')
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/receipt/${Number(row.id)}`,
+                    `${import.meta.env.VITE_SERVER_LINK}/receipt/${row.id}`,
                     {
                       method: 'GET',
                       headers: {

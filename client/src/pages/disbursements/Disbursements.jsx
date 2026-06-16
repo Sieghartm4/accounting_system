@@ -90,7 +90,7 @@ function DisbursementsContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${Number(id)}`,
+          `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${id}`,
           {
             method: 'GET',
             headers: {
@@ -519,14 +519,13 @@ function DisbursementsContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-
                   const token = localStorage.getItem('token')
                   if (!token) {
                     throw new Error('No authentication token found')
                   }
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${Number(row.id)}`,
+                    `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${row.id}`,
                     {
                       method: 'GET',
                       headers: {
@@ -570,7 +569,7 @@ function DisbursementsContent() {
                   }
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${Number(row.id)}`,
+                    `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${row.id}`,
                     {
                       method: 'GET',
                       headers: {

@@ -40,11 +40,6 @@ const getCashDisbursements = async (req, res, next) => {
       .select([
         { col: Accounting.cash_disbursements.selectOptionColumns.id, as: 'id' },
 
-        {
-          col: Accounting.cash_disbursements.selectOptionColumns.vendor_id,
-          as: 'vendor_id',
-        },
-
         { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
 
         {
@@ -166,10 +161,10 @@ const getCashDisbursements = async (req, res, next) => {
 const getAllCashDisbursements = async (req, res, next) => {
   const { cash_disbursement_id } = req.params
 
-  const cashDisbursementId = Number(cash_disbursement_id)
+  const cashDisbursementId = cash_disbursement_id
 
   console.log(
-    'Converted cash_disbursement_id:',
+    'Using cash_disbursement_id:',
     cashDisbursementId,
     'type:',
     typeof cashDisbursementId,
@@ -551,6 +546,29 @@ const createCashDisbursement = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      const nowForId = new Date()
+      const mm = String(nowForId.getMonth() + 1).padStart(2, '0')
+      const dd = String(nowForId.getDate()).padStart(2, '0')
+      const yy = String(nowForId.getFullYear()).slice(-2)
+      const datePart = `${mm}${dd}${yy}`
+      const idPrefix = `CD-${datePart}-`
+
+      const [existing] = await connection.execute(
+        `SELECT cd_id FROM cash_disbursements WHERE cd_id LIKE ? ORDER BY cd_id DESC LIMIT 1`,
+        [`${idPrefix}%`],
+      )
+
+      let seq = 1
+      if (existing && existing.length > 0) {
+        const lastId = existing[0].cd_id
+        const parts = lastId.split('-')
+        const lastSeq = parseInt(parts[parts.length - 1], 10) || 0
+        seq = lastSeq + 1
+      }
+
+      const seqStr = String(seq).padStart(4, '0')
+      const newCashDisbursementId = `${idPrefix}${seqStr}`
+
       const mainQuery = sql
         .insert(Accounting.cash_disbursements.tablename, {
           columns: Accounting.cash_disbursements.insertColumns,
@@ -562,6 +580,7 @@ const createCashDisbursement = async (req, res, next) => {
         .build()
 
       const mainValues = [
+        newCashDisbursementId,
         vendor_id || null,
 
         document_reference || '0',
@@ -591,7 +610,7 @@ const createCashDisbursement = async (req, res, next) => {
 
       const [mainResult] = await connection.execute(mainQuery, mainValues)
 
-      const cashDisbursementId = mainResult.insertId
+      const cashDisbursementId = newCashDisbursementId
 
       if (disbursement_items && disbursement_items.length > 0) {
         for (const item of disbursement_items) {
@@ -854,7 +873,7 @@ const createCashDisbursement = async (req, res, next) => {
 const updateCashDisbursement = async (req, res, next) => {
   const { cash_disbursement_id } = req.params
 
-  const disbursementId = Number(cash_disbursement_id)
+  const disbursementId = cash_disbursement_id
 
   console.log(
     'Updating cash_disbursement_id:',

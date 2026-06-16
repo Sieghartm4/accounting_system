@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
@@ -7,40 +7,40 @@ module.exports = {
       ra_id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
       },
       ra_receipt_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(50),
         allowNull: false,
         references: {
           model: 'receipts',
-          key: 'r_id'
-        }
+          key: 'r_id',
+        },
       },
       ra_file: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: false,
       },
       ra_name: {
         type: Sequelize.TEXT('medium'),
-        allowNull: false
+        allowNull: false,
       },
       ra_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: true,
       },
       ra_uploaded_by: {
         type: Sequelize.STRING(300),
-        allowNull: false
+        allowNull: false,
       },
       ra_uploaded_date: {
         type: Sequelize.STRING(30),
-        allowNull: false
-      }
-    });
+        allowNull: false,
+      },
+    })
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('receipt_attachments');
-  }
-};
+    await queryInterface.dropTable('receipt_attachments')
+  },
+}

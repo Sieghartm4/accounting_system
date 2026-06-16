@@ -11,7 +11,7 @@ module.exports = {
 
     // Change je_db_id column to allow null values
     await queryInterface.changeColumn('journal_entries', 'je_db_id', {
-      type: Sequelize.INTEGER,
+      type: Sequelize.STRING(50),
       allowNull: true,
     })
   },
@@ -24,7 +24,7 @@ module.exports = {
     })
 
     await queryInterface.changeColumn('journal_entries', 'je_db_id', {
-      type: Sequelize.INTEGER,
+      type: Sequelize.STRING(50),
       allowNull: false,
     })
   },

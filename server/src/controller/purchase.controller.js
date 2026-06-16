@@ -27,6 +27,30 @@ const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
 
+const generatePurchaseId = async (connection) => {
+  const now = new Date()
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  const yy = String(now.getFullYear()).slice(-2)
+  const datePart = `${mm}${dd}${yy}`
+  const idPrefix = `PO-${datePart}-`
+
+  const [existing] = await connection.execute(
+    `SELECT p_id FROM ${Accounting.purchase.tablename} WHERE p_id LIKE ? ORDER BY p_id DESC LIMIT 1`,
+    [`${idPrefix}%`],
+  )
+
+  let seq = 1
+  if (existing && existing.length > 0) {
+    const lastId = existing[0].p_id
+    const parts = lastId.split('-')
+    const lastSeq = parseInt(parts[parts.length - 1], 10) || 0
+    seq = lastSeq + 1
+  }
+
+  return `${idPrefix}${String(seq).padStart(4, '0')}`
+}
+
 const resolvePaymentAccountId = async (connection, modeOfPayment, bankName) => {
   const coaQuery = sql
     .select([
@@ -344,9 +368,9 @@ const getPurchase = async (req, res, next) => {
 const getAllPurchase = async (req, res, next) => {
   const { id } = req.params
 
-  const purchaseId = Number(id)
+  const purchaseId = String(id)
 
-  console.log('Converted purchase_id:', purchaseId, 'type:', typeof purchaseId)
+  console.log('Fetching purchase_id:', purchaseId, 'type:', typeof purchaseId)
 
   try {
     const purchase_query = sql
@@ -700,6 +724,8 @@ const createPurchase = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      const purchaseId = await generatePurchaseId(connection)
+
       const mainQuery = sql
         .insert(Accounting.purchase.tablename, {
           columns: Accounting.purchase.insertColumns,
@@ -711,6 +737,7 @@ const createPurchase = async (req, res, next) => {
         .build()
 
       const mainValues = [
+        purchaseId,
         vendor_id || null,
 
         document_reference || ' ',
@@ -738,9 +765,7 @@ const createPurchase = async (req, res, next) => {
         approved_by || null,
       ]
 
-      const [mainResult] = await connection.execute(mainQuery, mainValues)
-
-      const purchaseId = mainResult.insertId
+      await connection.execute(mainQuery, mainValues)
 
       if (purchase_items && purchase_items.length > 0) {
         for (const item of purchase_items) {
@@ -1116,7 +1141,7 @@ const updatePurchaseState = async (req, res, next) => {
         data: {
           updatedCount: results.length,
 
-          updates: results.map((result) => ({ id: result.insertId })),
+          updates: validUpdates.map((update) => ({ id: update.id })),
         },
 
         timestamp: new Date().toISOString(),
@@ -1151,7 +1176,7 @@ const updatePurchaseState = async (req, res, next) => {
 const updatePurchase = async (req, res, next) => {
   const { purchase_id } = req.params
 
-  const purchaseId = Number(purchase_id)
+  const purchaseId = String(purchase_id)
 
   console.log('Updating purchase_id:', purchaseId, 'type:', typeof purchaseId)
 
@@ -2452,8 +2477,8 @@ const getPrintPurchases = async (req, res, next) => {
 
   const purchaseIds = purchase_id
     .split(',')
-    .map((id) => Number(id.trim()))
-    .filter((id) => !isNaN(id))
+    .map((id) => id.trim())
+    .filter((id) => id)
 
   console.log('Converted purchase_ids:', purchaseIds, 'type:', typeof purchaseIds)
 

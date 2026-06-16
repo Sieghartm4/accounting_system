@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
@@ -7,40 +7,40 @@ module.exports = {
       a_id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
       },
       a_cash_disburssement_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(30),
         allowNull: false,
         references: {
           model: 'cash_disbursements',
-          key: 'cd_id'
-        }
+          key: 'cd_id',
+        },
       },
       a_file: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: false,
       },
       a_name: {
         type: Sequelize.TEXT('medium'),
-        allowNull: false
+        allowNull: false,
       },
       a_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: true,
       },
       a_uploaded_by: {
         type: Sequelize.STRING(300),
-        allowNull: false
+        allowNull: false,
       },
       a_uploaded_date: {
         type: Sequelize.STRING(30),
-        allowNull: false
-      }
-    });
+        allowNull: false,
+      },
+    })
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('cash_disbursement_attachments');
-  }
-};
+    await queryInterface.dropTable('cash_disbursement_attachments')
+  },
+}

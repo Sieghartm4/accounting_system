@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 module.exports = {
   async up(queryInterface, Sequelize) {
@@ -6,42 +6,42 @@ module.exports = {
       pa_id: {
         type: Sequelize.INTEGER,
         autoIncrement: true,
-        primaryKey: true
+        primaryKey: true,
       },
       pa_purchase_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(30),
         allowNull: false,
         references: {
           model: 'purchase',
-          key: 'p_id'
+          key: 'p_id',
         },
         onUpdate: 'CASCADE',
-        onDelete: 'CASCADE'
+        onDelete: 'CASCADE',
       },
       pa_file: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: true,
       },
       pa_name: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: true,
       },
       pa_remarks: {
         type: Sequelize.TEXT('long'),
-        allowNull: true
+        allowNull: true,
       },
       pa_uploaded_by: {
         type: Sequelize.STRING(300),
-        allowNull: true
+        allowNull: true,
       },
       pa_uploaded_date: {
         type: Sequelize.STRING(30),
-        allowNull: true
-      }
-    });
+        allowNull: true,
+      },
+    })
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('purchase_attachments');
-  }
-};
+    await queryInterface.dropTable('purchase_attachments')
+  },
+}

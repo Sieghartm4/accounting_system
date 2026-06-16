@@ -152,7 +152,7 @@ const getReceipts = async (req, res, next) => {
 const getAllReceipts = async (req, res, next) => {
   const { receipt_id } = req.params
 
-  const receiptId = Number(receipt_id)
+  const receiptId = receipt_id
 
   console.log('Converted receipt_id:', receiptId, 'type:', typeof receiptId)
 
@@ -448,8 +448,8 @@ const getPrintReceipts = async (req, res, next) => {
 
   const receiptIds = receipt_id
     .split(',')
-    .map((id) => Number(id.trim()))
-    .filter((id) => !isNaN(id))
+    .map((id) => id.trim())
+    .filter((id) => id !== '')
 
   console.log('Converted receipt_ids:', receiptIds, 'type:', typeof receiptIds)
 
@@ -967,6 +967,30 @@ const createReceipts = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      // generate receipt id in format CR-MMDDYY-0001 (sequence per day)
+      const nowForId = new Date()
+      const mm = String(nowForId.getMonth() + 1).padStart(2, '0')
+      const dd = String(nowForId.getDate()).padStart(2, '0')
+      const yy = String(nowForId.getFullYear()).slice(-2)
+      const datePart = `${mm}${dd}${yy}`
+      const idPrefix = `CR-${datePart}-`
+
+      const [existing] = await connection.execute(
+        `SELECT r_id FROM receipts WHERE r_id LIKE ? ORDER BY r_id DESC LIMIT 1`,
+        [`${idPrefix}%`],
+      )
+
+      let seq = 1
+      if (existing && existing.length > 0) {
+        const lastId = existing[0].r_id
+        const parts = lastId.split('-')
+        const lastSeq = parseInt(parts[parts.length - 1], 10) || 0
+        seq = lastSeq + 1
+      }
+
+      const seqStr = String(seq).padStart(4, '0')
+      const newReceiptId = `${idPrefix}${seqStr}`
+
       const mainQuery = sql
         .insert(Accounting.receipts.tablename, {
           columns: Accounting.receipts.insertColumns,
@@ -978,6 +1002,7 @@ const createReceipts = async (req, res, next) => {
         .build()
 
       const mainValues = [
+        newReceiptId,
         customer_id || null,
 
         document_reference || null,
@@ -1007,7 +1032,7 @@ const createReceipts = async (req, res, next) => {
 
       const [mainResult] = await connection.execute(mainQuery, mainValues)
 
-      const receiptId = mainResult.insertId
+      const receiptId = newReceiptId
 
       if (receipt_items && receipt_items.length > 0) {
         for (const item of receipt_items) {
@@ -1256,7 +1281,7 @@ const createReceipts = async (req, res, next) => {
 const updateReceipt = async (req, res, next) => {
   const { receipt_id } = req.params
 
-  const receiptId = Number(receipt_id)
+  const receiptId = receipt_id
 
   console.log('Updating receipt_id:', receiptId, 'type:', typeof receiptId)
 

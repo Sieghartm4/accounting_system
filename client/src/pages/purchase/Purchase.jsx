@@ -521,7 +521,7 @@ function PurchaseContent() {
                   }
 
                   const viewResponse = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/purchase/${Number(row.id)}`,
+                    `${import.meta.env.VITE_SERVER_LINK}/purchase/${row.id}`,
                     {
                       method: 'GET',
                       headers: {
@@ -565,7 +565,7 @@ function PurchaseContent() {
                   }
 
                   const editResponse = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/purchase/${Number(row.id)}`,
+                    `${import.meta.env.VITE_SERVER_LINK}/purchase/${row.id}`,
                     {
                       method: 'GET',
                       headers: {
