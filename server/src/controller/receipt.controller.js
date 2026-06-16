@@ -39,11 +39,6 @@ const getReceipts = async (req, res, next) => {
       .select([
         { col: Accounting.receipts.selectOptionColumns.id, as: 'id' },
 
-        {
-          col: Accounting.receipts.selectOptionColumns.customer_id,
-          as: 'customer_id',
-        },
-
         { col: Master.customers.selectOptionColumns.name, as: 'customer' },
 
         {
