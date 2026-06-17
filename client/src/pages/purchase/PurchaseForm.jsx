@@ -804,7 +804,7 @@ export default function PurchaseForm({
         }
       } else {
         setTermsNumber('')
-        setTermsOption('')
+        setTermsOption('DAYS')
       }
 
       setDateDelivered(mainData?.date_delivered || '')
@@ -821,26 +821,40 @@ export default function PurchaseForm({
           coa: item.charts_of_accounts_id,
           coaSearch: item.charts_of_accounts_name,
           description: item.description,
-          qty: item.quantity,
-          price: item.purchase_price,
+          qty: item.quantity ?? item.qty,
+          price: item.purchase_price ?? item.price,
           discount: item.discount,
           discountType: item.discount_type || 'PERCENT',
-          vat: item.vat_id ?? item.vat,
+          vat: item.vat_id ?? item.vat ?? item.vat_id ?? 0,
           vatSearch:
             item.vat_code || item.vat_name
               ? `${item.vat_code || ''}${item.vat_code && item.vat_name ? ' - ' : ''}${item.vat_name || ''}`
-              : '',
-          vatRate: parseFloat(item.vat_rate) || 0,
+              : item.vat_id === 0 || item.vat === 0
+                ? 'No VAT - No VAT%'
+                : '',
+          vatRate: parseFloat(item.vat_rate ?? item.vatRate) || 0,
           wht:
+            item.withholding_tax_id ??
             item.witholding_tax_id ??
+            item.withholding_tax ??
             item.witholding_tax ??
-            item.witholding_tax_id ??
-            item.witholding_tax_id,
+            item.wht ??
+            0,
           whtSearch: item.withholding_tax_code
             ? `${item.withholding_tax_code}${item.withholding_tax_name ? ' - ' + item.withholding_tax_name : ''}`
-            : item.withholding_tax_name || '',
-          whtRate: parseFloat(item.withholding_tax_rate) || 0,
-          responsibilityCenter: item.responsibility_center,
+            : item.withholding_tax_name ||
+                item.witholding_tax_id === 0 ||
+                item.withholding_tax_id === 0 ||
+                item.witholding_tax === 0 ||
+                item.wht === 0
+              ? 'NON-WHT - NON-WHT'
+              : '',
+          whtRate:
+            parseFloat(
+              item.withholding_tax_rate ?? item.witholding_tax_rate ?? item.whtRate,
+            ) || 0,
+          responsibilityCenter:
+            (item.responsibility_center ?? item.responsibilityCenter) || '',
           isOther: false,
           isNew: false,
         }))
@@ -926,6 +940,36 @@ export default function PurchaseForm({
     let didUpdate = false
     const updatedItems = purchaseItems.map((item) => {
       let nextItem = item
+
+      const normalizedProductSearch = item.productSearch
+        ? String(item.productSearch).trim().toLowerCase()
+        : ''
+
+      if (!item.productId && normalizedProductSearch) {
+        const matchedProduct = products.find((p) => {
+          const productLabel = String(p.name || p.product_name || '')
+            .trim()
+            .toLowerCase()
+          return (
+            productLabel === normalizedProductSearch ||
+            String(p.id) === normalizedProductSearch
+          )
+        })
+
+        if (matchedProduct) {
+          nextItem = {
+            ...nextItem,
+            productId: matchedProduct.id,
+            productSearch: matchedProduct.name || matchedProduct.product_name || '',
+            description:
+              nextItem.description ||
+              matchedProduct.name ||
+              matchedProduct.product_name ||
+              '',
+          }
+          didUpdate = true
+        }
+      }
 
       if (item.productId && !item.productSearch) {
         const matchedProduct = products.find((p) => p.id === item.productId)
@@ -1300,15 +1344,35 @@ export default function PurchaseForm({
           discount_type: item.discountType || 'PERCENT',
           vat:
             parseFloat(
-              item.vat === '' || item.vat === null || item.vat === undefined
-                ? defaultVatOpt?.value || 0
-                : item.vat,
+              item.vat !== undefined && item.vat !== '' && item.vat !== null
+                ? item.vat
+                : item.vat_id !== undefined &&
+                    item.vat_id !== '' &&
+                    item.vat_id !== null
+                  ? item.vat_id
+                  : defaultVatOpt?.value || 0,
             ) || 0,
           witholding_tax:
             parseFloat(
-              item.wht === '' || item.wht === null || item.wht === undefined
-                ? defaultWhtOpt?.value || 0
-                : item.wht,
+              item.wht !== undefined && item.wht !== '' && item.wht !== null
+                ? item.wht
+                : item.witholding_tax !== undefined &&
+                    item.witholding_tax !== '' &&
+                    item.witholding_tax !== null
+                  ? item.witholding_tax
+                  : item.withholding_tax !== undefined &&
+                      item.withholding_tax !== '' &&
+                      item.withholding_tax !== null
+                    ? item.withholding_tax
+                    : item.witholding_tax_id !== undefined &&
+                        item.witholding_tax_id !== '' &&
+                        item.witholding_tax_id !== null
+                      ? item.witholding_tax_id
+                      : item.withholding_tax_id !== undefined &&
+                          item.withholding_tax_id !== '' &&
+                          item.withholding_tax_id !== null
+                        ? item.withholding_tax_id
+                        : defaultWhtOpt?.value || 0,
             ) || 0,
           responsibility_center: item.responsibilityCenter || '',
         }))

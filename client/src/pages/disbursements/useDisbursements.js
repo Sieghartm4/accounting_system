@@ -511,6 +511,36 @@ export function useDisbursementForm({
     const updatedItems = disbursementItems.map((item) => {
       let nextItem = item
 
+      const normalizedProductSearch = item.productSearch
+        ? String(item.productSearch).trim().toLowerCase()
+        : ''
+
+      if (!item.productId && normalizedProductSearch) {
+        const matchedProduct = products.find((p) => {
+          const productLabel = String(p.name || p.product_name || '')
+            .trim()
+            .toLowerCase()
+          return (
+            productLabel === normalizedProductSearch ||
+            String(p.id) === normalizedProductSearch
+          )
+        })
+
+        if (matchedProduct) {
+          nextItem = {
+            ...nextItem,
+            productId: matchedProduct.id,
+            productSearch: matchedProduct.name || matchedProduct.product_name || '',
+            description:
+              nextItem.description ||
+              matchedProduct.name ||
+              matchedProduct.product_name ||
+              '',
+          }
+          didUpdate = true
+        }
+      }
+
       if (item.productId && !item.productSearch) {
         const matchedProduct = products.find((p) => p.id === item.productId)
         if (matchedProduct) {

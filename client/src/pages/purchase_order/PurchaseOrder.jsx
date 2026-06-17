@@ -101,6 +101,7 @@ function PurchaseOrderContent() {
         description: productLabel || '',
         qty: Number(row.quantity) || 0,
         price: Number(row.price) || 0,
+        purchase_price: Number(row.price) || 0,
         discount: 0,
         discountType: 'PERCENT',
         // Provide VAT fields using the same keys PurchaseForm expects so
