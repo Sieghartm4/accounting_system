@@ -10,7 +10,7 @@ module.exports = {
         autoIncrement: true,
       },
       ri_receipts_id: {
-        type: Sequelize.STRING(50),
+        type: Sequelize.STRING(300),
         allowNull: false,
         references: {
           model: 'receipts',

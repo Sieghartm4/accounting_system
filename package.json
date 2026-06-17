@@ -11,6 +11,7 @@
     "bump:major": "npm version major && npm run sync-versions",
     "sync-versions": "v=$(node -p \"require('./package.json').version\") && cd client && npm version $v --no-git-tag-version && cd ../server && npm version $v --no-git-tag-version",
     "migrate": "dotenv -e .env -- npm run db:migrate -w server",
+    "migrate:all": "dotenv -e .env -- npm run db:migrate:all -w server",
     "migrate:undo": "dotenv -e .env -- npm run db:migrate:undo -w server",
     "migrate:prod": "dotenv -e .env -- npm run db:migrate:prod -w server",
     "migrate:tenant": "dotenv -e .env -- npm run db:migrate:tenant -w server --",
@@ -21,7 +22,6 @@
     "db:setup": "dotenv -e .env -- npm run db:setup -w server",
     "migration:create": "npm run db:generate:migration -w server --",
     "seeder:create": "npm run db:generate:seeder -w server --"
-    
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0"

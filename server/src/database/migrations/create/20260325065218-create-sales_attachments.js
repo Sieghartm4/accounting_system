@@ -10,7 +10,7 @@ module.exports = {
         autoIncrement: true,
       },
       sa_sales_id: {
-        type: Sequelize.STRING(30),
+        type: Sequelize.STRING(300),
         allowNull: false,
         references: {
           model: 'sales',

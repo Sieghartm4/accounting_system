@@ -10,7 +10,7 @@ module.exports = {
         autoIncrement: true,
       },
       cdi_cash_disbursement_id: {
-        type: Sequelize.STRING(30),
+        type: Sequelize.STRING(300),
         allowNull: false,
         references: {
           model: 'cash_disbursements',

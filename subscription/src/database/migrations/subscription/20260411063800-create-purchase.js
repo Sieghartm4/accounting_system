@@ -4,7 +4,7 @@ module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('purchase', {
       p_id: {
-        type: Sequelize.TEXT('long'),
+        type: Sequelize.STRING(300),
         primaryKey: true,
         allowNull: false,
       },

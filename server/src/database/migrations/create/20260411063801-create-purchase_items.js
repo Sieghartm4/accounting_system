@@ -9,7 +9,7 @@ module.exports = {
         primaryKey: true,
       },
       pi_purchase_id: {
-        type: Sequelize.STRING(30),
+        type: Sequelize.STRING(300),
         allowNull: false,
         references: {
           model: 'purchase',
