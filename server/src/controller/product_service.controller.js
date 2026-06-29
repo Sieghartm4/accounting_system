@@ -85,6 +85,17 @@ const fetchJsonFromUrl = (url, headers = {}) => {
   })
 }
 
+const productServiceCodeExists = async (code, excludeId = null) => {
+  if (!code) return false
+
+  const query = excludeId
+    ? `SELECT ps_id FROM ${Master.products_service.tablename} WHERE ps_code = ? AND ps_id <> ? LIMIT 1`
+    : `SELECT ps_id FROM ${Master.products_service.tablename} WHERE ps_code = ? LIMIT 1`
+
+  const rows = await Query(query, excludeId ? [code, excludeId] : [code])
+  return Array.isArray(rows) && rows.length > 0
+}
+
 const syncProductService = async (req, res, next) => {
   try {
     const inventoryApiKey = process.env._INVENTORY_API_KEY
@@ -95,12 +106,12 @@ const syncProductService = async (req, res, next) => {
       })
     }
 
-const inventoryUrl = `${process.env._INVENTORY_PRODUCT_URL}/accounting/company`;
+    const inventoryUrl = `${process.env._INVENTORY_PRODUCT_URL}/accounting/company`
 
-const companies = await fetchJsonFromUrl(inventoryUrl, {
-  accept: 'application/json',
-  'x-api-key': inventoryApiKey,
-});
+    const companies = await fetchJsonFromUrl(inventoryUrl, {
+      accept: 'application/json',
+      'x-api-key': inventoryApiKey,
+    })
 
     if (!Array.isArray(companies)) {
       throw new Error('Inventory company API returned an unexpected response format')
@@ -109,6 +120,7 @@ const companies = await fetchJsonFromUrl(inventoryUrl, {
     const syncQueries = []
     const baseOrigin = new URL(inventoryUrl).origin
     let inventoriesProcessed = 0
+    const seenCodes = new Set()
 
     for (const company of companies) {
       const companyId = company.id || company.companyId || company.code
@@ -137,7 +149,9 @@ const companies = await fetchJsonFromUrl(inventoryUrl, {
         const externalName = item.inventoryName || item.name || item.description
 
         if (!externalId || !externalName) continue
+        if (seenCodes.has(externalId)) continue
 
+        seenCodes.add(externalId)
         inventoriesProcessed++
 
         const existing = await Query(
@@ -217,6 +231,13 @@ const createProductService = async (req, res, next) => {
         success: false,
         message:
           'Product/Service code, name, type, category, sales price, purchase price and unit are required',
+      })
+    }
+
+    if (await productServiceCodeExists(code)) {
+      return res.status(409).json({
+        success: false,
+        message: 'Product/Service code already exists',
       })
     }
 
@@ -352,6 +373,13 @@ const updateProductService = async (req, res, next) => {
       Master.products_service.prefix_,
     )
     const old = existingProducts[0] || {}
+
+    if (old.code !== code && (await productServiceCodeExists(code, id))) {
+      return res.status(409).json({
+        success: false,
+        message: 'Product/Service code already exists',
+      })
+    }
 
     const updateQuery = sql
       .update(Master.products_service.tablename)
