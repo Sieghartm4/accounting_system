@@ -385,6 +385,79 @@ export default function useSalesForm({
     }
   }
 
+  const createCustomer = async ({ code, name, category, type, status }) => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authorization token found')
+      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code, name, category, type, status }),
+      })
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.message || `HTTP error! status: ${res.status}`)
+      }
+      const result = await res.json()
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to create customer')
+      }
+      await fetchCustomers()
+      return { success: true, data: result.data }
+    } catch (err) {
+      return { success: false, message: err.message }
+    }
+  }
+
+  const createProduct = async ({
+    code,
+    name,
+    type,
+    category,
+    sales_price,
+    purchase_price,
+    unit,
+  }) => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authorization token found')
+      const res = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            code,
+            name,
+            type,
+            category,
+            sales_price,
+            purchase_price,
+            unit,
+          }),
+        },
+      )
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.message || `HTTP error! status: ${res.status}`)
+      }
+      const result = await res.json()
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to create product')
+      }
+      await fetchProducts()
+      return { success: true, data: result.data }
+    } catch (err) {
+      return { success: false, message: err.message }
+    }
+  }
+
   const fetchChartsOfAccounts = async () => {
     try {
       setCoaLoading(true)
@@ -1168,6 +1241,8 @@ export default function useSalesForm({
     handleFileChange,
     loadVatOnDemand,
     loadWhtOnDemand,
+    createCustomer,
+    createProduct,
     handlePostTransaction,
   }
 }

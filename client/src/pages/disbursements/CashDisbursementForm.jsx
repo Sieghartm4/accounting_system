@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
+import RightSideModal from '../../components/RightSideModal'
 import {
   useDisbursementForm,
   useDragToScroll,
@@ -98,6 +99,7 @@ function SearchableDropdown({
   emptyText = 'No results found',
   disabled = false,
   onFocus,
+  dropdownFooter,
 }) {
   const [open, setOpen] = useState(false)
   const anchorRef = useRef(null)
@@ -180,6 +182,11 @@ function SearchableDropdown({
             {emptyText}
           </div>
         )}
+        {dropdownFooter && (
+          <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
+            {dropdownFooter}
+          </div>
+        )}
       </PortalDropdown>
     </div>
   )
@@ -236,6 +243,7 @@ export default function CashDisbursementForm({
     vendorSearch,
     setSelectedVendor,
     setVendorSearch,
+    createVendor,
     chartsOfAccounts,
     coaLoading,
     coaError,
@@ -286,6 +294,119 @@ export default function CashDisbursementForm({
     onBack,
     onSuccess,
   })
+
+  const [isVendorModalOpen, setIsVendorModalOpen] = useState(false)
+  const [vendorCreateLoading, setVendorCreateLoading] = useState(false)
+  const [vendorForm, setVendorForm] = useState({
+    code: '',
+    name: '',
+    category: '',
+    type: '',
+    status: 'active',
+  })
+
+  const openVendorModal = () => {
+    setVendorForm({ code: '', name: '', category: '', type: '', status: 'active' })
+    setIsVendorModalOpen(true)
+  }
+
+  const closeVendorModal = () => {
+    setIsVendorModalOpen(false)
+    setVendorForm({ code: '', name: '', category: '', type: '', status: 'active' })
+  }
+
+  const handleVendorFormSubmit = async (e) => {
+    e.preventDefault()
+    setVendorCreateLoading(true)
+    const result = await createVendor(vendorForm)
+    setVendorCreateLoading(false)
+
+    if (!result.success) {
+      setToast({
+        type: 'error',
+        message: result.message || 'Failed to create vendor',
+      })
+      return
+    }
+
+    const createdVendor = result.data
+    setSelectedVendor(createdVendor.id || '')
+    setVendorSearch(createdVendor.name || createdVendor.code || '')
+    setToast({
+      type: 'success',
+      message: `Vendor "${createdVendor.name || createdVendor.code}" added successfully.`,
+    })
+    closeVendorModal()
+  }
+
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false)
+  const [productCreateLoading, setProductCreateLoading] = useState(false)
+  const [productForm, setProductForm] = useState({
+    code: '',
+    name: '',
+    type: '',
+    category: '',
+    sales_price: '',
+    purchase_price: '',
+    unit: '',
+  })
+
+  const openProductModal = () => {
+    setProductForm({
+      code: '',
+      name: '',
+      type: '',
+      category: '',
+      sales_price: '',
+      purchase_price: '',
+      unit: '',
+    })
+    setIsProductModalOpen(true)
+  }
+
+  const closeProductModal = () => {
+    setIsProductModalOpen(false)
+    setProductForm({
+      code: '',
+      name: '',
+      type: '',
+      category: '',
+      sales_price: '',
+      purchase_price: '',
+      unit: '',
+    })
+  }
+
+  const handleProductFormSubmit = async (e) => {
+    e.preventDefault()
+    setProductCreateLoading(true)
+    const result = await createProduct(productForm)
+    setProductCreateLoading(false)
+
+    if (!result.success) {
+      setToast({
+        type: 'error',
+        message: result.message || 'Failed to create product',
+      })
+      return
+    }
+
+    const createdProduct = result.data
+    const currentItemId = disbursementItems[disbursementItems.length - 1]?.id
+    if (currentItemId) {
+      updateDisbursementItem(currentItemId, 'productId', createdProduct.id || '')
+      updateDisbursementItem(
+        currentItemId,
+        'productSearch',
+        createdProduct.name || createdProduct.code || '',
+      )
+    }
+    setToast({
+      type: 'success',
+      message: `Product "${createdProduct.name || createdProduct.code}" added successfully.`,
+    })
+    closeProductModal()
+  }
 
   const modeOfPaymentOptions = [
     'CASH',
@@ -401,6 +522,21 @@ export default function CashDisbursementForm({
                   options={vendorOptions}
                   inputClassName={inputBase}
                   emptyText={vendorError || 'No vendors found'}
+                  onFocus={() => {
+                    if (!vendorSearch && vendorOptions.length === 0) {
+                      setVendorSearch('')
+                    }
+                  }}
+                  dropdownFooter={
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={openVendorModal}
+                      className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-black text-white text-[11px] font-black rounded-xl hover:bg-red-600 transition-all"
+                    >
+                      <Plus size={12} /> Add Vendor
+                    </button>
+                  }
                 />
               )}
             </fieldset>
@@ -670,6 +806,23 @@ export default function CashDisbursementForm({
                                 options={productOptions}
                                 inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                 emptyText={productError || 'No products found'}
+                                dropdownFooter={
+                                  !isViewMode ? (
+                                    <button
+                                      onPointerDown={(e) => {
+                                        e.preventDefault()
+                                      }}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault()
+                                      }}
+                                      onClick={() => openProductModal()}
+                                      className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-black rounded-lg transition-colors"
+                                    >
+                                      <Plus size={14} />
+                                      Add Product
+                                    </button>
+                                  ) : null
+                                }
                               />
                             )}
                           </td>
@@ -1255,6 +1408,269 @@ export default function CashDisbursementForm({
         </div>
 
         {/* IMAGE MODAL */}
+        {!isViewMode && (
+          <RightSideModal
+            isOpen={isVendorModalOpen}
+            onClose={closeVendorModal}
+            title="Add Vendor"
+          >
+            <form onSubmit={handleVendorFormSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Vendor Code <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={vendorForm.code}
+                    onChange={(e) =>
+                      setVendorForm({ ...vendorForm, code: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter vendor code..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Vendor Name <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={vendorForm.name}
+                    onChange={(e) =>
+                      setVendorForm({ ...vendorForm, name: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter vendor name..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    value={vendorForm.category}
+                    onChange={(e) =>
+                      setVendorForm({ ...vendorForm, category: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter category..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Type
+                  </label>
+                  <select
+                    value={vendorForm.type}
+                    onChange={(e) =>
+                      setVendorForm({ ...vendorForm, type: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="">Select type...</option>
+                    <option value="individual">Individual</option>
+                    <option value="business">Business</option>
+                    <option value="government">Government</option>
+                    <option value="non-profit">Non-Profit</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Status <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    value={vendorForm.status}
+                    onChange={(e) =>
+                      setVendorForm({ ...vendorForm, status: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                    required
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={closeVendorModal}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 text-xs font-black rounded-xl hover:bg-gray-200 transition-all uppercase tracking-widest"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={vendorCreateLoading}
+                  className="flex-1 px-4 py-3 bg-black text-white text-xs font-black rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} />
+                  {vendorCreateLoading ? 'Creating...' : 'Create Vendor'}
+                </button>
+              </div>
+            </form>
+          </RightSideModal>
+        )}
+
+        {!isViewMode && (
+          <RightSideModal
+            isOpen={isProductModalOpen}
+            onClose={closeProductModal}
+            title="Add Product/Service"
+          >
+            <form onSubmit={handleProductFormSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Product/Service Code <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={productForm.code}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, code: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter product/service code..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Product/Service Name <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={productForm.name}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, name: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter product/service name..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Type <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    value={productForm.type}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, type: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                    required
+                  >
+                    <option value="">Select type...</option>
+                    <option value="product">Product</option>
+                    <option value="service">Service</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Category <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={productForm.category}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, category: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter category..."
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                      Sales Price <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={productForm.sales_price}
+                      onChange={(e) =>
+                        setProductForm({
+                          ...productForm,
+                          sales_price: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                      Purchase Price <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={productForm.purchase_price}
+                      onChange={(e) =>
+                        setProductForm({
+                          ...productForm,
+                          purchase_price: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Unit <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    value={productForm.unit}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, unit: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                    required
+                  >
+                    <option value="">Select unit...</option>
+                    <option value="pcs">Pieces</option>
+                    <option value="kg">Kilograms</option>
+                    <option value="l">Liters</option>
+                    <option value="m">Meters</option>
+                    <option value="box">Box</option>
+                    <option value="hour">Hour</option>
+                    <option value="day">Day</option>
+                    <option value="service">Service</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={closeProductModal}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 text-xs font-black rounded-xl hover:bg-gray-200 transition-all uppercase tracking-widest"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={productCreateLoading}
+                  className="flex-1 px-4 py-3 bg-black text-white text-xs font-black rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} />
+                  {productCreateLoading ? 'Creating...' : 'Create Product/Service'}
+                </button>
+              </div>
+            </form>
+          </RightSideModal>
+        )}
+
         {imageModal.isOpen && (
           <div
             className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300"

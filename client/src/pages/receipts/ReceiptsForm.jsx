@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
+import RightSideModal from '../../components/RightSideModal'
 import { useReceiptsForm, useDragToScroll, fmt } from './useReceipts'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ function SearchableDropdown({
   emptyText = 'No results found',
   disabled = false,
   onFocus,
+  dropdownFooter,
 }) {
   const [open, setOpen] = useState(false)
   const anchorRef = useRef(null)
@@ -172,6 +174,11 @@ function SearchableDropdown({
         ) : (
           <div className="px-3 py-3 text-[12px] text-gray-400 text-center">
             {emptyText}
+          </div>
+        )}
+        {dropdownFooter && (
+          <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
+            {dropdownFooter}
           </div>
         )}
       </PortalDropdown>
@@ -278,7 +285,123 @@ export default function ReceiptsForm({
     loadWhtOnDemand,
     handlePostTransaction,
     summary,
+    createCustomer,
+    createProduct,
   } = useReceiptsForm({ isViewMode, isEditMode, receiptData, onBack, onSuccess })
+
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
+  const [customerCreateLoading, setCustomerCreateLoading] = useState(false)
+  const [customerForm, setCustomerForm] = useState({
+    code: '',
+    name: '',
+    category: '',
+    type: '',
+    status: 'active',
+  })
+
+  const openCustomerModal = () => {
+    setCustomerForm({ code: '', name: '', category: '', type: '', status: 'active' })
+    setIsCustomerModalOpen(true)
+  }
+
+  const closeCustomerModal = () => {
+    setIsCustomerModalOpen(false)
+    setCustomerForm({ code: '', name: '', category: '', type: '', status: 'active' })
+  }
+
+  const handleCustomerFormSubmit = async (e) => {
+    e.preventDefault()
+    setCustomerCreateLoading(true)
+    const result = await createCustomer(customerForm)
+    setCustomerCreateLoading(false)
+
+    if (!result.success) {
+      setToast({
+        type: 'error',
+        message: result.message || 'Failed to create customer',
+      })
+      return
+    }
+
+    const createdCustomer = result.data
+    setSelectedCustomer(createdCustomer.name || createdCustomer.customer_name || '')
+    setCustomerSearch(createdCustomer.name || createdCustomer.customer_name || '')
+    setSelectedCustomerId(createdCustomer.id || '')
+    setToast({
+      type: 'success',
+      message: `Customer "${createdCustomer.name || createdCustomer.customer_name}" added successfully.`,
+    })
+    closeCustomerModal()
+  }
+
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false)
+  const [productCreateLoading, setProductCreateLoading] = useState(false)
+  const [productForm, setProductForm] = useState({
+    code: '',
+    name: '',
+    type: '',
+    category: '',
+    sales_price: '',
+    purchase_price: '',
+    unit: '',
+  })
+
+  const openProductModal = () => {
+    setProductForm({
+      code: '',
+      name: '',
+      type: '',
+      category: '',
+      sales_price: '',
+      purchase_price: '',
+      unit: '',
+    })
+    setIsProductModalOpen(true)
+  }
+
+  const closeProductModal = () => {
+    setIsProductModalOpen(false)
+    setProductForm({
+      code: '',
+      name: '',
+      type: '',
+      category: '',
+      sales_price: '',
+      purchase_price: '',
+      unit: '',
+    })
+  }
+
+  const handleProductFormSubmit = async (e) => {
+    e.preventDefault()
+    setProductCreateLoading(true)
+    const result = await createProduct(productForm)
+    setProductCreateLoading(false)
+
+    if (!result.success) {
+      setToast({
+        type: 'error',
+        message: result.message || 'Failed to create product',
+      })
+      return
+    }
+
+    const createdProduct = result.data
+    const currentItemId = receiptItems[receiptItems.length - 1]?.id
+    if (currentItemId) {
+      updateReceiptItem(currentItemId, 'productId', createdProduct.id || '')
+      updateReceiptItem(
+        currentItemId,
+        'productSearch',
+        createdProduct.name || createdProduct.code || '',
+      )
+    }
+    setToast({
+      type: 'success',
+      message: `Product "${createdProduct.name || createdProduct.code}" added successfully.`,
+    })
+    closeProductModal()
+  }
 
   const modeOfPaymentOptions = [
     'CASH',
@@ -403,6 +526,21 @@ export default function ReceiptsForm({
                     options={customerOptions}
                     inputClassName={inputBase}
                     emptyText={customerError || 'No customers found'}
+                    onFocus={() => {
+                      if (!customerSearch && customerOptions.length === 0) {
+                        setCustomerSearch('')
+                      }
+                    }}
+                    dropdownFooter={
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={openCustomerModal}
+                        className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-black text-white text-[11px] font-black rounded-xl hover:bg-red-600 transition-all"
+                      >
+                        <Plus size={12} /> Add Customer
+                      </button>
+                    }
                   />
                 )}
               </fieldset>
@@ -666,6 +804,23 @@ export default function ReceiptsForm({
                                 options={productOptions}
                                 inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                 emptyText={productError || 'No products found'}
+                                dropdownFooter={
+                                  !isDisabled ? (
+                                    <button
+                                      onPointerDown={(e) => {
+                                        e.preventDefault()
+                                      }}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault()
+                                      }}
+                                      onClick={() => openProductModal()}
+                                      className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-black rounded-lg transition-colors"
+                                    >
+                                      <Plus size={14} />
+                                      Add Product
+                                    </button>
+                                  ) : null
+                                }
                               />
                             )}
                           </td>
@@ -1257,6 +1412,270 @@ export default function ReceiptsForm({
             </motion.div>
           </main>
         </div>
+
+        {/* CUSTOMER ADD MODAL */}
+        {!isDisabled && (
+          <RightSideModal
+            isOpen={isCustomerModalOpen}
+            onClose={closeCustomerModal}
+            title="Add Customer"
+          >
+            <form onSubmit={handleCustomerFormSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Customer Code <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={customerForm.code}
+                    onChange={(e) =>
+                      setCustomerForm({ ...customerForm, code: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter customer code..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Customer Name <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={customerForm.name}
+                    onChange={(e) =>
+                      setCustomerForm({ ...customerForm, name: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter customer name..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    value={customerForm.category}
+                    onChange={(e) =>
+                      setCustomerForm({ ...customerForm, category: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter category..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Type
+                  </label>
+                  <select
+                    value={customerForm.type}
+                    onChange={(e) =>
+                      setCustomerForm({ ...customerForm, type: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="">Select type...</option>
+                    <option value="individual">Individual</option>
+                    <option value="business">Business</option>
+                    <option value="government">Government</option>
+                    <option value="non-profit">Non-Profit</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Status <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    value={customerForm.status}
+                    onChange={(e) =>
+                      setCustomerForm({ ...customerForm, status: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                    required
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={closeCustomerModal}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 text-xs font-black rounded-xl hover:bg-gray-200 transition-all uppercase tracking-widest"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={customerCreateLoading}
+                  className="flex-1 px-4 py-3 bg-black text-white text-xs font-black rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} />
+                  {customerCreateLoading ? 'Creating...' : 'Create Customer'}
+                </button>
+              </div>
+            </form>
+          </RightSideModal>
+        )}
+
+        {!isDisabled && (
+          <RightSideModal
+            isOpen={isProductModalOpen}
+            onClose={closeProductModal}
+            title="Add Product/Service"
+          >
+            <form onSubmit={handleProductFormSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Product/Service Code <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={productForm.code}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, code: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter product/service code..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Product/Service Name <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={productForm.name}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, name: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter product/service name..."
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Type <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    value={productForm.type}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, type: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                    required
+                  >
+                    <option value="">Select type...</option>
+                    <option value="product">Product</option>
+                    <option value="service">Service</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Category <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={productForm.category}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, category: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    placeholder="Enter category..."
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                      Sales Price <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={productForm.sales_price}
+                      onChange={(e) =>
+                        setProductForm({
+                          ...productForm,
+                          sales_price: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                      Purchase Price <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={productForm.purchase_price}
+                      onChange={(e) =>
+                        setProductForm({
+                          ...productForm,
+                          purchase_price: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Unit <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    value={productForm.unit}
+                    onChange={(e) =>
+                      setProductForm({ ...productForm, unit: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                    required
+                  >
+                    <option value="">Select unit...</option>
+                    <option value="pcs">Pieces</option>
+                    <option value="kg">Kilograms</option>
+                    <option value="l">Liters</option>
+                    <option value="m">Meters</option>
+                    <option value="box">Box</option>
+                    <option value="hour">Hour</option>
+                    <option value="day">Day</option>
+                    <option value="service">Service</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={closeProductModal}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 text-xs font-black rounded-xl hover:bg-gray-200 transition-all uppercase tracking-widest"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={productCreateLoading}
+                  className="flex-1 px-4 py-3 bg-black text-white text-xs font-black rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} />
+                  {productCreateLoading ? 'Creating...' : 'Create Product/Service'}
+                </button>
+              </div>
+            </form>
+          </RightSideModal>
+        )}
 
         {/* IMAGE MODAL */}
         {imageModal.isOpen && (

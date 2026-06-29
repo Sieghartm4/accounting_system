@@ -250,12 +250,92 @@ export function useReceiptsForm({
       })
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
       const result = await res.json()
-      if (result.success) setCustomers(result.data)
-      else setCustomerError(result.message || 'Failed to fetch customers')
+      if (result.success) {
+        setCustomers(result.data)
+        setCustomerError('')
+      } else {
+        setCustomerError(result.message || 'Failed to fetch customers')
+      }
     } catch (err) {
       setCustomerError(err.message)
     } finally {
       setCustomerLoading(false)
+    }
+  }
+
+  const createCustomer = async ({ code, name, category, type, status }) => {
+    try {
+      setCustomerLoading(true)
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authorization token found')
+      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code, name, category, type, status }),
+      })
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.message || `HTTP error! status: ${res.status}`)
+      }
+      const result = await res.json()
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to create customer')
+      }
+      await fetchCustomers()
+      return { success: true, data: result.data }
+    } catch (err) {
+      return { success: false, message: err.message }
+    } finally {
+      setCustomerLoading(false)
+    }
+  }
+
+  const createProduct = async ({
+    code,
+    name,
+    type,
+    category,
+    sales_price,
+    purchase_price,
+    unit,
+  }) => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authorization token found')
+      const res = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            code,
+            name,
+            type,
+            category,
+            sales_price,
+            purchase_price,
+            unit,
+          }),
+        },
+      )
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.message || `HTTP error! status: ${res.status}`)
+      }
+      const result = await res.json()
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to create product')
+      }
+      await fetchProducts()
+      return { success: true, data: result.data }
+    } catch (err) {
+      return { success: false, message: err.message }
     }
   }
 
@@ -1040,6 +1120,8 @@ export function useReceiptsForm({
     addJournalEntry,
     removeJournalEntry,
     updateJournalEntry,
+    createCustomer,
+    createProduct,
     addAttachment,
     removeAttachment,
     updateAttachment,
