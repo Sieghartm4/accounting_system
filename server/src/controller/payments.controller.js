@@ -1268,8 +1268,8 @@ const getPrintPayments = async (req, res, next) => {
 
   const paymentIds = payment_id
     .split(',')
-    .map((id) => Number(id.trim()))
-    .filter((id) => !isNaN(id))
+    .map((id) => id.trim())
+    .filter((id) => id !== '')
 
   console.log('Converted payment_ids:', paymentIds, 'type:', typeof paymentIds)
 

@@ -2207,8 +2207,8 @@ const getPrintDisbursements = async (req, res, next) => {
 
   const disbursementIds = cash_disbursement_id
     .split(',')
-    .map((id) => Number(id.trim()))
-    .filter((id) => !isNaN(id))
+    .map((id) => id.trim())
+    .filter((id) => id !== '')
 
   console.log(
     'Converted disbursement_ids:',

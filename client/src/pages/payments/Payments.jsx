@@ -177,7 +177,9 @@ function PaymentsContent() {
       const token = localStorage.getItem('token')
       if (!token) throw new Error('No authentication token found')
 
-      const paymentIds = selectedRows.map((row) => row.id).join(',')
+      const paymentIds = selectedRows
+        .map((row) => encodeURIComponent(String(row.id)))
+        .join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/payments/print/${paymentIds}?copyType=${copyType}`,

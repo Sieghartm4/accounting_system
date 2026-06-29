@@ -7,4 +7,4 @@ dashboardRouter.get('/', getDashboardData)
 
 module.exports = {
   dashboardRouter,
-}
+} 

@@ -161,7 +161,9 @@ function CollectionsContent() {
       const token = localStorage.getItem('token')
       if (!token) throw new Error('No authentication token found')
 
-      const collectionIds = selectedRows.map((row) => row.id).join(',')
+      const collectionIds = selectedRows
+        .map((row) => encodeURIComponent(String(row.id)))
+        .join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/collections/print/${collectionIds}?copyType=${copyType}`,

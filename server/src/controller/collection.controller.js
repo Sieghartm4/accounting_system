@@ -1242,8 +1242,8 @@ const getPrintCollections = async (req, res, next) => {
 
   const collectionIds = collection_id
     .split(',')
-    .map((id) => Number(id.trim()))
-    .filter((id) => !isNaN(id))
+    .map((id) => id.trim())
+    .filter((id) => id !== '')
 
   console.log(
     'Converted collection_ids:',

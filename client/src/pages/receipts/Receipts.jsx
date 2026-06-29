@@ -250,7 +250,9 @@ function ReceiptsContent() {
       const token = localStorage.getItem('token')
       if (!token) throw new Error('No authentication token found')
 
-      const receiptIds = selectedRows.map((row) => row.id).join(',')
+      const receiptIds = selectedRows
+        .map((row) => encodeURIComponent(String(row.id)))
+        .join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/receipt/print/${receiptIds}?copyType=${copyType}`,

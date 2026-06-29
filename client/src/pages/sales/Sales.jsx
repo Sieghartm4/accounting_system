@@ -160,7 +160,9 @@ function SalesContent() {
       const token = localStorage.getItem('token')
       if (!token) throw new Error('No authentication token found')
 
-      const salesIds = selectedRows.map((row) => row.id).join(',')
+      const salesIds = selectedRows
+        .map((row) => encodeURIComponent(String(row.id)))
+        .join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/sales/print/${salesIds}?copyType=${copyType}`,

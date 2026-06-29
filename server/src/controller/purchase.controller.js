@@ -249,8 +249,6 @@ const getPurchase = async (req, res, next) => {
       .select([
         { col: Accounting.purchase.selectOptionColumns.id, as: 'id' },
 
-        { col: Accounting.purchase.selectOptionColumns.vendor_id, as: 'vendor_id' },
-
         { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
 
         {

@@ -160,7 +160,9 @@ function PurchaseContent() {
       const token = localStorage.getItem('token')
       if (!token) throw new Error('No authentication token found')
 
-      const purchaseIds = selectedRows.map((row) => row.id).join(',')
+      const purchaseIds = selectedRows
+        .map((row) => encodeURIComponent(String(row.id)))
+        .join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/purchase/print/${purchaseIds}?copyType=${copyType}`,

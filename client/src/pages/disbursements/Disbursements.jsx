@@ -180,7 +180,9 @@ function DisbursementsContent() {
       const token = localStorage.getItem('token')
       if (!token) throw new Error('No authentication token found')
 
-      const disbursementIds = selectedRows.map((row) => row.id).join(',')
+      const disbursementIds = selectedRows
+        .map((row) => encodeURIComponent(String(row.id)))
+        .join(',')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/print/${disbursementIds}?copyType=${copyType}`,
