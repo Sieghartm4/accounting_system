@@ -39,7 +39,7 @@ const createTenantDatabase = async (dbName, userData = null, companyName = null)
     logger.info(`📦 Running migrations for ${dbName}...`)
     try {
       execSync(
-        'npx sequelize-cli db:migrate --migrations-path ./src/database/migrations/subscription_db',
+        'npx sequelize-cli db:migrate --migrations-path ./src/database/migrations/subscription',
         {
           stdio: 'inherit',
           cwd: process.cwd(),
@@ -54,7 +54,7 @@ const createTenantDatabase = async (dbName, userData = null, companyName = null)
     logger.info(`🌱 Running seeders for ${dbName}...`)
     try {
       execSync(
-        'npx sequelize-cli db:seed:all --seeders-path ./src/database/seeders/subscription_db',
+        'npx sequelize-cli db:seed:all --seeders-path ./src/database/seeders/subscription',
         {
           stdio: 'inherit',
           cwd: process.cwd(),
