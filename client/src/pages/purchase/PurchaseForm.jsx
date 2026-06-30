@@ -235,7 +235,14 @@ function SearchableDropdown({
         )}
         {dropdownFooter && (
           <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
-            {dropdownFooter}
+            {React.cloneElement(dropdownFooter, {
+              onClick: (e) => {
+                if (dropdownFooter.props.onClick) {
+                  dropdownFooter.props.onClick(e)
+                }
+                setOpen(false)
+              },
+            })}
           </div>
         )}
       </PortalDropdown>
@@ -1865,6 +1872,160 @@ export default function PurchaseForm({
         </form>
       </RightSideModal>
 
+      {/* Add Product Modal */}
+      <RightSideModal
+        isOpen={isProductModalOpen}
+        onClose={closeProductModal}
+        title="Add Product/Service"
+      >
+        <form onSubmit={handleProductFormSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Product/Service Code <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={productForm.code}
+                onChange={(e) =>
+                  setProductForm({ ...productForm, code: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter product/service code..."
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Product/Service Name <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={productForm.name}
+                onChange={(e) =>
+                  setProductForm({ ...productForm, name: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter product/service name..."
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Type <span className="text-red-600">*</span>
+              </label>
+              <select
+                value={productForm.type}
+                onChange={(e) =>
+                  setProductForm({ ...productForm, type: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                required
+              >
+                <option value="">Select type...</option>
+                <option value="product">Product</option>
+                <option value="service">Service</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Category <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={productForm.category}
+                onChange={(e) =>
+                  setProductForm({ ...productForm, category: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter category..."
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                  Sales Price <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={productForm.sales_price}
+                  onChange={(e) =>
+                    setProductForm({
+                      ...productForm,
+                      sales_price: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                  Purchase Price <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={productForm.purchase_price}
+                  onChange={(e) =>
+                    setProductForm({
+                      ...productForm,
+                      purchase_price: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Unit <span className="text-red-600">*</span>
+              </label>
+              <select
+                value={productForm.unit}
+                onChange={(e) =>
+                  setProductForm({ ...productForm, unit: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                required
+              >
+                <option value="">Select unit...</option>
+                <option value="pcs">Pieces</option>
+                <option value="kg">Kilograms</option>
+                <option value="l">Liters</option>
+                <option value="m">Meters</option>
+                <option value="box">Box</option>
+                <option value="hour">Hour</option>
+                <option value="day">Day</option>
+                <option value="service">Service</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={closeProductModal}
+              className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 text-xs font-black rounded-xl hover:bg-gray-200 transition-all uppercase tracking-widest"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={productCreateLoading}
+              className="flex-1 px-4 py-3 bg-black text-white text-xs font-black rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Plus size={14} />
+              {productCreateLoading ? 'Creating...' : 'Create Product/Service'}
+            </button>
+          </div>
+        </form>
+      </RightSideModal>
+
       {/* TOP NAV */}
       <div className="flex items-center justify-between flex-shrink-0">
         <nav
@@ -2196,9 +2357,13 @@ export default function PurchaseForm({
                               disabled={isViewMode || item.isOther}
                               placeholder="Search product..."
                               value={item.productSearch}
-                              onChange={(v) =>
+                              onChange={(v) => {
                                 updatePurchaseItem(item.id, 'productSearch', v)
-                              }
+                                // Clear productId when user manually changes search text
+                                if (v === '') {
+                                  updatePurchaseItem(item.id, 'productId', '')
+                                }
+                              }}
                               onSelect={(opt) => {
                                 updatePurchaseItem(item.id, 'productId', opt.value)
                                 updatePurchaseItem(

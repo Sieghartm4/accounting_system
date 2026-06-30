@@ -184,7 +184,14 @@ function SearchableDropdown({
         )}
         {dropdownFooter && (
           <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
-            {dropdownFooter}
+            {React.cloneElement(dropdownFooter, {
+              onClick: (e) => {
+                if (dropdownFooter.props.onClick) {
+                  dropdownFooter.props.onClick(e)
+                }
+                setOpen(false)
+              },
+            })}
           </div>
         )}
       </PortalDropdown>
@@ -244,6 +251,7 @@ export default function CashDisbursementForm({
     setSelectedVendor,
     setVendorSearch,
     createVendor,
+    createProduct,
     chartsOfAccounts,
     coaLoading,
     coaError,
