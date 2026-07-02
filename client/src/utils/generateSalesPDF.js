@@ -248,8 +248,8 @@ export async function generateSalesPDF(salesData, copyType = 'internal') {
       },
       columnStyles: {
         0: { halign: 'center', cellWidth: 16 },
-        1: { halign: 'left', cellWidth: 58 },
-        2: { halign: 'left', cellWidth: 55 },
+        1: { halign: 'left' }, // Removed cellWidth: 58 (grows automatically)
+        2: { halign: 'left' }, // Removed cellWidth: 55 (grows automatically)
         3: { halign: 'center', cellWidth: 24 },
         4: { halign: 'right', cellWidth: 36 },
         5: { halign: 'right', cellWidth: 46 },

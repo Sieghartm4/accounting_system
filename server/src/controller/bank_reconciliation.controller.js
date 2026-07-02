@@ -1186,7 +1186,27 @@ const createBankReconciliationSummary = async (req, res, next) => {
     } = req.body
 
     const created_by = req.user?.name || req.user?.username || 'system'
-    const created_date = new Date()
+    // Normalize dates to SQL DATE (YYYY-MM-DD) to avoid DATETIME format issues
+    const toSqlDate = (d) => {
+      if (!d) return null
+      if (typeof d === 'string' && d.length >= 10) return d.slice(0, 10)
+      try {
+        return new Date(d).toISOString().slice(0, 10)
+      } catch (e) {
+        return null
+      }
+    }
+    const sqlStart = toSqlDate(start_date)
+    const sqlEnd = toSqlDate(end_date)
+    const created_date = new Date().toISOString().slice(0, 10)
+
+    if (!sqlStart || !sqlEnd) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Invalid start_date or end_date. Expected a valid date (YYYY-MM-DD or ISO string).',
+      })
+    }
 
     if (
       !br_id ||
@@ -1202,10 +1222,32 @@ const createBankReconciliationSummary = async (req, res, next) => {
       })
     }
 
+    // Check for existing summaries with overlapping date ranges for same bank reconciliation
+    const existingQuery = `
+      SELECT COUNT(*) AS count
+      FROM ${Accounting.bank_reconciliation_summary.tablename}
+      WHERE ${Accounting.bank_reconciliation_summary.selectOptionColumns.br_id} = ?
+        AND NOT (
+          ${Accounting.bank_reconciliation_summary.selectOptionColumns.end_date} < ?
+          OR ${Accounting.bank_reconciliation_summary.selectOptionColumns.start_date} > ?
+        )
+    `
+
+    const existingResult = await Query(existingQuery, [br_id, sqlStart, sqlEnd])
+    const existingCount = existingResult?.[0]?.count || 0
+
+    if (existingCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message:
+          'A bank reconciliation for the selected date range already exists and cannot be saved again.',
+      })
+    }
+
     const summaryValues = [
       br_id || null,
-      start_date || null,
-      end_date || null,
+      sqlStart || null,
+      sqlEnd || null,
       parseFloat(adjusted_bank_balance) || 0,
       parseFloat(adjusted_book_balance) || 0,
       final_output || null,

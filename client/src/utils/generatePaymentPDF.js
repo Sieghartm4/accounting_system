@@ -239,8 +239,8 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
       },
       columnStyles: {
         0: { halign: 'center', cellWidth: 14 },
-        1: { halign: 'left', cellWidth: 44 },
-        2: { halign: 'left', cellWidth: 48 },
+        1: { halign: 'left' }, // Auto-grows to perfectly fill the right side gap
+        2: { halign: 'left' }, // Auto-grows to perfectly fill the right side gap
         3: { halign: 'left', cellWidth: 50 },
         4: { halign: 'center', cellWidth: 20 },
         5: { halign: 'right', cellWidth: 32 },

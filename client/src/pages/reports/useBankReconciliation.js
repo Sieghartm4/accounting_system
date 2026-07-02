@@ -1627,9 +1627,29 @@ export function useBankReconciliation(selectedReconciliation) {
       return sum + (c - d)
     }, 0)
 
-  const bankStatementEndingBalance = parseFloat(
-    reconData?.bank_statement_balance || 0,
+  const totalReconciliationDebits = items.reduce((sum, item) => {
+    return sum + (parseFloat(item.debit || item.bri_debit || 0) || 0)
+  }, 0)
+
+  const totalReconciliationCredits = items.reduce((sum, item) => {
+    return sum + (parseFloat(item.credit || item.bri_credit || 0) || 0)
+  }, 0)
+
+  const computedBankStatementBalance = Math.abs(
+    totalReconciliationDebits - totalReconciliationCredits,
   )
+
+  const hasExplicitBankStatementBalance =
+    reconData &&
+    Object.prototype.hasOwnProperty.call(reconData, 'bank_statement_balance') &&
+    reconData.bank_statement_balance !== null &&
+    reconData.bank_statement_balance !== ''
+
+  const bankStatementEndingBalance = hasExplicitBankStatementBalance
+    ? Math.abs(
+        parseFloat(reconData.bank_statement_balance) || computedBankStatementBalance,
+      )
+    : computedBankStatementBalance
 
   const bankAdditions = bankSectionItems.reduce((sum, item) => {
     const debit = Math.abs(parseFloat(item.bri_debit || item.debit || 0))

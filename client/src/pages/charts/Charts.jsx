@@ -1,61 +1,89 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { BookOpen, FilePlus, ShieldCheck, PieChart, ArrowRight, Download, Plus, Edit2 } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import RightSideModal from '../../components/RightSideModal';
-import DynamicToast from '../../components/DynamicToast';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import useChartsOfAccounts from './useChartsOfAccounts';
+import React, { useState } from 'react'
+import { motion } from 'framer-motion'
+import {
+  BookOpen,
+  FilePlus,
+  ShieldCheck,
+  PieChart,
+  ArrowRight,
+  Download,
+  Plus,
+  Edit2,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import RightSideModal from '../../components/RightSideModal'
+import DynamicToast from '../../components/DynamicToast'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import useChartsOfAccounts from './useChartsOfAccounts'
 
 function ChartsOfAccountsContent() {
-  const { chartsOfAccounts, loading, error, createChartsOfAccount, updateChartsOfAccount } = useChartsOfAccounts();
+  const {
+    chartsOfAccounts,
+    loading,
+    error,
+    createChartsOfAccount,
+    updateChartsOfAccount,
+  } = useChartsOfAccounts()
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingChart, setEditingChart] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingChart, setEditingChart] = useState(null)
   const [formData, setFormData] = useState({
     code: '',
     name: '',
     type: '',
     description: '',
-    status: 'active'
-  });
-  const [toast, setToast] = useState(null);
+    status: 'active',
+  })
+  const [toast, setToast] = useState(null)
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
+
+  const normalizeStatus = (status) => {
+    const normalized = String(status || 'active')
+      .trim()
+      .toLowerCase()
+    return normalized === 'inactive' ? 'inactive' : 'active'
+  }
 
   const handleAddAccountClick = (chartData = null) => {
     if (chartData) {
-      setEditingChart(chartData);
+      setEditingChart(chartData)
       setFormData({
         code: chartData.code || '',
         name: chartData.name || '',
         type: chartData.type || '',
         description: chartData.description || '',
-        status: chartData.status || 'active'
-      });
+        status: normalizeStatus(chartData.status),
+      })
     } else {
-      setEditingChart(null);
-      setFormData({ code: '', name: '', type: '', description: '', status: 'active' });
+      setEditingChart(null)
+      setFormData({
+        code: '',
+        name: '',
+        type: '',
+        description: '',
+        status: 'active',
+      })
     }
-    setIsModalOpen(true);
-  };
+    setIsModalOpen(true)
+  }
 
   const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingChart(null);
-    setFormData({ code: '', name: '', type: '', description: '', status: 'active' });
-  };
+    setIsModalOpen(false)
+    setEditingChart(null)
+    setFormData({ code: '', name: '', type: '', description: '', status: 'active' })
+  }
 
   const handleToastClose = () => {
-    setToast(null);
-  };
+    setToast(null)
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     try {
       const result = editingChart
         ? await updateChartsOfAccount(
@@ -64,44 +92,47 @@ function ChartsOfAccountsContent() {
             formData.name,
             formData.type,
             formData.description,
-            formData.status
+            formData.status,
           )
         : await createChartsOfAccount(
             formData.code,
             formData.name,
             formData.type,
             formData.description,
-            formData.status
-          );
-      
+          )
+
       if (result.success) {
         setToast({
           type: 'success',
-          message: `Chart of Account "${formData.name}" ${editingChart ? 'updated' : 'created'} successfully!`
-        });
-        setIsModalOpen(false);
-        setEditingChart(null);
+          message: `Chart of Account "${formData.name}" ${editingChart ? 'updated' : 'created'} successfully!`,
+        })
+        setIsModalOpen(false)
+        setEditingChart(null)
       } else {
         setToast({
           type: 'error',
-          message: result.message || `Failed to ${editingChart ? 'update' : 'create'} chart of account`
-        });
+          message:
+            result.message ||
+            `Failed to ${editingChart ? 'update' : 'create'} chart of account`,
+        })
       }
     } catch (error) {
       setToast({
         type: 'error',
-        message: `Network error occurred while ${editingChart ? 'updating' : 'creating'} chart of account`
-      });
+        message: `Network error occurred while ${editingChart ? 'updating' : 'creating'} chart of account`,
+      })
     }
-  };
+  }
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Loading Financial Structure...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Loading Financial Structure...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -112,12 +143,11 @@ function ChartsOfAccountsContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-      
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
         {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -126,7 +156,7 @@ function ChartsOfAccountsContent() {
           <span className="text-black">Chart of Accounts</span>
         </nav> */}
 
-        <motion.div 
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -152,7 +182,10 @@ function ChartsOfAccountsContent() {
               EXPORT COA
             </button>
             <ProtectedAction routeName="charts">
-              <button onClick={handleAddAccountClick} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button
+                onClick={() => handleAddAccountClick()}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
                 <FilePlus size={14} />
                 New Account
               </button>
@@ -162,29 +195,29 @@ function ChartsOfAccountsContent() {
 
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard 
-            icon={<BookOpen className="text-red-600" size={20} />} 
-            label="Total Accounts" 
-            value={chartsOfAccounts?.length || 0} 
+          <SummaryCard
+            icon={<BookOpen className="text-red-600" size={20} />}
+            label="Total Accounts"
+            value={chartsOfAccounts?.length || 0}
             subText="Active COA"
           />
-          <SummaryCard 
-            icon={<PieChart className="text-black" size={20} />} 
-            label="Main Categories" 
-            value="5" 
+          <SummaryCard
+            icon={<PieChart className="text-black" size={20} />}
+            label="Main Categories"
+            value="5"
             subText="Asset/Liab/Eq/Inc/Exp"
           />
-          <SummaryCard 
-            icon={<ShieldCheck className="text-gray-400" size={20} />} 
-            label="Status" 
-            value="Audit" 
+          <SummaryCard
+            icon={<ShieldCheck className="text-gray-400" size={20} />}
+            label="Status"
+            value="Audit"
             subText="Verified Ready"
           />
         </div>
       </div>
 
       {/* --- TABLE SECTION --- */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -199,17 +232,19 @@ function ChartsOfAccountsContent() {
             {
               label: 'Edit',
               onClick: (row) => handleAddAccountClick(row),
-              icon: <Edit2 size={16} />
-            }
+              icon: <Edit2 size={16} />,
+            },
           ]}
         />
       </motion.div>
-      
+
       {/* Add/Edit Chart of Account Modal */}
-      <RightSideModal 
-        isOpen={isModalOpen} 
-        onClose={handleCloseModal} 
-        title={editingChart ? "Edit Chart of Account" : "Create New Chart of Account"}
+      <RightSideModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        title={
+          editingChart ? 'Edit Chart of Account' : 'Create New Chart of Account'
+        }
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
@@ -220,13 +255,13 @@ function ChartsOfAccountsContent() {
               <input
                 type="text"
                 value={formData.code}
-                onChange={(e) => setFormData({...formData, code: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter account code..."
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Account Name <span className="text-red-600">*</span>
@@ -234,20 +269,20 @@ function ChartsOfAccountsContent() {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter account name..."
                 required
               />
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Account Type <span className="text-red-600">*</span>
               </label>
               <select
                 value={formData.type}
-                onChange={(e) => setFormData({...formData, type: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
@@ -259,37 +294,43 @@ function ChartsOfAccountsContent() {
                 <option value="EXPENSES">Expenses</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 Description <span className="text-red-600">*</span>
               </label>
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all resize-none"
                 placeholder="Enter account description..."
                 rows={3}
                 required
               />
             </div>
-            
-            <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                Status <span className="text-red-600">*</span>
-              </label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({...formData, status: e.target.value})}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
-                required
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
+
+            {editingChart && (
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                  Status <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) =>
+                    setFormData({ ...formData, status: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                  required
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            )}
           </div>
-          
+
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -308,7 +349,7 @@ function ChartsOfAccountsContent() {
           </div>
         </form>
       </RightSideModal>
-      
+
       {/* Toast Notification */}
       {toast && (
         <DynamicToast
@@ -319,7 +360,7 @@ function ChartsOfAccountsContent() {
         />
       )}
     </div>
-  );
+  )
 }
 
 function SummaryCard({ icon, label, value, subText }) {
@@ -327,14 +368,18 @@ function SummaryCard({ icon, label, value, subText }) {
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 export default function ChartsOfAccounts() {
@@ -342,5 +387,5 @@ export default function ChartsOfAccounts() {
     <RouteProtection routeName="charts">
       <ChartsOfAccountsContent />
     </RouteProtection>
-  );
+  )
 }

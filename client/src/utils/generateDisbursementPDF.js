@@ -13,6 +13,22 @@ export async function generateDisbursementPDF(
     ? disbursementData
     : [disbursementData]
 
+  // Debug logging
+  console.log('[PDF Generator] Received disbursements:', disbursements)
+  disbursements.forEach((d, idx) => {
+    console.log(`[PDF Generator] Disbursement ${idx}:`, {
+      id: d.id,
+      vendor: d.vendor_name || d.vendor || d.customer_name || d.customer,
+      date:
+        d.payment_date ||
+        d.disbursement_date ||
+        d.collection_date ||
+        d.date ||
+        d.created_at,
+      company: d.company?.company_name,
+    })
+  })
+
   for (let idx = 0; idx < disbursements.length; idx++) {
     const disbursement = disbursements[idx]
 
@@ -96,30 +112,45 @@ export async function generateDisbursementPDF(
     y += 13
 
     // ── PARTY / DOC INFO ──────────────────────────────────────────────────────
+    // Resolve vendor/customer name with fallbacks
+    const vendorName =
+      disbursement.vendor_name ||
+      disbursement.vendor ||
+      disbursement.customer_name ||
+      disbursement.customer ||
+      '—'
+
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(...BLACK)
-    doc.text(disbursement.customer || '—', margin, y)
+    doc.text(vendorName, margin, y)
 
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DGRAY)
-    doc.text(disbursement.customer_tin || '000-000-000-00000', margin, y + 12)
+    const tinValue =
+      disbursement.vendor_tin || disbursement.customer_tin || '000-000-000-00000'
+    doc.text(tinValue, margin, y + 12)
 
     const INFO_LABEL_X = margin + contentW * 0.52
     const INFO_VALUE_X = INFO_LABEL_X + 92
 
+    // Resolve payment date with multiple fallbacks
     let paymentDate = '—'
-    if (disbursement.collection_date) {
+    const dateField =
+      disbursement.payment_date ||
+      disbursement.disbursement_date ||
+      disbursement.collection_date ||
+      disbursement.date ||
+      disbursement.created_at
+
+    if (dateField) {
       try {
-        paymentDate = new Date(disbursement.collection_date).toLocaleDateString(
-          'en-US',
-          {
-            month: 'short',
-            day: '2-digit',
-            year: 'numeric',
-          },
-        )
+        paymentDate = new Date(dateField).toLocaleDateString('en-US', {
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric',
+        })
       } catch (_) {}
     }
 
@@ -245,8 +276,8 @@ export async function generateDisbursementPDF(
       },
       columnStyles: {
         0: { halign: 'center', cellWidth: 16 },
-        1: { halign: 'left', cellWidth: 58 },
-        2: { halign: 'left', cellWidth: 55 },
+        1: { halign: 'left' }, // Removed cellWidth: 58 (grows automatically)
+        2: { halign: 'left' }, // Removed cellWidth: 55 (grows automatically)
         3: { halign: 'center', cellWidth: 24 },
         4: { halign: 'right', cellWidth: 36 },
         5: { halign: 'right', cellWidth: 46 },

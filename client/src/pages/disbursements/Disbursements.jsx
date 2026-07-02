@@ -204,8 +204,22 @@ function DisbursementsContent() {
       // Extract the actual disbursement data from the response
       const data = result.data || []
       console.log('PDF Data received:', data)
+      console.log('First disbursement:', data[0])
       console.log('First disbursement items:', data[0]?.items)
       console.log('First disbursement journal:', data[0]?.journal)
+      console.log('Vendor/Customer info:', {
+        customer: data[0]?.customer,
+        vendor_name: data[0]?.vendor_name,
+        vendor: data[0]?.vendor,
+        customer_name: data[0]?.customer_name,
+      })
+      console.log('Payment date info:', {
+        payment_date: data[0]?.payment_date,
+        disbursement_date: data[0]?.disbursement_date,
+        collection_date: data[0]?.collection_date,
+        date: data[0]?.date,
+        created_at: data[0]?.created_at,
+      })
       if (!Array.isArray(data))
         throw new Error('Invalid data format received from server')
 

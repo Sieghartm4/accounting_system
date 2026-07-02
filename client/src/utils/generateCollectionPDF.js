@@ -253,17 +253,17 @@ export async function generateCollectionPDF(collectionData, copyType = 'internal
       },
       columnStyles: {
         0: { halign: 'center', cellWidth: 14 },
-        1: { halign: 'left', cellWidth: 50 },
-        2: { halign: 'left', cellWidth: 50 },
+        1: { halign: 'left' }, // Auto-grows to perfectly fill the right side gap
+        2: { halign: 'left' }, // Auto-grows to perfectly fill the right side gap
         3: { halign: 'left', cellWidth: 50 },
-        4: { halign: 'center', cellWidth: 22 },
+        4: { halign: 'center', cellWidth: 20 },
         5: { halign: 'right', cellWidth: 32 },
         6: { halign: 'right', cellWidth: 40 },
-        7: { halign: 'right', cellWidth: 40 },
+        7: { halign: 'right', cellWidth: 36 },
         8: { halign: 'right', cellWidth: 36 },
-        9: { halign: 'center', cellWidth: 22 },
+        9: { halign: 'center', cellWidth: 20 },
         10: { halign: 'right', cellWidth: 36 },
-        11: { halign: 'center', cellWidth: 22 },
+        11: { halign: 'center', cellWidth: 20 },
         12: { halign: 'right', cellWidth: 36 },
         13: { halign: 'right', cellWidth: 40 },
       },
