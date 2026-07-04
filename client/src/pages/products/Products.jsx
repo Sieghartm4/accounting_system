@@ -97,6 +97,54 @@ function ProductServiceContent() {
     setToast(null)
   }
 
+  const handleExportCatalog = () => {
+    try {
+      if (!Array.isArray(productService) || productService.length === 0) {
+        setToast({ type: 'error', message: 'No products/services to export' })
+        return
+      }
+
+      const exclude = new Set(['id', '_id', 'action'])
+      const rawHeaders = Object.keys(productService[0] || {})
+      const headers = rawHeaders.filter((h) => !exclude.has(h))
+
+      const csvRows = []
+      csvRows.push(headers.join(','))
+
+      productService.forEach((row) => {
+        const values = headers.map((h) => {
+          let val = row[h]
+          if (val === null || val === undefined) return ''
+          if (typeof val === 'object') {
+            try {
+              val = JSON.stringify(val)
+            } catch (e) {
+              val = String(val)
+            }
+          }
+          const escaped = String(val).replace(/"/g, '""')
+          return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped
+        })
+        csvRows.push(values.join(','))
+      })
+
+      const csvContent = csvRows.join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `product_catalog_${Date.now()}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      setToast({ type: 'success', message: 'Export started' })
+    } catch (err) {
+      setToast({ type: 'error', message: 'Failed to export CSV' })
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
@@ -218,7 +266,10 @@ function ProductServiceContent() {
               <ArrowRight size={14} />
               {syncing ? 'Syncing...' : 'Sync Inventory'}
             </button>
-            <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
+            <button
+              onClick={handleExportCatalog}
+              className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm"
+            >
               <Download size={14} />
               EXPORT CATALOG
             </button>

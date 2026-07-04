@@ -1,23 +1,42 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { FileText, Percent, ShieldCheck, Clock, ArrowRight, Download, Plus, X, Edit2, Save, Receipt } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import RightSideModal from '../../components/RightSideModal';
-import DynamicToast from '../../components/DynamicToast';
-import useWithholdingTax from './useWithholdingTax';
+import React, { useState } from 'react'
+import { motion } from 'framer-motion'
+import {
+  FileText,
+  Percent,
+  ShieldCheck,
+  Clock,
+  ArrowRight,
+  Download,
+  Plus,
+  X,
+  Edit2,
+  Save,
+  Receipt,
+} from 'lucide-react'
+import DynamicTable from '../../components/DynamicTable'
+import RouteProtection from '../../components/RouteProtection'
+import ProtectedAction from '../../components/ProtectedAction'
+import RightSideModal from '../../components/RightSideModal'
+import DynamicToast from '../../components/DynamicToast'
+import useWithholdingTax from './useWithholdingTax'
 
 function WithholdingTaxContent() {
-  const { withholdingTax, loading, error, createWithholdingTaxEntry, updateWithholdingTaxEntry, refreshWithholdingTax } = useWithholdingTax();
+  const {
+    withholdingTax,
+    loading,
+    error,
+    createWithholdingTaxEntry,
+    updateWithholdingTaxEntry,
+    refreshWithholdingTax,
+  } = useWithholdingTax()
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingWithholdingTax, setEditingWithholdingTax] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingWithholdingTax, setEditingWithholdingTax] = useState(null)
   const [formData, setFormData] = useState({
     id: '',
     code: '',
@@ -25,50 +44,111 @@ function WithholdingTaxContent() {
     rate: '',
     tax_account: '',
     description: '',
-    status: 'ACTIVE'
-  });
-  const [toast, setToast] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+    status: 'ACTIVE',
+  })
+  const [toast, setToast] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const withholdingTaxStatuses = ['ACTIVE', 'INACTIVE'];
+  const handleExportWithholdingTax = () => {
+    try {
+      if (!Array.isArray(withholdingTax) || withholdingTax.length === 0) {
+        setToast({ type: 'error', message: 'No withholding tax data to export' })
+        return
+      }
+
+      const exclude = new Set(['id', '_id', 'action'])
+      const rawHeaders = Object.keys(withholdingTax[0] || {})
+      const headers = rawHeaders.filter((h) => !exclude.has(h))
+
+      const csvRows = []
+      csvRows.push(headers.join(','))
+
+      withholdingTax.forEach((row) => {
+        const values = headers.map((h) => {
+          let val = row[h]
+          if (val === null || val === undefined) return ''
+          if (typeof val === 'object') {
+            try {
+              val = JSON.stringify(val)
+            } catch (e) {
+              val = String(val)
+            }
+          }
+          const escaped = String(val).replace(/"/g, '""')
+          return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped
+        })
+        csvRows.push(values.join(','))
+      })
+
+      const csvContent = csvRows.join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `withholding_tax_${Date.now()}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      setToast({ type: 'success', message: 'Export started' })
+    } catch (err) {
+      setToast({ type: 'error', message: 'Failed to export withholding tax data' })
+    }
+  }
+
+  const withholdingTaxStatuses = ['ACTIVE', 'INACTIVE']
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
+    const { name, value } = e.target
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
-    }));
-  };
+      [name]: value,
+    }))
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+    e.preventDefault()
+    setIsSubmitting(true)
 
-    let result;
+    let result
     if (editingWithholdingTax) {
-      result = await updateWithholdingTaxEntry(editingWithholdingTax.id, formData);
+      result = await updateWithholdingTaxEntry(editingWithholdingTax.id, formData)
     } else {
-      result = await createWithholdingTaxEntry(formData);
+      result = await createWithholdingTaxEntry(formData)
     }
-    
+
     if (result.success) {
-      setToast({ 
-        type: 'success', 
-        message: `Withholding Tax entry ${editingWithholdingTax ? 'updated' : 'created'} successfully!` 
-      });
-      setFormData({ id: '', code: '', name: '', rate: '', tax_account: '', description: '', status: 'ACTIVE' });
-      setEditingWithholdingTax(null);
-      setIsModalOpen(false);
+      setToast({
+        type: 'success',
+        message: `Withholding Tax entry ${editingWithholdingTax ? 'updated' : 'created'} successfully!`,
+      })
+      setFormData({
+        id: '',
+        code: '',
+        name: '',
+        rate: '',
+        tax_account: '',
+        description: '',
+        status: 'ACTIVE',
+      })
+      setEditingWithholdingTax(null)
+      setIsModalOpen(false)
     } else {
-      setToast({ type: 'error', message: result.error || `Failed to ${editingWithholdingTax ? 'update' : 'create'} Withholding Tax entry` });
+      setToast({
+        type: 'error',
+        message:
+          result.error ||
+          `Failed to ${editingWithholdingTax ? 'update' : 'create'} Withholding Tax entry`,
+      })
     }
-    
-    setIsSubmitting(false);
-  };
+
+    setIsSubmitting(false)
+  }
 
   const openModal = (withholdingTaxData = null) => {
     if (withholdingTaxData) {
-      setEditingWithholdingTax(withholdingTaxData);
+      setEditingWithholdingTax(withholdingTaxData)
       setFormData({
         id: withholdingTaxData.id || '',
         code: withholdingTaxData.code || '',
@@ -76,33 +156,43 @@ function WithholdingTaxContent() {
         rate: withholdingTaxData.rate || '',
         tax_account: withholdingTaxData.tax_account || '',
         description: withholdingTaxData.description || '',
-        status: withholdingTaxData.status || 'ACTIVE'
-      });
+        status: withholdingTaxData.status || 'ACTIVE',
+      })
     } else {
-      setEditingWithholdingTax(null);
-      setFormData({ id: '', code: '', name: '', rate: '', tax_account: '', description: '', status: 'ACTIVE' });
+      setEditingWithholdingTax(null)
+      setFormData({
+        id: '',
+        code: '',
+        name: '',
+        rate: '',
+        tax_account: '',
+        description: '',
+        status: 'ACTIVE',
+      })
     }
-    setIsModalOpen(true);
-  };
+    setIsModalOpen(true)
+  }
 
   const formatRate = (rate) => {
-    return `${rate}%`;
-  };
+    return `${rate}%`
+  }
 
   const getStatusBadge = (status) => {
-    const baseClasses = "px-2 py-1 text-xs font-bold rounded-full";
-    return status === 'ACTIVE' 
+    const baseClasses = 'px-2 py-1 text-xs font-bold rounded-full'
+    return status === 'ACTIVE'
       ? `${baseClasses} bg-green-100 text-green-800`
-      : `${baseClasses} bg-red-100 text-red-800`;
-  };
+      : `${baseClasses} bg-red-100 text-red-800`
+  }
 
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">Fetching Withholding Tax Data...</p>
+        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+          Fetching Withholding Tax Data...
+        </p>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -113,21 +203,20 @@ function WithholdingTaxContent() {
           <p className="text-red-600 text-sm mt-1">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   // Transform data for table display
-  const transformedWithholdingTaxData = withholdingTax.map(item => ({
+  const transformedWithholdingTaxData = withholdingTax.map((item) => ({
     ...item,
-    rate: formatRate(item.rate)
-  }));
+    rate: formatRate(item.rate),
+  }))
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-      
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
-        <motion.div 
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
@@ -139,18 +228,25 @@ function WithholdingTaxContent() {
                 <Receipt size={24} />
               </div>
               <h1 className="text-4xl font-black text-black tracking-tighter">
-                Withholding <span className="text-red-600 italic">Tax Management</span>
+                Withholding{' '}
+                <span className="text-red-600 italic">Tax Management</span>
               </h1>
             </div>
           </div>
 
           <div className="flex gap-3">
-            <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
+            <button
+              onClick={handleExportWithholdingTax}
+              className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm"
+            >
               <Download size={14} />
               EXPORT DATA
             </button>
             <ProtectedAction routeName="witholding_tax">
-              <button onClick={() => openModal()} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
+              <button
+                onClick={() => openModal()}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+              >
                 <Plus size={14} />
                 New WHT
               </button>
@@ -160,29 +256,29 @@ function WithholdingTaxContent() {
 
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard 
-            icon={<Receipt className="text-red-600" size={20} />} 
-            label="Total WHT Rates" 
-            value={withholdingTax?.length || 0} 
+          <SummaryCard
+            icon={<Receipt className="text-red-600" size={20} />}
+            label="Total WHT Rates"
+            value={withholdingTax?.length || 0}
             subText="Configured"
           />
-          <SummaryCard 
-            icon={<ShieldCheck className="text-green-600" size={20} />} 
-            label="Active Rates" 
-            value={withholdingTax?.filter(w => w.status === 'ACTIVE').length || 0} 
+          <SummaryCard
+            icon={<ShieldCheck className="text-green-600" size={20} />}
+            label="Active Rates"
+            value={withholdingTax?.filter((w) => w.status === 'ACTIVE').length || 0}
             subText="In Use"
           />
-          <SummaryCard 
-            icon={<Clock className="text-black" size={20} />} 
-            label="System Status" 
-            value="Active" 
+          <SummaryCard
+            icon={<Clock className="text-black" size={20} />}
+            label="System Status"
+            value="Active"
             subText="Operational"
           />
         </div>
       </div>
 
       {/* --- TABLE SECTION --- */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -196,18 +292,19 @@ function WithholdingTaxContent() {
           actionButtons={[
             {
               label: 'Edit',
-              onClick: (row) => openModal(withholdingTax.find(item => item.id === row.id)),
-              icon: <Edit2 size={16} />
-            }
+              onClick: (row) =>
+                openModal(withholdingTax.find((item) => item.id === row.id)),
+              icon: <Edit2 size={16} />,
+            },
           ]}
           badgeColumns={[
             {
               column: 'status',
               values: {
-                'ACTIVE': 'green',
-                'INACTIVE': 'red'
-              }
-            }
+                ACTIVE: 'green',
+                INACTIVE: 'red',
+              },
+            },
           ]}
         />
       </motion.div>
@@ -216,7 +313,11 @@ function WithholdingTaxContent() {
       <RightSideModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingWithholdingTax ? "Edit Withholding Tax Entry" : "Create New Withholding Tax Entry"}
+        title={
+          editingWithholdingTax
+            ? 'Edit Withholding Tax Entry'
+            : 'Create New Withholding Tax Entry'
+        }
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -309,8 +410,10 @@ function WithholdingTaxContent() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
               required
             >
-              {withholdingTaxStatuses.map(status => (
-                <option key={status} value={status}>{status}</option>
+              {withholdingTaxStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
               ))}
             </select>
           </div>
@@ -328,7 +431,11 @@ function WithholdingTaxContent() {
               disabled={isSubmitting}
               className="flex-1 px-4 py-3 bg-black text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'SAVING...' : (editingWithholdingTax ? 'UPDATE WHT' : 'CREATE WHT')}
+              {isSubmitting
+                ? 'SAVING...'
+                : editingWithholdingTax
+                  ? 'UPDATE WHT'
+                  : 'CREATE WHT'}
             </button>
           </div>
         </form>
@@ -343,7 +450,7 @@ function WithholdingTaxContent() {
         />
       )}
     </div>
-  );
+  )
 }
 
 function SummaryCard({ icon, label, value, subText }) {
@@ -351,14 +458,18 @@ function SummaryCard({ icon, label, value, subText }) {
     <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">{label}</p>
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+          {label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">{subText}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase">
+            {subText}
+          </span>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 export default function WithholdingTax() {
@@ -366,5 +477,5 @@ export default function WithholdingTax() {
     <RouteProtection routeName="witholding_tax">
       <WithholdingTaxContent />
     </RouteProtection>
-  );
+  )
 }

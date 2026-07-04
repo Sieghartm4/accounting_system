@@ -279,10 +279,11 @@ function CustomerContent() {
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
               >
                 <option value="">Select type...</option>
-                <option value="individual">Individual</option>
-                <option value="business">Business</option>
-                <option value="government">Government</option>
-                <option value="non-profit">Non-Profit</option>
+                <option value="Individual">Individual</option>
+                <option value="Partnership">Partnership</option>
+                <option value="Corporation">Corporation</option>
+                <option value="Government">Government</option>
+                <option value="Non - Profit">Non - Profit</option>
               </select>
             </div>
 
