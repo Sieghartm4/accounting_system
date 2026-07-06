@@ -7,6 +7,7 @@ const {
   Insert,
   SelectWithCondition,
 } = require('../database/util/queries.util')
+const { getTenantPool } = require('../database/util/tenantConnection.util')
 const {
   formatMemoryUsage,
   formatTime,
@@ -18,12 +19,179 @@ const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
 
+const getInfoTableColumns = async (tableName) => {
+  const query = `
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = ?
+  `
+  const rows = await Query(query, [tableName])
+  return rows.map((row) => row.COLUMN_NAME)
+}
+
+const buildCustomerInfoInsertQuery = (
+  columns,
+  code,
+  name,
+  address,
+  tin,
+  details,
+  contact,
+  id,
+) => {
+  if (!columns || columns.length === 0) return null
+
+  const cols = []
+  const placeholders = []
+  const values = []
+
+  if (columns.includes('ci_customer_id')) {
+    cols.push('ci_customer_id')
+    if (typeof id !== 'undefined' && id !== null) {
+      placeholders.push('?')
+      values.push(id)
+    } else {
+      placeholders.push('LAST_INSERT_ID()')
+    }
+  }
+  if (columns.includes('ci_customer_code')) {
+    cols.push('ci_customer_code')
+    placeholders.push('?')
+    values.push(code || null)
+  }
+  if (columns.includes('ci_customer_name')) {
+    cols.push('ci_customer_name')
+    placeholders.push('?')
+    values.push(name || null)
+  }
+  if (columns.includes('ci_address')) {
+    cols.push('ci_address')
+    placeholders.push('?')
+    values.push(address || null)
+  }
+  if (columns.includes('ci_tin')) {
+    cols.push('ci_tin')
+    placeholders.push('?')
+    values.push(tin || null)
+  }
+  if (columns.includes('ci_details')) {
+    cols.push('ci_details')
+    placeholders.push('?')
+    values.push(details || null)
+  }
+  if (columns.includes('ci_contact')) {
+    cols.push('ci_contact')
+    placeholders.push('?')
+    values.push(contact || null)
+  }
+
+  if (cols.length === 0) return null
+
+  return {
+    sql: `INSERT INTO customers_information (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`,
+    values,
+  }
+}
+
+const buildCustomerInfoUpdateQuery = (
+  columns,
+  keyColumn,
+  keyValue,
+  oldCode,
+  oldName,
+  code,
+  name,
+  address,
+  tin,
+  details,
+  contact,
+) => {
+  if (!keyColumn) return null
+
+  const sets = []
+  const values = []
+
+  if (columns.includes('ci_customer_code')) {
+    sets.push('ci_customer_code = ?')
+    values.push(code || null)
+  }
+  if (columns.includes('ci_customer_name')) {
+    sets.push('ci_customer_name = ?')
+    values.push(name || null)
+  }
+  if (columns.includes('ci_address')) {
+    sets.push('ci_address = ?')
+    values.push(address || null)
+  }
+  if (columns.includes('ci_tin')) {
+    sets.push('ci_tin = ?')
+    values.push(tin || null)
+  }
+  if (columns.includes('ci_details')) {
+    sets.push('ci_details = ?')
+    values.push(details || null)
+  }
+  if (columns.includes('ci_contact')) {
+    sets.push('ci_contact = ?')
+    values.push(contact || null)
+  }
+
+  if (sets.length === 0) return null
+
+  const lookupValue =
+    keyColumn === 'ci_customer_code'
+      ? oldCode || code
+      : keyColumn === 'ci_customer_name'
+        ? oldName || name
+        : keyValue
+
+  return {
+    sql: `UPDATE customers_information SET ${sets.join(', ')} WHERE ${keyColumn} = ?`,
+    values: [...values, lookupValue],
+  }
+}
+
 const getCustomers = async (req, res, next) => {
   try {
-    const customers = await SelectAll(
-      Master.customers.tablename,
-      Master.customers.prefix_,
-    )
+    const customerInfoColumns = await getInfoTableColumns('customers_information')
+    const joinKey = customerInfoColumns.includes('ci_customer_id')
+      ? { info: 'ci_customer_id', main: 'c_id' }
+      : customerInfoColumns.includes('ci_customer_code')
+        ? { info: 'ci_customer_code', main: 'c_code' }
+        : customerInfoColumns.includes('ci_customer_name')
+          ? { info: 'ci_customer_name', main: 'c_name' }
+          : null
+
+    const selectFields = [
+      'c.c_id AS id',
+      'c.c_code AS code',
+      'c.c_name AS name',
+      'c.c_category AS category',
+      'c.c_type AS type',
+      'UPPER(c.c_status) AS status',
+    ]
+
+    if (customerInfoColumns.includes('ci_address')) {
+      selectFields.push('ci.ci_address AS address')
+    }
+    if (customerInfoColumns.includes('ci_tin')) {
+      selectFields.push('ci.ci_tin AS tin')
+    }
+    if (customerInfoColumns.includes('ci_details')) {
+      selectFields.push('ci.ci_details AS details')
+    }
+    if (customerInfoColumns.includes('ci_contact')) {
+      selectFields.push('ci.ci_contact AS contact')
+    }
+
+    let query = `SELECT ${selectFields.join(', ')} FROM customers c`
+    if (joinKey) {
+      query += ` LEFT JOIN customers_information ci ON ci.${joinKey.info} = c.${joinKey.main}`
+    }
+    query += ' ORDER BY c.c_name ASC'
+
+    const customers = await Query(query, [])
 
     res.status(200).json({
       success: true,
@@ -115,42 +283,78 @@ const getCustomerTransactions = async (req, res, next) => {
 
 const createCustomer = async (req, res, next) => {
   try {
-    const { code, name, category, type, status } = req.body
+    const { code, name, category, type, address, tin, details, contact } = req.body
+    const status = 'ACTIVE'
 
-    if (!code || !name || !status) {
+    if (!code || !name || !address || !tin || !details || !contact) {
       return res.status(400).json({
         success: false,
-        message: 'Customer code, name, and status are required',
+        message:
+          'Customer code, name, address, TIN, details, and contact are required',
       })
     }
 
-    let queries = []
+    const customerInfoColumns = await getInfoTableColumns('customers_information')
+    const pool = getTenantPool()
+    const connection = await pool.getConnection()
 
-    queries.push({
-      sql: sql
+    let newCustomerId = null
+    try {
+      await connection.beginTransaction()
+
+      const insertCustomerQuery = sql
         .insert(Master.customers.tablename, {
           columns: Master.customers.insertColumns,
           prefix: Master.customers.prefix,
           isTransaction: true,
         })
-        .build(),
-      values: [
+        .build()
+
+      const [customerResult] = await connection.execute(insertCustomerQuery, [
         code || null,
         name || null,
         category || null,
         type || null,
-        status || null,
-      ],
-    })
+        status,
+      ])
 
-    let result = await Transaction(queries)
+      newCustomerId = customerResult.insertId
+      if (!newCustomerId) {
+        throw new Error('Failed to get customer ID from insertion')
+      }
 
-    const getIdQuery = `SELECT LAST_INSERT_ID() as insertId`
-    const idResult = await Query(getIdQuery)
-    const newCustomerId = idResult[0]?.insertId
+      const customerInfoInsert = buildCustomerInfoInsertQuery(
+        customerInfoColumns,
+        code,
+        name,
+        address,
+        tin,
+        details,
+        contact,
+        newCustomerId,
+      )
 
-    if (!newCustomerId) {
-      throw new Error('Failed to get customer ID from insertion')
+      if (customerInfoInsert) {
+        await connection.execute(customerInfoInsert.sql, customerInfoInsert.values)
+      }
+
+      await connection.commit()
+    } catch (error) {
+      if (connection) {
+        try {
+          await connection.rollback()
+        } catch (rollbackError) {
+          console.error(
+            'Error rolling back customer creation transaction:',
+            rollbackError,
+          )
+        }
+      }
+      throw error
+    } finally {
+      if (connection) {
+        connection.release()
+      }
     }
 
     // Audit trail for create
@@ -184,6 +388,10 @@ const createCustomer = async (req, res, next) => {
         name: name,
         category: category,
         type: type,
+        address: address,
+        tin: tin,
+        details: details,
+        contact: contact,
         status: status,
       },
       timestamp: new Date().toISOString(),
@@ -203,14 +411,25 @@ const createCustomer = async (req, res, next) => {
 
 const updateCustomer = async (req, res, next) => {
   try {
-    const { id: idFromBody, code, name, category, type, status } = req.body
+    const {
+      id: idFromBody,
+      code,
+      name,
+      category,
+      type,
+      address,
+      tin,
+      details,
+      contact,
+      status: statusFromBody,
+    } = req.body
     const { id: idFromParams } = req.params
     const id = Number(idFromParams || idFromBody)
 
-    if (!id || !code || !name || !status) {
+    if (!id || !code || !name) {
       return res.status(400).json({
         success: false,
-        message: 'ID, customer code, name, and status are required',
+        message: 'ID, customer code, and name are required',
       })
     }
 
@@ -232,6 +451,35 @@ const updateCustomer = async (req, res, next) => {
       Master.customers.prefix_,
     )
     const old = existingCustomers[0] || {}
+    const status =
+      typeof statusFromBody !== 'undefined'
+        ? String(statusFromBody).toUpperCase()
+        : old.status
+
+    const customerInfoColumns = await getInfoTableColumns('customers_information')
+    const keyColumn = customerInfoColumns.includes('ci_customer_id')
+      ? 'ci_customer_id'
+      : customerInfoColumns.includes('ci_customer_code')
+        ? 'ci_customer_code'
+        : customerInfoColumns.includes('ci_customer_name')
+          ? 'ci_customer_name'
+          : null
+
+    let hasInfoRecord = false
+    let infoLookupValue = null
+
+    if (keyColumn) {
+      infoLookupValue =
+        keyColumn === 'ci_customer_id'
+          ? id
+          : keyColumn === 'ci_customer_code'
+            ? old.code
+            : old.name
+
+      const existingInfoQuery = `SELECT ${keyColumn} FROM customers_information WHERE ${keyColumn} = ?`
+      const existingInfoRows = await Query(existingInfoQuery, [infoLookupValue])
+      hasInfoRecord = existingInfoRows.length > 0
+    }
 
     const updateQuery = sql
       .update(Master.customers.tablename)
@@ -251,6 +499,39 @@ const updateCustomer = async (req, res, next) => {
         values: [code, name, category, type, status, id],
       },
     ]
+
+    if (keyColumn && hasInfoRecord) {
+      const updateInfo = buildCustomerInfoUpdateQuery(
+        customerInfoColumns,
+        keyColumn,
+        infoLookupValue,
+        old.code,
+        old.name,
+        code,
+        name,
+        address,
+        tin,
+        details,
+        contact,
+      )
+      if (updateInfo) {
+        queries.push(updateInfo)
+      }
+    } else {
+      const customerInfoInsert = buildCustomerInfoInsertQuery(
+        customerInfoColumns,
+        code,
+        name,
+        address,
+        tin,
+        details,
+        contact,
+        keyColumn === 'ci_customer_id' ? id : undefined,
+      )
+      if (customerInfoInsert) {
+        queries.push(customerInfoInsert)
+      }
+    }
 
     await Transaction(queries)
 
@@ -288,7 +569,18 @@ const updateCustomer = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Customer updated successfully',
-      data: { id, code, name, category, type, status },
+      data: {
+        id,
+        code,
+        name,
+        category,
+        type,
+        address,
+        tin,
+        details,
+        contact,
+        status,
+      },
       timestamp: new Date().toISOString(),
     })
   } catch (error) {

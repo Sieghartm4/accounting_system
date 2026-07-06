@@ -7,6 +7,7 @@ const {
   Insert,
   SelectWithCondition,
 } = require('../database/util/queries.util')
+const { getTenantPool } = require('../database/util/tenantConnection.util')
 const {
   formatMemoryUsage,
   formatTime,
@@ -17,9 +18,183 @@ const { SQLQueryBuilder } = require('../util/helper.util')
 const sql = new SQLQueryBuilder()
 require('dotenv').config()
 
+const getInfoTableColumns = async (tableName) => {
+  try {
+    const query = `
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+    `
+    const rows = await Query(query, [tableName])
+    return rows.map((row) => row.COLUMN_NAME)
+  } catch (error) {
+    return []
+  }
+}
+
+const buildVendorInfoInsertQuery = (
+  columns,
+  code,
+  name,
+  address,
+  tin,
+  details,
+  contact,
+  id,
+) => {
+  if (!columns || columns.length === 0) return null
+
+  const cols = []
+  const placeholders = []
+  const values = []
+
+  if (columns.includes('vi_vendor_id')) {
+    cols.push('vi_vendor_id')
+    if (typeof id !== 'undefined' && id !== null) {
+      placeholders.push('?')
+      values.push(id)
+    } else {
+      placeholders.push('LAST_INSERT_ID()')
+    }
+  }
+  if (columns.includes('vi_vendor_code')) {
+    cols.push('vi_vendor_code')
+    placeholders.push('?')
+    values.push(code || null)
+  }
+  if (columns.includes('vi_vendor_name')) {
+    cols.push('vi_vendor_name')
+    placeholders.push('?')
+    values.push(name || null)
+  }
+  if (columns.includes('vi_address')) {
+    cols.push('vi_address')
+    placeholders.push('?')
+    values.push(address || null)
+  }
+  if (columns.includes('vi_tin')) {
+    cols.push('vi_tin')
+    placeholders.push('?')
+    values.push(tin || null)
+  }
+  if (columns.includes('vi_details')) {
+    cols.push('vi_details')
+    placeholders.push('?')
+    values.push(details || null)
+  }
+  if (columns.includes('vi_contact')) {
+    cols.push('vi_contact')
+    placeholders.push('?')
+    values.push(contact || null)
+  }
+
+  if (cols.length === 0) return null
+
+  return {
+    sql: `INSERT INTO vendors_information (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`,
+    values,
+  }
+}
+
+const buildVendorInfoUpdateQuery = (
+  columns,
+  keyColumn,
+  keyValue,
+  oldCode,
+  oldName,
+  code,
+  name,
+  address,
+  tin,
+  details,
+  contact,
+) => {
+  if (!keyColumn) return null
+
+  const sets = []
+  const values = []
+
+  if (columns.includes('vi_vendor_code')) {
+    sets.push('vi_vendor_code = ?')
+    values.push(code || null)
+  }
+  if (columns.includes('vi_vendor_name')) {
+    sets.push('vi_vendor_name = ?')
+    values.push(name || null)
+  }
+  if (columns.includes('vi_address')) {
+    sets.push('vi_address = ?')
+    values.push(address || null)
+  }
+  if (columns.includes('vi_tin')) {
+    sets.push('vi_tin = ?')
+    values.push(tin || null)
+  }
+  if (columns.includes('vi_details')) {
+    sets.push('vi_details = ?')
+    values.push(details || null)
+  }
+  if (columns.includes('vi_contact')) {
+    sets.push('vi_contact = ?')
+    values.push(contact || null)
+  }
+
+  if (sets.length === 0) return null
+
+  const lookupValue =
+    keyColumn === 'vi_vendor_code'
+      ? oldCode || code
+      : keyColumn === 'vi_vendor_name'
+        ? oldName || name
+        : keyValue
+
+  return {
+    sql: `UPDATE vendors_information SET ${sets.join(', ')} WHERE ${keyColumn} = ?`,
+    values: [...values, lookupValue],
+  }
+}
+
 const getVendors = async (req, res, next) => {
   try {
-    const vendors = await SelectAll(Master.vendors.tablename, Master.vendors.prefix_)
+    const vendorInfoColumns = await getInfoTableColumns('vendors_information')
+    const joinKey = vendorInfoColumns.includes('vi_vendor_id')
+      ? { info: 'vi_vendor_id', main: 'v_id' }
+      : vendorInfoColumns.includes('vi_vendor_code')
+        ? { info: 'vi_vendor_code', main: 'v_code' }
+        : vendorInfoColumns.includes('vi_vendor_name')
+          ? { info: 'vi_vendor_name', main: 'v_name' }
+          : null
+
+    const selectFields = [
+      'v.v_id AS id',
+      'v.v_code AS code',
+      'v.v_name AS name',
+      'v.v_category AS category',
+      'v.v_type AS type',
+      'UPPER(v.v_status) AS status',
+    ]
+
+    if (vendorInfoColumns.includes('vi_address')) {
+      selectFields.push('vi.vi_address AS address')
+    }
+    if (vendorInfoColumns.includes('vi_tin')) {
+      selectFields.push('vi.vi_tin AS tin')
+    }
+    if (vendorInfoColumns.includes('vi_details')) {
+      selectFields.push('vi.vi_details AS details')
+    }
+    if (vendorInfoColumns.includes('vi_contact')) {
+      selectFields.push('vi.vi_contact AS contact')
+    }
+
+    let query = `SELECT ${selectFields.join(', ')} FROM vendors v`
+    if (joinKey) {
+      query += ` LEFT JOIN vendors_information vi ON vi.${joinKey.info} = v.${joinKey.main}`
+    }
+    query += ' ORDER BY v.v_name ASC'
+
+    const vendors = await Query(query, [])
 
     res.status(200).json({
       success: true,
@@ -114,42 +289,78 @@ const getVendorTransactions = async (req, res, next) => {
 
 const createVendor = async (req, res, next) => {
   try {
-    const { code, name, category, type, status } = req.body
+    const { code, name, category, type, address, tin, details, contact } = req.body
+    const status = 'ACTIVE'
 
-    if (!code || !name || !status) {
+    if (!code || !name || !address || !tin || !details || !contact) {
       return res.status(400).json({
         success: false,
-        message: 'Vendor code, name, and status are required',
+        message:
+          'Vendor code, name, address, TIN, details, and contact are required',
       })
     }
 
-    let queries = []
+    const vendorInfoColumns = await getInfoTableColumns('vendors_information')
+    const pool = getTenantPool()
+    const connection = await pool.getConnection()
 
-    queries.push({
-      sql: sql
+    let newVendorId = null
+    try {
+      await connection.beginTransaction()
+
+      const insertVendorQuery = sql
         .insert(Master.vendors.tablename, {
           columns: Master.vendors.insertColumns,
           prefix: Master.vendors.prefix,
           isTransaction: true,
         })
-        .build(),
-      values: [
+        .build()
+
+      const [vendorResult] = await connection.execute(insertVendorQuery, [
         code || null,
         name || null,
         category || null,
         type || null,
-        status || null,
-      ],
-    })
+        status,
+      ])
 
-    let result = await Transaction(queries)
+      newVendorId = vendorResult.insertId
+      if (!newVendorId) {
+        throw new Error('Failed to get vendor ID from insertion')
+      }
 
-    const getIdQuery = `SELECT LAST_INSERT_ID() as insertId`
-    const idResult = await Query(getIdQuery)
-    const newVendorId = idResult[0]?.insertId
+      const vendorInfoInsert = buildVendorInfoInsertQuery(
+        vendorInfoColumns,
+        code,
+        name,
+        address,
+        tin,
+        details,
+        contact,
+        newVendorId,
+      )
 
-    if (!newVendorId) {
-      throw new Error('Failed to get vendor ID from insertion')
+      if (vendorInfoInsert) {
+        await connection.execute(vendorInfoInsert.sql, vendorInfoInsert.values)
+      }
+
+      await connection.commit()
+    } catch (error) {
+      if (connection) {
+        try {
+          await connection.rollback()
+        } catch (rollbackError) {
+          console.error(
+            'Error rolling back vendor creation transaction:',
+            rollbackError,
+          )
+        }
+      }
+      throw error
+    } finally {
+      if (connection) {
+        connection.release()
+      }
     }
 
     // Audit trail for create
@@ -183,6 +394,10 @@ const createVendor = async (req, res, next) => {
         name: name,
         category: category,
         type: type,
+        address: address,
+        tin: tin,
+        details: details,
+        contact: contact,
         status: status,
       },
       timestamp: new Date().toISOString(),
@@ -202,14 +417,25 @@ const createVendor = async (req, res, next) => {
 
 const updateVendor = async (req, res, next) => {
   try {
-    const { id: idFromBody, code, name, category, type, status } = req.body
+    const {
+      id: idFromBody,
+      code,
+      name,
+      category,
+      type,
+      address,
+      tin,
+      details,
+      contact,
+      status: statusFromBody,
+    } = req.body
     const { id: idFromParams } = req.params
     const id = Number(idFromParams || idFromBody)
 
-    if (!id || !code || !name || !status) {
+    if (!id || !code || !name) {
       return res.status(400).json({
         success: false,
-        message: 'ID, vendor code, name, and status are required',
+        message: 'ID, vendor code, and name are required',
       })
     }
 
@@ -227,6 +453,35 @@ const updateVendor = async (req, res, next) => {
       .build()
     const existingVendors = await Query(existingQuery, [id], Master.vendors.prefix_)
     const old = existingVendors[0] || {}
+    const status =
+      typeof statusFromBody !== 'undefined'
+        ? String(statusFromBody).toUpperCase()
+        : old.status
+
+    const vendorInfoColumns = await getInfoTableColumns('vendors_information')
+    const keyColumn = vendorInfoColumns.includes('vi_vendor_id')
+      ? 'vi_vendor_id'
+      : vendorInfoColumns.includes('vi_vendor_code')
+        ? 'vi_vendor_code'
+        : vendorInfoColumns.includes('vi_vendor_name')
+          ? 'vi_vendor_name'
+          : null
+
+    let hasInfoRecord = false
+    let infoLookupValue = null
+
+    if (keyColumn) {
+      infoLookupValue =
+        keyColumn === 'vi_vendor_id'
+          ? id
+          : keyColumn === 'vi_vendor_code'
+            ? old.code
+            : old.name
+
+      const existingInfoQuery = `SELECT ${keyColumn} FROM vendors_information WHERE ${keyColumn} = ?`
+      const existingInfoRows = await Query(existingInfoQuery, [infoLookupValue])
+      hasInfoRecord = existingInfoRows.length > 0
+    }
 
     const updateQuery = sql
       .update(Master.vendors.tablename)
@@ -246,6 +501,39 @@ const updateVendor = async (req, res, next) => {
         values: [code, name, category, type, status, id],
       },
     ]
+
+    if (keyColumn && hasInfoRecord) {
+      const updateInfo = buildVendorInfoUpdateQuery(
+        vendorInfoColumns,
+        keyColumn,
+        infoLookupValue,
+        old.code,
+        old.name,
+        code,
+        name,
+        address,
+        tin,
+        details,
+        contact,
+      )
+      if (updateInfo) {
+        queries.push(updateInfo)
+      }
+    } else {
+      const vendorInfoInsert = buildVendorInfoInsertQuery(
+        vendorInfoColumns,
+        code,
+        name,
+        address,
+        tin,
+        details,
+        contact,
+        keyColumn === 'vi_vendor_id' ? id : undefined,
+      )
+      if (vendorInfoInsert) {
+        queries.push(vendorInfoInsert)
+      }
+    }
 
     await Transaction(queries)
 
@@ -283,7 +571,18 @@ const updateVendor = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Vendor updated successfully',
-      data: { id, code, name, category, type, status },
+      data: {
+        id,
+        code,
+        name,
+        category,
+        type,
+        address,
+        tin,
+        details,
+        contact,
+        status,
+      },
       timestamp: new Date().toISOString(),
     })
   } catch (error) {

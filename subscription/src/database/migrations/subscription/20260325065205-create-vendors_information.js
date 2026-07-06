@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
@@ -7,36 +7,36 @@ module.exports = {
       vi_id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
       },
-      vi_vendor_code: {
-        type: Sequelize.STRING(120),
-        allowNull: false
-      },
-      vi_vendor_name: {
-        type: Sequelize.STRING(300),
-        allowNull: false
+      vi_vendor_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'vendors',
+          key: 'v_id',
+        },
       },
       vi_address: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: false,
       },
       vi_tin: {
         type: Sequelize.STRING(15),
-        allowNull: false
+        allowNull: false,
       },
       vi_details: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: false,
       },
       vi_contact: {
         type: Sequelize.STRING(15),
-        allowNull: false
-      }
-    });
+        allowNull: false,
+      },
+    })
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('vendors_information');
-  }
-};
+    await queryInterface.dropTable('vendors_information')
+  },
+}

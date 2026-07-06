@@ -27,6 +27,10 @@ function VendorsContent() {
     name: '',
     category: '',
     type: '',
+    address: '',
+    tin: '',
+    details: '',
+    contact: '',
     status: 'active',
   })
   const [toast, setToast] = useState(null)
@@ -38,7 +42,17 @@ function VendorsContent() {
 
   const handleAddVendorClick = () => {
     setEditingVendor(null)
-    setFormData({ code: '', name: '', category: '', type: '', status: 'active' })
+    setFormData({
+      code: '',
+      name: '',
+      category: '',
+      type: '',
+      address: '',
+      tin: '',
+      details: '',
+      contact: '',
+      status: 'active',
+    })
     setIsModalOpen(true)
   }
 
@@ -49,7 +63,16 @@ function VendorsContent() {
       name: row.name || '',
       category: row.category || '',
       type: row.type || '',
-      status: row.status || 'active',
+      address: row.address || '',
+      tin: row.tin || '',
+      details: row.details || '',
+      contact: row.contact || '',
+      status:
+        row.status?.toLowerCase() === 'inactive'
+          ? 'inactive'
+          : row.status?.toLowerCase() === 'active'
+            ? 'active'
+            : 'active',
     })
     setIsModalOpen(true)
   }
@@ -73,6 +96,10 @@ function VendorsContent() {
             formData.name,
             formData.category,
             formData.type,
+            formData.address,
+            formData.tin,
+            formData.details,
+            formData.contact,
             formData.status,
           )
         : await createVendor(
@@ -80,7 +107,10 @@ function VendorsContent() {
             formData.name,
             formData.category,
             formData.type,
-            formData.status,
+            formData.address,
+            formData.tin,
+            formData.details,
+            formData.contact,
           )
 
       if (result.success) {
@@ -301,20 +331,83 @@ function VendorsContent() {
 
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                Status <span className="text-red-600">*</span>
+                Address <span className="text-red-600">*</span>
               </label>
-              <select
-                value={formData.status}
+              <input
+                type="text"
+                value={formData.address}
                 onChange={(e) =>
-                  setFormData({ ...formData, status: e.target.value })
+                  setFormData({ ...formData, address: e.target.value })
                 }
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter address..."
                 required
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+              />
             </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                TIN <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.tin}
+                onChange={(e) => setFormData({ ...formData, tin: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter TIN..."
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Details <span className="text-red-600">*</span>
+              </label>
+              <textarea
+                value={formData.details}
+                onChange={(e) =>
+                  setFormData({ ...formData, details: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all min-h-[120px]"
+                placeholder="Enter additional details..."
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Contact <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.contact}
+                onChange={(e) =>
+                  setFormData({ ...formData, contact: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter contact number..."
+                required
+              />
+            </div>
+
+            {editingVendor && (
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                  Status <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) =>
+                    setFormData({ ...formData, status: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                  required
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">
@@ -330,7 +423,7 @@ function VendorsContent() {
               className="flex-1 px-4 py-3 bg-black text-white text-xs font-black rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
             >
               <Plus size={14} />
-              Create Vendor
+              {editingVendor ? 'Save Vendor' : 'Create Vendor'}
             </button>
           </div>
         </form>

@@ -15,7 +15,7 @@
     "db:drop": "node src/database/settings/confirmation.settings.js \"⚠️ WARNING: This will DROP the database. Type 'yes' to continue: \" && npx sequelize-cli db:drop",
     "db:create": "npx sequelize-cli db:create",
     "db:seed": "npx sequelize-cli db:seed:all",
-    "db:reset": "node src/database/settings/confirmation.settings.js \"⚠️ WARNING: This will RESET the database. Type 'yes' to continue: \" && npm run db:drop && npm run db:create && npm run db:migrate && npm run db:seed",
+    "db:reset": "node src/database/settings/reset.settings.js",
     "env:setup": "node src/database/settings/envSetup.settings.js",
     "generate:schema": "node src/database/util/generateSchema.util.js",
     "db:migrate:prod": "npx sequelize-cli db:migrate --migrations-path src/database/migrations/create && node src/database/util/generateModels.util.js",

@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
@@ -7,36 +7,36 @@ module.exports = {
       ci_id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
       },
-      ci_customer_code: {
-        type: Sequelize.STRING(20),
-        allowNull: false
-      },
-      ci_customer_name: {
-        type: Sequelize.STRING(300),
-        allowNull: false
+      ci_customer_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'customers',
+          key: 'c_id',
+        },
       },
       ci_address: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: false,
       },
       ci_tin: {
         type: Sequelize.STRING(15),
-        allowNull: false
+        allowNull: false,
       },
       ci_details: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: false,
       },
       ci_contact: {
         type: Sequelize.STRING(15),
-        allowNull: false
-      }
-    });
+        allowNull: false,
+      },
+    })
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('customers_information');
-  }
-};
+    await queryInterface.dropTable('customers_information')
+  },
+}

@@ -9,13 +9,13 @@ module.exports = {
         primaryKey: true,
         autoIncrement: true
       },
-      ci_customer_code: {
-        type: Sequelize.STRING(20),
-        allowNull: false
-      },
-      ci_customer_name: {
-        type: Sequelize.STRING(300),
-        allowNull: false
+      ci_customer_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'customers',
+          key: 'c_id'
+        }
       },
       ci_address: {
         type: Sequelize.TEXT('long'),
