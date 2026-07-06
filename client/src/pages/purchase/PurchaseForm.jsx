@@ -547,8 +547,22 @@ export default function PurchaseForm({
     name: '',
     category: '',
     type: '',
+    address: '',
+    tin: '',
+    details: '',
+    contact: '',
     status: 'active',
   })
+
+  const formatTinInput = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 12)
+    let formatted = ''
+    if (digits.length > 0) formatted += digits.substring(0, 3)
+    if (digits.length > 3) formatted += '-' + digits.substring(3, 6)
+    if (digits.length > 6) formatted += '-' + digits.substring(6, 9)
+    if (digits.length > 9) formatted += '-' + digits.substring(9, 12)
+    return formatted
+  }
 
   const modeOfPaymentOptions = [
     'CASH',
@@ -819,7 +833,17 @@ export default function PurchaseForm({
     }
   }
 
-  const createVendor = async ({ code, name, category, type, status }) => {
+  const createVendor = async ({
+    code,
+    name,
+    category,
+    type,
+    status,
+    address,
+    tin,
+    details,
+    contact,
+  }) => {
     try {
       setVendorCreateLoading(true)
       const token = localStorage.getItem('token')
@@ -830,7 +854,17 @@ export default function PurchaseForm({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ code, name, category, type, status }),
+        body: JSON.stringify({
+          code,
+          name,
+          category,
+          type,
+          status,
+          address,
+          tin,
+          details,
+          contact,
+        }),
       })
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}))
@@ -850,18 +884,43 @@ export default function PurchaseForm({
   }
 
   const openVendorModal = () => {
-    setVendorForm({ code: '', name: '', category: '', type: '', status: 'active' })
+    setVendorForm({
+      code: '',
+      name: '',
+      category: '',
+      type: '',
+      address: '',
+      tin: '',
+      details: '',
+      contact: '',
+      status: 'active',
+    })
     setIsVendorModalOpen(true)
   }
 
   const closeVendorModal = () => {
     setIsVendorModalOpen(false)
-    setVendorForm({ code: '', name: '', category: '', type: '', status: 'active' })
+    setVendorForm({
+      code: '',
+      name: '',
+      category: '',
+      type: '',
+      address: '',
+      tin: '',
+      details: '',
+      contact: '',
+      status: 'active',
+    })
   }
 
   const handleVendorFormSubmit = async (e) => {
     e.preventDefault()
-    const result = await createVendor(vendorForm)
+    const payload = {
+      ...vendorForm,
+      tin: vendorForm.tin?.slice(0, 15),
+      contact: vendorForm.contact?.slice(0, 15),
+    }
+    const result = await createVendor(payload)
     if (result.success) {
       // Auto-select the newly created vendor
       const newVendor = result.data
@@ -1832,6 +1891,78 @@ export default function PurchaseForm({
                 <option value="government">Government</option>
                 <option value="non-profit">Non-Profit</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Address
+              </label>
+              <input
+                type="text"
+                value={vendorForm.address}
+                onChange={(e) =>
+                  setVendorForm({ ...vendorForm, address: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter address..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                TIN <span className="text-red-600">*</span>{' '}
+                <span className="text-[9px] text-gray-400">(max 15 chars)</span>
+              </label>
+              <input
+                type="text"
+                value={vendorForm.tin}
+                onChange={(e) =>
+                  setVendorForm({
+                    ...vendorForm,
+                    tin: formatTinInput(e.target.value),
+                  })
+                }
+                maxLength={15}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter TIN (XXX-XXX-XXX-XXX)"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Details <span className="text-red-600">*</span>
+              </label>
+              <textarea
+                value={vendorForm.details}
+                onChange={(e) =>
+                  setVendorForm({ ...vendorForm, details: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all min-h-[120px]"
+                placeholder="Enter additional details..."
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Contact <span className="text-red-600">*</span>{' '}
+                <span className="text-[9px] text-gray-400">(max 15 chars)</span>
+              </label>
+              <input
+                type="text"
+                value={vendorForm.contact}
+                onChange={(e) =>
+                  setVendorForm({
+                    ...vendorForm,
+                    contact: e.target.value.slice(0, 15),
+                  })
+                }
+                maxLength={15}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter contact number..."
+                required
+              />
             </div>
 
             <div>

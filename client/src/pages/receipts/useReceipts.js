@@ -263,7 +263,17 @@ export function useReceiptsForm({
     }
   }
 
-  const createCustomer = async ({ code, name, category, type, status }) => {
+  const createCustomer = async ({
+    code,
+    name,
+    category,
+    type,
+    status,
+    address,
+    tin,
+    details,
+    contact,
+  }) => {
     try {
       setCustomerLoading(true)
       const token = localStorage.getItem('token')
@@ -274,7 +284,17 @@ export function useReceiptsForm({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ code, name, category, type, status }),
+        body: JSON.stringify({
+          code,
+          name,
+          category,
+          type,
+          status,
+          address,
+          tin,
+          details,
+          contact,
+        }),
       })
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}))

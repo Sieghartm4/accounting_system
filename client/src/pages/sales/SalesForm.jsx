@@ -275,22 +275,61 @@ export default function SalesForm({
     name: '',
     category: '',
     type: '',
+    address: '',
+    tin: '',
+    details: '',
+    contact: '',
     status: 'active',
   })
 
+  const formatTinInput = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 12)
+    let formatted = ''
+    if (digits.length > 0) formatted += digits.substring(0, 3)
+    if (digits.length > 3) formatted += '-' + digits.substring(3, 6)
+    if (digits.length > 6) formatted += '-' + digits.substring(6, 9)
+    if (digits.length > 9) formatted += '-' + digits.substring(9, 12)
+    return formatted
+  }
+
   const openCustomerModal = () => {
-    setCustomerForm({ code: '', name: '', category: '', type: '', status: 'active' })
+    setCustomerForm({
+      code: '',
+      name: '',
+      category: '',
+      type: '',
+      address: '',
+      tin: '',
+      details: '',
+      contact: '',
+      status: 'active',
+    })
     setIsCustomerModalOpen(true)
   }
 
   const closeCustomerModal = () => {
     setIsCustomerModalOpen(false)
-    setCustomerForm({ code: '', name: '', category: '', type: '', status: 'active' })
+    setCustomerForm({
+      code: '',
+      name: '',
+      category: '',
+      type: '',
+      address: '',
+      tin: '',
+      details: '',
+      contact: '',
+      status: 'active',
+    })
   }
 
   const handleCustomerFormSubmit = async (e) => {
     e.preventDefault()
-    const result = await form.createCustomer(customerForm)
+    const payload = {
+      ...customerForm,
+      tin: customerForm.tin?.slice(0, 15),
+      contact: customerForm.contact?.slice(0, 15),
+    }
+    const result = await form.createCustomer(payload)
 
     if (!result.success) {
       form.setToast({
@@ -473,6 +512,78 @@ export default function SalesForm({
                 <option value="government">Government</option>
                 <option value="non-profit">Non-Profit</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Address
+              </label>
+              <input
+                type="text"
+                value={customerForm.address}
+                onChange={(e) =>
+                  setCustomerForm({ ...customerForm, address: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter address..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                TIN <span className="text-red-600">*</span>{' '}
+                <span className="text-[9px] text-gray-400">(max 15 chars)</span>
+              </label>
+              <input
+                type="text"
+                value={customerForm.tin}
+                onChange={(e) =>
+                  setCustomerForm({
+                    ...customerForm,
+                    tin: formatTinInput(e.target.value),
+                  })
+                }
+                maxLength={15}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter TIN (XXX-XXX-XXX-XXX)"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Details <span className="text-red-600">*</span>
+              </label>
+              <textarea
+                value={customerForm.details}
+                onChange={(e) =>
+                  setCustomerForm({ ...customerForm, details: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all min-h-[120px]"
+                placeholder="Enter additional details..."
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                Contact <span className="text-red-600">*</span>{' '}
+                <span className="text-[9px] text-gray-400">(max 15 chars)</span>
+              </label>
+              <input
+                type="text"
+                value={customerForm.contact}
+                onChange={(e) =>
+                  setCustomerForm({
+                    ...customerForm,
+                    contact: e.target.value.slice(0, 15),
+                  })
+                }
+                maxLength={15}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                placeholder="Enter contact number..."
+                required
+              />
             </div>
 
             <div>

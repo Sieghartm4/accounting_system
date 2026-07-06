@@ -86,6 +86,16 @@ function VendorsContent() {
     setToast(null)
   }
 
+  const formatTinInput = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 12)
+    let formatted = ''
+    if (digits.length > 0) formatted += digits.substring(0, 3)
+    if (digits.length > 3) formatted += '-' + digits.substring(3, 6)
+    if (digits.length > 6) formatted += '-' + digits.substring(6, 9)
+    if (digits.length > 9) formatted += '-' + digits.substring(9, 12)
+    return formatted
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
@@ -347,14 +357,18 @@ function VendorsContent() {
 
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                TIN <span className="text-red-600">*</span>
+                TIN <span className="text-red-600">*</span>{' '}
+                <span className="text-[9px] text-gray-400">(max 15 chars)</span>
               </label>
               <input
                 type="text"
                 value={formData.tin}
-                onChange={(e) => setFormData({ ...formData, tin: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, tin: formatTinInput(e.target.value) })
+                }
+                maxLength={15}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
-                placeholder="Enter TIN..."
+                placeholder="Enter TIN (XXX-XXX-XXX-XXX)"
                 required
               />
             </div>
@@ -376,14 +390,16 @@ function VendorsContent() {
 
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                Contact <span className="text-red-600">*</span>
+                Contact <span className="text-red-600">*</span>{' '}
+                <span className="text-[9px] text-gray-400">(max 15 chars)</span>
               </label>
               <input
                 type="text"
                 value={formData.contact}
                 onChange={(e) =>
-                  setFormData({ ...formData, contact: e.target.value })
+                  setFormData({ ...formData, contact: e.target.value.slice(0, 15) })
                 }
+                maxLength={15}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter contact number..."
                 required

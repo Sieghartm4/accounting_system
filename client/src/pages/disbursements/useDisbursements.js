@@ -260,7 +260,17 @@ export function useDisbursementForm({
     }
   }
 
-  const createVendor = async ({ code, name, category, type, status }) => {
+  const createVendor = async ({
+    code,
+    name,
+    category,
+    type,
+    status,
+    address,
+    tin,
+    details,
+    contact,
+  }) => {
     try {
       const token = localStorage.getItem('token')
       if (!token) throw new Error('No authorization token found')
@@ -270,7 +280,17 @@ export function useDisbursementForm({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ code, name, category, type, status }),
+        body: JSON.stringify({
+          code,
+          name,
+          category,
+          type,
+          status,
+          address,
+          tin,
+          details,
+          contact,
+        }),
       })
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}))
