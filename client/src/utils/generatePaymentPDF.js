@@ -94,7 +94,12 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
     y += 13
 
     // ── PARTY / DOC INFO ──────────────────────────────────────────────────────
-    // Left – vendor name + TIN
+    // Left – vendor name, TIN and address
+    const paymentTin =
+      payment.vendor_tin || payment.tin || payment.vendor?.tin || '000-000-000-00000'
+    const paymentAddress =
+      payment.vendor_address || payment.address || payment.vendor?.address || ''
+
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(...BLACK)
@@ -103,7 +108,11 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DGRAY)
-    doc.text('000-000-000-00000', margin, y + 12)
+    doc.text(paymentTin, margin, y + 12)
+    if (paymentAddress) {
+      doc.text(paymentAddress, margin, y + 24)
+      y += 12
+    }
 
     // Right – doc metadata (label + value two-column)
     const INFO_LABEL_X = margin + contentW * 0.52

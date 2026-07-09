@@ -213,6 +213,220 @@ const syncProductService = async (req, res, next) => {
   }
 }
 
+const getExistingProductCodes = async () => {
+  const rows = await Query(
+    `SELECT ${Master.products_service.selectOptionColumns.code} AS code FROM ${Master.products_service.tablename}`,
+  )
+  return new Set(rows.map((row) => String(row.code)))
+}
+
+const previewProductServiceSync = async (req, res, next) => {
+  try {
+    const inventoryApiKey = process.env._INVENTORY_API_KEY
+    if (!inventoryApiKey) {
+      return res.status(500).json({
+        success: false,
+        message: 'Inventory API key is not configured',
+      })
+    }
+
+    const inventoryUrl = `${process.env._INVENTORY_PRODUCT_URL}/accounting/company`
+    const companies = await fetchJsonFromUrl(inventoryUrl, {
+      accept: 'application/json',
+      'x-api-key': inventoryApiKey,
+    })
+
+    if (!Array.isArray(companies)) {
+      throw new Error('Inventory company API returned an unexpected response format')
+    }
+
+    const existingCodes = await getExistingProductCodes()
+    const previewItems = []
+    const categories = new Set()
+    const seenCodes = new Set()
+
+    for (const company of companies) {
+      const companyId = company.id || company.companyId || company.code
+      if (!companyId) continue
+
+      let inventories = []
+      try {
+        const invUrl = `${process.env._INVENTORY_PRODUCT_URL}/accounting/inventories/${companyId}`
+        const invRes = await fetchJsonFromUrl(invUrl, {
+          accept: 'application/json',
+          'x-api-key': inventoryApiKey,
+        })
+        if (Array.isArray(invRes)) inventories = invRes
+      } catch (err) {
+        console.error(
+          `Failed to fetch inventories for company ${companyId}:`,
+          err.message,
+        )
+        continue
+      }
+
+      for (const item of inventories) {
+        const externalId = item.inventoryId || item.id || item.code
+        const externalName = item.inventoryName || item.name || item.description
+
+        if (!externalId || !externalName) continue
+        if (seenCodes.has(externalId)) continue
+        seenCodes.add(externalId)
+
+        const category = item.category || 'INVENTORY'
+        const unit = item.unit || 'pcs'
+        categories.add(category)
+
+        previewItems.push({
+          code: externalId,
+          name: externalName,
+          type: 'PRODUCT',
+          category,
+          sales_price: 0,
+          purchase_price: 0,
+          unit,
+          existsInDb: existingCodes.has(String(externalId)),
+          sourceCompanyId: companyId,
+          sourceCompanyName:
+            company.name || company.companyName || company.company || '',
+        })
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Preview inventory sync completed successfully',
+      data: previewItems,
+      categories: Array.from(categories).sort(),
+      count: previewItems.length,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error previewing product/service sync:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while previewing product/service sync',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const importProductService = async (req, res, next) => {
+  try {
+    const { items } = req.body
+    if (!Array.isArray(items)) {
+      return res.status(400).json({
+        success: false,
+        message: 'A list of selected inventory items is required',
+      })
+    }
+
+    const existingRecords = await Query(
+      `SELECT ${Master.products_service.selectOptionColumns.id} AS id, ${Master.products_service.selectOptionColumns.code} AS code FROM ${Master.products_service.tablename}`,
+    )
+    const existingMap = new Map(
+      existingRecords.map((record) => [String(record.code), Number(record.id)]),
+    )
+
+    const importQueries = []
+    let insertedCount = 0
+    let updatedCount = 0
+    const processedCodes = new Set()
+
+    for (const item of items) {
+      if (
+        !item ||
+        !item.code ||
+        !item.name ||
+        !item.type ||
+        !item.category ||
+        !item.unit
+      ) {
+        continue
+      }
+
+      const code = String(item.code)
+      if (processedCodes.has(code)) {
+        continue
+      }
+      processedCodes.add(code)
+
+      const name = String(item.name)
+      const type = String(item.type)
+      const category = String(item.category)
+      const unit = String(item.unit)
+      const salesPrice = Number(item.sales_price || 0)
+      const purchasePrice = Number(item.purchase_price || 0)
+
+      if (existingMap.has(code)) {
+        const existingId = existingMap.get(code)
+        importQueries.push({
+          sql: `UPDATE ${Master.products_service.tablename} SET ${Master.products_service.selectOptionColumns.name} = ?, ${Master.products_service.selectOptionColumns.type} = ?, ${Master.products_service.selectOptionColumns.category} = ?, ${Master.products_service.selectOptionColumns.sales_price} = ?, ${Master.products_service.selectOptionColumns.purchase_price} = ?, ${Master.products_service.selectOptionColumns.unit} = ? WHERE ${Master.products_service.selectOptionColumns.id} = ?`,
+          values: [
+            name,
+            type,
+            category,
+            salesPrice,
+            purchasePrice,
+            unit,
+            existingId,
+          ],
+        })
+        updatedCount += 1
+      } else {
+        importQueries.push({
+          sql: sql
+            .insert(Master.products_service.tablename, {
+              columns: Master.products_service.insertColumns,
+              prefix: Master.products_service.prefix,
+              isTransaction: true,
+            })
+            .build(),
+          values: [code, name, type, category, salesPrice, purchasePrice, unit],
+        })
+        insertedCount += 1
+      }
+    }
+
+    if (importQueries.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid inventory items were selected for import',
+      })
+    }
+
+    await Transaction(importQueries)
+
+    const productsService = await SelectAll(
+      Master.products_service.tablename,
+      Master.products_service.prefix_,
+    )
+
+    res.status(200).json({
+      success: true,
+      message: `Imported ${insertedCount} item(s) and updated ${updatedCount} existing record(s).`,
+      data: productsService,
+      count: productsService.length,
+      importedCount: insertedCount,
+      updatedCount,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error importing product/service:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while importing product/service',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
 const createProductService = async (req, res, next) => {
   try {
     const { code, name, type, category, sales_price, purchase_price, unit } =
@@ -460,6 +674,8 @@ const updateProductService = async (req, res, next) => {
 module.exports = {
   getProductsService,
   syncProductService,
+  previewProductServiceSync,
+  importProductService,
   createProductService,
   updateProductService,
 }

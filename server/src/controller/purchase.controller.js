@@ -252,6 +252,16 @@ const getPurchase = async (req, res, next) => {
         { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
 
         {
+          col: Master.vendors_information.selectOptionColumns.address,
+          as: 'vendor_address',
+        },
+
+        {
+          col: Master.vendors_information.selectOptionColumns.tin,
+          as: 'vendor_tin',
+        },
+
+        {
           col: Accounting.purchase.selectOptionColumns.document_reference,
           as: 'doc_ref',
         },
@@ -283,6 +293,12 @@ const getPurchase = async (req, res, next) => {
         Master.vendors.tablename,
         Accounting.purchase.selectOptionColumns.vendor_id,
         Master.vendors.selectOptionColumns.id,
+      )
+
+      .leftJoin(
+        Master.vendors_information.tablename,
+        `${Master.vendors_information.tablename}.${Master.vendors_information.selectOptionColumns.vendor_id}`,
+        `${Master.vendors.tablename}.${Master.vendors.selectOptionColumns.id}`,
       )
 
       .build()
@@ -420,8 +436,18 @@ const getAllPurchase = async (req, res, next) => {
     let purchases = await Query(
       purchase_query,
       [purchaseId],
-      [Accounting.purchase.prefix_, Master.vendors.prefix_],
+      [
+        Accounting.purchase.prefix_,
+        Master.vendors.prefix_,
+        Master.vendors_information.prefix_,
+      ],
     )
+
+    purchases = (purchases || []).map((r) => ({
+      ...r,
+      vendor_address: r.vendor_address || '',
+      vendor_tin: r.vendor_tin || '',
+    }))
 
     const purchase_items_query = sql
       .select([
@@ -1030,22 +1056,14 @@ const updatePurchaseState = async (req, res, next) => {
       const updatePromises = updates.map(async (update) => {
         const { id, currentState } = update
 
-        // Convert id to number if it's a string
-
-        const purchaseId = typeof id === 'string' ? parseInt(id, 10) : id
+        const purchaseId = String(id || '').trim()
 
         if (!purchaseId || !currentState) {
           throw new Error('Each update requires valid id and currentState')
         }
 
-        if (isNaN(purchaseId)) {
-          throw new Error(`Invalid purchase ID: ${id} (converted to ${purchaseId})`)
-        }
-
         let nextState
-
         let updateQuery
-
         let updateValues
 
         if (currentState === 'PREPARED') {
@@ -1053,14 +1071,11 @@ const updatePurchaseState = async (req, res, next) => {
 
           updateQuery = sql
             .update(Accounting.purchase.tablename)
-
             .set([
               Accounting.purchase.selectOptionColumns.state,
               Accounting.purchase.selectOptionColumns.checked_by,
             ])
-
             .where(Accounting.purchase.selectOptionColumns.id)
-
             .build()
 
           updateValues = [nextState, req.context.username, purchaseId]
@@ -1069,14 +1084,11 @@ const updatePurchaseState = async (req, res, next) => {
 
           updateQuery = sql
             .update(Accounting.purchase.tablename)
-
             .set([
               Accounting.purchase.selectOptionColumns.state,
               Accounting.purchase.selectOptionColumns.approved_by,
             ])
-
             .where(Accounting.purchase.selectOptionColumns.id)
-
             .build()
 
           updateValues = [nextState, req.context.username, purchaseId]
@@ -1139,7 +1151,7 @@ const updatePurchaseState = async (req, res, next) => {
         data: {
           updatedCount: results.length,
 
-          updates: validUpdates.map((update) => ({ id: update.id })),
+          updates: updates.map((update) => ({ id: update.id })),
         },
 
         timestamp: new Date().toISOString(),
@@ -2611,6 +2623,12 @@ const getPrintPurchases = async (req, res, next) => {
         `${Master.vendors.tablename}.${Master.vendors.selectOptionColumns.id}`,
       )
 
+      .leftJoin(
+        Master.vendors_information.tablename,
+        `${Master.vendors_information.tablename}.${Master.vendors_information.selectOptionColumns.vendor_id}`,
+        `${Master.vendors.tablename}.${Master.vendors.selectOptionColumns.id}`,
+      )
+
       .whereIn(
         `${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.id}`,
         purchaseIds,
@@ -2621,7 +2639,11 @@ const getPrintPurchases = async (req, res, next) => {
     let purchases = await Query(
       purchases_query,
       [...purchaseIds],
-      [Accounting.purchase.prefix_, Master.vendors.prefix_],
+      [
+        Accounting.purchase.prefix_,
+        Master.vendors.prefix_,
+        Master.vendors_information.prefix_,
+      ],
     )
 
     // Fetch purchase items
@@ -2831,9 +2853,38 @@ const getPrintPurchases = async (req, res, next) => {
       [Accounting.purchase_attachments.prefix_],
     )
 
+    // Fetch vendors_information for involved vendors
+    const purchaseVendorIds = Array.from(
+      new Set(purchases.map((p) => p.vendor_id).filter(Boolean)),
+    )
+    let vendorsInfoMap = {}
+    if (purchaseVendorIds.length > 0) {
+      const placeholders = purchaseVendorIds.map(() => '?').join(',')
+      const vendors_info_query = `SELECT ${Master.vendors_information.selectOptionColumns.vendor_id} AS vendor_id, ${Master.vendors_information.selectOptionColumns.address} AS address, ${Master.vendors_information.selectOptionColumns.tin} AS tin FROM ${Master.vendors_information.tablename} WHERE ${Master.vendors_information.selectOptionColumns.vendor_id} IN (${placeholders})`
+      let vendors_info_rows = await Query(
+        vendors_info_query,
+        [...purchaseVendorIds],
+        [Master.vendors_information.prefix_],
+      )
+      vendors_info_rows = vendors_info_rows || []
+      vendorsInfoMap = vendors_info_rows.reduce((acc, row) => {
+        acc[row.vendor_id] = { address: row.address || '', tin: row.tin || '' }
+        return acc
+      }, {})
+    }
+
     // Group items, journal, and attachments by purchase ID
 
     const groupedData = purchases.map((purchase) => {
+      // merge vendor info
+      const vi = vendorsInfoMap[purchase.vendor_id]
+      if (vi) {
+        purchase.vendor_address = vi.address || purchase.vendor_address || ''
+        purchase.vendor_tin = vi.tin || purchase.vendor_tin || ''
+      } else {
+        purchase.vendor_address = purchase.vendor_address || ''
+        purchase.vendor_tin = purchase.vendor_tin || ''
+      }
       const purchaseItems = purchase_items.filter(
         (item) => item.purchase_id === purchase.id,
       )

@@ -438,6 +438,12 @@ const getAllSales = async (req, res, next) => {
         Master.customers.selectOptionColumns.id,
       )
 
+      .leftJoin(
+        Master.customers_information.tablename,
+        `${Master.customers_information.tablename}.${Master.customers_information.selectOptionColumns.customer_id}`,
+        `${Master.customers.tablename}.${Master.customers.selectOptionColumns.id}`,
+      )
+
       .where(Accounting.sales.selectOptionColumns.id)
 
       .build()
@@ -445,8 +451,19 @@ const getAllSales = async (req, res, next) => {
     let sales = await Query(
       sales_query,
       [salesId],
-      [Accounting.sales.prefix_, Master.customers.prefix_],
+      [
+        Accounting.sales.prefix_,
+        Master.customers.prefix_,
+        Master.customers_information.prefix_,
+      ],
     )
+
+    // Sanitize customer info for PDF printing
+    sales = (sales || []).map((r) => ({
+      ...r,
+      customer_address: r.customer_address || '',
+      customer_tin: r.customer_tin || '',
+    }))
 
     const sales_items_query = sql
       .select([
@@ -2677,6 +2694,12 @@ const getPrintSales = async (req, res, next) => {
         Master.customers.selectOptionColumns.id,
       )
 
+      .leftJoin(
+        Master.customers_information.tablename,
+        Master.customers_information.selectOptionColumns.customer_id,
+        Master.customers.selectOptionColumns.id,
+      )
+
       .whereIn(Accounting.sales.selectOptionColumns.id, salesIds)
 
       .build()
@@ -2684,7 +2707,11 @@ const getPrintSales = async (req, res, next) => {
     let sales = await Query(
       sales_query,
       [...salesIds],
-      [Accounting.sales.prefix_, Master.customers.prefix_],
+      [
+        Accounting.sales.prefix_,
+        Master.customers.prefix_,
+        Master.customers_information.prefix_,
+      ],
     )
 
     const sales_items_query = sql
@@ -2867,7 +2894,36 @@ const getPrintSales = async (req, res, next) => {
       [Accounting.sales_attachments.prefix_],
     )
 
+    // Fetch customers_information for involved customers
+    const saleCustomerIds = Array.from(
+      new Set(sales.map((s) => s.customer_id).filter(Boolean)),
+    )
+    let customersInfoMap = {}
+    if (saleCustomerIds.length > 0) {
+      const placeholders = saleCustomerIds.map(() => '?').join(',')
+      const customers_info_query = `SELECT ${Master.customers_information.selectOptionColumns.customer_id} AS customer_id, ${Master.customers_information.selectOptionColumns.address} AS address, ${Master.customers_information.selectOptionColumns.tin} AS tin FROM ${Master.customers_information.tablename} WHERE ${Master.customers_information.selectOptionColumns.customer_id} IN (${placeholders})`
+      let customers_info_rows = await Query(
+        customers_info_query,
+        [...saleCustomerIds],
+        [Master.customers_information.prefix_],
+      )
+      customers_info_rows = customers_info_rows || []
+      customersInfoMap = customers_info_rows.reduce((acc, row) => {
+        acc[row.customer_id] = { address: row.address || '', tin: row.tin || '' }
+        return acc
+      }, {})
+    }
+
     const groupedData = sales.map((sale) => {
+      // merge customer info
+      const ci = customersInfoMap[sale.customer_id]
+      if (ci) {
+        sale.customer_address = ci.address || sale.customer_address || ''
+        sale.customer_tin = ci.tin || sale.customer_tin || ''
+      } else {
+        sale.customer_address = sale.customer_address || ''
+        sale.customer_tin = sale.customer_tin || ''
+      }
       const saleItems = sales_items.filter((item) => item.sales_id === sale.id)
 
       const saleJournal =

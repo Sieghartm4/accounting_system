@@ -36,7 +36,7 @@ const getCollections = async (req, res, next) => {
         { col: `${Master.customers.tablename}.c_name`, as: 'customer' },
 
         {
-          col: `${Accounting.collections.tablename}.c_document_reference`,
+          col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.document_reference}`,
           as: 'doc_ref',
         },
 
@@ -470,6 +470,12 @@ const getAllCollections = async (req, res, next) => {
         `${Master.customers.tablename}.${Master.customers.selectOptionColumns.id}`,
       )
 
+      .leftJoin(
+        Master.customers_information.tablename,
+        `${Master.customers_information.tablename}.${Master.customers_information.selectOptionColumns.customer_id}`,
+        `${Master.customers.tablename}.${Master.customers.selectOptionColumns.id}`,
+      )
+
       .where(
         `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id}`,
       )
@@ -479,8 +485,18 @@ const getAllCollections = async (req, res, next) => {
     let collection = await Query(
       collection_query,
       [collectionId],
-      [Accounting.collections.prefix_, Master.customers.prefix_],
+      [
+        Accounting.collections.prefix_,
+        Master.customers.prefix_,
+        Master.customers_information.prefix_,
+      ],
     )
+
+    collection = (collection || []).map((r) => ({
+      ...r,
+      customer_address: r.customer_address || '',
+      customer_tin: r.customer_tin || '',
+    }))
 
     const collection_items_query = sql
       .select([
@@ -1378,6 +1394,12 @@ const getPrintCollections = async (req, res, next) => {
         `${Master.customers.tablename}.${Master.customers.selectOptionColumns.id}`,
       )
 
+      .leftJoin(
+        Master.customers_information.tablename,
+        `${Master.customers_information.tablename}.${Master.customers_information.selectOptionColumns.customer_id}`,
+        `${Master.customers.tablename}.${Master.customers.selectOptionColumns.id}`,
+      )
+
       .whereIn(
         `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id}`,
         collectionIds,
@@ -1388,7 +1410,11 @@ const getPrintCollections = async (req, res, next) => {
     let collections = await Query(
       collections_query,
       [...collectionIds],
-      [Accounting.collections.prefix_, Master.customers.prefix_],
+      [
+        Accounting.collections.prefix_,
+        Master.customers.prefix_,
+        Master.customers_information.prefix_,
+      ],
     )
 
     // Fetch collection items with sales info
@@ -1607,9 +1633,38 @@ const getPrintCollections = async (req, res, next) => {
       [Accounting.collection_attachments.prefix_],
     )
 
+    // Fetch customers_information for involved customers
+    const collCustomerIds = Array.from(
+      new Set(collections.map((c) => c.customer_id).filter(Boolean)),
+    )
+    let customersInfoMap = {}
+    if (collCustomerIds.length > 0) {
+      const placeholders = collCustomerIds.map(() => '?').join(',')
+      const customers_info_query = `SELECT ${Master.customers_information.selectOptionColumns.customer_id} AS customer_id, ${Master.customers_information.selectOptionColumns.address} AS address, ${Master.customers_information.selectOptionColumns.tin} AS tin FROM ${Master.customers_information.tablename} WHERE ${Master.customers_information.selectOptionColumns.customer_id} IN (${placeholders})`
+      let customers_info_rows = await Query(
+        customers_info_query,
+        [...collCustomerIds],
+        [Master.customers_information.prefix_],
+      )
+      customers_info_rows = customers_info_rows || []
+      customersInfoMap = customers_info_rows.reduce((acc, row) => {
+        acc[row.customer_id] = { address: row.address || '', tin: row.tin || '' }
+        return acc
+      }, {})
+    }
+
     // Group items, journal, and attachments by collection ID
 
     const groupedData = collections.map((collection) => {
+      // merge customer info
+      const ci = customersInfoMap[collection.customer_id]
+      if (ci) {
+        collection.customer_address = ci.address || collection.customer_address || ''
+        collection.customer_tin = ci.tin || collection.customer_tin || ''
+      } else {
+        collection.customer_address = collection.customer_address || ''
+        collection.customer_tin = collection.customer_tin || ''
+      }
       const items = collection_items.filter(
         (item) => item.collection_id === collection.id,
       )

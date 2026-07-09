@@ -96,7 +96,18 @@ export async function generateCollectionPDF(collectionData, copyType = 'internal
     y += 13
 
     // ── PARTY / DOC INFO ──────────────────────────────────────────────────────
-    // Left – customer name + TIN
+    // Left – customer name, TIN and address
+    const collectionTin =
+      collection.customer_tin ||
+      collection.tin ||
+      collection.customer?.tin ||
+      '000-000-000-00000'
+    const collectionAddress =
+      collection.customer_address ||
+      collection.address ||
+      collection.customer?.address ||
+      ''
+
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(...BLACK)
@@ -105,7 +116,11 @@ export async function generateCollectionPDF(collectionData, copyType = 'internal
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DGRAY)
-    doc.text('000-000-000-00000', margin, y + 12)
+    doc.text(collectionTin, margin, y + 12)
+    if (collectionAddress) {
+      doc.text(collectionAddress, margin, y + 24)
+      y += 12
+    }
 
     // Right – doc metadata (label + value two-column)
     const INFO_LABEL_X = margin + contentW * 0.52

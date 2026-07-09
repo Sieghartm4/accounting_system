@@ -94,7 +94,15 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     y += 13
 
     // ── PARTY / DOC INFO ──────────────────────────────────────────────────────
-    // Left – customer name + TIN
+    // Left – customer name, TIN and address
+    const receiptTin =
+      receipt.customer_tin ||
+      receipt.tin ||
+      receipt.customer?.tin ||
+      '000-000-000-00000'
+    const receiptAddress =
+      receipt.customer_address || receipt.address || receipt.customer?.address || ''
+
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(...BLACK)
@@ -103,7 +111,11 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DGRAY)
-    doc.text('000-000-000-00000', margin, y + 12)
+    doc.text(receiptTin, margin, y + 12)
+    if (receiptAddress) {
+      doc.text(receiptAddress, margin, y + 24)
+      y += 12
+    }
 
     // Right – doc metadata (label + value two-column)
     const INFO_LABEL_X = margin + contentW * 0.52
@@ -243,21 +255,21 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
         valign: 'middle',
         minCellHeight: 24,
       },
-columnStyles: {
-  0: { halign: 'center', cellWidth: 16 },
-  1: { halign: 'left' },                 // Removed cellWidth: 58 (grows automatically)
-  2: { halign: 'left' },                 // Removed cellWidth: 55 (grows automatically)
-  3: { halign: 'center', cellWidth: 24 },
-  4: { halign: 'right', cellWidth: 36 },
-  5: { halign: 'right', cellWidth: 46 },
-  6: { halign: 'right', cellWidth: 44 },
-  7: { halign: 'right', cellWidth: 40 },
-  8: { halign: 'center', cellWidth: 24 },
-  9: { halign: 'right', cellWidth: 40 },
-  10: { halign: 'center', cellWidth: 24 },
-  11: { halign: 'right', cellWidth: 40 },
-  12: { halign: 'right', cellWidth: 46 },
-},
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 16 },
+        1: { halign: 'left' }, // Removed cellWidth: 58 (grows automatically)
+        2: { halign: 'left' }, // Removed cellWidth: 55 (grows automatically)
+        3: { halign: 'center', cellWidth: 24 },
+        4: { halign: 'right', cellWidth: 36 },
+        5: { halign: 'right', cellWidth: 46 },
+        6: { halign: 'right', cellWidth: 44 },
+        7: { halign: 'right', cellWidth: 40 },
+        8: { halign: 'center', cellWidth: 24 },
+        9: { halign: 'right', cellWidth: 40 },
+        10: { halign: 'center', cellWidth: 24 },
+        11: { halign: 'right', cellWidth: 40 },
+        12: { halign: 'right', cellWidth: 46 },
+      },
       alternateRowStyles: { fillColor: [252, 252, 252] },
       tableLineColor: [210, 210, 210],
       tableLineWidth: 0.4,

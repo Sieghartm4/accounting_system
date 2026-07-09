@@ -183,6 +183,16 @@ const getAllCashDisbursements = async (req, res, next) => {
         { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
 
         {
+          col: Master.vendors_information.selectOptionColumns.address,
+          as: 'vendor_address',
+        },
+
+        {
+          col: Master.vendors_information.selectOptionColumns.tin,
+          as: 'vendor_tin',
+        },
+
+        {
           col: Accounting.cash_disbursements.selectOptionColumns.document_reference,
           as: 'doc_ref',
         },
@@ -231,6 +241,12 @@ const getAllCashDisbursements = async (req, res, next) => {
         Master.vendors.selectOptionColumns.id,
       )
 
+      .leftJoin(
+        Master.vendors_information.tablename,
+        `${Master.vendors_information.tablename}.${Master.vendors_information.selectOptionColumns.vendor_id}`,
+        `${Master.vendors.tablename}.${Master.vendors.selectOptionColumns.id}`,
+      )
+
       .where(Accounting.cash_disbursements.selectOptionColumns.id)
 
       .build()
@@ -238,8 +254,18 @@ const getAllCashDisbursements = async (req, res, next) => {
     let cash_disbursement = await Query(
       cash_disbursements_query,
       [cashDisbursementId],
-      [Accounting.cash_disbursements.prefix_, Master.vendors.prefix_],
+      [
+        Accounting.cash_disbursements.prefix_,
+        Master.vendors.prefix_,
+        Master.vendors_information.prefix_,
+      ],
     )
+
+    cash_disbursement = (cash_disbursement || []).map((r) => ({
+      ...r,
+      vendor_address: r.vendor_address || '',
+      vendor_tin: r.vendor_tin || '',
+    }))
 
     const cash_disbursement_items_query = sql
       .select([
@@ -2345,8 +2371,32 @@ const getPrintDisbursements = async (req, res, next) => {
     let disbursements = await Query(
       disbursements_query,
       [...disbursementIds],
-      [Accounting.cash_disbursements.prefix_, Master.vendors.prefix_],
+      [
+        Accounting.cash_disbursements.prefix_,
+        Master.vendors.prefix_,
+        Master.vendors_information.prefix_,
+      ],
     )
+
+    // Fetch vendors_information for involved vendors
+    const disbVendorIds = Array.from(
+      new Set(disbursements.map((d) => d.vendor_id).filter(Boolean)),
+    )
+    let vendorsInfoMap = {}
+    if (disbVendorIds.length > 0) {
+      const placeholders = disbVendorIds.map(() => '?').join(',')
+      const vendors_info_query = `SELECT ${Master.vendors_information.selectOptionColumns.vendor_id} AS vendor_id, ${Master.vendors_information.selectOptionColumns.address} AS address, ${Master.vendors_information.selectOptionColumns.tin} AS tin FROM ${Master.vendors_information.tablename} WHERE ${Master.vendors_information.selectOptionColumns.vendor_id} IN (${placeholders})`
+      let vendors_info_rows = await Query(
+        vendors_info_query,
+        [...disbVendorIds],
+        [Master.vendors_information.prefix_],
+      )
+      vendors_info_rows = vendors_info_rows || []
+      vendorsInfoMap = vendors_info_rows.reduce((acc, row) => {
+        acc[row.vendor_id] = { address: row.address || '', tin: row.tin || '' }
+        return acc
+      }, {})
+    }
 
     const disbursement_items_query = sql
       .select([
@@ -2506,6 +2556,15 @@ const getPrintDisbursements = async (req, res, next) => {
     // Group items and journal by disbursement ID
 
     const groupedData = disbursements.map((disbursement) => {
+      // merge vendor info
+      const vi = vendorsInfoMap[disbursement.vendor_id]
+      if (vi) {
+        disbursement.vendor_address = vi.address || disbursement.vendor_address || ''
+        disbursement.vendor_tin = vi.tin || disbursement.vendor_tin || ''
+      } else {
+        disbursement.vendor_address = disbursement.vendor_address || ''
+        disbursement.vendor_tin = disbursement.vendor_tin || ''
+      }
       const disbursementItems = disbursement_items.filter(
         (item) => item.cash_disbursement_id === disbursement.id,
       )

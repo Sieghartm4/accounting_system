@@ -94,7 +94,15 @@ export async function generatePurchasePDF(purchaseData, copyType = 'internal') {
     y += 13
 
     // ── PARTY / DOC INFO ──────────────────────────────────────────────────────
-    // Left – vendor name + TIN
+    // Left – vendor name, TIN and address
+    const purchaseTin =
+      purchase.vendor_tin ||
+      purchase.tin ||
+      purchase.vendor?.tin ||
+      '000-000-000-00000'
+    const purchaseAddress =
+      purchase.vendor_address || purchase.address || purchase.vendor?.address || ''
+
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(...BLACK)
@@ -103,7 +111,11 @@ export async function generatePurchasePDF(purchaseData, copyType = 'internal') {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DGRAY)
-    doc.text('000-000-000-00000', margin, y + 12)
+    doc.text(purchaseTin, margin, y + 12)
+    if (purchaseAddress) {
+      doc.text(purchaseAddress, margin, y + 24)
+      y += 12
+    }
 
     // Right – doc metadata (label + value two-column)
     const INFO_LABEL_X = margin + contentW * 0.52

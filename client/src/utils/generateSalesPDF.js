@@ -94,7 +94,12 @@ export async function generateSalesPDF(salesData, copyType = 'internal') {
     y += 13
 
     // ── PARTY / DOC INFO ──────────────────────────────────────────────────────
-    // Left – customer name + TIN
+    // Left – customer name, TIN and address
+    const saleTin =
+      sale.customer_tin || sale.tin || sale.customer?.tin || '000-000-000-00000'
+    const saleAddress =
+      sale.customer_address || sale.address || sale.customer?.address || ''
+
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(...BLACK)
@@ -103,7 +108,11 @@ export async function generateSalesPDF(salesData, copyType = 'internal') {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DGRAY)
-    doc.text('000-000-000-00000', margin, y + 12)
+    doc.text(saleTin, margin, y + 12)
+    if (saleAddress) {
+      doc.text(saleAddress, margin, y + 24)
+      y += 12
+    }
 
     // Right – doc metadata (label + value two-column)
     const INFO_LABEL_X = margin + contentW * 0.52

@@ -1204,7 +1204,8 @@ export default function CollectionsForm({
               >
                 <option value="">Select type...</option>
                 <option value="individual">Individual</option>
-                <option value="business">Business</option>
+                <option value="partnership">Partnership</option>
+                <option value="corporation">Corporation</option>
                 <option value="government">Government</option>
                 <option value="non-profit">Non-Profit</option>
               </select>
@@ -1280,22 +1281,6 @@ export default function CollectionsForm({
                 placeholder="Enter contact number..."
                 required
               />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                Status <span className="text-red-600">*</span>
-              </label>
-              <select
-                value={customerForm.status}
-                onChange={(e) =>
-                  setCustomerForm({ ...customerForm, status: e.target.value })
-                }
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
             </div>
           </div>
 

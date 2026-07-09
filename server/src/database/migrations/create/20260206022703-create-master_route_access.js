@@ -24,7 +24,7 @@ module.exports = {
         allowNull: false
       },
       mra_status: {
-        type: Sequelize.STRING(300),
+        type: Sequelize.JSON,
         allowNull: false,
       }
     });

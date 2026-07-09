@@ -18,11 +18,11 @@ export function renderPDFCompanyHeader(
   const rightTextMaxWidth = rightBlockWidth - 8
 
   const leftLines = []
-  if (company.company_name) leftLines.push(company.company_name)
-  if (company.owner_name) leftLines.push(company.owner_name)
+  if (company.company_name) leftLines.push(String(company.company_name))
+  if (company.owner_name) leftLines.push(String(company.owner_name))
 
   const rightLines = []
-  if (company.address) rightLines.push(company.address)
+  if (company.address) rightLines.push(String(company.address))
   const contactLine = [company.phone, company.email].filter(Boolean).join('  |  ')
   if (contactLine) rightLines.push(contactLine)
   const tinWebLine = [company.tin ? `TIN: ${company.tin}` : null, company.website]

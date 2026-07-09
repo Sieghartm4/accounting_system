@@ -458,6 +458,16 @@ const getAllPayments = async (req, res, next) => {
         { col: Accounting.payments.selectOptionColumns.remarks, as: 'remarks' },
 
         { col: Accounting.payments.selectOptionColumns.state, as: 'state' },
+
+        {
+          col: Master.vendors_information.selectOptionColumns.address,
+          as: 'vendor_address',
+        },
+
+        {
+          col: Master.vendors_information.selectOptionColumns.tin,
+          as: 'vendor_tin',
+        },
       ])
 
       .from(Accounting.payments.tablename)
@@ -468,6 +478,12 @@ const getAllPayments = async (req, res, next) => {
         Master.vendors.selectOptionColumns.id,
       )
 
+      .leftJoin(
+        Master.vendors_information.tablename,
+        `${Master.vendors_information.tablename}.${Master.vendors_information.selectOptionColumns.vendor_id}`,
+        `${Master.vendors.tablename}.${Master.vendors.selectOptionColumns.id}`,
+      )
+
       .where(Accounting.payments.selectOptionColumns.id)
 
       .build()
@@ -475,8 +491,19 @@ const getAllPayments = async (req, res, next) => {
     let payment = await Query(
       payment_query,
       [paymentId],
-      [Accounting.payments.prefix_, Master.vendors.prefix_],
+      [
+        Accounting.payments.prefix_,
+        Master.vendors.prefix_,
+        Master.vendors_information.prefix_,
+      ],
     )
+
+    // Sanitize vendor info for PDF
+    payment = (payment || []).map((r) => ({
+      ...r,
+      vendor_address: r.vendor_address || '',
+      vendor_tin: r.vendor_tin || '',
+    }))
 
     const payment_items_query = sql
       .select([
@@ -1614,9 +1641,38 @@ const getPrintPayments = async (req, res, next) => {
       [Accounting.payment_attachments.prefix_],
     )
 
+    // Fetch vendors_information for involved vendors
+    const paymentVendorIds = Array.from(
+      new Set(payments.map((p) => p.vendor_id).filter(Boolean)),
+    )
+    let vendorsInfoMap = {}
+    if (paymentVendorIds.length > 0) {
+      const placeholders = paymentVendorIds.map(() => '?').join(',')
+      const vendors_info_query = `SELECT ${Master.vendors_information.selectOptionColumns.vendor_id} AS vendor_id, ${Master.vendors_information.selectOptionColumns.address} AS address, ${Master.vendors_information.selectOptionColumns.tin} AS tin FROM ${Master.vendors_information.tablename} WHERE ${Master.vendors_information.selectOptionColumns.vendor_id} IN (${placeholders})`
+      let vendors_info_rows = await Query(
+        vendors_info_query,
+        [...paymentVendorIds],
+        [Master.vendors_information.prefix_],
+      )
+      vendors_info_rows = vendors_info_rows || []
+      vendorsInfoMap = vendors_info_rows.reduce((acc, row) => {
+        acc[row.vendor_id] = { address: row.address || '', tin: row.tin || '' }
+        return acc
+      }, {})
+    }
+
     // Group items, journal, and attachments by payment ID
 
     const groupedData = payments.map((payment) => {
+      // merge vendor info
+      const vi = vendorsInfoMap[payment.vendor_id]
+      if (vi) {
+        payment.vendor_address = vi.address || payment.vendor_address || ''
+        payment.vendor_tin = vi.tin || payment.vendor_tin || ''
+      } else {
+        payment.vendor_address = payment.vendor_address || ''
+        payment.vendor_tin = payment.vendor_tin || ''
+      }
       const paymentItems = payment_items.filter(
         (item) => item.payment_id === payment.id,
       )

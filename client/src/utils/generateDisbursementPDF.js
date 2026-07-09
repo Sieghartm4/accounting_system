@@ -128,9 +128,21 @@ export async function generateDisbursementPDF(
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DGRAY)
-    const tinValue =
-      disbursement.vendor_tin || disbursement.customer_tin || '000-000-000-00000'
-    doc.text(tinValue, margin, y + 12)
+    const disbursementTin =
+      disbursement.vendor_tin ||
+      disbursement.customer_tin ||
+      disbursement.tin ||
+      '000-000-000-00000'
+    const disbursementAddress =
+      disbursement.vendor_address ||
+      disbursement.customer_address ||
+      disbursement.address ||
+      ''
+    doc.text(disbursementTin, margin, y + 12)
+    if (disbursementAddress) {
+      doc.text(disbursementAddress, margin, y + 24)
+      y += 12
+    }
 
     const INFO_LABEL_X = margin + contentW * 0.52
     const INFO_VALUE_X = INFO_LABEL_X + 92

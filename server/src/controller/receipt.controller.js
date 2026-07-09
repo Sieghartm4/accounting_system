@@ -169,6 +169,16 @@ const getAllReceipts = async (req, res, next) => {
         { col: Master.customers.selectOptionColumns.name, as: 'customer' },
 
         {
+          col: Master.customers_information.selectOptionColumns.address,
+          as: 'customer_address',
+        },
+
+        {
+          col: Master.customers_information.selectOptionColumns.tin,
+          as: 'customer_tin',
+        },
+
+        {
           col: Accounting.receipts.selectOptionColumns.document_reference,
           as: 'doc_ref',
         },
@@ -205,6 +215,12 @@ const getAllReceipts = async (req, res, next) => {
         Master.customers.selectOptionColumns.id,
       )
 
+      .leftJoin(
+        Master.customers_information.tablename,
+        `${Master.customers_information.tablename}.${Master.customers_information.selectOptionColumns.customer_id}`,
+        `${Master.customers.tablename}.${Master.customers.selectOptionColumns.id}`,
+      )
+
       .where(Accounting.receipts.selectOptionColumns.id)
 
       .build()
@@ -212,8 +228,18 @@ const getAllReceipts = async (req, res, next) => {
     let receipts = await Query(
       receipts_query,
       [receiptId],
-      [Accounting.receipts.prefix_, Master.customers.prefix_],
+      [
+        Accounting.receipts.prefix_,
+        Master.customers.prefix_,
+        Master.customers_information.prefix_,
+      ],
     )
+    // Ensure customer address/tin are non-null strings for PDFs
+    receipts = (receipts || []).map((r) => ({
+      ...r,
+      customer_address: r.customer_address || '',
+      customer_tin: r.customer_tin || '',
+    }))
 
     const receipts_items_query = sql
       .select([
@@ -562,6 +588,12 @@ const getPrintReceipts = async (req, res, next) => {
         Master.customers.selectOptionColumns.id,
       )
 
+      .leftJoin(
+        Master.customers_information.tablename,
+        `${Master.customers_information.tablename}.${Master.customers_information.selectOptionColumns.customer_id}`,
+        `${Master.customers.tablename}.${Master.customers.selectOptionColumns.id}`,
+      )
+
       .whereIn(Accounting.receipts.selectOptionColumns.id, receiptIds)
 
       .build()
@@ -569,7 +601,11 @@ const getPrintReceipts = async (req, res, next) => {
     let receipts = await Query(
       receipts_query,
       [...receiptIds],
-      [Accounting.receipts.prefix_, Master.customers.prefix_],
+      [
+        Accounting.receipts.prefix_,
+        Master.customers.prefix_,
+        Master.customers_information.prefix_,
+      ],
     )
 
     const receipts_items_query = sql
@@ -764,9 +800,40 @@ const getPrintReceipts = async (req, res, next) => {
       [Accounting.receipt_attachments.prefix_],
     )
 
+    // Fetch customers_information for all involved customers and build a map
+    const customerIds = Array.from(
+      new Set(receipts.map((r) => r.customer_id).filter(Boolean)),
+    )
+    let customersInfoMap = {}
+    if (customerIds.length > 0) {
+      const placeholders = customerIds.map(() => '?').join(',')
+      const customers_info_query = `SELECT ${Master.customers_information.selectOptionColumns.customer_id} AS customer_id, ${Master.customers_information.selectOptionColumns.address} AS address, ${Master.customers_information.selectOptionColumns.tin} AS tin FROM ${Master.customers_information.tablename} WHERE ${Master.customers_information.selectOptionColumns.customer_id} IN (${placeholders})`
+
+      let customers_info_rows = await Query(
+        customers_info_query,
+        [...customerIds],
+        [Master.customers_information.prefix_],
+      )
+
+      customers_info_rows = customers_info_rows || []
+
+      customersInfoMap = customers_info_rows.reduce((acc, row) => {
+        acc[row.customer_id] = { address: row.address || '', tin: row.tin || '' }
+        return acc
+      }, {})
+    }
     // Group items, journal, and attachments by receipt ID
 
     const groupedData = receipts.map((receipt) => {
+      // merge customer info from customers_information map if present
+      const ci = customersInfoMap[receipt.customer_id]
+      if (ci) {
+        receipt.customer_address = ci.address || receipt.customer_address || ''
+        receipt.customer_tin = ci.tin || receipt.customer_tin || ''
+      } else {
+        receipt.customer_address = receipt.customer_address || ''
+        receipt.customer_tin = receipt.customer_tin || ''
+      }
       const receiptItems = receipts_items.filter(
         (item) => item.receipts_id === receipt.id,
       )

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   Package,
@@ -9,6 +9,7 @@ import {
   Download,
   Plus,
   Edit2,
+  Search,
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import RightSideModal from '../../components/RightSideModal'
@@ -33,6 +34,8 @@ function ProductServiceContent() {
     createProductService,
     updateProductService,
     syncProductService,
+    previewProductServiceSync,
+    importProductService,
   } = useProductService()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -47,7 +50,86 @@ function ProductServiceContent() {
     unit: '',
   })
   const [toast, setToast] = useState(null)
-  const [syncing, setSyncing] = useState(false)
+  const [syncModalOpen, setSyncModalOpen] = useState(false)
+  const [syncPreviewItems, setSyncPreviewItems] = useState([])
+  const [syncCategories, setSyncCategories] = useState([])
+  const [selectedCategoryKeys, setSelectedCategoryKeys] = useState(new Set())
+  const [selectedSyncItems, setSelectedSyncItems] = useState(new Set())
+  const [syncSearchTerm, setSyncSearchTerm] = useState('')
+  const [syncPreviewLoading, setSyncPreviewLoading] = useState(false)
+
+  const filteredSyncPreviewItems = useMemo(() => {
+    const term = syncSearchTerm.trim().toLowerCase()
+    return syncPreviewItems.filter((item) => {
+      if (!term) return true
+      return [item.code, item.name, item.category, item.sourceCompanyName]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term))
+    })
+  }, [syncPreviewItems, syncSearchTerm])
+
+  const allVisibleSyncKeys = useMemo(
+    () => filteredSyncPreviewItems.map((item) => String(item.code)),
+    [filteredSyncPreviewItems],
+  )
+
+  const allSyncChecked =
+    allVisibleSyncKeys.length > 0 &&
+    allVisibleSyncKeys.every((key) => selectedSyncItems.has(key))
+
+  const someSyncChecked = allVisibleSyncKeys.some((key) =>
+    selectedSyncItems.has(key),
+  )
+
+  const handleToggleAllVisibleRows = () => {
+    setSelectedSyncItems((prev) => {
+      const next = new Set(prev)
+      if (allSyncChecked) {
+        allVisibleSyncKeys.forEach((key) => next.delete(key))
+      } else {
+        allVisibleSyncKeys.forEach((key) => next.add(key))
+      }
+      return next
+    })
+  }
+
+  const toggleCategorySelection = (category) => {
+    const nextCategories = new Set(selectedCategoryKeys)
+    const shouldSelect = !nextCategories.has(category)
+    if (shouldSelect) {
+      nextCategories.add(category)
+    } else {
+      nextCategories.delete(category)
+    }
+    setSelectedCategoryKeys(nextCategories)
+
+    setSelectedSyncItems((prev) => {
+      const nextSelected = new Set(prev)
+      syncPreviewItems.forEach((item) => {
+        if (item.category === category) {
+          const key = String(item.code)
+          if (shouldSelect) {
+            nextSelected.add(key)
+          } else {
+            nextSelected.delete(key)
+          }
+        }
+      })
+      return nextSelected
+    })
+  }
+
+  const togglePreviewRow = (item) => {
+    const key = String(item.code)
+    setSelectedSyncItems((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const isCategorySelected = (category) => selectedCategoryKeys.has(category)
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -95,6 +177,60 @@ function ProductServiceContent() {
 
   const handleToastClose = () => {
     setToast(null)
+  }
+
+  const loadSyncPreview = async () => {
+    try {
+      setSyncPreviewLoading(true)
+      const result = await previewProductServiceSync()
+      if (result.success) {
+        setSyncPreviewItems(result.data || [])
+        setSyncCategories(result.categories || [])
+        setSelectedCategoryKeys(new Set())
+        setSelectedSyncItems(new Set())
+        setSyncSearchTerm('')
+        setSyncModalOpen(true)
+      } else {
+        setToast({
+          type: 'error',
+          message: result.message || 'Failed to load inventory preview',
+        })
+      }
+    } catch (err) {
+      setToast({
+        type: 'error',
+        message: err.message || 'Failed to load inventory preview',
+      })
+    } finally {
+      setSyncPreviewLoading(false)
+    }
+  }
+
+  const handleSyncImport = async () => {
+    const selected = syncPreviewItems.filter((item) =>
+      selectedSyncItems.has(String(item.code)),
+    )
+    if (selected.length === 0) {
+      setToast({ type: 'error', message: 'Select at least one item to import' })
+      return
+    }
+
+    const result = await importProductService(selected)
+    if (result.success) {
+      setToast({
+        type: 'success',
+        message: result.message || 'Selected inventory items imported successfully',
+      })
+      setSyncModalOpen(false)
+      setSelectedSyncItems(new Set())
+      setSelectedCategoryKeys(new Set())
+      setSyncPreviewItems([])
+    } else {
+      setToast({
+        type: 'error',
+        message: result.message || 'Failed to import selected items',
+      })
+    }
   }
 
   const handleExportCatalog = () => {
@@ -247,24 +383,13 @@ function ProductServiceContent() {
           <div className="flex gap-3">
             <button
               onClick={async () => {
-                setSyncing(true)
-                const result = await syncProductService()
-                setSyncing(false)
-
-                setToast({
-                  type: result.success ? 'success' : 'error',
-                  message:
-                    result.message ||
-                    (result.success
-                      ? 'Sync completed successfully.'
-                      : 'Failed to sync inventory.'),
-                })
+                await loadSyncPreview()
               }}
-              disabled={syncing}
+              disabled={syncPreviewLoading}
               className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <ArrowRight size={14} />
-              {syncing ? 'Syncing...' : 'Sync Inventory'}
+              {syncPreviewLoading ? 'Loading...' : 'Preview Sync'}
             </button>
             <button
               onClick={handleExportCatalog}
@@ -478,6 +603,173 @@ function ProductServiceContent() {
             </button>
           </div>
         </form>
+      </RightSideModal>
+
+      <RightSideModal
+        isOpen={syncModalOpen}
+        onClose={() => setSyncModalOpen(false)}
+        title="Preview Inventory Sync"
+        size="5xl"
+      >
+        <div className="space-y-2">
+          {/* <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="text-lg font-black text-black">Inventory Preview</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Select which inventory rows should be imported into your
+                product/service catalog.
+              </p>
+            </div>
+          </div> */}
+
+          <div className="flex flex-wrap gap-2">
+            {syncCategories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => toggleCategorySelection(category)}
+                className={`px-4 py-2 text-[10px] font-black uppercase tracking-[2px] rounded-full transition-all border ${
+                  isCategorySelected(category)
+                    ? 'bg-red-600 text-white border-red-600'
+                    : 'bg-white text-red-600 border-red-600 hover:bg-red-50'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+
+          <div className="overflow-x-auto border border-gray-100 rounded-3xl shadow-sm">
+            <div className="p-4 border-b border-gray-100 bg-white">
+              <div className="relative max-w-md w-full">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={syncSearchTerm}
+                  onChange={(e) => setSyncSearchTerm(e.target.value)}
+                  placeholder="Search products, categories, company..."
+                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                />
+              </div>
+            </div>
+            <table className="min-w-full border-collapse text-left">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-4 w-12">
+                    <input
+                      type="checkbox"
+                      checked={allSyncChecked}
+                      ref={(input) => {
+                        if (input)
+                          input.indeterminate = someSyncChecked && !allSyncChecked
+                      }}
+                      onChange={handleToggleAllVisibleRows}
+                      className="h-4 w-4 accent-red-600"
+                    />
+                  </th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[2px] text-gray-500">
+                    Code
+                  </th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[2px] text-gray-500">
+                    Name
+                  </th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[2px] text-gray-500">
+                    Category
+                  </th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[2px] text-gray-500">
+                    Unit
+                  </th>
+                  <th className="px-3 py-4 hidden xl:table-cell text-[10px] font-black uppercase tracking-[2px] text-gray-500">
+                    Company
+                  </th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-[2px] text-gray-500">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSyncPreviewItems.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-6 py-8 text-center text-sm text-gray-500"
+                    >
+                      No inventory items match your current filters.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredSyncPreviewItems.map((item) => {
+                    const key = String(item.code)
+                    const checked = selectedSyncItems.has(key)
+                    const visibleByCategory =
+                      selectedCategoryKeys.size === 0 ||
+                      selectedCategoryKeys.has(item.category)
+                    if (!visibleByCategory) return null
+                    return (
+                      <tr
+                        key={key}
+                        className={`border-b border-gray-100 transition-colors ${checked ? 'bg-red-50' : 'hover:bg-gray-50'}`}
+                      >
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => togglePreviewRow(item)}
+                            className="h-4 w-4 accent-red-600"
+                          />
+                        </td>
+                        <td className="px-3 py-3 text-sm font-bold text-gray-700">
+                          {item.code}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-gray-700">
+                          {item.name}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-gray-700">
+                          {item.category}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-gray-700">
+                          {item.unit}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-gray-700 hidden xl:table-cell">
+                          {item.sourceCompanyName || '—'}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-gray-700">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-[1px] ${item.existsInDb ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}
+                          >
+                            {item.existsInDb ? 'Existing' : 'New'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs text-gray-500">
+              {selectedSyncItems.size} item(s) selected
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={() => setSyncModalOpen(false)}
+                className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSyncImport}
+                className="px-4 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-600 transition-all"
+              >
+                Import Selected
+              </button>
+            </div>
+          </div>
+        </div>
       </RightSideModal>
 
       {/* Toast Notification */}

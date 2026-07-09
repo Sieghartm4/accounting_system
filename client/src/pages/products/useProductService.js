@@ -103,6 +103,41 @@ const useProductService = () => {
     }
   }
 
+  const syncProductService = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('No authorization token found')
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/product_service/sync`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+      return result.success
+        ? { success: true, data: result.data, message: result.message }
+        : {
+            success: false,
+            message: result.message || 'Failed to sync product/service',
+          }
+    } catch (err) {
+      console.error('Error syncing product/service:', err.message)
+      return { success: false, message: err.message }
+    }
+  }
+
   const updateProductService = async (
     id,
     code,
@@ -162,7 +197,7 @@ const useProductService = () => {
     }
   }
 
-  const syncProductService = async () => {
+  const previewProductServiceSync = async () => {
     try {
       const token = localStorage.getItem('token')
 
@@ -171,7 +206,7 @@ const useProductService = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service/sync`,
+        `${import.meta.env.VITE_SERVER_LINK}/product_service/sync/preview`,
         {
           method: 'GET',
           headers: {
@@ -188,16 +223,61 @@ const useProductService = () => {
       const result = await response.json()
 
       if (result.success) {
+        return {
+          success: true,
+          data: result.data,
+          categories: result.categories,
+          message: result.message,
+        }
+      }
+
+      return {
+        success: false,
+        message: result.message || 'Failed to preview sync product/service',
+      }
+    } catch (err) {
+      console.error('Error previewing product/service sync:', err.message)
+      return { success: false, message: err.message }
+    }
+  }
+
+  const importProductService = async (items) => {
+    try {
+      const token = localStorage.getItem('token')
+
+      if (!token) {
+        throw new Error('No authorization token found')
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/product_service/sync/import`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ items }),
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
         await fetchProductService()
         return { success: true, data: result.data, message: result.message }
       }
 
       return {
         success: false,
-        message: result.message || 'Failed to sync product/service',
+        message: result.message || 'Failed to import selected product/service items',
       }
     } catch (err) {
-      console.error('Error syncing product/service:', err.message)
+      console.error('Error importing selected product/service items:', err.message)
       return { success: false, message: err.message }
     }
   }
@@ -209,6 +289,8 @@ const useProductService = () => {
     createProductService,
     updateProductService,
     syncProductService,
+    previewProductServiceSync,
+    importProductService,
   }
 }
 
