@@ -647,8 +647,8 @@ export default function AdjustmentsForm({
 
       // ── adjustment header payload ──
       const adjustmentPayload = {
-        document_reference: documentReference,
-        posting_date: new Date().toISOString().split('T')[0],
+        document_reference: documentReference || null,
+        posting_date: postingDate || new Date().toISOString().split('T')[0],
         remarks: remarks,
         status: 'PREPARED BY',
         total_amount: totalDebit, // Use total debit as the adjustment amount

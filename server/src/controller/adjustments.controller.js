@@ -321,7 +321,7 @@ const createAdjustment = async (req, res, next) => {
     if (!posting_date || !total_amount || !created_by) {
       return res.status(400).json({
         success: false,
-        message: 'All required fields must be provided',
+        message: 'Posting date, total amount, and created by are required',
       })
     }
 
@@ -682,10 +682,10 @@ const updateAdjustmentData = async (req, res, next) => {
       })
     }
 
-    if (!document_reference || !posting_date || !total_amount) {
+    if (!posting_date || !total_amount) {
       return res.status(400).json({
         success: false,
-        message: 'Required fields must be provided',
+        message: 'Posting date and total amount are required',
       })
     }
 
