@@ -263,7 +263,7 @@ const getAdjustmentById = async (req, res, next) => {
         { col: Accounting.journal_entries.selectOptionColumns.date, as: 'date' },
       ])
       .from(Accounting.journal_entries.tablename)
-      .innerJoin(
+      .leftJoin(
         Master.charts_of_accounts.tablename,
         Accounting.journal_entries.selectOptionColumns.coa_id,
         Master.charts_of_accounts.selectOptionColumns.id,
@@ -275,7 +275,7 @@ const getAdjustmentById = async (req, res, next) => {
     let journal_entries = await Query(
       journal_entries_query,
       ['adjustments', adjustmentId],
-      [Accounting.journal_entries.prefix_],
+      [Accounting.journal_entries.prefix_, Master.charts_of_accounts.prefix_],
     )
 
     console.log(adjustment, adjustment_attachments, journal_entries)
@@ -379,7 +379,6 @@ const createAdjustment = async (req, res, next) => {
       if (journal_entries && journal_entries.length > 0) {
         const entriesNeedingLookup = journal_entries.filter(
           (entry) =>
-            !entry.id &&
             normalizeAccountKey(entry.account_id) !== null &&
             !isNumericAccountKey(entry.account_id),
         )
@@ -389,24 +388,6 @@ const createAdjustment = async (req, res, next) => {
             : {}
 
         for (const entry of journal_entries) {
-          if (entry.id) {
-            const updateQuery = sql
-              .update(Accounting.journal_entries.tablename)
-              .set([
-                Accounting.journal_entries.selectOptionColumns.db_name,
-                Accounting.journal_entries.selectOptionColumns.db_id,
-              ])
-              .where(Accounting.journal_entries.selectOptionColumns.id)
-              .build()
-
-            await connection.execute(updateQuery, [
-              'adjustments',
-              adjustmentId,
-              entry.id,
-            ])
-            continue
-          }
-
           const entryQuery = sql
             .insert(Accounting.journal_entries.tablename, {
               columns: Accounting.journal_entries.insertColumns,

@@ -619,13 +619,21 @@ export default function AdjustmentsForm({
       const userData = JSON.parse(localStorage.getItem('user') || '{}')
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
 
-      const preparedJournalEntries = journalEntries.map((entry) => ({
-        id: entry.id,
-        account_id: entry.account || '',
-        responsibility_center: entry.center || '',
-        debit: parseFloat(entry.debit) || 0,
-        credit: parseFloat(entry.credit) || 0,
-      }))
+      const preparedJournalEntries = journalEntries.map((entry) => {
+        const rawAccountValue = entry.account || entry.accountSearch || ''
+        const accountValue = String(rawAccountValue || '').trim()
+        const resolvedAccountId =
+          accountValue && !Number.isNaN(Number(accountValue))
+            ? Number(accountValue)
+            : findCoaIdByLabel(accountValue)
+
+        return {
+          account_id: resolvedAccountId || null,
+          responsibility_center: entry.center || '',
+          debit: parseFloat(entry.debit) || 0,
+          credit: parseFloat(entry.credit) || 0,
+        }
+      })
 
       const preparedAttachments = await Promise.all(
         attachments.map(async (att) => ({
