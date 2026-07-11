@@ -89,14 +89,17 @@ function VendorsContent() {
   const formatTinInput = (value) => {
     const digits = String(value || '')
       .replace(/\D/g, '')
-      .slice(0, 15)
+      .slice(0, 14)
 
+    if (digits.length === 0) return ''
     if (digits.length <= 3) return digits
 
     const parts = []
-    for (let index = 0; index < digits.length; index += 3) {
-      parts.push(digits.slice(index, index + 3))
-    }
+    // 3-3-3-5 format
+    parts.push(digits.slice(0, 3))
+    if (digits.length > 3) parts.push(digits.slice(3, 6))
+    if (digits.length > 6) parts.push(digits.slice(6, 9))
+    if (digits.length > 9) parts.push(digits.slice(9, 14))
 
     return parts.join('-')
   }
@@ -364,7 +367,7 @@ function VendorsContent() {
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                 TIN <span className="text-red-600">*</span>{' '}
-                <span className="text-[9px] text-gray-400">(max 15 chars)</span>
+                <span className="text-[9px] text-gray-400">(max 14 chars)</span>
               </label>
               <input
                 type="text"
@@ -373,16 +376,16 @@ function VendorsContent() {
                   setFormData({ ...formData, tin: formatTinInput(e.target.value) })
                 }
                 inputMode="numeric"
-                maxLength={19}
+                maxLength={18}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
-                placeholder="Enter TIN (XXX-XXX-XXX-XXX-XXX)"
+                placeholder="Enter TIN (XXX-XXX-XXX-XXXXX)"
                 required
               />
             </div>
 
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                Details <span className="text-red-600">*</span>
+                Details
               </label>
               <textarea
                 value={formData.details}
@@ -391,13 +394,12 @@ function VendorsContent() {
                 }
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all min-h-[120px]"
                 placeholder="Enter additional details..."
-                required
               />
             </div>
 
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                Contact <span className="text-red-600">*</span>{' '}
+                Contact{' '}
                 <span className="text-[9px] text-gray-400">(max 15 chars)</span>
               </label>
               <input
@@ -409,7 +411,6 @@ function VendorsContent() {
                 maxLength={15}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter contact number..."
-                required
               />
             </div>
 

@@ -13,6 +13,20 @@ export async function generateDisbursementPDF(
     ? disbursementData
     : [disbursementData]
 
+  // Helper to format TIN with hyphens (000-000-000-000-000)
+  const formatTin = (tin) => {
+    if (!tin) return '000-000-000-0000'
+    const digits = String(tin).replace(/\D/g, '').slice(0, 14)
+    if (digits.length === 0) return '000-000-000-0000'
+    const parts = []
+    // 3-3-3-5 format
+    parts.push(digits.slice(0, 3))
+    if (digits.length > 3) parts.push(digits.slice(3, 6))
+    if (digits.length > 6) parts.push(digits.slice(6, 9))
+    if (digits.length > 9) parts.push(digits.slice(9, 14))
+    return parts.join('-')
+  }
+
   // Debug logging
   console.log('[PDF Generator] Received disbursements:', disbursements)
   disbursements.forEach((d, idx) => {
@@ -138,7 +152,7 @@ export async function generateDisbursementPDF(
       disbursement.customer_address ||
       disbursement.address ||
       ''
-    doc.text(disbursementTin, margin, y + 12)
+    doc.text(formatTin(disbursementTin), margin, y + 12)
     if (disbursementAddress) {
       doc.text(disbursementAddress, margin, y + 24)
       y += 12

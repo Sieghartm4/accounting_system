@@ -8,6 +8,20 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
 
   const receipts = Array.isArray(receiptData) ? receiptData : [receiptData]
 
+  // Helper to format TIN with hyphens (000-000-000-000-000)
+  const formatTin = (tin) => {
+    if (!tin) return '000-000-000-0000'
+    const digits = String(tin).replace(/\D/g, '').slice(0, 14)
+    if (digits.length === 0) return '000-000-000-0000'
+    const parts = []
+    // 3-3-3-5 format
+    parts.push(digits.slice(0, 3))
+    if (digits.length > 3) parts.push(digits.slice(3, 6))
+    if (digits.length > 6) parts.push(digits.slice(6, 9))
+    if (digits.length > 9) parts.push(digits.slice(9, 14))
+    return parts.join('-')
+  }
+
   for (let idx = 0; idx < receipts.length; idx++) {
     const receipt = receipts[idx]
 
@@ -111,7 +125,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DGRAY)
-    doc.text(receiptTin, margin, y + 12)
+    doc.text(formatTin(receiptTin), margin, y + 12)
     if (receiptAddress) {
       doc.text(receiptAddress, margin, y + 24)
       y += 12

@@ -42,8 +42,8 @@ const DynamicTable = ({
   const [searchTerm, setSearchTerm] = useState('')
   const [filterColumn, setFilterColumn] = useState('')
   const [filterValue, setFilterValue] = useState('')
-  const [sortColumn, setSortColumn] = useState('')
-  const [sortDirection, setSortDirection] = useState('asc')
+  const [sortColumn, setSortColumn] = useState('id')
+  const [sortDirection, setSortDirection] = useState('desc')
   const [visibleColumns, setVisibleColumns] = useState(new Set())
   const [showColumnDropdown, setShowColumnDropdown] = useState(false)
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' })
@@ -160,7 +160,25 @@ const DynamicTable = ({
     return header.replace(/_/g, ' ')
   }
 
+  // Function to format TIN display (XXX-XXX-XXX-XXXXX format)
+  const formatTin = (tin) => {
+    if (!tin) return 'N/A'
+    const digits = String(tin).replace(/\D/g, '').slice(0, 14)
+    if (digits.length === 0) return 'N/A'
+    const parts = []
+    // 3-3-3-5 format
+    parts.push(digits.slice(0, 3))
+    if (digits.length > 3) parts.push(digits.slice(3, 6))
+    if (digits.length > 6) parts.push(digits.slice(6, 9))
+    if (digits.length > 9) parts.push(digits.slice(9, 14))
+    return parts.join('-')
+  }
+
   const renderCellValue = (value, header, row) => {
+    // Format TIN column
+    if (header === 'tin' && value) {
+      return <span className="font-bold text-gray-900">{formatTin(value)}</span>
+    }
     // Check if this column should render a badge
     const badgeColumn = badgeColumns.find((badge) => badge.column === header)
     if (badgeColumn && badgeColumn.values && value) {

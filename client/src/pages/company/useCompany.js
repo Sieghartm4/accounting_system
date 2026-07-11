@@ -97,7 +97,12 @@ const useCompany = () => {
     if (field === 'tin') {
       const digits = String(value || '')
         .replace(/\D/g, '')
-        .slice(0, 15)
+        .slice(0, 14)
+
+      if (digits.length === 0) {
+        setFormData((prev) => ({ ...prev, [field]: '' }))
+        return
+      }
 
       if (digits.length <= 3) {
         setFormData((prev) => ({ ...prev, [field]: digits }))
@@ -105,9 +110,11 @@ const useCompany = () => {
       }
 
       const parts = []
-      for (let index = 0; index < digits.length; index += 3) {
-        parts.push(digits.slice(index, index + 3))
-      }
+      // 3-3-3-5 format
+      parts.push(digits.slice(0, 3))
+      if (digits.length > 3) parts.push(digits.slice(3, 6))
+      if (digits.length > 6) parts.push(digits.slice(6, 9))
+      if (digits.length > 9) parts.push(digits.slice(9, 14))
 
       setFormData((prev) => ({ ...prev, [field]: parts.join('-') }))
     } else {

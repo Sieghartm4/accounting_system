@@ -8,6 +8,20 @@ export async function generateSalesPDF(salesData, copyType = 'internal') {
 
   const sales = Array.isArray(salesData) ? salesData : [salesData]
 
+  // Helper to format TIN with hyphens (000-000-000-000-000)
+  const formatTin = (tin) => {
+    if (!tin) return '000-000-000-0000'
+    const digits = String(tin).replace(/\D/g, '').slice(0, 14)
+    if (digits.length === 0) return '000-000-000-0000'
+    const parts = []
+    // 3-3-3-5 format
+    parts.push(digits.slice(0, 3))
+    if (digits.length > 3) parts.push(digits.slice(3, 6))
+    if (digits.length > 6) parts.push(digits.slice(6, 9))
+    if (digits.length > 9) parts.push(digits.slice(9, 14))
+    return parts.join('-')
+  }
+
   for (let idx = 0; idx < sales.length; idx++) {
     const sale = sales[idx]
 
@@ -108,7 +122,7 @@ export async function generateSalesPDF(salesData, copyType = 'internal') {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DGRAY)
-    doc.text(saleTin, margin, y + 12)
+    doc.text(formatTin(saleTin), margin, y + 12)
     if (saleAddress) {
       doc.text(saleAddress, margin, y + 24)
       y += 12

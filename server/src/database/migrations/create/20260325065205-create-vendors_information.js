@@ -31,7 +31,7 @@ module.exports = {
       },
       vi_contact: {
         type: Sequelize.STRING(15),
-        allowNull: false,
+        allowNull: true,
       },
     })
   },

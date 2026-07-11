@@ -286,11 +286,11 @@ const createCustomer = async (req, res, next) => {
     const { code, name, category, type, address, tin, details, contact } = req.body
     const status = 'ACTIVE'
 
-    if (!code || !name || !address || !tin || !details || !contact) {
+    // Require only essential fields; details and contact may be blank/null
+    if (!code || !name || !address || !tin) {
       return res.status(400).json({
         success: false,
-        message:
-          'Customer code, name, address, TIN, details, and contact are required',
+        message: 'Customer code, name, address, and TIN are required',
       })
     }
 

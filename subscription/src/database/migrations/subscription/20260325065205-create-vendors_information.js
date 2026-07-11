@@ -27,11 +27,11 @@ module.exports = {
       },
       vi_details: {
         type: Sequelize.TEXT('long'),
-        allowNull: false,
+        allowNull: true,
       },
       vi_contact: {
         type: Sequelize.STRING(15),
-        allowNull: false,
+        allowNull: true,
       },
     })
   },

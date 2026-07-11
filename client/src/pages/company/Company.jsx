@@ -184,8 +184,8 @@ function CompanyContent() {
                         value={formData.tin}
                         onChange={(e) => handleInputChange('tin', e.target.value)}
                         inputMode="numeric"
-                        maxLength={19}
-                        placeholder="000-000-000-000-000"
+                        maxLength={18}
+                        placeholder="000-000-000-0000"
                         className={inputCls}
                       />
                     </div>

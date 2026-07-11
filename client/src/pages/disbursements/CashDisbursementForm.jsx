@@ -320,14 +320,17 @@ export default function CashDisbursementForm({
   const formatTinInput = (value) => {
     const digits = String(value || '')
       .replace(/\D/g, '')
-      .slice(0, 15)
+      .slice(0, 14)
 
+    if (digits.length === 0) return ''
     if (digits.length <= 3) return digits
 
     const parts = []
-    for (let index = 0; index < digits.length; index += 3) {
-      parts.push(digits.slice(index, index + 3))
-    }
+    // 3-3-3-5 format
+    parts.push(digits.slice(0, 3))
+    if (digits.length > 3) parts.push(digits.slice(3, 6))
+    if (digits.length > 6) parts.push(digits.slice(6, 9))
+    if (digits.length > 9) parts.push(digits.slice(9, 14))
 
     return parts.join('-')
   }
@@ -367,7 +370,7 @@ export default function CashDisbursementForm({
     setVendorCreateLoading(true)
     const payload = {
       ...vendorForm,
-      tin: vendorForm.tin?.slice(0, 15),
+      tin: vendorForm.tin?.replace(/\D/g, '').slice(0, 14),
       contact: vendorForm.contact?.slice(0, 15),
     }
     const result = await createVendor(payload)
@@ -1514,6 +1517,25 @@ export default function CashDisbursementForm({
                 </div>
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
+                    Type
+                  </label>
+                  <select
+                    value={vendorForm.type}
+                    onChange={(e) =>
+                      setVendorForm({ ...vendorForm, type: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="">Select type...</option>
+                    <option value="individual">Individual</option>
+                    <option value="partnership">Partnership</option>
+                    <option value="corporation">Corporation</option>
+                    <option value="government">Government</option>
+                    <option value="non-profit">Non-Profit</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
                     Address
                   </label>
                   <input
@@ -1541,7 +1563,7 @@ export default function CashDisbursementForm({
                       })
                     }
                     inputMode="numeric"
-                    maxLength={19}
+                    maxLength={18}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                     placeholder="Enter TIN (XXX-XXX-XXX-XXX-XXX)"
                     required
@@ -1549,7 +1571,7 @@ export default function CashDisbursementForm({
                 </div>
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                    Details <span className="text-red-600">*</span>
+                    Details
                   </label>
                   <textarea
                     value={vendorForm.details}
@@ -1558,12 +1580,11 @@ export default function CashDisbursementForm({
                     }
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all min-h-[120px]"
                     placeholder="Enter additional details..."
-                    required
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                    Contact <span className="text-red-600">*</span>{' '}
+                    Contact{' '}
                     <span className="text-[9px] text-gray-400">(max 15 chars)</span>
                   </label>
                   <input
@@ -1578,27 +1599,7 @@ export default function CashDisbursementForm({
                     maxLength={15}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                     placeholder="Enter contact number..."
-                    required
                   />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                    Type
-                  </label>
-                  <select
-                    value={vendorForm.type}
-                    onChange={(e) =>
-                      setVendorForm({ ...vendorForm, type: e.target.value })
-                    }
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="">Select type...</option>
-                    <option value="individual">Individual</option>
-                    <option value="partnership">Partnership</option>
-                    <option value="corporation">Corporation</option>
-                    <option value="government">Government</option>
-                    <option value="non-profit">Non-Profit</option>
-                  </select>
                 </div>
               </div>
               <div className="flex gap-3 pt-4">

@@ -27,11 +27,11 @@ module.exports = {
       },
       ci_details: {
         type: Sequelize.TEXT('long'),
-        allowNull: false,
+        allowNull: true,
       },
       ci_contact: {
         type: Sequelize.STRING(15),
-        allowNull: false,
+        allowNull: true,
       },
     })
   },
