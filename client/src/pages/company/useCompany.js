@@ -94,25 +94,22 @@ const useCompany = () => {
   }
 
   const handleInputChange = (field, value) => {
-    // Auto-format TIN to Philippines format: 123-456-789-000
     if (field === 'tin') {
-      // Remove all non-digits
-      const digits = value.replace(/\D/g, '')
-      // Format as 123-456-789-000
-      let formatted = ''
-      if (digits.length > 0) {
-        formatted += digits.substring(0, 3)
+      const digits = String(value || '')
+        .replace(/\D/g, '')
+        .slice(0, 15)
+
+      if (digits.length <= 3) {
+        setFormData((prev) => ({ ...prev, [field]: digits }))
+        return
       }
-      if (digits.length > 3) {
-        formatted += '-' + digits.substring(3, 6)
+
+      const parts = []
+      for (let index = 0; index < digits.length; index += 3) {
+        parts.push(digits.slice(index, index + 3))
       }
-      if (digits.length > 6) {
-        formatted += '-' + digits.substring(6, 9)
-      }
-      if (digits.length > 9) {
-        formatted += '-' + digits.substring(9, 12)
-      }
-      setFormData((prev) => ({ ...prev, [field]: formatted }))
+
+      setFormData((prev) => ({ ...prev, [field]: parts.join('-') }))
     } else {
       setFormData((prev) => ({ ...prev, [field]: value }))
     }

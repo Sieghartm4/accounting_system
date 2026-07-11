@@ -65,7 +65,7 @@ function CustomerContent() {
       category: row.category || '',
       type: row.type || '',
       address: row.address || '',
-      tin: row.tin || '',
+      tin: formatTinInput(row.tin || ''),
       details: row.details || '',
       contact: row.contact || '',
       status:
@@ -88,18 +88,24 @@ function CustomerContent() {
   }
 
   const formatTinInput = (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 12)
-    let formatted = ''
-    if (digits.length > 0) formatted += digits.substring(0, 3)
-    if (digits.length > 3) formatted += '-' + digits.substring(3, 6)
-    if (digits.length > 6) formatted += '-' + digits.substring(6, 9)
-    if (digits.length > 9) formatted += '-' + digits.substring(9, 12)
-    return formatted
+    const digits = String(value || '')
+      .replace(/\D/g, '')
+      .slice(0, 15)
+
+    if (digits.length <= 3) return digits
+
+    const parts = []
+    for (let index = 0; index < digits.length; index += 3) {
+      parts.push(digits.slice(index, index + 3))
+    }
+
+    return parts.join('-')
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
+      const sanitizedTin = formData.tin.replace(/\D/g, '')
       const result = editingCustomer
         ? await updateCustomer(
             editingCustomer.id,
@@ -108,7 +114,7 @@ function CustomerContent() {
             formData.category,
             formData.type,
             formData.address,
-            formData.tin,
+            sanitizedTin,
             formData.details,
             formData.contact,
             formData.status,
@@ -119,7 +125,7 @@ function CustomerContent() {
             formData.category,
             formData.type,
             formData.address,
-            formData.tin,
+            sanitizedTin,
             formData.details,
             formData.contact,
           )
@@ -364,9 +370,10 @@ function CustomerContent() {
                 onChange={(e) =>
                   setFormData({ ...formData, tin: formatTinInput(e.target.value) })
                 }
-                maxLength={15}
+                inputMode="numeric"
+                maxLength={19}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
-                placeholder="Enter TIN (XXX-XXX-XXX-XXX)"
+                placeholder="Enter TIN (XXX-XXX-XXX-XXX-XXX)"
                 required
               />
             </div>
