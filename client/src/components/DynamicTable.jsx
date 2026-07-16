@@ -119,6 +119,7 @@ const DynamicTable = ({
       if (label === 'view') {
         return (
           accessLevel === 'Check Access' ||
+          accessLevel === 'Add Access' ||
           accessLevel === 'View Access' ||
           accessLevel === 'Edit Access' ||
           accessLevel === 'Approve Access' ||

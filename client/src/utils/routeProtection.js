@@ -25,12 +25,13 @@ export const hasRouteAccess = (routeName, user) => {
       return false
     }
     return (
-      route.name === routeName &&
+      route.name.toLowerCase() === routeName.toLowerCase() &&
       (route.status === 'Full Access' ||
         route.status === 'Edit Access' ||
         route.status === 'View Access' ||
         route.status === 'Check Access' ||
-        route.status === 'Approve Access')
+        route.status === 'Approve Access' ||
+        route.status === 'Add Access')
     )
   })
 }
@@ -144,6 +145,30 @@ export const hasEditAccess = (routeName, user) => {
 }
 
 /**
+ * Check if user has add-only access to a specific route (can create only)
+ */
+export const hasAddAccess = (routeName, user) => {
+  if (!user || !user.route_access || !routeName || typeof routeName !== 'string') {
+    return false
+  }
+
+  return user.route_access.some((route) => {
+    if (!route || typeof route !== 'object') {
+      console.warn('Invalid route object:', route)
+      return false
+    }
+    if (!route.name || typeof route.name !== 'string') {
+      console.warn('Invalid route.name:', route.name)
+      return false
+    }
+    return (
+      route.name.toLowerCase() === routeName.toLowerCase() &&
+      route.status === 'Add Access'
+    )
+  })
+}
+
+/**
  * Check if user has view access to a specific route (can only view)
  * @param {string} routeName - The route name to check
  * @param {Object} user - User object with route_access array
@@ -177,7 +202,12 @@ export const hasViewAccess = (routeName, user) => {
  * @returns {boolean} - Whether user can create/edit
  */
 export const canCreateEdit = (routeName, user) => {
-  return hasFullAccess(routeName, user) || hasEditAccess(routeName, user)
+  // Allow create when user has Full, Edit, or Add access. Edit requires Edit or Full.
+  return (
+    hasFullAccess(routeName, user) ||
+    hasEditAccess(routeName, user) ||
+    hasAddAccess(routeName, user)
+  )
 }
 
 /**
@@ -221,7 +251,8 @@ export const getAccessibleRoutes = (user) => {
           route.status === 'Edit Access' ||
           route.status === 'View Access' ||
           route.status === 'Check Access' ||
-          route.status === 'Approve Access'),
+          route.status === 'Approve Access' ||
+          route.status === 'Add Access'),
     )
     .map((route) => route.name)
 }

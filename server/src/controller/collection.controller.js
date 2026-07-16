@@ -1672,7 +1672,9 @@ const getPrintCollections = async (req, res, next) => {
       const collectionJournal =
         copyType === 'customer'
           ? []
-          : collection_journal.filter((entry) => entry.db_id === collection.id)
+          : collection_journal.filter(
+              (entry) => Number(entry.db_id) === Number(collection.id),
+            )
 
       const mappedItems = items.map((item) => {
         const quantity = parseFloat(item.quantity || 1)

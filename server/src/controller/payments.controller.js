@@ -1680,7 +1680,9 @@ const getPrintPayments = async (req, res, next) => {
       const paymentJournal =
         copyType === 'customer'
           ? []
-          : payment_journal.filter((entry) => entry.db_id === payment.id)
+          : payment_journal.filter(
+              (entry) => Number(entry.db_id) === Number(payment.id),
+            )
 
       const mappedItems = paymentItems.map((item) => {
         const quantity = parseFloat(item.quantity || 1)
