@@ -2051,7 +2051,7 @@ export default function PurchaseForm({
             </div>
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                Category <span className="text-red-600">*</span>
+                Category
               </label>
               <input
                 type="text"
@@ -2061,13 +2061,12 @@ export default function PurchaseForm({
                 }
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter category..."
-                required
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                  Sales Price <span className="text-red-600">*</span>
+                  Sales Price
                 </label>
                 <input
                   type="number"
@@ -2081,12 +2080,11 @@ export default function PurchaseForm({
                   }
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                   placeholder="0.00"
-                  required
                 />
               </div>
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                  Purchase Price <span className="text-red-600">*</span>
+                  Purchase Price
                 </label>
                 <input
                   type="number"
@@ -2100,13 +2098,12 @@ export default function PurchaseForm({
                   }
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                   placeholder="0.00"
-                  required
                 />
               </div>
             </div>
             <div>
               <label className="block text-[10px] font-black uppercase tracking-widest text-gray-700 mb-2">
-                Unit <span className="text-red-600">*</span>
+                Unit
               </label>
               <select
                 value={productForm.unit}
@@ -2114,7 +2111,6 @@ export default function PurchaseForm({
                   setProductForm({ ...productForm, unit: e.target.value })
                 }
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
-                required
               >
                 <option value="">Select unit...</option>
                 <option value="pcs">Pieces</option>

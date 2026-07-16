@@ -432,19 +432,10 @@ const createProductService = async (req, res, next) => {
     const { code, name, type, category, sales_price, purchase_price, unit } =
       req.body
 
-    if (
-      !code ||
-      !name ||
-      !type ||
-      !category ||
-      !sales_price ||
-      !purchase_price ||
-      !unit
-    ) {
+    if (!code || !name || !type) {
       return res.status(400).json({
         success: false,
-        message:
-          'Product/Service code, name, type, category, sales price, purchase price and unit are required',
+        message: 'Product/Service code, name, and type are required',
       })
     }
 
@@ -551,19 +542,10 @@ const updateProductService = async (req, res, next) => {
     const { id: idFromParams } = req.params
     const id = Number(idFromParams || idFromBody)
 
-    if (
-      !id ||
-      !code ||
-      !name ||
-      !type ||
-      !category ||
-      sales_price === undefined ||
-      purchase_price === undefined ||
-      !unit
-    ) {
+    if (!id || !code || !name || !type) {
       return res.status(400).json({
         success: false,
-        message: 'All fields are required',
+        message: 'Product/Service id, code, name, and type are required',
       })
     }
 

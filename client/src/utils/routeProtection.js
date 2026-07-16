@@ -1,7 +1,39 @@
 // Route protection utility for checking user access
 
+const normalizeText = (value) => {
+  if (typeof value === 'string') {
+    return value.toLowerCase().trim()
+  }
+  if (value && typeof value === 'object') {
+    if (typeof value.status === 'string') {
+      return value.status.toLowerCase().trim()
+    }
+    if (typeof value.value === 'string') {
+      return value.value.toLowerCase().trim()
+    }
+    return JSON.stringify(value).toLowerCase().trim()
+  }
+  return ''
+}
+
+const normalizeAccessStatus = (status) => {
+  const normalized = normalizeText(status)
+  if (normalized === 'add') return 'add access'
+  return normalized
+}
+
+const titleCaseStatus = (status) => {
+  const normalized = normalizeAccessStatus(status)
+  if (!normalized) return null
+  return normalized
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
 /**
- * Check if user has access to a specific route (Full Access, Edit Access, View Access, Check Access, or Approve Access)
+ * Check if user has access to a specific route (Full Access, Edit Access, View Access, Check Access, Approve Access, or Add Access)
  * @param {string} routeName - The route name to check
  * @param {Object} user - User object with route_access array
  * @returns {boolean} - Whether user has access
@@ -15,6 +47,16 @@ export const hasRouteAccess = (routeName, user) => {
     return false
   }
 
+  const normalizedRouteName = routeName.toLowerCase().trim()
+  const truthyStatuses = new Set([
+    'full access',
+    'edit access',
+    'view access',
+    'check access',
+    'approve access',
+    'add access',
+  ])
+
   return user.route_access.some((route) => {
     if (!route || typeof route !== 'object') {
       console.warn('Invalid route object:', route)
@@ -24,16 +66,64 @@ export const hasRouteAccess = (routeName, user) => {
       console.warn('Invalid route.name:', route.name)
       return false
     }
+    const status =
+      route.status && typeof route.status === 'string'
+        ? route.status.toLowerCase().trim()
+        : ''
     return (
-      route.name.toLowerCase() === routeName.toLowerCase() &&
-      (route.status === 'Full Access' ||
-        route.status === 'Edit Access' ||
-        route.status === 'View Access' ||
-        route.status === 'Check Access' ||
-        route.status === 'Approve Access' ||
-        route.status === 'Add Access')
+      route.name.toLowerCase().trim() === normalizedRouteName &&
+      truthyStatuses.has(status)
     )
   })
+}
+
+/**
+ * Normalize an access status value from the DB or UI.
+ * Accepts string status values and JSON/string-wrapped values.
+ */
+const normalizeStatus = (status) => {
+  if (!status) {
+    return ''
+  }
+
+  if (typeof status === 'string') {
+    const normalized = status.toLowerCase().trim()
+    if (normalized === 'add') return 'add access'
+    return normalized
+  }
+
+  if (typeof status === 'object') {
+    if (typeof status.status === 'string') {
+      return normalizeStatus(status.status)
+    }
+    if (typeof status.value === 'string') {
+      return normalizeStatus(status.value)
+    }
+    try {
+      const value = JSON.stringify(status)
+      return normalizeStatus(value)
+    } catch (error) {
+      return ''
+    }
+  }
+
+  return ''
+}
+
+const normalizeRouteName = (routeName) => {
+  if (!routeName || typeof routeName !== 'string') {
+    return ''
+  }
+
+  return routeName.toLowerCase().trim()
+}
+
+const hasRouteStatus = (route, expectedStatus) => {
+  if (!route || typeof route !== 'object') {
+    return false
+  }
+  const status = normalizeStatus(route.status)
+  return status === expectedStatus
 }
 
 /**
@@ -47,6 +137,7 @@ export const hasFullAccess = (routeName, user) => {
     return false
   }
 
+  const normalizedRouteName = normalizeRouteName(routeName)
   return user.route_access.some((route) => {
     if (!route || typeof route !== 'object') {
       console.warn('Invalid route object:', route)
@@ -57,8 +148,8 @@ export const hasFullAccess = (routeName, user) => {
       return false
     }
     return (
-      route.name.toLowerCase() === routeName.toLowerCase() &&
-      route.status === 'Full Access'
+      normalizeRouteName(route.name) === normalizedRouteName &&
+      hasRouteStatus(route, 'full access')
     )
   })
 }
@@ -74,6 +165,7 @@ export const hasCheckAccess = (routeName, user) => {
     return false
   }
 
+  const normalizedRouteName = normalizeRouteName(routeName)
   return user.route_access.some((route) => {
     if (!route || typeof route !== 'object') {
       console.warn('Invalid route object:', route)
@@ -84,8 +176,8 @@ export const hasCheckAccess = (routeName, user) => {
       return false
     }
     return (
-      route.name.toLowerCase() === routeName.toLowerCase() &&
-      route.status === 'Check Access'
+      normalizeRouteName(route.name) === normalizedRouteName &&
+      hasRouteStatus(route, 'check access')
     )
   })
 }
@@ -101,6 +193,7 @@ export const hasApproveAccess = (routeName, user) => {
     return false
   }
 
+  const normalizedRouteName = normalizeRouteName(routeName)
   return user.route_access.some((route) => {
     if (!route || typeof route !== 'object') {
       console.warn('Invalid route object:', route)
@@ -111,8 +204,8 @@ export const hasApproveAccess = (routeName, user) => {
       return false
     }
     return (
-      route.name.toLowerCase() === routeName.toLowerCase() &&
-      route.status === 'Approve Access'
+      normalizeRouteName(route.name) === normalizedRouteName &&
+      hasRouteStatus(route, 'approve access')
     )
   })
 }
@@ -128,6 +221,7 @@ export const hasEditAccess = (routeName, user) => {
     return false
   }
 
+  const normalizedRouteName = normalizeRouteName(routeName)
   return user.route_access.some((route) => {
     if (!route || typeof route !== 'object') {
       console.warn('Invalid route object:', route)
@@ -138,8 +232,8 @@ export const hasEditAccess = (routeName, user) => {
       return false
     }
     return (
-      route.name.toLowerCase() === routeName.toLowerCase() &&
-      route.status === 'Edit Access'
+      normalizeRouteName(route.name) === normalizedRouteName &&
+      hasRouteStatus(route, 'edit access')
     )
   })
 }
@@ -152,6 +246,7 @@ export const hasAddAccess = (routeName, user) => {
     return false
   }
 
+  const normalizedRouteName = normalizeRouteName(routeName)
   return user.route_access.some((route) => {
     if (!route || typeof route !== 'object') {
       console.warn('Invalid route object:', route)
@@ -162,8 +257,8 @@ export const hasAddAccess = (routeName, user) => {
       return false
     }
     return (
-      route.name.toLowerCase() === routeName.toLowerCase() &&
-      route.status === 'Add Access'
+      normalizeRouteName(route.name) === normalizedRouteName &&
+      hasRouteStatus(route, 'add access')
     )
   })
 }
@@ -179,6 +274,7 @@ export const hasViewAccess = (routeName, user) => {
     return false
   }
 
+  const normalizedRouteName = normalizeRouteName(routeName)
   return user.route_access.some((route) => {
     if (!route || typeof route !== 'object') {
       console.warn('Invalid route object:', route)
@@ -189,8 +285,8 @@ export const hasViewAccess = (routeName, user) => {
       return false
     }
     return (
-      route.name.toLowerCase() === routeName.toLowerCase() &&
-      route.status === 'View Access'
+      normalizeRouteName(route.name) === normalizedRouteName &&
+      hasRouteStatus(route, 'view access')
     )
   })
 }
@@ -221,14 +317,15 @@ export const getAccessLevel = (routeName, user) => {
     return null
   }
 
+  const normalizedRouteName = normalizeRouteName(routeName)
   const route = user.route_access.find(
     (route) =>
       route &&
       route.name &&
       typeof route.name === 'string' &&
-      route.name.toLowerCase() === routeName.toLowerCase(),
+      normalizeRouteName(route.name) === normalizedRouteName,
   )
-  return route ? route.status : null
+  return route ? titleCaseStatus(route.status) : null
 }
 
 /**
@@ -246,13 +343,15 @@ export const getAccessibleRoutes = (user) => {
       (route) =>
         route &&
         route.name &&
-        route.status &&
-        (route.status === 'Full Access' ||
-          route.status === 'Edit Access' ||
-          route.status === 'View Access' ||
-          route.status === 'Check Access' ||
-          route.status === 'Approve Access' ||
-          route.status === 'Add Access'),
+        normalizeStatus(route.status) &&
+        [
+          'full access',
+          'edit access',
+          'view access',
+          'check access',
+          'approve access',
+          'add access',
+        ].includes(normalizeStatus(route.status)),
     )
     .map((route) => route.name)
 }

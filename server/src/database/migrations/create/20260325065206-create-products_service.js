@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
@@ -7,40 +7,40 @@ module.exports = {
       ps_id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
       },
       ps_code: {
         type: Sequelize.TEXT('long'),
-        allowNull: false
+        allowNull: false,
       },
       ps_name: {
         type: Sequelize.STRING(300),
-        allowNull: false
+        allowNull: false,
       },
       ps_type: {
-        type: Sequelize.ENUM("PRODUCT","SERVICE"),
-        allowNull: false
+        type: Sequelize.ENUM('PRODUCT', 'SERVICE'),
+        allowNull: false,
       },
       ps_category: {
         type: Sequelize.STRING(120),
-        allowNull: false
+        allowNull: true,
       },
       ps_sales_price: {
         type: Sequelize.INTEGER,
-        allowNull: false
+        allowNull: true,
       },
       ps_purchase_price: {
         type: Sequelize.INTEGER,
-        allowNull: false
+        allowNull: true,
       },
       ps_unit: {
         type: Sequelize.STRING(120),
-        allowNull: false
-      }
-    });
+        allowNull: true,
+      },
+    })
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('products_service');
-  }
-};
+    await queryInterface.dropTable('products_service')
+  },
+}
