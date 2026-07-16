@@ -6,12 +6,10 @@ const ProtectedRoute = ({ children, routeName }) => {
   // Get user from localStorage
   const user = JSON.parse(localStorage.getItem('user'));
   
-  // Check if user is logged in
   if (!user) {
     return <Navigate to="/" replace />;
   }
   
-  // Check if user has access to this route
   if (!hasRouteAccess(routeName, user)) {
     // Get all accessible routes for this user
     const accessibleRoutes = getAccessibleRoutes(user);
