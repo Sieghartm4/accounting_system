@@ -38,7 +38,7 @@ module.exports = {
         allowNull: true,
       },
       cdi_purchase_price: {
-        type: Sequelize.DECIMAL(18, 2),
+        type: Sequelize.NUMERIC,
         allowNull: false,
       },
       cdi_discount: {

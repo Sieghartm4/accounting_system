@@ -38,7 +38,7 @@ module.exports = {
         allowNull: false,
       },
       ri_sales_price: {
-        type: Sequelize.DECIMAL(18, 2),
+        type: Sequelize.NUMERIC,
         allowNull: false,
       },
       ri_discount: {

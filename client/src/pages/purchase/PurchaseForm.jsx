@@ -348,27 +348,48 @@ function computeSummary(items) {
 const fmt = (n) =>
   n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-// Format price for display (always shows .00)
+// Format price for display (adds commas to integers, allows unlimited decimals)
 const formatPriceDisplay = (value) => {
-  if (value === '' || value === null || value === undefined || isNaN(value))
-    return ''
-  return Number(value).toLocaleString('en-PH', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  if (value === '' || value === null || value === undefined) return ''
+
+  // Ensure we are working with a string
+  const stringValue = String(value)
+
+  // Split the integer part and the decimal part
+  const parts = stringValue.split('.')
+  const integerPart = parts[0]
+  const decimalPart = parts.length > 1 ? parts[1] : null
+
+  // Add commas to the integer part (e.g., 98732123 -> 98,732,123)
+  let formattedInteger = ''
+  if (integerPart) {
+    // Regex to add commas every 3 digits
+    formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  }
+
+  // If the user typed a dot, reattach the dot and all exact decimal digits
+  if (decimalPart !== null) {
+    return `${formattedInteger}.${decimalPart}`
+  }
+
+  return formattedInteger
 }
 
-// Parse price input smoothly as the user types (sliding decimal)
+// Parse price input (keeps it as a safe string to preserve dots and zeros)
 const parsePriceInput = (input) => {
   if (input === '' || input === null || input === undefined) return ''
 
-  // Strip everything except numbers
-  const digits = input.replace(/\D/g, '')
-  if (!digits) return 0
+  // Strip everything except digits and the decimal dot
+  let cleaned = String(input).replace(/[^0-9.]/g, '')
 
-  // Convert raw digits to decimal value (e.g., "367" becomes 3.67)
-  const parsed = parseFloat(digits) / 100
-  return parsed
+  // Prevent multiple decimal dots (e.g., 1.2.3 becomes 1.23)
+  const parts = cleaned.split('.')
+  if (parts.length > 2) {
+    cleaned = parts[0] + '.' + parts.slice(1).join('')
+  }
+
+  // Return as a STRING so React doesn't delete trailing dots or zeros while typing
+  return cleaned
 }
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components

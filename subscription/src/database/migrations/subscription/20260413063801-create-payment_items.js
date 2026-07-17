@@ -23,7 +23,7 @@ module.exports = {
         allowNull: true,
       },
       ci_amount: {
-        type: Sequelize.DECIMAL(18, 2),
+        type: Sequelize.NUMERIC,
         allowNull: false,
       },
       ci_witholding_tax: {

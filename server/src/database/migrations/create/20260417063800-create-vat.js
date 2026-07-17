@@ -28,7 +28,7 @@ module.exports = {
       },
       vat_sub_type: {
         type: Sequelize.ENUM('Services', 'Goods Other Than Capital Goods', 'Capital Goods'),
-        allowNull: false
+        allowNull: true
       },
       vat_description: {
         type: Sequelize.TEXT('long'),
