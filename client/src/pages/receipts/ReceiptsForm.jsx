@@ -197,28 +197,29 @@ function SearchableDropdown({
 // Helper Functions
 // ─────────────────────────────────────────────────────────────────────────────
 // Format price for display (always shows .00)
+// Format price for display (always shows .00)
 const formatPriceDisplay = (value) => {
-  if (value === '' || value === null || value === undefined) return ''
-  const num = typeof value === 'string' ? parseFloat(value) : value
-  if (isNaN(num)) return ''
-  return num.toLocaleString('en-PH', {
+  if (value === '' || value === null || value === undefined || isNaN(value))
+    return ''
+  // If the user is actively typing a dot at the end, don't format it yet
+  return Number(value).toLocaleString('en-PH', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
 }
 
-// Parse price input - extract numeric value from user input
-const parsePriceInput = (input) => {
+// Parse price input smoothly as the user types
+const parsePriceInput = (input, oldValue = 0) => {
   if (input === '' || input === null || input === undefined) return ''
-  // Extract digits and decimal point only
-  const cleaned = input.replace(/[^0-9.]/g, '')
-  // Prevent multiple decimals
-  const parts = cleaned.split('.')
-  if (parts.length > 2) return parseFloat(parts[0] + '.' + parts[1]) || 0
-  const parsed = parseFloat(cleaned) || 0
+
+  // Strip everything except numbers
+  const digits = input.replace(/\D/g, '')
+  if (!digits) return 0
+
+  // Turn strings like "367" into 3.67 dynamically as they type
+  const parsed = parseFloat(digits) / 100
   return parsed
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -939,6 +940,7 @@ export default function ReceiptsForm({
                               inputMode="decimal"
                               value={formatPriceDisplay(item.price)}
                               onChange={(e) => {
+                                // Pass the raw text to our updated parser
                                 const parsed = parsePriceInput(e.target.value)
                                 updateReceiptItem(item.id, 'price', parsed)
                               }}

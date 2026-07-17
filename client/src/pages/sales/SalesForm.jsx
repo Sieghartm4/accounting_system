@@ -195,27 +195,26 @@ function SearchableDropdown({
 // ─────────────────────────────────────────────────────────────────────────────
 // Format price for display (always shows .00)
 const formatPriceDisplay = (value) => {
-  if (value === '' || value === null || value === undefined) return ''
-  const num = typeof value === 'string' ? parseFloat(value) : value
-  if (isNaN(num)) return ''
-  return num.toLocaleString('en-PH', {
+  if (value === '' || value === null || value === undefined || isNaN(value))
+    return ''
+  return Number(value).toLocaleString('en-PH', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
 }
 
-// Parse price input - extract numeric value from user input
+// Parse price input smoothly as the user types (sliding decimal)
 const parsePriceInput = (input) => {
   if (input === '' || input === null || input === undefined) return ''
-  // Extract digits and decimal point only
-  const cleaned = input.replace(/[^0-9.]/g, '')
-  // Prevent multiple decimals
-  const parts = cleaned.split('.')
-  if (parts.length > 2) return parseFloat(parts[0] + '.' + parts[1]) || 0
-  const parsed = parseFloat(cleaned) || 0
+
+  // Strip everything except numbers
+  const digits = input.replace(/\D/g, '')
+  if (!digits) return 0
+
+  // Convert raw digits to decimal value (e.g., "367" becomes 3.67)
+  const parsed = parseFloat(digits) / 100
   return parsed
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
