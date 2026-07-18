@@ -8,7 +8,7 @@ import {
   Activity,
   GitBranch,
 } from 'lucide-react'
-import SandboxTool from './SandboxTool'
+import SandboxTool from './Sandboxtool'
 
 // ============================================================================
 // FLOWCHART DATA
@@ -273,10 +273,10 @@ const scenarioFlows = {
     ],
     explanation: [
       'Step 1: A Sales document is created — sales, sales_items, and attachments are written, starting in state PREPARED.',
-      "Step 2: The document moves PREPARED → CHECKED → APPROVED. Only on APPROVED do journal lines reach the Posting Engine.",
+      'Step 2: The document moves PREPARED → CHECKED → APPROVED. Only on APPROVED do journal lines reach the Posting Engine.',
       'Step 3: The Posting Engine validates DR = CR and writes the entries to the General Ledger (journal_entries).',
       'Step 4: Because the Sale is APPROVED, a Collections document can now be created against it.',
-      "Step 5: Collections runs its own PREPARED → CHECKED → APPROVED cycle, posting its own journal lines through the same engine.",
+      'Step 5: Collections runs its own PREPARED → CHECKED → APPROVED cycle, posting its own journal lines through the same engine.',
       "Step 6: Once Collections is APPROVED, it updates the originating Sale's status to COLLECTED — the GL feeds the Trial Balance, Income Statement, and Balance Sheet in real time.",
     ],
   },
@@ -298,7 +298,7 @@ const scenarioFlows = {
       'Step 2: The document moves PREPARED → CHECKED → APPROVED, releasing its journal lines to the Posting Engine.',
       'Step 3: The Posting Engine validates and writes the approved entries to the General Ledger.',
       'Step 4: Because the Purchase is APPROVED, a Payment can now be created against it.',
-      "Step 5: Payments runs its own PREPARED → CHECKED → APPROVED cycle before posting.",
+      'Step 5: Payments runs its own PREPARED → CHECKED → APPROVED cycle before posting.',
       "Step 6: Once Payments is APPROVED, it updates the originating Purchase's status to PAID, and the reports refresh accordingly.",
     ],
   },
@@ -706,8 +706,13 @@ function FlowchartTool() {
               </span>
               <div className="bg-slate-950 rounded-lg p-3 space-y-2 border border-slate-800">
                 {selectedNode.decision.options.map((opt) => (
-                  <div key={opt.label} className="text-[11px] border-l-2 border-amber-400 pl-2">
-                    <span className="font-bold text-amber-400 block">{opt.label}</span>
+                  <div
+                    key={opt.label}
+                    className="text-[11px] border-l-2 border-amber-400 pl-2"
+                  >
+                    <span className="font-bold text-amber-400 block">
+                      {opt.label}
+                    </span>
                     <span className="text-[10px] text-slate-400">{opt.outcome}</span>
                   </div>
                 ))}
