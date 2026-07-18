@@ -12,6 +12,7 @@ module.exports = {
       c_code: {
         type: Sequelize.STRING(20),
         allowNull: false,
+        unique: true,
       },
       c_name: {
         type: Sequelize.STRING(300),

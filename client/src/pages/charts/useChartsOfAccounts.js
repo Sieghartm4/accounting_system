@@ -65,11 +65,11 @@ const useChartsOfAccounts = () => {
         },
       )
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
       const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || `HTTP error! status: ${response.status}`)
+      }
 
       if (result.success) {
         // Refresh the charts of accounts list
@@ -114,11 +114,11 @@ const useChartsOfAccounts = () => {
         },
       )
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
       const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || `HTTP error! status: ${response.status}`)
+      }
 
       if (result.success) {
         // Refresh the charts of accounts list

@@ -1,311 +1,257 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Play,
   Pause,
   ChevronRight,
   ChevronLeft,
   Terminal,
-  AlertTriangle,
-  CheckCircle2,
-  RefreshCw,
-  Code,
   Activity,
+  GitBranch,
 } from 'lucide-react'
+import SandboxTool from './SandboxTool'
 
 // ============================================================================
 // FLOWCHART DATA
 // ============================================================================
+// Node "type" controls badge color only — kept identical to the original
+// palette (input: indigo, cash: emerald, core: blue, report: teal,
+// utility: purple, external: slate) so no new colors are introduced.
 
 const nodes = {
+  receipt: {
+    id: 'receipt',
+    label: 'Receipt',
+    x: 100,
+    y: 70,
+    type: 'cash',
+    desc: 'Direct cash income entry point. Creates a receipt with line items and supporting attachments, independent of any AR cycle.',
+    endpoint: 'POST /receipts',
+    creates: ['receipts', 'receipt_items', 'attachments', 'journal_entries'],
+    approvalFlow: ['PREPARED', 'CHECKED', 'APPROVED'],
+    dbTable: 'receipts / receipt_items',
+  },
+  cash_disbursement: {
+    id: 'cash_disbursement',
+    label: 'Cash Disbursement',
+    x: 100,
+    y: 170,
+    type: 'cash',
+    desc: 'Direct cash outflow entry point. Creates a disbursement with line items and attachments, and posts straight to the Posting Engine — it never touches Collections.',
+    endpoint: 'POST /cash_disbursements',
+    creates: [
+      'cash_disbursements',
+      'cash_disbursement_items',
+      'attachments',
+      'journal_entries',
+    ],
+    approvalFlow: ['PREPARED', 'CHECKED', 'APPROVED'],
+    dbTable: 'cash_disbursements / cash_disbursement_items',
+  },
   sales: {
     id: 'sales',
-    label: 'Sales Invoice',
+    label: 'Sales',
     x: 100,
-    y: 110,
+    y: 270,
     type: 'input',
-    desc: 'Creates sales invoices, recognizing Revenue & AR balance on credit.',
+    desc: 'Creates a sales document with line items and attachments. Once fully APPROVED, a Collections document can be raised against it.',
     endpoint: 'POST /sales',
-    debits: [
-      {
-        account: '1100 - Accounts Receivable',
-        desc: 'Total invoice net + tax + VAT',
-      },
-    ],
-    credits: [
-      {
-        account: '4000 - Sales Revenue',
-        desc: 'Sum of item sales prices (excluding taxes)',
-      },
-    ],
+    creates: ['sales', 'sales_items', 'attachments', 'journal_entries'],
+    approvalFlow: ['PREPARED', 'CHECKED', 'APPROVED'],
     dbTable: 'sales / sales_items',
+  },
+  purchase: {
+    id: 'purchase',
+    label: 'Purchase',
+    x: 100,
+    y: 370,
+    type: 'input',
+    desc: 'Creates a vendor purchase document with line items and attachments. Once fully APPROVED, a Payment can be raised against it.',
+    endpoint: 'POST /purchase',
+    creates: ['purchase', 'purchase_items', 'attachments', 'journal_entries'],
+    approvalFlow: ['PREPARED', 'CHECKED', 'APPROVED'],
+    dbTable: 'purchase / purchase_items',
+  },
+  purchase_order: {
+    id: 'purchase_order',
+    label: 'Purchase Order',
+    x: 100,
+    y: 470,
+    type: 'input',
+    desc: 'Created manually or fetched from the Inventory Management System (IMS). Approval decides the settlement path: credit routes to Purchase, cash routes to Cash Disbursement.',
+    endpoint: 'POST /purchase_order',
+    creates: ['purchase_orders'],
+    decision: {
+      question: 'Settlement type on approval',
+      options: [
+        { label: 'CREDIT', outcome: 'redirects & creates Purchase' },
+        { label: 'CASH', outcome: 'redirects & creates Cash Disbursement' },
+      ],
+    },
+    dbTable: 'purchase_orders',
+  },
+  advances: {
+    id: 'advances',
+    label: 'Advances',
+    x: 100,
+    y: 570,
+    type: 'input',
+    desc: 'Fetched from the Budget Management System (BMS). Once APPROVED, redirects into an Adjustment entry.',
+    endpoint: 'GET /advances (BMS sync)',
+    creates: ['advances'],
+    approvalFlow: ['FETCHED (BMS)', 'APPROVED'],
+    dbTable: 'advances [BMS synced]',
   },
   collections: {
     id: 'collections',
     label: 'Collections',
-    x: 100,
-    y: 220,
+    x: 340,
+    y: 245,
     type: 'input',
-    desc: 'Customer cash payments applied directly to reduce outstanding AR.',
+    desc: 'Can only be created against an APPROVED Sales document. Once fully APPROVED, updates that Sale to COLLECTED.',
     endpoint: 'POST /collections',
-    debits: [
-      { account: '1000 - Cash in Bank', desc: 'Total payment amount cleared' },
-    ],
-    credits: [
-      {
-        account: '1100 - Accounts Receivable',
-        desc: 'Customer balance settlement reduction',
-      },
-    ],
+    creates: ['collections', 'collection_items', 'attachments', 'journal_entries'],
+    approvalFlow: ['PREPARED', 'CHECKED', 'APPROVED'],
+    statusUpdate: "Sets Sales.status = 'COLLECTED'",
     dbTable: 'collections / collection_items',
-  },
-  arsub: {
-    id: 'arsub',
-    label: 'AR Subledger',
-    x: 300,
-    y: 165,
-    type: 'subledger',
-    desc: 'Tracks individual customer invoices, payments, and outstanding aging balances.',
-    endpoint: 'GET /customers/:id',
-    debits: [
-      { account: 'Customer Balance (Debit)', desc: 'Tracks running owed amounts' },
-    ],
-    credits: [],
-    dbTable: 'customers',
-  },
-  purchase: {
-    id: 'purchase',
-    label: 'Purchase Invoice',
-    x: 100,
-    y: 350,
-    type: 'input',
-    desc: 'Creates vendor purchase invoices, recognizing Expenses/Inventory & AP balance.',
-    endpoint: 'POST /purchase',
-    debits: [
-      {
-        account: '5000+ - Expense / Inventory',
-        desc: 'Direct product/service cost mappings',
-      },
-    ],
-    credits: [
-      { account: '2000 - Accounts Payable', desc: 'Total liability to vendor' },
-    ],
-    dbTable: 'purchase / purchase_items',
   },
   payments: {
     id: 'payments',
-    label: 'Vendor Payments',
-    x: 100,
-    y: 460,
+    label: 'Payments',
+    x: 340,
+    y: 345,
     type: 'input',
-    desc: 'Disburses company cash to reduce outstanding accounts payable.',
+    desc: 'Can only be created against an APPROVED Purchase document. Once fully APPROVED, updates that Purchase to PAID.',
     endpoint: 'POST /payments',
-    debits: [
-      {
-        account: '2000 - Accounts Payable',
-        desc: 'Reduces outstanding liability to vendor',
-      },
-    ],
-    credits: [{ account: '1000 - Cash in Bank', desc: 'Reduces cash holdings' }],
+    creates: ['payments', 'payment_items', 'attachments', 'journal_entries'],
+    approvalFlow: ['PREPARED', 'CHECKED', 'APPROVED'],
+    statusUpdate: "Sets Purchase.status = 'PAID'",
     dbTable: 'payments / payment_items',
-  },
-  apsub: {
-    id: 'apsub',
-    label: 'AP Subledger',
-    x: 300,
-    y: 405,
-    type: 'subledger',
-    desc: 'Tracks individual vendor liabilities, aging schedules, and payment obligations.',
-    endpoint: 'GET /vendor/:id',
-    debits: [],
-    credits: [
-      { account: 'Vendor Liability (Credit)', desc: 'Tracks running owed amounts' },
-    ],
-    dbTable: 'vendors',
-  },
-  receipts: {
-    id: 'receipts',
-    label: 'Direct Receipts',
-    x: 300,
-    y: 260,
-    type: 'cash',
-    desc: 'Direct cash income bypassing the invoice/AR cycle.',
-    endpoint: 'POST /receipt',
-    debits: [{ account: '1000 - Cash in Bank', desc: 'Direct cash increase' }],
-    credits: [
-      {
-        account: '4500+ - Non-Operating Revenue',
-        desc: 'Direct revenue stream recognition',
-      },
-    ],
-    dbTable: 'receipts',
-  },
-  disbursements: {
-    id: 'disbursements',
-    label: 'Direct Disbursements',
-    x: 300,
-    y: 510,
-    type: 'cash',
-    desc: 'Instant cash outflows bypassing the purchase/AP cycle.',
-    endpoint: 'POST /cash_disbursements',
-    debits: [
-      {
-        account: '5100+ - Category Expense Account',
-        desc: 'Direct operational expense mapping',
-      },
-    ],
-    credits: [
-      { account: '1000 - Cash in Bank', desc: 'Reduces cash holdings directly' },
-    ],
-    dbTable: 'cash_disbursements',
   },
   adjustments: {
     id: 'adjustments',
-    label: 'Adjustments / JEs',
-    x: 300,
-    y: 590,
+    label: 'Adjustments',
+    x: 340,
+    y: 570,
     type: 'core',
-    desc: 'Manual adjusting entries (accruals, depreciation) entered by accountants.',
+    desc: 'Created once an Advance is APPROVED, or entered manually by accountants (accruals, corrections).',
     endpoint: 'POST /adjustments',
-    debits: [
-      {
-        account: 'Any Custom COA (Debit)',
-        desc: 'Manual correction or accrued debit balance',
-      },
-    ],
-    credits: [
-      {
-        account: 'Any Custom COA (Credit)',
-        desc: 'Manual correction or accrued credit balance',
-      },
-    ],
+    creates: ['adjustments', 'attachments', 'journal_entries'],
+    approvalFlow: ['PREPARED', 'CHECKED', 'APPROVED'],
     dbTable: 'adjustments / adjustment_items',
   },
   posting: {
     id: 'posting',
     label: 'Posting Engine',
-    x: 520,
+    x: 560,
     y: 350,
     type: 'core',
-    desc: 'Critical processing middleware. Validates DR=CR transactions, computes totals, and writes immutable records.',
-    endpoint: 'PUT /sales/sales-state',
-    debits: [],
-    credits: [],
+    desc: 'Critical processing middleware. Validates DR = CR on every APPROVED document, computes totals, and writes immutable journal entries.',
+    endpoint: 'PUT /posting-engine/process',
+    creates: ['journal_entries'],
     dbTable: 'Middleware Processing Logic',
-  },
-  audit: {
-    id: 'audit',
-    label: 'Audit Trail Ledger',
-    x: 520,
-    y: 500,
-    type: 'utility',
-    desc: 'Irreversible tamper-proof records of every completed accounting state update.',
-    endpoint: 'GET /audit_trail',
-    debits: [],
-    credits: [],
-    dbTable: 'audit_trail',
   },
   gl: {
     id: 'gl',
     label: 'General Ledger (GL)',
-    x: 720,
+    x: 760,
     y: 350,
     type: 'core',
-    desc: 'The Single Source of Truth. Aggregates all validated transaction lines as journal entries.',
+    desc: 'The single source of truth. Aggregates every posted journal entry line from every source document.',
     endpoint: 'GET /journal_entries',
-    debits: [
-      {
-        account: 'All Debit lines from source',
-        desc: 'Aggregated in journal_entries',
-      },
-    ],
-    credits: [
-      {
-        account: 'All Credit lines from source',
-        desc: 'Aggregated in journal_entries',
-      },
-    ],
+    creates: ['journal_entries'],
     dbTable: 'journal_entries',
+  },
+  bankstatement: {
+    id: 'bankstatement',
+    label: 'Bank Statement',
+    x: 760,
+    y: 600,
+    type: 'external',
+    desc: 'Raw external transaction statement sourced from the financial institution, imported for matching.',
+    endpoint: 'External Input / Statement Import',
+    creates: ['bank_statement_imports'],
+    dbTable: 'Uploaded document logs',
   },
   tb: {
     id: 'tb',
     label: 'Trial Balance (TB)',
-    x: 920,
-    y: 165,
+    x: 960,
+    y: 150,
     type: 'report',
-    desc: 'Verifies the ultimate accounting rule: sum of all debits equals sum of all credits.',
+    desc: 'Verifies the fundamental accounting rule: total debits equal total credits.',
     endpoint: 'GET /reports/trial-balance',
-    debits: [],
-    credits: [],
+    creates: [],
     dbTable: 'journal_entries [aggregated]',
   },
   is: {
     id: 'is',
     label: 'Income Statement',
-    x: 920,
-    y: 260,
+    x: 960,
+    y: 250,
     type: 'report',
-    desc: 'Calculates operational performance over a period: Revenues - Expenses = Net Income.',
+    desc: 'Calculates operational performance over a period: Revenues − Expenses = Net Income.',
     endpoint: 'GET /reports/income-statement',
-    debits: [],
-    credits: [],
+    creates: [],
     dbTable: 'journal_entries [filtered Revenue/Expense]',
   },
   bs: {
     id: 'bs',
     label: 'Balance Sheet',
-    x: 920,
+    x: 960,
     y: 350,
     type: 'report',
     desc: 'Represents the fundamental equation: Assets = Liabilities + Equity at an exact point in time.',
     endpoint: 'GET /reports/balance-sheet',
-    debits: [],
-    credits: [],
+    creates: [],
     dbTable: 'journal_entries [filtered Asset/Liability/Equity]',
   },
   bankrecon: {
     id: 'bankrecon',
     label: 'Bank Reconciliation',
-    x: 920,
-    y: 500,
+    x: 960,
+    y: 460,
     type: 'utility',
     desc: 'Matches internally tracked cash journal records against raw external bank statement items.',
     endpoint: 'GET /bank_reconciliation',
-    debits: [],
-    credits: [],
-    dbTable: 'bank_reconciliation / bank_reconciliation_items',
-  },
-  bankstatement: {
-    id: 'bankstatement',
-    label: 'Bank Statement',
-    x: 720,
-    y: 590,
-    type: 'external',
-    desc: 'Raw external transaction statement sourced from actual financial institutions.',
-    endpoint: 'External Input / Statement Import',
-    debits: [],
-    credits: [],
-    dbTable: 'Uploaded document logs',
+    creates: [
+      'bank_reconciliation',
+      'bank_reconciliation_items',
+      'bank_reconciliation_summary',
+    ],
+    dbTable: 'bank_reconciliation / items / summary',
   },
 }
 
+// `loop: true` marks a "feedback" edge that reports a status update back to
+// the originating document (e.g. Collections -> Sales: status COLLECTED).
 const connections = [
-  { from: 'sales', to: 'arsub', label: 'creates' },
+  { from: 'receipt', to: 'posting', label: 'journal lines' },
+  { from: 'cash_disbursement', to: 'posting', label: 'journal lines' },
   { from: 'sales', to: 'posting', label: 'journal lines' },
-  { from: 'collections', to: 'arsub', label: 'applies to' },
+  { from: 'sales', to: 'collections', label: 'if APPROVED' },
   { from: 'collections', to: 'posting', label: 'journal lines' },
-  { from: 'arsub', to: 'gl', label: 'posting updates' },
-  { from: 'purchase', to: 'apsub', label: 'creates' },
+  { from: 'collections', to: 'sales', label: 'status → COLLECTED', loop: true },
   { from: 'purchase', to: 'posting', label: 'journal lines' },
-  { from: 'payments', to: 'apsub', label: 'applies to' },
+  { from: 'purchase', to: 'payments', label: 'if APPROVED' },
   { from: 'payments', to: 'posting', label: 'journal lines' },
-  { from: 'apsub', to: 'gl', label: 'posting updates' },
-  { from: 'receipts', to: 'posting', label: 'journal lines' },
-  { from: 'disbursements', to: 'posting', label: 'journal lines' },
+  { from: 'payments', to: 'purchase', label: 'status → PAID', loop: true },
+  {
+    from: 'purchase_order',
+    to: 'purchase',
+    label: 'CREDIT · redirect',
+    sameColumn: true,
+  },
+  {
+    from: 'purchase_order',
+    to: 'cash_disbursement',
+    label: 'CASH · redirect',
+    sameColumn: true,
+  },
+  { from: 'advances', to: 'adjustments', label: 'if APPROVED' },
   { from: 'adjustments', to: 'posting', label: 'journal lines' },
   { from: 'posting', to: 'gl', label: 'posts to' },
-  { from: 'posting', to: 'audit', label: 'writes' },
   { from: 'gl', to: 'tb', label: 'balances' },
-  { from: 'gl', to: 'is', label: 'revenues/expenses' },
+  { from: 'gl', to: 'is', label: 'revenue/expense' },
   { from: 'gl', to: 'bs', label: 'ending values' },
   { from: 'gl', to: 'bankrecon', label: 'cash ledger' },
   { from: 'bankstatement', to: 'bankrecon', label: 'external matches' },
@@ -314,92 +260,89 @@ const connections = [
 const scenarioFlows = {
   sales_cycle: {
     name: 'Sales to Collections Cycle',
-    nodes: [
-      'sales',
-      'arsub',
-      'posting',
-      'gl',
-      'collections',
-      'gl',
-      'tb',
-      'is',
-      'bs',
-    ],
+    nodes: ['sales', 'posting', 'gl', 'collections', 'tb', 'is', 'bs'],
     edges: [
-      { from: 'sales', to: 'arsub' },
       { from: 'sales', to: 'posting' },
       { from: 'posting', to: 'gl' },
-      { from: 'collections', to: 'arsub' },
+      { from: 'sales', to: 'collections' },
       { from: 'collections', to: 'posting' },
-      { from: 'arsub', to: 'gl' },
+      { from: 'collections', to: 'sales' },
       { from: 'gl', to: 'tb' },
       { from: 'gl', to: 'is' },
       { from: 'gl', to: 'bs' },
     ],
     explanation: [
-      'Step 1: Sales invoice is generated. It creates a PENDING record in the database and registers customer balance in the AR subledger.',
-      'Step 2: Admin approves the invoice. Journal lines (Debit Accounts Receivable 1100, Credit Revenue 4000) go to the Posting Engine.',
-      'Step 3: The Posting Engine validates calculations and records the initial credit balance to the General Ledger (journal_entries).',
-      "Step 4: Customer sends payment. This collection is recorded, applying directly to lower the customer's AR subledger balance.",
-      'Step 5: Collection approval triggers DR Cash 1000, CR AR 1100, which updates the General Ledger, settling the AR balance.',
-      'Step 6: Real-time accounting queries update the Trial Balance, Income Statement, and Balance Sheet instantly.',
+      'Step 1: A Sales document is created — sales, sales_items, and attachments are written, starting in state PREPARED.',
+      "Step 2: The document moves PREPARED → CHECKED → APPROVED. Only on APPROVED do journal lines reach the Posting Engine.",
+      'Step 3: The Posting Engine validates DR = CR and writes the entries to the General Ledger (journal_entries).',
+      'Step 4: Because the Sale is APPROVED, a Collections document can now be created against it.',
+      "Step 5: Collections runs its own PREPARED → CHECKED → APPROVED cycle, posting its own journal lines through the same engine.",
+      "Step 6: Once Collections is APPROVED, it updates the originating Sale's status to COLLECTED — the GL feeds the Trial Balance, Income Statement, and Balance Sheet in real time.",
     ],
   },
   purchase_cycle: {
-    name: 'Purchase to Payout Cycle',
-    nodes: [
-      'purchase',
-      'apsub',
-      'posting',
-      'gl',
-      'payments',
-      'gl',
-      'tb',
-      'is',
-      'bs',
-    ],
+    name: 'Purchase to Payment Cycle',
+    nodes: ['purchase', 'posting', 'gl', 'payments', 'tb', 'is', 'bs'],
     edges: [
-      { from: 'purchase', to: 'apsub' },
       { from: 'purchase', to: 'posting' },
       { from: 'posting', to: 'gl' },
-      { from: 'payments', to: 'apsub' },
+      { from: 'purchase', to: 'payments' },
       { from: 'payments', to: 'posting' },
-      { from: 'apsub', to: 'gl' },
+      { from: 'payments', to: 'purchase' },
       { from: 'gl', to: 'tb' },
       { from: 'gl', to: 'is' },
       { from: 'gl', to: 'bs' },
     ],
     explanation: [
-      'Step 1: Receive a vendor purchase invoice. This establishes the liability inside the Accounts Payable (AP) subledger.',
-      'Step 2: Associated expense/inventory debit lines and credit lines go directly into the Posting Engine for approval.',
-      'Step 3: Posting writes the approved entries (DR Expense/Asset, CR AP 2000) to the General Ledger.',
-      'Step 4: Later, vendor payments are generated (Debit Accounts Payable 2000, Credit Cash 1000) to settle invoices.',
-      'Step 5: The payment is marked as completed in the AP subledger and verified through the Posting Engine to update JEs.',
-      'Step 6: Net Income decreases and cash drops dynamically across all accounting output reports.',
+      'Step 1: A Purchase document is created — purchase, purchase_items, and attachments are written, starting in state PREPARED.',
+      'Step 2: The document moves PREPARED → CHECKED → APPROVED, releasing its journal lines to the Posting Engine.',
+      'Step 3: The Posting Engine validates and writes the approved entries to the General Ledger.',
+      'Step 4: Because the Purchase is APPROVED, a Payment can now be created against it.',
+      "Step 5: Payments runs its own PREPARED → CHECKED → APPROVED cycle before posting.",
+      "Step 6: Once Payments is APPROVED, it updates the originating Purchase's status to PAID, and the reports refresh accordingly.",
     ],
   },
   direct_cash_cycle: {
     name: 'Direct Cash Flows',
-    nodes: ['receipts', 'disbursements', 'posting', 'gl', 'tb', 'is', 'bs'],
+    nodes: ['receipt', 'cash_disbursement', 'posting', 'gl', 'tb', 'is', 'bs'],
     edges: [
-      { from: 'receipts', to: 'posting' },
-      { from: 'disbursements', to: 'posting' },
+      { from: 'receipt', to: 'posting' },
+      { from: 'cash_disbursement', to: 'posting' },
       { from: 'posting', to: 'gl' },
       { from: 'gl', to: 'tb' },
       { from: 'gl', to: 'is' },
       { from: 'gl', to: 'bs' },
     ],
     explanation: [
-      'Direct Cash transactions do not require customer AR or vendor AP subledgers, simplifying processing speed.',
-      'Receipts (like interest earned or cash sales) directly route journal lines straight to the Posting Engine.',
-      'Disbursements (like bank fees or direct utility costs) write expense debits and cash credits straight to the Posting Engine.',
-      'The engine commits these entries to journal_entries immediately on approval, triggering instant updates across all report panels.',
+      'Receipts and Cash Disbursements both bypass Sales/Collections and Purchase/Payments entirely.',
+      'Each still runs its own PREPARED → CHECKED → APPROVED workflow before releasing journal lines.',
+      'Cash Disbursement posts straight to the Posting Engine — it is never linked to Collections.',
+      'On APPROVED, the engine commits entries to journal_entries, instantly updating every report panel.',
     ],
   },
-  report_cycle: {
-    name: 'Trial Balance & Reports',
-    nodes: ['adjustments', 'posting', 'gl', 'tb', 'is', 'bs'],
+  purchase_order_cycle: {
+    name: 'Purchase Order Routing',
+    nodes: ['purchase_order', 'purchase', 'cash_disbursement', 'posting', 'gl'],
     edges: [
+      { from: 'purchase_order', to: 'purchase' },
+      { from: 'purchase_order', to: 'cash_disbursement' },
+      { from: 'purchase', to: 'posting' },
+      { from: 'cash_disbursement', to: 'posting' },
+      { from: 'posting', to: 'gl' },
+    ],
+    explanation: [
+      'Step 1: A Purchase Order is created manually, or fetched directly from the IMS.',
+      'Step 2: Approval requires a settlement decision — CREDIT or CASH.',
+      'Step 3a: CREDIT redirects and creates a new Purchase document, entering the standard Purchase → Payment cycle.',
+      'Step 3b: CASH redirects and creates a new Cash Disbursement instead, skipping the AP cycle entirely.',
+      'Step 4: Either path eventually reaches the Posting Engine and the General Ledger through its own approval flow.',
+    ],
+  },
+  advances_cycle: {
+    name: 'Advances to Adjustments',
+    nodes: ['advances', 'adjustments', 'posting', 'gl', 'tb', 'is', 'bs'],
+    edges: [
+      { from: 'advances', to: 'adjustments' },
       { from: 'adjustments', to: 'posting' },
       { from: 'posting', to: 'gl' },
       { from: 'gl', to: 'tb' },
@@ -407,11 +350,24 @@ const scenarioFlows = {
       { from: 'gl', to: 'bs' },
     ],
     explanation: [
-      'Step 1: End of period adjusting journal entries (accruals, depreciation) are entered by accountants and validated.',
-      'Step 2: Posting writes manual adjust details straight to the immutable General Ledger (journal_entries).',
-      'Step 3: Trial Balance pulls entire coa, validating that global Debits matches global Credits perfectly.',
-      'Step 4: Income Statement queries all EXPENSE and REVENUE codes from journal_entries to compute bottom line.',
-      'Step 5: Balance Sheet aggregates ASSETS, LIABILITIES, and EQUITY to check that Assets = Liabilities + Equity.',
+      'Step 1: An Advance is fetched from the Budget Management System (BMS).',
+      'Step 2: Once the Advance is APPROVED, it redirects into a new Adjustment entry.',
+      'Step 3: The Adjustment runs its own PREPARED → CHECKED → APPROVED cycle, then posts journal lines.',
+      'Step 4: The Posting Engine writes the entries to the General Ledger, refreshing every downstream report.',
+    ],
+  },
+  bank_recon_cycle: {
+    name: 'Bank Reconciliation',
+    nodes: ['gl', 'bankrecon', 'bankstatement'],
+    edges: [
+      { from: 'gl', to: 'bankrecon' },
+      { from: 'bankstatement', to: 'bankrecon' },
+    ],
+    explanation: [
+      'Step 1: The General Ledger supplies every internally recorded cash movement (Receipts, Disbursements, Collections, Payments).',
+      'Step 2: A raw Bank Statement is imported as an external, unedited record of what actually cleared the bank.',
+      'Step 3: Bank Reconciliation matches the two sources line by line, writing bank_reconciliation, its items, and a summary.',
+      'Step 4: Unmatched items surface as reconciling differences for accountants to investigate.',
     ],
   },
 }
@@ -456,8 +412,8 @@ function FlowchartTool() {
           Interactive System Flowchart Map
         </h2>
         <p className="text-sm text-slate-400 mt-2">
-          Trace subledgers, posting validations, database tables, and dual general
-          ledger updates through real-time path simulations.
+          Trace source documents, PREPARED → CHECKED → APPROVED workflows, redirect
+          logic, and General Ledger fan-out through real-time path simulations.
         </p>
       </div>
 
@@ -514,11 +470,11 @@ function FlowchartTool() {
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         {/* SVG Diagram */}
-        <div className="xl:col-span-8 bg-[#0c1220] border border-slate-800 rounded-2xl p-4 flex justify-center items-center overflow-auto min-h-[500px] relative">
+        <div className="xl:col-span-8 bg-[#0c1220] border border-slate-800 rounded-2xl p-4 flex justify-center items-center overflow-auto min-h-[560px] relative">
           <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-35 pointer-events-none" />
           <svg
-            viewBox="0 0 1060 670"
-            className="w-full max-w-[1060px] aspect-[1060/670] z-10 select-none relative"
+            viewBox="0 0 1060 700"
+            className="w-full max-w-[1060px] aspect-[1060/700] z-10 select-none relative"
           >
             <defs>
               <marker
@@ -551,7 +507,10 @@ function FlowchartTool() {
               if (!origin || !dest) return null
               const isHighlighted = isConnectionHighlighted(conn.from, conn.to)
               const deltaX = dest.x - origin.x
-              const pathData = `M ${origin.x} ${origin.y} C ${origin.x + deltaX * 0.45} ${origin.y}, ${origin.x + deltaX * 0.55} ${dest.y}, ${dest.x} ${dest.y}`
+
+              const pathData = conn.sameColumn
+                ? `M ${origin.x} ${origin.y} C ${origin.x - 90} ${origin.y}, ${origin.x - 90} ${dest.y}, ${dest.x} ${dest.y}`
+                : `M ${origin.x} ${origin.y} C ${origin.x + deltaX * 0.45} ${origin.y}, ${origin.x + deltaX * 0.55} ${dest.y}, ${dest.x} ${dest.y}`
 
               return (
                 <g key={idx}>
@@ -568,6 +527,7 @@ function FlowchartTool() {
                     fill="none"
                     stroke={isHighlighted ? '#06b6d4' : '#1e293b'}
                     strokeWidth={isHighlighted ? '3' : '2'}
+                    strokeDasharray={conn.loop ? '2,4' : undefined}
                     markerEnd={isHighlighted ? 'url(#arrow-active)' : 'url(#arrow)'}
                     className="transition-all duration-300"
                   />
@@ -583,9 +543,9 @@ function FlowchartTool() {
                   )}
                   {isHighlighted && (
                     <foreignObject
-                      x={(origin.x + dest.x) / 2 - 55}
+                      x={(origin.x + dest.x) / 2 - 65}
                       y={(origin.y + dest.y) / 2 - 12}
-                      width="110"
+                      width="130"
                       height="24"
                     >
                       <div className="text-[9px] text-center font-bold font-mono text-cyan-400 bg-[#080d1a] border border-cyan-500/30 px-1 py-0.5 rounded shadow-lg truncate">
@@ -604,7 +564,6 @@ function FlowchartTool() {
               const typeBadgeColor =
                 {
                   input: 'text-indigo-400',
-                  subledger: 'text-cyan-400',
                   core: 'text-blue-400',
                   report: 'text-teal-400',
                   cash: 'text-emerald-400',
@@ -702,58 +661,68 @@ function FlowchartTool() {
             </span>
           </div>
 
-          {(selectedNode.debits?.length > 0 || selectedNode.credits?.length > 0) && (
-            <div className="space-y-3 pt-2">
+          {selectedNode.creates?.length > 0 && (
+            <div className="space-y-2">
               <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">
-                LEDGER POSTING SETUP
+                RECORDS CREATED
               </span>
-              <div className="bg-slate-950 rounded-lg p-3 space-y-3 border border-slate-800">
-                <div>
-                  <span className="text-[8px] font-bold font-mono text-emerald-400 block uppercase tracking-wider mb-1">
-                    DEBIT SIDE (DR)
+              <div className="flex flex-wrap gap-1.5">
+                {selectedNode.creates.map((table) => (
+                  <span
+                    key={table}
+                    className="text-[10px] font-mono px-2 py-1 rounded bg-slate-950 border border-slate-800 text-slate-300"
+                  >
+                    {table}
                   </span>
-                  {selectedNode.debits?.length > 0 ? (
-                    selectedNode.debits.map((d, i) => (
-                      <div
-                        key={i}
-                        className="text-[11px] border-l-2 border-emerald-500 pl-2"
-                      >
-                        <span className="font-bold text-slate-200 block">
-                          {d.account}
-                        </span>
-                        <span className="text-[10px] text-slate-500">{d.desc}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <span className="text-[10px] text-slate-500 pl-2 block">
-                      Direct subledger pipeline update
-                    </span>
-                  )}
-                </div>
-                <div className="border-t border-slate-900" />
-                <div>
-                  <span className="text-[8px] font-bold font-mono text-rose-400 block uppercase tracking-wider mb-1">
-                    CREDIT SIDE (CR)
-                  </span>
-                  {selectedNode.credits?.length > 0 ? (
-                    selectedNode.credits.map((c, i) => (
-                      <div
-                        key={i}
-                        className="text-[11px] border-l-2 border-rose-500 pl-2"
-                      >
-                        <span className="font-bold text-slate-200 block">
-                          {c.account}
-                        </span>
-                        <span className="text-[10px] text-slate-500">{c.desc}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <span className="text-[10px] text-slate-500 pl-2 block">
-                      No credit lines for this node
-                    </span>
-                  )}
-                </div>
+                ))}
               </div>
+            </div>
+          )}
+
+          {selectedNode.approvalFlow && (
+            <div className="space-y-2">
+              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">
+                APPROVAL WORKFLOW
+              </span>
+              <div className="flex items-center flex-wrap gap-1.5">
+                {selectedNode.approvalFlow.map((step, i) => (
+                  <React.Fragment key={step}>
+                    <span className="text-[10px] font-mono font-bold px-2 py-1 rounded bg-sky-500/10 border border-sky-500/40 text-sky-400">
+                      {step}
+                    </span>
+                    {i < selectedNode.approvalFlow.length - 1 && (
+                      <ChevronRight size={11} className="text-slate-600" />
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selectedNode.decision && (
+            <div className="space-y-2">
+              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <GitBranch size={11} /> {selectedNode.decision.question}
+              </span>
+              <div className="bg-slate-950 rounded-lg p-3 space-y-2 border border-slate-800">
+                {selectedNode.decision.options.map((opt) => (
+                  <div key={opt.label} className="text-[11px] border-l-2 border-amber-400 pl-2">
+                    <span className="font-bold text-amber-400 block">{opt.label}</span>
+                    <span className="text-[10px] text-slate-400">{opt.outcome}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selectedNode.statusUpdate && (
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">
+                ON FINAL APPROVAL
+              </span>
+              <span className="text-[11px] font-mono bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2.5 py-1.5 rounded block">
+                {selectedNode.statusUpdate}
+              </span>
             </div>
           )}
 
@@ -777,309 +746,6 @@ function FlowchartTool() {
               ))}
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
-// SANDBOX TOOL
-// ============================================================================
-
-function SandboxTool() {
-  const [traceStep, setTraceStep] = useState(0)
-  const [sandboxQty, setSandboxQty] = useState(12)
-  const [sandboxPrice, setSandboxPrice] = useState(150)
-  const [sandboxVatRate, setSandboxVatRate] = useState(12)
-  const [sandboxWhtRate, setSandboxWhtRate] = useState(3)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [sandboxResponse, setSandboxResponse] = useState(null)
-
-  const computedGross = useMemo(
-    () => sandboxQty * sandboxPrice,
-    [sandboxQty, sandboxPrice],
-  )
-  const computedVat = useMemo(
-    () => computedGross * (sandboxVatRate / 100),
-    [computedGross, sandboxVatRate],
-  )
-  const computedWht = useMemo(
-    () => computedGross * (sandboxWhtRate / 100),
-    [computedGross, sandboxWhtRate],
-  )
-  const computedNet = useMemo(
-    () => computedGross + computedVat - computedWht,
-    [computedGross, computedVat, computedWht],
-  )
-
-  const triggerSandboxPost = () => {
-    setIsSubmitting(true)
-    setTimeout(() => {
-      setSandboxResponse({
-        success: true,
-        message: 'Invoice recorded under PENDING state in DB.',
-        timestamp: '2026-06-09T15:52:00Z',
-        data: {
-          invoice_id: Math.floor(Math.random() * 900) + 101,
-          document_reference: 'INV-2026-MOCK',
-          gross_amount: computedGross.toFixed(2),
-          calculated_vat: computedVat.toFixed(2),
-          withholding_tax_withheld: computedWht.toFixed(2),
-          total_receivable_due: computedNet.toFixed(2),
-          state: 'PENDING',
-          db_operations: [
-            `INSERT INTO sales (customer_id, doc_ref, total_amount_due, state) VALUES (5, 'INV-2026-MOCK', ${computedNet.toFixed(2)}, 'PENDING')`,
-            `INSERT INTO sales_items (product_service, gross, vat, wht, net) VALUES (12, ${computedGross.toFixed(2)}, ${computedVat.toFixed(2)}, ${computedWht.toFixed(2)}, ${computedNet.toFixed(2)})`,
-          ],
-          system_message:
-            'Pending transactions will NOT generate general ledger entries until APPROVED.',
-        },
-      })
-      setIsSubmitting(false)
-      setTraceStep(1)
-    }, 1000)
-  }
-
-  const triggerSandboxApprove = () => {
-    if (!sandboxResponse) return
-    setSandboxResponse((prev) => ({
-      ...prev,
-      message:
-        'Invoice Approved. Double entry posted successfully to General Ledger.',
-      data: {
-        ...prev.data,
-        state: 'APPROVED',
-        generated_journal_entries: 4,
-        ledger_entries: [
-          {
-            type: 'DEBIT',
-            coa_code: '1100',
-            coa_name: 'Accounts Receivable',
-            amount: computedNet.toFixed(2),
-          },
-          {
-            type: 'CREDIT',
-            coa_code: '4000',
-            coa_name: 'Sales Revenue',
-            amount: computedGross.toFixed(2),
-          },
-          {
-            type: 'CREDIT',
-            coa_code: '2150',
-            coa_name: 'VAT Payable',
-            amount: computedVat.toFixed(2),
-          },
-          {
-            type: 'DEBIT',
-            coa_code: '1150',
-            coa_name: 'Withholding Taxes Asset',
-            amount: computedWht.toFixed(2),
-          },
-        ],
-        db_operations: [
-          `UPDATE sales SET state = 'APPROVED' WHERE id = ${prev.data.invoice_id}`,
-          `INSERT INTO journal_entries (db_name, db_id, coa_id, type, amount) VALUES ('SALES', ${prev.data.invoice_id}, 11, 'DEBIT', ${computedNet.toFixed(2)})`,
-          `INSERT INTO journal_entries (db_name, db_id, coa_id, type, amount) VALUES ('SALES', ${prev.data.invoice_id}, 45, 'CREDIT', ${computedGross.toFixed(2)})`,
-          `INSERT INTO journal_entries (db_name, db_id, coa_id, type, amount) VALUES ('SALES', ${prev.data.invoice_id}, 25, 'CREDIT', ${computedVat.toFixed(2)})`,
-          `INSERT INTO journal_entries (db_name, db_id, coa_id, type, amount) VALUES ('SALES', ${prev.data.invoice_id}, 15, 'DEBIT', ${computedWht.toFixed(2)})`,
-        ],
-      },
-    }))
-    setTraceStep(2)
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="border-b border-slate-800 pb-4">
-        <span className="text-xs font-mono font-bold uppercase tracking-widest text-sky-400">
-          INTERACTIVE SANDBOX ENVIRONMENT
-        </span>
-        <h2 className="text-3xl font-extrabold text-white mt-1">
-          Live Endpoint Playground
-        </h2>
-        <p className="text-sm text-slate-400 mt-2">
-          Simulate live transactional postings. Adjust quantities, values, or tax
-          rates to verify calculations, dynamic SQL outputs, and balancing general
-          ledger offsets.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Controls */}
-        <div className="lg:col-span-4 bg-[#121826] border border-slate-800 rounded-xl p-5 space-y-4">
-          <h3 className="text-xs font-bold text-slate-200 tracking-wider uppercase border-b border-slate-800 pb-2">
-            1. Configure Post Data
-          </h3>
-
-          <div className="space-y-1 text-xs">
-            <label className="text-slate-400 block font-semibold">
-              Mock Client Profile
-            </label>
-            <select className="w-full p-2 bg-slate-950 border border-slate-800 rounded text-slate-200 text-xs font-mono">
-              <option>CUST-001 - ABC Corporation</option>
-              <option>CUST-002 - Acme Group Holdings</option>
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            {[
-              {
-                label: 'Bill Quantity',
-                value: sandboxQty,
-                setter: setSandboxQty,
-                min: 1,
-              },
-              {
-                label: 'Unit Price ($)',
-                value: sandboxPrice,
-                setter: setSandboxPrice,
-                min: 1,
-              },
-              {
-                label: 'VAT Percentage (%)',
-                value: sandboxVatRate,
-                setter: setSandboxVatRate,
-                min: 0,
-              },
-              {
-                label: 'WHT Deduct (%)',
-                value: sandboxWhtRate,
-                setter: setSandboxWhtRate,
-                min: 0,
-              },
-            ].map(({ label, value, setter, min }) => (
-              <div key={label} className="space-y-1">
-                <label className="text-slate-400 block font-semibold">{label}</label>
-                <input
-                  type="number"
-                  value={value}
-                  onChange={(e) =>
-                    setter(Math.max(min, parseInt(e.target.value) || 0))
-                  }
-                  className="w-full p-2 bg-slate-950 border border-slate-800 rounded text-slate-200 font-mono text-xs"
-                />
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-slate-950 rounded-lg p-3 border border-slate-800 font-mono text-[11px] space-y-2">
-            {[
-              { label: 'Gross Goods:', value: `$${computedGross.toFixed(2)}` },
-              { label: 'VAT Total (+):', value: `$${computedVat.toFixed(2)}` },
-              { label: 'Withholding (-):', value: `$${computedWht.toFixed(2)}` },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex justify-between">
-                <span className="text-slate-500">{label}</span>
-                <span className="font-bold text-slate-300">{value}</span>
-              </div>
-            ))}
-            <div className="border-t border-slate-900" />
-            <div className="flex justify-between text-xs text-sky-400 font-bold">
-              <span>Total Invoice Due:</span>
-              <span>${computedNet.toFixed(2)}</span>
-            </div>
-          </div>
-
-          <button
-            onClick={triggerSandboxPost}
-            disabled={isSubmitting}
-            className="w-full py-2.5 bg-gradient-to-tr from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 disabled:from-slate-800 disabled:to-slate-800 text-white font-bold text-xs rounded-lg shadow-lg flex items-center justify-center gap-2 transition-all"
-          >
-            {isSubmitting ? (
-              <>
-                <RefreshCw className="animate-spin" size={14} />
-                <span>Posting Draft...</span>
-              </>
-            ) : (
-              <>
-                <Terminal size={14} />
-                <span>POST Draft Sales Order</span>
-              </>
-            )}
-          </button>
-
-          {traceStep > 0 && (
-            <button
-              onClick={() => {
-                setTraceStep(0)
-                setSandboxResponse(null)
-              }}
-              className="w-full py-1.5 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-all text-xs font-mono rounded"
-            >
-              Clear Playground
-            </button>
-          )}
-        </div>
-
-        {/* Response Console */}
-        <div className="lg:col-span-8 bg-[#121826] border border-slate-800 rounded-xl p-5 flex flex-col justify-between min-h-[420px]">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <h4 className="text-xs font-bold text-slate-200 tracking-widest uppercase flex items-center gap-2 font-mono">
-                <Terminal size={14} className="text-sky-400" /> API RESPONSE CONSOLE
-              </h4>
-              <span className="text-[10px] font-mono text-slate-500">
-                {sandboxResponse ? 'Status: 201 Created' : 'Idle'}
-              </span>
-            </div>
-
-            {sandboxResponse ? (
-              <div className="space-y-4 font-mono text-xs">
-                <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 text-emerald-400 overflow-x-auto">
-                  <pre>
-                    <code>{JSON.stringify(sandboxResponse, null, 2)}</code>
-                  </pre>
-                </div>
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block font-mono">
-                    Simulated DB Write Statements
-                  </span>
-                  <div className="bg-slate-950/80 p-3 rounded border border-slate-800 text-slate-300 text-[11px] leading-relaxed">
-                    {sandboxResponse.data.db_operations.map((op, i) => (
-                      <div
-                        key={i}
-                        className="flex gap-2 text-[10px] py-1 border-l-2 border-sky-400 pl-2"
-                      >
-                        <span className="text-slate-500 font-bold shrink-0">
-                          [{i + 1}]
-                        </span>
-                        <span className="text-slate-200">{op}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-24 text-xs text-slate-500 space-y-3">
-                <Code className="mx-auto text-slate-700" size={32} />
-                <p className="max-w-md mx-auto leading-relaxed">
-                  Configure your quantities and rates on the left parameter block and
-                  click "POST Draft" to inspect database operations.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {traceStep === 1 && (
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 mt-4 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="space-y-1 text-xs text-slate-300">
-                <span className="font-bold text-amber-400 flex items-center gap-1">
-                  <AlertTriangle size={12} /> Double Entry Pending Verification
-                </span>
-                <p className="text-[11px] leading-relaxed">
-                  Your draft has successfully saved, but has not yet posted any
-                  ledger entries. Trigger approval state-change to post double entry.
-                </p>
-              </div>
-              <button
-                onClick={triggerSandboxApprove}
-                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold rounded-lg shrink-0 shadow-lg flex items-center gap-1"
-              >
-                <CheckCircle2 size={12} /> Approve and Post
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

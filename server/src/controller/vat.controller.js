@@ -17,6 +17,28 @@ const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
 
+const normalizeCodeValue = (value) =>
+  String(value || '')
+    .trim()
+    .toUpperCase()
+
+const findVatCodeDuplicate = async (code, excludeId = null) => {
+  const normalizedCode = normalizeCodeValue(code)
+  if (!normalizedCode) return false
+
+  const query = excludeId
+    ? `SELECT ${Master.vat.selectOptionColumns.id} FROM ${Master.vat.tablename} WHERE UPPER(${Master.vat.selectOptionColumns.code}) = ? AND ${Master.vat.selectOptionColumns.id} <> ? LIMIT 1`
+    : `SELECT ${Master.vat.selectOptionColumns.id} FROM ${Master.vat.tablename} WHERE UPPER(${Master.vat.selectOptionColumns.code}) = ? LIMIT 1`
+
+  const rows = await Query(
+    query,
+    excludeId ? [normalizedCode, excludeId] : [normalizedCode],
+    Master.vat.prefix_,
+  )
+
+  return Array.isArray(rows) && rows.length > 0
+}
+
 const getVat = async (req, res, next) => {
   try {
     const query = sql
@@ -59,16 +81,32 @@ const getVat = async (req, res, next) => {
 const createVat = async (req, res, next) => {
   try {
     const { code, name, rate, type, sub_type, description, status } = req.body
+    const normalizedCode = String(code || '').trim()
     const normalizedSubType =
       sub_type === '' || sub_type === null || sub_type === undefined
         ? null
         : sub_type
 
-    if (!code || !name || rate === undefined || !type || !description || !status) {
+    if (
+      !normalizedCode ||
+      !name ||
+      rate === undefined ||
+      !type ||
+      !description ||
+      !status
+    ) {
       return res.status(400).json({
         success: false,
         message:
           'Missing required fields: code, name, rate, type, description, status',
+      })
+    }
+
+    const isDuplicateCode = await findVatCodeDuplicate(normalizedCode)
+    if (isDuplicateCode) {
+      return res.status(409).json({
+        success: false,
+        message: 'A VAT code already exists. Please use a different code.',
       })
     }
 
@@ -83,7 +121,7 @@ const createVat = async (req, res, next) => {
         })
         .build(),
       values: [
-        code || null,
+        normalizedCode || null,
         name || null,
         rate || null,
         type || null,
@@ -156,6 +194,7 @@ const createVat = async (req, res, next) => {
 const updateVat = async (req, res, next) => {
   try {
     const { id, code, name, rate, type, sub_type, description, status } = req.body
+    const normalizedCode = String(code || '').trim()
     const normalizedSubType =
       sub_type === '' || sub_type === null || sub_type === undefined
         ? null
@@ -164,7 +203,7 @@ const updateVat = async (req, res, next) => {
 
     if (
       !id ||
-      !code ||
+      !normalizedCode ||
       !name ||
       rate === undefined ||
       !type ||
@@ -193,6 +232,14 @@ const updateVat = async (req, res, next) => {
       .build()
     const existingVats = await Query(existingQuery, [id], Master.vat.prefix_)
     const old = existingVats[0] || {}
+
+    const isDuplicateCode = await findVatCodeDuplicate(normalizedCode, id)
+    if (isDuplicateCode) {
+      return res.status(409).json({
+        success: false,
+        message: 'A VAT code already exists. Please use a different code.',
+      })
+    }
 
     let connection
     try {
@@ -230,7 +277,7 @@ const updateVat = async (req, res, next) => {
 
       // Build change description - only include changed columns with new values
       const changes = []
-      if (old.code !== code) changes.push(`code='${code}'`)
+      if (old.code !== normalizedCode) changes.push(`code='${normalizedCode}'`)
       if (old.name !== name) changes.push(`name='${name}'`)
       if (old.rate != rate) changes.push(`rate='${rate}'`)
       if (old.type !== type) changes.push(`type='${type}'`)
@@ -268,7 +315,7 @@ const updateVat = async (req, res, next) => {
         message: 'VAT entry updated successfully',
         data: {
           id,
-          code,
+          normalizedCode,
           name,
           rate,
           type,

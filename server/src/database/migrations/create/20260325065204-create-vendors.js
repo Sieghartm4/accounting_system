@@ -1,4 +1,4 @@
-'use strict';
+'use strict'
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
@@ -7,32 +7,33 @@ module.exports = {
       v_id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
       },
       v_code: {
         type: Sequelize.STRING(20),
-        allowNull: false
+        allowNull: false,
+        unique: true,
       },
       v_name: {
         type: Sequelize.STRING(300),
-        allowNull: false
+        allowNull: false,
       },
       v_category: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: true,
       },
       v_type: {
         type: Sequelize.STRING(120),
-        allowNull: true
+        allowNull: true,
       },
       v_status: {
-        type: Sequelize.ENUM("ACTIVE","INACTIVE"),
-        allowNull: false
-      }
-    });
+        type: Sequelize.ENUM('ACTIVE', 'INACTIVE'),
+        allowNull: false,
+      },
+    })
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('vendors');
-  }
-};
+    await queryInterface.dropTable('vendors')
+  },
+}

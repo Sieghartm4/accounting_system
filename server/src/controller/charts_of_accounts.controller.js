@@ -16,6 +16,28 @@ const { SQLQueryBuilder } = require('../util/helper.util')
 const sql = new SQLQueryBuilder()
 require('dotenv').config()
 
+const normalizeCodeValue = (value) =>
+  String(value || '')
+    .trim()
+    .toUpperCase()
+
+const findChartCodeDuplicate = async (code, excludeId = null) => {
+  const normalizedCode = normalizeCodeValue(code)
+  if (!normalizedCode) return false
+
+  const query = excludeId
+    ? `SELECT ${Master.charts_of_accounts.selectOptionColumns.id} FROM ${Master.charts_of_accounts.tablename} WHERE UPPER(${Master.charts_of_accounts.selectOptionColumns.code}) = ? AND ${Master.charts_of_accounts.selectOptionColumns.id} <> ? LIMIT 1`
+    : `SELECT ${Master.charts_of_accounts.selectOptionColumns.id} FROM ${Master.charts_of_accounts.tablename} WHERE UPPER(${Master.charts_of_accounts.selectOptionColumns.code}) = ? LIMIT 1`
+
+  const rows = await Query(
+    query,
+    excludeId ? [normalizedCode, excludeId] : [normalizedCode],
+    Master.charts_of_accounts.prefix_,
+  )
+
+  return Array.isArray(rows) && rows.length > 0
+}
+
 const getChartsOfAccounts = async (req, res, next) => {
   try {
     const chartsOfAccounts = await SelectAll(
@@ -46,11 +68,21 @@ const getChartsOfAccounts = async (req, res, next) => {
 const createChartsOfAccount = async (req, res, next) => {
   try {
     const { code, name, type, description, status = 'active' } = req.body
+    const normalizedCode = String(code || '').trim()
 
-    if (!code || !name || !type || !description) {
+    if (!normalizedCode || !name || !type || !description) {
       return res.status(400).json({
         success: false,
         message: 'Charts of account code, name, type, and description are required',
+      })
+    }
+
+    const isDuplicateCode = await findChartCodeDuplicate(normalizedCode)
+    if (isDuplicateCode) {
+      return res.status(409).json({
+        success: false,
+        message:
+          'A chart of account code already exists. Please use a different code.',
       })
     }
 
@@ -65,7 +97,7 @@ const createChartsOfAccount = async (req, res, next) => {
         })
         .build(),
       values: [
-        code || null,
+        normalizedCode || null,
         name || null,
         type || null,
         description || null,
@@ -110,7 +142,7 @@ const createChartsOfAccount = async (req, res, next) => {
       message: 'Charts of account created successfully',
       data: {
         id: newChartsOfAccountId,
-        code: code,
+        code: normalizedCode,
         name: name,
         type: type,
         description: description,
@@ -136,8 +168,9 @@ const updateChartsOfAccount = async (req, res, next) => {
     const { id: idFromBody, code, name, type, description, status } = req.body
     const { id: idFromParams } = req.params
     const id = Number(idFromParams || idFromBody)
+    const normalizedCode = String(code || '').trim()
 
-    if (!id || !code || !name || !type || !description || !status) {
+    if (!id || !normalizedCode || !name || !type || !description || !status) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required',
@@ -163,6 +196,15 @@ const updateChartsOfAccount = async (req, res, next) => {
     )
     const old = existingAccounts[0] || {}
 
+    const isDuplicateCode = await findChartCodeDuplicate(normalizedCode, id)
+    if (isDuplicateCode) {
+      return res.status(409).json({
+        success: false,
+        message:
+          'A chart of account code already exists. Please use a different code.',
+      })
+    }
+
     const updateQuery = sql
       .update(Master.charts_of_accounts.tablename)
       .set([
@@ -178,7 +220,7 @@ const updateChartsOfAccount = async (req, res, next) => {
     const queries = [
       {
         sql: updateQuery,
-        values: [code, name, type, description, status, id],
+        values: [normalizedCode, name, type, description, status, id],
       },
     ]
 
@@ -186,7 +228,7 @@ const updateChartsOfAccount = async (req, res, next) => {
 
     // Build change description - only include changed columns with new values
     const changes = []
-    if (old.code !== code) changes.push(`code='${code}'`)
+    if (old.code !== normalizedCode) changes.push(`code='${normalizedCode}'`)
     if (old.name !== name) changes.push(`name='${name}'`)
     if (old.type !== type) changes.push(`type='${type}'`)
     if (old.description !== description) changes.push(`description='${description}'`)
@@ -218,7 +260,7 @@ const updateChartsOfAccount = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Charts of account updated successfully',
-      data: { id, code, name, type, description, status },
+      data: { id, code: normalizedCode, name, type, description, status },
       timestamp: new Date().toISOString(),
     })
   } catch (error) {

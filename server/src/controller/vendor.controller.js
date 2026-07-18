@@ -18,6 +18,28 @@ const { SQLQueryBuilder } = require('../util/helper.util')
 const sql = new SQLQueryBuilder()
 require('dotenv').config()
 
+const normalizeCodeValue = (value) =>
+  String(value || '')
+    .trim()
+    .toUpperCase()
+
+const findVendorCodeDuplicate = async (code, excludeId = null) => {
+  const normalizedCode = normalizeCodeValue(code)
+  if (!normalizedCode) return false
+
+  const query = excludeId
+    ? `SELECT ${Master.vendors.selectOptionColumns.id} FROM ${Master.vendors.tablename} WHERE UPPER(${Master.vendors.selectOptionColumns.code}) = ? AND ${Master.vendors.selectOptionColumns.id} <> ? LIMIT 1`
+    : `SELECT ${Master.vendors.selectOptionColumns.id} FROM ${Master.vendors.tablename} WHERE UPPER(${Master.vendors.selectOptionColumns.code}) = ? LIMIT 1`
+
+  const rows = await Query(
+    query,
+    excludeId ? [normalizedCode, excludeId] : [normalizedCode],
+    Master.vendors.prefix_,
+  )
+
+  return Array.isArray(rows) && rows.length > 0
+}
+
 const getInfoTableColumns = async (tableName) => {
   try {
     const query = `
@@ -290,13 +312,22 @@ const getVendorTransactions = async (req, res, next) => {
 const createVendor = async (req, res, next) => {
   try {
     const { code, name, category, type, address, tin, details, contact } = req.body
+    const normalizedCode = normalizeCodeValue(code)
     const status = 'ACTIVE'
 
     // Require only essential fields; details and contact may be blank/null
-    if (!code || !name || !address || !tin) {
+    if (!normalizedCode || !name || !address || !tin) {
       return res.status(400).json({
         success: false,
         message: 'Vendor code, name, address, and TIN are required',
+      })
+    }
+
+    const isDuplicateCode = await findVendorCodeDuplicate(normalizedCode)
+    if (isDuplicateCode) {
+      return res.status(409).json({
+        success: false,
+        message: 'A vendor code already exists. Please use a different code.',
       })
     }
 
@@ -317,7 +348,7 @@ const createVendor = async (req, res, next) => {
         .build()
 
       const [vendorResult] = await connection.execute(insertVendorQuery, [
-        code || null,
+        normalizedCode || null,
         name || null,
         category || null,
         type || null,
@@ -390,7 +421,7 @@ const createVendor = async (req, res, next) => {
       message: 'Vendor created successfully',
       data: {
         id: newVendorId,
-        code: code,
+        code: normalizedCode,
         name: name,
         category: category,
         type: type,
@@ -431,8 +462,9 @@ const updateVendor = async (req, res, next) => {
     } = req.body
     const { id: idFromParams } = req.params
     const id = Number(idFromParams || idFromBody)
+    const normalizedCode = String(code || '').trim()
 
-    if (!id || !code || !name) {
+    if (!id || !normalizedCode || !name) {
       return res.status(400).json({
         success: false,
         message: 'ID, vendor code, and name are required',
@@ -453,6 +485,15 @@ const updateVendor = async (req, res, next) => {
       .build()
     const existingVendors = await Query(existingQuery, [id], Master.vendors.prefix_)
     const old = existingVendors[0] || {}
+
+    const isDuplicateCode = await findVendorCodeDuplicate(normalizedCode, id)
+    if (isDuplicateCode) {
+      return res.status(409).json({
+        success: false,
+        message: 'A vendor code already exists. Please use a different code.',
+      })
+    }
+
     const status =
       typeof statusFromBody !== 'undefined'
         ? String(statusFromBody).toUpperCase()
@@ -498,7 +539,7 @@ const updateVendor = async (req, res, next) => {
     const queries = [
       {
         sql: updateQuery,
-        values: [code, name, category, type, status, id],
+        values: [normalizedCode, name, category, type, status, id],
       },
     ]
 
@@ -539,7 +580,7 @@ const updateVendor = async (req, res, next) => {
 
     // Build change description - only include changed columns with new values
     const changes = []
-    if (old.code !== code) changes.push(`code='${code}'`)
+    if (old.code !== normalizedCode) changes.push(`code='${normalizedCode}'`)
     if (old.name !== name) changes.push(`name='${name}'`)
     if (old.category !== category) changes.push(`category='${category}'`)
     if (old.type !== type) changes.push(`type='${type}'`)
