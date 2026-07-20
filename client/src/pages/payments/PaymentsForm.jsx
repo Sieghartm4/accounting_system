@@ -260,6 +260,38 @@ const fmt = (n = 0) =>
     maximumFractionDigits: 2,
   })
 
+// Format price for display (adds commas to integers, allows unlimited decimals)
+const formatPriceDisplay = (value) => {
+  if (value === '' || value === null || value === undefined) return ''
+
+  const stringValue = String(value)
+  const parts = stringValue.split('.')
+  const integerPart = parts[0]
+  const decimalPart = parts.length > 1 ? parts[1] : null
+
+  let formattedInteger = ''
+  if (integerPart) {
+    formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  }
+
+  if (decimalPart !== null) {
+    return `${formattedInteger}.${decimalPart}`
+  }
+
+  return formattedInteger
+}
+
+const parsePriceInput = (input) => {
+  if (input === '' || input === null || input === undefined) return ''
+
+  let cleaned = String(input).replace(/[^0-9.]/g, '')
+  const parts = cleaned.split('.')
+  if (parts.length > 2) {
+    cleaned = parts[0] + '.' + parts.slice(1).join('')
+  }
+  return cleaned
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Drag to scroll hook
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2045,17 +2077,17 @@ export default function PaymentsForm({
                                 disabled={isViewMode}
                                 className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                 placeholder="0.00"
-                                type="number"
-                                value={entry.debit || ''}
-                                onChange={(e) =>
+                                type="text"
+                                inputMode="decimal"
+                                value={formatPriceDisplay(entry.debit ?? '')}
+                                onChange={(e) => {
+                                  const parsed = parsePriceInput(e.target.value)
                                   updateJournalEntry(
                                     entry.id,
                                     'debit',
-                                    e.target.value === ''
-                                      ? ''
-                                      : parseFloat(e.target.value) || 0,
+                                    parsed === '' ? '' : parseFloat(parsed) || 0,
                                   )
-                                }
+                                }}
                               />
                             </td>
                             <td className="py-1.5 px-1">
@@ -2063,21 +2095,17 @@ export default function PaymentsForm({
                                 disabled={isViewMode}
                                 className={`${tableInput + ' font-black text-red-600'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                 placeholder="0.00"
-                                type="number"
-                                value={
-                                  entry.credit === null || entry.credit === undefined
-                                    ? ''
-                                    : entry.credit
-                                }
-                                onChange={(e) =>
+                                type="text"
+                                inputMode="decimal"
+                                value={formatPriceDisplay(entry.credit ?? '')}
+                                onChange={(e) => {
+                                  const parsed = parsePriceInput(e.target.value)
                                   updateJournalEntry(
                                     entry.id,
                                     'credit',
-                                    e.target.value === ''
-                                      ? null
-                                      : parseFloat(e.target.value) || 0,
+                                    parsed === '' ? null : parseFloat(parsed) || 0,
                                   )
-                                }
+                                }}
                                 readOnly={!entry.isManual}
                               />
                             </td>
@@ -2156,7 +2184,11 @@ export default function PaymentsForm({
 
               {/* 3. ATTACHMENTS & REMARKS */}
               <div className="grid grid-cols-1 gap-4">
-                <TableSection title="Attachments" icon={<Paperclip size={14} />}>
+                <TableSection
+                  title="Attachments"
+                  icon={<Paperclip size={14} />}
+                  defaultCollapsed
+                >
                   <div className="w-full flex flex-col gap-[2px] mb-4">
                     <div className="h-[2px] w-full bg-red-600 rounded-full" />
                     <div className="h-[1px] w-full bg-black/10" />
@@ -2329,7 +2361,11 @@ export default function PaymentsForm({
                   )}
                 </TableSection>
 
-                <TableSection title="Remarks" icon={<FileText size={14} />}>
+                <TableSection
+                  title="Remarks"
+                  icon={<FileText size={14} />}
+                  defaultCollapsed
+                >
                   <textarea
                     disabled={isViewMode}
                     className={`w-full min-h-[100px] mt-4 p-4 rounded-xl text-[14px] font-bold outline-none ${
@@ -2545,8 +2581,8 @@ export default function PaymentsForm({
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
-function TableSection({ title, icon, children }) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+function TableSection({ title, icon, children, defaultCollapsed = false }) {
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

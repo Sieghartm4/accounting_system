@@ -598,7 +598,7 @@ export function useReceiptsForm({
         coaSearch: '',
         description: '',
         qty: 1,
-        price: 0,
+        price: '',
         discount: 0,
         discountType: 'PERCENT',
         vat: '',

@@ -16,6 +16,7 @@ import {
 import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
+import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drag to Scroll Hook
@@ -394,8 +395,8 @@ const parsePriceInput = (input) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
-function TableSection({ title, icon, children }) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+function TableSection({ title, icon, children, defaultCollapsed = false }) {
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -506,6 +507,18 @@ export default function PurchaseForm({
   purchaseData = null,
 }) {
   const [purchaseItems, setPurchaseItems] = useState([])
+
+  const {
+    responsibilityCenters,
+    loading: responsibilityCentersLoading,
+    error: responsibilityCentersError,
+  } = useResponsibilityCenter()
+
+  const responsibilityCenterOptions = responsibilityCenters.map((center) => ({
+    label: center.name || '',
+    sublabel: center.department || '',
+    value: center.name || '',
+  }))
 
   const [journalEntries, setJournalEntries] = useState([
     { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 },
@@ -1313,7 +1326,7 @@ export default function PurchaseForm({
         coaSearch: '',
         description: '',
         qty: 1,
-        price: 0,
+        price: '',
         discount: 0,
         discountType: 'PERCENT',
         vat: '',
@@ -2708,17 +2721,29 @@ export default function PurchaseForm({
                             )}
                           </td>
                           <td className="py-1 px-1">
-                            <input
+                            <SearchableDropdown
                               disabled={isViewMode}
-                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               placeholder="Select"
                               value={item.responsibilityCenter}
-                              onChange={(e) =>
+                              onChange={(v) =>
                                 updatePurchaseItem(
                                   item.id,
                                   'responsibilityCenter',
-                                  e.target.value,
+                                  v,
                                 )
+                              }
+                              onSelect={(opt) =>
+                                updatePurchaseItem(
+                                  item.id,
+                                  'responsibilityCenter',
+                                  opt.value,
+                                )
+                              }
+                              options={responsibilityCenterOptions}
+                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              emptyText={
+                                responsibilityCentersError ||
+                                'No responsibility centers found'
                               }
                             />
                           </td>
@@ -2814,17 +2839,17 @@ export default function PurchaseForm({
                               disabled={isViewMode || !entry.isManual}
                               className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               placeholder="0.00"
-                              type="number"
-                              value={entry.debit || ''}
-                              onChange={(e) =>
+                              type="text"
+                              inputMode="decimal"
+                              value={formatPriceDisplay(entry.debit ?? '')}
+                              onChange={(e) => {
+                                const parsed = parsePriceInput(e.target.value)
                                 updateJournalEntry(
                                   entry.id,
                                   'debit',
-                                  e.target.value === ''
-                                    ? ''
-                                    : parseFloat(e.target.value) || 0,
+                                  parsed === '' ? '' : parseFloat(parsed) || 0,
                                 )
-                              }
+                              }}
                               readOnly={isViewMode || !entry.isManual}
                             />
                           </td>
@@ -2833,17 +2858,17 @@ export default function PurchaseForm({
                               disabled={isViewMode || !entry.isManual}
                               className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               placeholder="0.00"
-                              type="number"
-                              value={entry.credit || ''}
-                              onChange={(e) =>
+                              type="text"
+                              inputMode="decimal"
+                              value={formatPriceDisplay(entry.credit ?? '')}
+                              onChange={(e) => {
+                                const parsed = parsePriceInput(e.target.value)
                                 updateJournalEntry(
                                   entry.id,
                                   'credit',
-                                  e.target.value === ''
-                                    ? ''
-                                    : parseFloat(e.target.value) || 0,
+                                  parsed === '' ? '' : parseFloat(parsed) || 0,
                                 )
-                              }
+                              }}
                               readOnly={isViewMode || !entry.isManual}
                             />
                           </td>
@@ -2922,7 +2947,11 @@ export default function PurchaseForm({
 
               {/* 3. ATTACHMENTS & REMARKS */}
               <div className="grid grid-cols-1 gap-4">
-                <TableSection title="Attachments" icon={<Paperclip size={14} />}>
+                <TableSection
+                  title="Attachments"
+                  icon={<Paperclip size={14} />}
+                  defaultCollapsed
+                >
                   <div className="w-full flex flex-col gap-[2px] mb-4">
                     <div className="h-[2px] w-full bg-red-600 rounded-full" />
                     <div className="h-[1px] w-full bg-black/10" />
@@ -3063,7 +3092,11 @@ export default function PurchaseForm({
                   )}
                 </TableSection>
 
-                <TableSection title="Remarks" icon={<FileText size={14} />}>
+                <TableSection
+                  title="Remarks"
+                  icon={<FileText size={14} />}
+                  defaultCollapsed
+                >
                   <textarea
                     disabled={isViewMode}
                     className={`w-full min-h-[100px] mt-4 p-4 rounded-xl text-[14px] font-bold focus:ring-1 focus:ring-red-500 outline-none ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : 'bg-gray-50 border-none'}`}

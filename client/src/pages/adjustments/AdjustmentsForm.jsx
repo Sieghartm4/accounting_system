@@ -1094,7 +1094,11 @@ export default function AdjustmentsForm({
 
             {/* 2. ATTACHMENTS & REMARKS */}
             <div className="grid grid-cols-1 gap-4">
-              <TableSection title="Attachments" icon={<Paperclip size={14} />}>
+              <TableSection
+                title="Attachments"
+                icon={<Paperclip size={14} />}
+                defaultCollapsed
+              >
                 <div className="w-full flex flex-col gap-[2px] mb-4">
                   <div className="h-[2px] w-full bg-red-600 rounded-full" />
                   <div className="h-[1px] w-full bg-black/10" />
@@ -1253,7 +1257,11 @@ export default function AdjustmentsForm({
                 )}
               </TableSection>
 
-              <TableSection title="Remarks" icon={<FileText size={14} />}>
+              <TableSection
+                title="Remarks"
+                icon={<FileText size={14} />}
+                defaultCollapsed
+              >
                 <textarea
                   disabled={isViewMode}
                   className={`w-full min-h-[100px] mt-4 p-4 rounded-xl text-[14px] font-bold outline-none ${
@@ -1301,7 +1309,7 @@ export default function AdjustmentsForm({
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
-function TableSection({ title, icon, children }) {
+function TableSection({ title, icon, children, defaultCollapsed = false }) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   return (

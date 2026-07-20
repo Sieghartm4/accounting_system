@@ -25,6 +25,7 @@ import Payments from './pages/payments/Payments'
 import Customer from './pages/customers/Customer'
 import CustomerTransactions from './pages/customers/CustomerTransactions'
 import Vat from './pages/vat/Vat'
+import ResponsibilityCenter from './pages/responsibility_center/ResponsibilityCenter'
 import WithholdingTax from './pages/withholding_tax/WithholdingTax'
 import Adjustments from './pages/adjustments/Adjustments'
 import TrialBalance from './pages/reports/TrialBalance'
@@ -199,6 +200,14 @@ function App() {
             element={
               <ProtectedRoute routeName="vat">
                 <Vat />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="responsibility_center"
+            element={
+              <ProtectedRoute routeName="responsibility_center">
+                <ResponsibilityCenter />
               </ProtectedRoute>
             }
           />

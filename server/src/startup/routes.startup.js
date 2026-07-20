@@ -42,6 +42,10 @@ const { proformaEntriesRouter } = require('../routes/proforma_entries.routes')
 
 const { vatRouter } = require('../routes/vat.routes')
 
+const {
+  responsibilityCenterRouter,
+} = require('../routes/responsibility_center.routes')
+
 const { withholdingTaxRouter } = require('../routes/withholding_tax.routes')
 
 const { adjustmentsRouter } = require('../routes/adjustments.routes')
@@ -98,6 +102,8 @@ const initRoutes = (app) => {
   app.use('/proforma_entries', proformaEntriesRouter)
 
   app.use('/vat', vatRouter)
+
+  app.use('/responsibility_center', responsibilityCenterRouter)
 
   app.use('/withholding_tax', withholdingTaxRouter)
 

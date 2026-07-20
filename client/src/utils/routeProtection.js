@@ -378,6 +378,11 @@ export const ROUTE_CONFIG = {
   },
   company: { name: 'company', label: 'Company Management', icon: 'Building' },
   vat: { name: 'vat', label: 'VAT Management', icon: 'Percent' },
+  responsibility_center: {
+    name: 'responsibility_center',
+    label: 'Responsibility Center',
+    icon: 'MapPin',
+  },
   witholding_tax: {
     name: 'witholding_tax',
     label: 'Withholding Tax',
@@ -482,6 +487,7 @@ export const getSidebarItems = (user) => {
     'product_service',
     'company',
     'vat',
+    'responsibility_center',
     'witholding_tax',
   ]
 

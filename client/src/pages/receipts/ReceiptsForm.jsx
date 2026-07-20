@@ -17,6 +17,7 @@ import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
 import { useReceiptsForm, useDragToScroll, fmt } from './useReceipts'
+import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
@@ -315,6 +316,18 @@ export default function ReceiptsForm({
     createCustomer,
     createProduct,
   } = useReceiptsForm({ isViewMode, isEditMode, receiptData, onBack, onSuccess })
+
+  const {
+    responsibilityCenters,
+    loading: responsibilityCentersLoading,
+    error: responsibilityCentersError,
+  } = useResponsibilityCenter()
+
+  const responsibilityCenterOptions = responsibilityCenters.map((center) => ({
+    label: center.name || '',
+    sublabel: center.department || '',
+    value: center.name || '',
+  }))
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
   const [customerCreateLoading, setCustomerCreateLoading] = useState(false)
@@ -1074,17 +1087,25 @@ export default function ReceiptsForm({
                             )}
                           </td>
                           <td className="py-1 px-1">
-                            <input
+                            <SearchableDropdown
                               disabled={isDisabled}
-                              className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               placeholder="Select"
                               value={item.responsibilityCenter}
-                              onChange={(e) =>
+                              onChange={(v) =>
+                                updateReceiptItem(item.id, 'responsibilityCenter', v)
+                              }
+                              onSelect={(opt) =>
                                 updateReceiptItem(
                                   item.id,
                                   'responsibilityCenter',
-                                  e.target.value,
+                                  opt.value,
                                 )
+                              }
+                              options={responsibilityCenterOptions}
+                              inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              emptyText={
+                                responsibilityCentersError ||
+                                'No responsibility centers found'
                               }
                             />
                           </td>
@@ -1186,17 +1207,17 @@ export default function ReceiptsForm({
                               disabled={isDisabled}
                               className={`${tableInput + ' font-black'} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                               placeholder="0.00"
-                              type="number"
-                              value={entry.debit || ''}
-                              onChange={(e) =>
+                              type="text"
+                              inputMode="decimal"
+                              value={formatPriceDisplay(entry.debit ?? '')}
+                              onChange={(e) => {
+                                const parsed = parsePriceInput(e.target.value)
                                 updateJournalEntry(
                                   entry.id,
                                   'debit',
-                                  e.target.value === ''
-                                    ? ''
-                                    : parseFloat(e.target.value) || 0,
+                                  parsed === '' ? '' : parseFloat(parsed) || 0,
                                 )
-                              }
+                              }}
                             />
                           </td>
                           <td className="py-1.5 px-1">
@@ -1204,17 +1225,17 @@ export default function ReceiptsForm({
                               disabled={isDisabled}
                               className={`${tableInput + ' font-black text-red-600'} ${isDisabled ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
                               placeholder="0.00"
-                              type="number"
-                              value={entry.credit || ''}
-                              onChange={(e) =>
+                              type="text"
+                              inputMode="decimal"
+                              value={formatPriceDisplay(entry.credit ?? '')}
+                              onChange={(e) => {
+                                const parsed = parsePriceInput(e.target.value)
                                 updateJournalEntry(
                                   entry.id,
                                   'credit',
-                                  e.target.value === ''
-                                    ? ''
-                                    : parseFloat(e.target.value) || 0,
+                                  parsed === '' ? '' : parseFloat(parsed) || 0,
                                 )
-                              }
+                              }}
                             />
                           </td>
                           <td className="py-1.5 px-1">
@@ -1300,7 +1321,11 @@ export default function ReceiptsForm({
 
               {/* 3. ATTACHMENTS & REMARKS */}
               <div className="grid grid-cols-1 gap-4">
-                <TableSection title="Attachments" icon={<Paperclip size={14} />}>
+                <TableSection
+                  title="Attachments"
+                  icon={<Paperclip size={14} />}
+                  defaultCollapsed
+                >
                   <div className="w-full flex flex-col gap-[2px] mb-4">
                     <div className="h-[2px] w-full bg-red-600 rounded-full" />
                     <div className="h-[1px] w-full bg-black/10" />
@@ -1475,7 +1500,11 @@ export default function ReceiptsForm({
                   )}
                 </TableSection>
 
-                <TableSection title="Remarks" icon={<FileText size={14} />}>
+                <TableSection
+                  title="Remarks"
+                  icon={<FileText size={14} />}
+                  defaultCollapsed
+                >
                   <textarea
                     disabled={isDisabled}
                     className={`w-full min-h-[100px] mt-4 p-4 rounded-xl text-[14px] font-bold outline-none ${isDisabled ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed resize-none' : 'bg-gray-50 border-none focus:ring-1 focus:ring-red-500'}`}
@@ -1836,8 +1865,8 @@ export default function ReceiptsForm({
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
-function TableSection({ title, icon, children }) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+function TableSection({ title, icon, children, defaultCollapsed = false }) {
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between p-4">
