@@ -19,8 +19,12 @@ module.exports = {
         onDelete: 'CASCADE',
       },
       ci_purchase_id: {
-        type: Sequelize.STRING(30),
+        type: Sequelize.INTEGER,
         allowNull: true,
+        references: {
+          model: 'purchase_items',
+          key: 'pi_id',
+        },
       },
       ci_amount: {
         type: Sequelize.NUMERIC,
