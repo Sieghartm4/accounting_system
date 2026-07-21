@@ -19,6 +19,11 @@ module.exports = {
         mra_name: 'responsibility_center',
         mra_status: 'Full Access',
       },
+      {
+        mra_access_id: 4,
+        mra_name: 'responsibility_center',
+        mra_status: 'Full Access',
+      },
     ]
 
     await queryInterface.bulkInsert('master_route_access', seedData, {})
@@ -30,7 +35,7 @@ module.exports = {
       {
         mra_name: 'responsibility_center',
         mra_access_id: {
-          [Sequelize.Op.in]: [1, 2, 3],
+          [Sequelize.Op.in]: [1, 2, 3, 4],
         },
       },
       {},
