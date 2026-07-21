@@ -357,7 +357,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.masters?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
                 Internal Systems
               </p>
             )}
@@ -436,7 +436,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.partners?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
                 Partners
               </p>
             )}
@@ -497,7 +497,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.receipts?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
                 Financial Operations
               </p>
             )}
@@ -560,7 +560,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.sales?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
                 Revenue Management
               </p>
             )}
@@ -625,7 +625,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.purchase?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
                 Procurement & Treasury
               </p>
             )}
@@ -694,7 +694,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.adjustments?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
                 Adjustments
               </p>
             )}
@@ -759,7 +759,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.reports?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
                 Reports
               </p>
             )}
@@ -830,7 +830,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.settings?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
                 System
               </p>
             )}

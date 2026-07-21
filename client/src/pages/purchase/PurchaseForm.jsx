@@ -2957,17 +2957,21 @@ export default function PurchaseForm({
                             />
                           </td>
                           <td className="py-1.5 px-1">
-                            <input
+                            <SearchableDropdown
                               disabled={isViewMode}
-                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              placeholder="Center..."
+                              placeholder="Select"
                               value={entry.center}
-                              onChange={(e) =>
-                                updateJournalEntry(
-                                  entry.id,
-                                  'center',
-                                  e.target.value,
-                                )
+                              onChange={(v) =>
+                                updateJournalEntry(entry.id, 'center', v)
+                              }
+                              onSelect={(opt) =>
+                                updateJournalEntry(entry.id, 'center', opt.value)
+                              }
+                              options={responsibilityCenterOptions}
+                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              emptyText={
+                                responsibilityCentersError ||
+                                'No responsibility centers found'
                               }
                             />
                           </td>
@@ -3012,7 +3016,6 @@ export default function PurchaseForm({
                             ),
                           )}
                         </td>
-                        <td />
                         <td />
                         <td />
                       </tr>

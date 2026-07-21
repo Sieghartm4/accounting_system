@@ -76,6 +76,7 @@ const getAuditTrail = async (req, res, next) => {
       count: auditTrails.length,
       limit: parseInt(limit),
       offset: parseInt(offset),
+      hasMore: auditTrails.length === parseInt(limit),
       timestamp: new Date().toISOString(),
     })
   } catch (error) {

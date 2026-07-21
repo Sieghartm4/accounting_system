@@ -420,7 +420,7 @@ function AdjustmentsContent() {
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
                 <FilePlus size={14} />
-                New Receipt
+                New Adjustment
               </button>
             </ProtectedAction>
           </div>

@@ -1525,17 +1525,29 @@ export default function SalesForm({
                             />
                           </td>
                           <td className="py-1.5 px-1">
-                            <input
+                            <SearchableDropdown
                               disabled={isViewMode}
-                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              placeholder="Center..."
+                              placeholder="Select"
                               value={entry.center}
-                              onChange={(e) =>
+                              onChange={(v) =>
+                                form.updateJournalEntry(entry.id, 'center', v)
+                              }
+                              onSelect={(opt) =>
                                 form.updateJournalEntry(
                                   entry.id,
                                   'center',
-                                  e.target.value,
+                                  opt.value,
                                 )
+                              }
+                              options={
+                                form.responsibilityCenterOptions ||
+                                responsibilityCenterOptions
+                              }
+                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              emptyText={
+                                form.responsibilityCentersError ||
+                                responsibilityCentersError ||
+                                'No responsibility centers found'
                               }
                             />
                           </td>

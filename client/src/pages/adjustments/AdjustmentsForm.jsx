@@ -11,10 +11,12 @@ import {
   Layers,
   Landmark,
   Calculator,
+  Search,
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import * as XLSX from 'xlsx'
 import DynamicToast from '../../components/DynamicToast'
+import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
@@ -229,6 +231,20 @@ export default function AdjustmentsForm({
 
   // ── Remote data ──────────────────────────────────────────────────────────
   const [chartsOfAccounts, setChartsOfAccounts] = useState([])
+
+  const {
+    responsibilityCenters,
+    loading: responsibilityCentersLoading,
+    error: responsibilityCentersError,
+  } = useResponsibilityCenter()
+
+  const responsibilityCenterOptions = responsibilityCenters.map((center) => ({
+    label: center.name || '',
+    sublabel: center.department || '',
+    value: center.name || '',
+  }))
+
+  const [bulkResponsibilityCenter, setBulkResponsibilityCenter] = useState('')
 
   // ── Payment / header fields ───────────────────────────────────────────────
   const [documentReference, setDocumentReference] = useState('')
@@ -908,7 +924,37 @@ export default function AdjustmentsForm({
         <main className="flex-1 overflow-y-auto custom-table-scroller space-y-4 pr-1 min-h-0">
           <div className="space-y-4">
             {/* 1. JOURNAL ENTRIES */}
-            <TableSection title="Journal Entries" icon={<Layers size={14} />}>
+            <TableSection
+              title="Journal Entries"
+              icon={<Layers size={14} />}
+              extraContent={
+                !isViewMode && (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-red-400 pointer-events-none" />
+                    <div className="pl-8">
+                      <SearchableDropdown
+                        placeholder="Responsibility Center to All"
+                        value={bulkResponsibilityCenter}
+                        onChange={setBulkResponsibilityCenter}
+                        onSelect={(opt) => {
+                          setBulkResponsibilityCenter(opt.value)
+                          journalEntries.forEach((entry) =>
+                            updateJournalEntry(entry.id, 'center', opt.value),
+                          )
+                        }}
+                        options={responsibilityCenterOptions}
+                        inputClassName="w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all bg-white border border-red-300 text-black focus:ring-1 focus:ring-red-500"
+                        emptyText={
+                          responsibilityCentersError ||
+                          'No responsibility centers found'
+                        }
+                        disabled={isViewMode}
+                      />
+                    </div>
+                  </div>
+                )
+              }
+            >
               <div className="w-full flex flex-col gap-[2px] mb-4">
                 <div className="h-[2px] w-full bg-red-600 rounded-full" />
                 <div className="h-[1px] w-full bg-black/10" />
@@ -1024,17 +1070,25 @@ export default function AdjustmentsForm({
                             />
                           </td>
                           <td className="py-1.5 px-1">
-                            <input
+                            <SearchableDropdown
                               disabled={isViewMode}
-                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              placeholder="Center..."
+                              placeholder="Select"
                               value={entry.center}
-                              onChange={(e) =>
+                              onChange={(v) =>
+                                updateJournalEntry(entry.id, 'center', v)
+                              }
+                              onSelect={(opt) =>
                                 updateJournalEntry(
                                   entry.id,
                                   'center',
-                                  e.target.value,
+                                  opt.value,
                                 )
+                              }
+                              options={responsibilityCenterOptions}
+                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                              emptyText={
+                                responsibilityCentersError ||
+                                'No responsibility centers found'
                               }
                             />
                           </td>
@@ -1309,7 +1363,7 @@ export default function AdjustmentsForm({
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
-function TableSection({ title, icon, children, defaultCollapsed = false }) {
+function TableSection({ title, icon, children, defaultCollapsed = false, extraContent }) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   return (
@@ -1321,22 +1375,25 @@ function TableSection({ title, icon, children, defaultCollapsed = false }) {
             {title}
           </h2>
         </div>
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
-        >
-          {isCollapsed ? (
-            <>
-              <Plus size={16} />
-              <span className="text-[11px] font-black uppercase">Show</span>
-            </>
-          ) : (
-            <>
-              <Minus size={16} />
-              <span className="text-[11px] font-black uppercase">Hide</span>
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          {extraContent}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+          >
+            {isCollapsed ? (
+              <>
+                <Plus size={16} />
+                <span className="text-[11px] font-black uppercase">Show</span>
+              </>
+            ) : (
+              <>
+                <Minus size={16} />
+                <span className="text-[11px] font-black uppercase">Hide</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {!isCollapsed && <div className="px-4 pb-4">{children}</div>}

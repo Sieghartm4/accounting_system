@@ -16,6 +16,7 @@ import {
 import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
+import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
@@ -312,6 +313,18 @@ export default function CollectionsForm({
   const [customerSearch, setCustomerSearch] = useState('')
 
   const [chartsOfAccounts, setChartsOfAccounts] = useState([])
+
+  const {
+    responsibilityCenters,
+    loading: responsibilityCentersLoading,
+    error: responsibilityCentersError,
+  } = useResponsibilityCenter()
+
+  const responsibilityCenterOptions = responsibilityCenters.map((center) => ({
+    label: center.name || '',
+    sublabel: center.department || '',
+    value: center.name || '',
+  }))
 
   // ── Payment / header fields ───────────────────────────────────────────────
   const [modeOfPayment, setModeOfPayment] = useState('')
@@ -1735,20 +1748,6 @@ export default function CollectionsForm({
                   <div className="h-[1px] w-full bg-black/10" />
                 </div>
 
-                {/* <div className="mb-3 grid grid-cols-2 gap-2">
-                {[
-                  { label: 'CR  Accounts Receivable', sub: 'Gross + VAT — closes the AR',      color: 'bg-red-50 border-red-100 text-red-600'       },
-                  { label: 'DR  Sales Discounts',      sub: 'Discount given on collection',     color: 'bg-orange-50 border-orange-100 text-orange-600' },
-                  { label: 'DR  Creditable WHT',       sub: 'Tax withheld by customer (asset)', color: 'bg-blue-50 border-blue-100 text-blue-600'      },
-                  { label: 'DR  Cash / Bank',          sub: 'Actual cash received',             color: 'bg-green-50 border-green-100 text-green-600'   },
-                ].map((leg, i) => (
-                  <div key={i} className={`px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase ${leg.color}`}>
-                    {leg.label}<br />
-                    <span className="opacity-70 normal-case font-semibold">{leg.sub}</span>
-                  </div>
-                ))}
-              </div> */}
-
                 <div className="overflow-x-auto custom-table-scroller">
                   <table
                     className="w-full text-center"
@@ -1853,17 +1852,25 @@ export default function CollectionsForm({
                               />
                             </td>
                             <td className="py-1.5 px-1">
-                              <input
+                              <SearchableDropdown
                                 disabled={isViewMode}
-                                className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                placeholder="Center..."
+                                placeholder="Select"
                                 value={entry.center}
-                                onChange={(e) =>
+                                onChange={(v) =>
+                                  updateJournalEntry(entry.id, 'center', v)
+                                }
+                                onSelect={(opt) =>
                                   updateJournalEntry(
                                     entry.id,
                                     'center',
-                                    e.target.value,
+                                    opt.value,
                                   )
+                                }
+                                options={responsibilityCenterOptions}
+                                inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                emptyText={
+                                  responsibilityCentersError ||
+                                  'No responsibility centers found'
                                 }
                               />
                             </td>

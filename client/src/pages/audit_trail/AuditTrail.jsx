@@ -7,7 +7,7 @@ import RouteProtection from '../../components/RouteProtection'
 import useAuditTrail from './useAuditTrail'
 
 function AuditTrailContent() {
-  const { auditTrails, loading, error, refetch } = useAuditTrail()
+  const { auditTrails, loading, loadingMore, error, hasMore, refetch, loadMore } = useAuditTrail()
   const [toast, setToast] = useState(null)
 
   const fadeInUp = {
@@ -131,6 +131,10 @@ function AuditTrailContent() {
               },
             },
           ]}
+          enableInfiniteScroll={true}
+          hasMore={hasMore}
+          isLoadingMore={loadingMore}
+          onLoadMore={() => loadMore()}
         />
       </motion.div>
 

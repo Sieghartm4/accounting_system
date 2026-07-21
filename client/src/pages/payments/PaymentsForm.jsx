@@ -16,6 +16,7 @@ import {
 import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
+import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
@@ -374,6 +375,18 @@ export default function PaymentsForm({
   const [vendorSearch, setVendorSearch] = useState('')
 
   const [chartsOfAccounts, setChartsOfAccounts] = useState([])
+
+  const {
+    responsibilityCenters,
+    loading: responsibilityCentersLoading,
+    error: responsibilityCentersError,
+  } = useResponsibilityCenter()
+
+  const responsibilityCenterOptions = responsibilityCenters.map((center) => ({
+    label: center.name || '',
+    sublabel: center.department || '',
+    value: center.name || '',
+  }))
 
   // ── Payment / header fields ───────────────────────────────────────────────
   const [modeOfPayment, setModeOfPayment] = useState('')
@@ -1085,24 +1098,23 @@ export default function PaymentsForm({
   useEffect(() => {
     // Auto-generate journal entries logic:
     // 1. Never in view mode
-    // 2. Only when there are no manual entries (preserve user's manual work)
-    // 3. In create mode: always auto-generate if no manual entries
-    // 4. In edit mode: NEVER auto-generate if we're loading existing payment data
-    const hasManualEntries = journalEntries.some((entry) => entry.isManual)
+    // 2. In create mode: always auto-generate when paymentItems or modeOfPayment changes
+    // 3. In edit mode: NEVER auto-generate if we're loading existing payment data
+    // 4. Auto-generation will replace all entries (both manual and auto) to maintain consistency
 
     console.log(
       'DEBUG: useEffect running - isEditMode:',
       isEditMode,
-      'journalEntries.length:',
-      journalEntries.length,
-      'hasManualEntries:',
-      hasManualEntries,
+      'paymentItems.length:',
+      paymentItems.length,
+      'modeOfPayment:',
+      modeOfPayment,
       'isLoadingData:',
       isLoadingData.current,
     )
 
-    if (!isViewMode && !hasManualEntries && !isLoadingData.current) {
-      // In create mode, always auto-generate
+    if (!isViewMode && !isLoadingData.current) {
+      // In create mode, always auto-generate when paymentItems or modeOfPayment changes
       if (!isEditMode) {
         console.log('DEBUG: Auto-generating in create mode')
         generateJournalEntries()
@@ -1126,8 +1138,6 @@ export default function PaymentsForm({
       console.log(
         'DEBUG: NOT auto-generating - isViewMode:',
         isViewMode,
-        'hasManualEntries:',
-        hasManualEntries,
         'isLoadingData:',
         isLoadingData.current,
       )
@@ -2110,17 +2120,25 @@ export default function PaymentsForm({
                               />
                             </td>
                             <td className="py-1.5 px-1">
-                              <input
+                              <SearchableDropdown
                                 disabled={isViewMode}
-                                className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                placeholder="Center..."
+                                placeholder="Select"
                                 value={entry.center}
-                                onChange={(e) =>
+                                onChange={(v) =>
+                                  updateJournalEntry(entry.id, 'center', v)
+                                }
+                                onSelect={(opt) =>
                                   updateJournalEntry(
                                     entry.id,
                                     'center',
-                                    e.target.value,
+                                    opt.value,
                                   )
+                                }
+                                options={responsibilityCenterOptions}
+                                inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                emptyText={
+                                  responsibilityCentersError ||
+                                  'No responsibility centers found'
                                 }
                               />
                             </td>
