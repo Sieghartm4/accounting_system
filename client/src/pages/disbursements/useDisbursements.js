@@ -1,4 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import {
+  getItemResponsibilityCenter,
+  getJournalEntryCenter,
+} from '../../utils/responsibilityCenterDefaults'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drag to Scroll Hook
@@ -742,6 +746,7 @@ export function useDisbursementForm({
     isOther = false,
     defaultVatOpt = null,
     defaultWhtOpt = null,
+    defaultResponsibilityCenter = '',
   ) => {
     if (vatOptions.length === 0 && !vatLoading) {
       loadVatOnDemand()
@@ -770,7 +775,7 @@ export function useDisbursementForm({
         wht: '',
         whtSearch: '',
         whtRate: 0,
-        responsibilityCenter: '',
+        responsibilityCenter: defaultResponsibilityCenter || '',
         isOther,
         isNew: true,
       },
@@ -785,14 +790,14 @@ export function useDisbursementForm({
     )
 
   // ── Journal Entries CRUD ──
-  const addJournalEntry = () =>
+  const addJournalEntry = (defaultResponsibilityCenter = '') =>
     setJournalEntries((prev) => [
       ...prev,
       {
         id: Date.now(),
         account: '',
         accountSearch: '',
-        center: '',
+        center: defaultResponsibilityCenter || '',
         debit: 0,
         credit: 0,
         isManual: true,
@@ -838,141 +843,147 @@ export function useDisbursementForm({
   const hasNewDisbursementItems = () => disbursementItems.some((item) => item.isNew)
 
   // ── Journal Auto-generation ──
-  const generateJournalEntries = useCallback(() => {
-    const entries = []
+  const generateJournalEntries = useCallback(
+    (defaultResponsibilityCenter = '') => {
+      const entries = []
 
-    let paymentAccount = null
-    if (modeOfPayment === 'CASH') {
-      paymentAccount =
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('cash on hand'),
-        ) ||
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('petty cash'),
-        )
-    } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
-      paymentAccount =
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes(bankName.toLowerCase()),
-        ) ||
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('cash in bank'),
-        )
-    }
-
-    disbursementItems.forEach((item) => {
-      const qty = parseFloat(item.qty) || 0
-      const price = parseFloat(item.price) || 0
-      const discountValue = parseFloat(item.discount) || 0
-      const discountType = item.discountType || 'PERCENT'
-      const vatPct = parseFloat(item.vatRate) || 0
-      const whtPct = parseFloat(item.whtRate) || 0
-      const gross = qty * price
-      const discountAmount =
-        discountType === 'PERCENT'
-          ? gross * (discountValue / 100)
-          : discountValue * qty
-      const discountedAmount = gross - discountAmount
-      const vatAmount = discountedAmount * (vatPct / 100)
-      const whtAmount = discountedAmount * (whtPct / 100)
-
-      const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
-      if (selectedCoa && gross > 0) {
-        entries.push({
-          id: Date.now() + Math.random(),
-          account: selectedCoa.id,
-          accountSearch: selectedCoa.name,
-          center: item.responsibilityCenter || '',
-          debit: parseFloat(gross.toFixed(2)),
-          credit: 0,
-          isManual: false,
-        })
+      let paymentAccount = null
+      if (modeOfPayment === 'CASH') {
+        paymentAccount =
+          chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('cash on hand'),
+          ) ||
+          chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('petty cash'),
+          )
+      } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
+        paymentAccount =
+          chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes(bankName.toLowerCase()),
+          ) ||
+          chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('cash in bank'),
+          )
       }
 
-      if (vatAmount > 0) {
-        const inputVatAccount = chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('input vat'),
-        )
-        if (inputVatAccount) {
+      disbursementItems.forEach((item) => {
+        const qty = parseFloat(item.qty) || 0
+        const price = parseFloat(item.price) || 0
+        const discountValue = parseFloat(item.discount) || 0
+        const discountType = item.discountType || 'PERCENT'
+        const vatPct = parseFloat(item.vatRate) || 0
+        const whtPct = parseFloat(item.whtRate) || 0
+        const gross = qty * price
+        const discountAmount =
+          discountType === 'PERCENT'
+            ? gross * (discountValue / 100)
+            : discountValue * qty
+        const discountedAmount = gross - discountAmount
+        const vatAmount = discountedAmount * (vatPct / 100)
+        const whtAmount = discountedAmount * (whtPct / 100)
+
+        const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
+        if (selectedCoa && gross > 0) {
           entries.push({
             id: Date.now() + Math.random(),
-            account: inputVatAccount.id,
-            accountSearch: inputVatAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: parseFloat(vatAmount.toFixed(2)),
+            account: selectedCoa.id,
+            accountSearch: selectedCoa.name,
+            center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
+            debit: parseFloat(gross.toFixed(2)),
             credit: 0,
             isManual: false,
           })
         }
-      }
 
-      if (whtAmount > 0) {
-        const whtAccount = chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('withholding tax - expanded'),
-        )
-        if (whtAccount) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: whtAccount.id,
-            accountSearch: whtAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: 0,
-            credit: parseFloat(whtAmount.toFixed(2)),
-            isManual: false,
-          })
+        if (vatAmount > 0) {
+          const inputVatAccount = chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('input vat'),
+          )
+          if (inputVatAccount) {
+            entries.push({
+              id: Date.now() + Math.random(),
+              account: inputVatAccount.id,
+              accountSearch: inputVatAccount.name,
+              center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
+              debit: parseFloat(vatAmount.toFixed(2)),
+              credit: 0,
+              isManual: false,
+            })
+          }
         }
-      }
 
-      if (discountAmount > 0) {
-        const discountAccount = chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('purchase discounts'),
-        )
-        if (discountAccount) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: discountAccount.id,
-            accountSearch: discountAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: 0,
-            credit: parseFloat(discountAmount.toFixed(2)),
-            isManual: false,
-          })
+        if (whtAmount > 0) {
+          const whtAccount = chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('withholding tax - expanded'),
+          )
+          if (whtAccount) {
+            entries.push({
+              id: Date.now() + Math.random(),
+              account: whtAccount.id,
+              accountSearch: whtAccount.name,
+              center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
+              debit: 0,
+              credit: parseFloat(whtAmount.toFixed(2)),
+              isManual: false,
+            })
+          }
         }
-      }
-    })
 
-    const totalCashPaid = disbursementItems.reduce((sum, item) => {
-      const qty = parseFloat(item.qty) || 0
-      const price = parseFloat(item.price) || 0
-      const discountValue = parseFloat(item.discount) || 0
-      const discountType = item.discountType || 'PERCENT'
-      const vatPct = parseFloat(item.vatRate) || 0
-      const whtPct = parseFloat(item.whtRate) || 0
-      const gross = qty * price
-      const discountAmount =
-        discountType === 'PERCENT'
-          ? gross * (discountValue / 100)
-          : discountValue * qty
-      const discountedAmount = gross - discountAmount
-      const vatAmount = discountedAmount * (vatPct / 100)
-      const whtAmount = discountedAmount * (whtPct / 100)
-      return sum + (discountedAmount + vatAmount - whtAmount)
-    }, 0)
-
-    if (paymentAccount && totalCashPaid > 0) {
-      entries.push({
-        id: Date.now() + Math.random(),
-        account: paymentAccount.id,
-        accountSearch: paymentAccount.name,
-        center: '',
-        debit: 0,
-        credit: parseFloat(totalCashPaid.toFixed(2)),
-        isManual: false,
+        if (discountAmount > 0) {
+          const discountAccount = chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('purchase discounts'),
+          )
+          if (discountAccount) {
+            entries.push({
+              id: Date.now() + Math.random(),
+              account: discountAccount.id,
+              accountSearch: discountAccount.name,
+              center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
+              debit: 0,
+              credit: parseFloat(discountAmount.toFixed(2)),
+              isManual: false,
+            })
+          }
+        }
       })
-    }
 
-    setJournalEntries(entries)
-  }, [disbursementItems, modeOfPayment, bankName, chartsOfAccounts])
+      const totalCashPaid = disbursementItems.reduce((sum, item) => {
+        const qty = parseFloat(item.qty) || 0
+        const price = parseFloat(item.price) || 0
+        const discountValue = parseFloat(item.discount) || 0
+        const discountType = item.discountType || 'PERCENT'
+        const vatPct = parseFloat(item.vatRate) || 0
+        const whtPct = parseFloat(item.whtRate) || 0
+        const gross = qty * price
+        const discountAmount =
+          discountType === 'PERCENT'
+            ? gross * (discountValue / 100)
+            : discountValue * qty
+        const discountedAmount = gross - discountAmount
+        const vatAmount = discountedAmount * (vatPct / 100)
+        const whtAmount = discountedAmount * (whtPct / 100)
+        return sum + (discountedAmount + vatAmount - whtAmount)
+      }, 0)
+
+      if (paymentAccount && totalCashPaid > 0) {
+        entries.push({
+          id: Date.now() + Math.random(),
+          account: paymentAccount.id,
+          accountSearch: paymentAccount.name,
+          center: getItemResponsibilityCenter(
+            disbursementItems[0],
+            defaultResponsibilityCenter,
+          ),
+          debit: 0,
+          credit: parseFloat(totalCashPaid.toFixed(2)),
+          isManual: false,
+        })
+      }
+
+      setJournalEntries(entries)
+    },
+    [disbursementItems, modeOfPayment, bankName, chartsOfAccounts],
+  )
 
   useEffect(() => {
     if (!isViewMode) {

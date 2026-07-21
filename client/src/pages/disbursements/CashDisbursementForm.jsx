@@ -12,6 +12,7 @@ import {
   Layers,
   Landmark,
   Minus,
+  Search,
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
@@ -335,6 +336,8 @@ export default function CashDisbursementForm({
     sublabel: center.department || '',
     value: center.name || '',
   }))
+
+  const [bulkResponsibilityCenter, setBulkResponsibilityCenter] = useState('')
 
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false)
   const [vendorCreateLoading, setVendorCreateLoading] = useState(false)
@@ -812,7 +815,44 @@ export default function CashDisbursementForm({
               className="space-y-4"
             >
               {/* 1. DISBURSEMENT ITEMS */}
-              <TableSection title="Disbursement Items" icon={<Wallet size={14} />}>
+              <TableSection
+                title="Disbursement Items"
+                icon={<Wallet size={14} />}
+                headerActions={
+                  <div className="w-full">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-red-400 pointer-events-none" />
+                      <div className="pl-8">
+                        <SearchableDropdown
+                          placeholder="Responsibility Center to All"
+                          value={bulkResponsibilityCenter}
+                          onChange={setBulkResponsibilityCenter}
+                          onSelect={(opt) => {
+                            setBulkResponsibilityCenter(opt.value)
+                            disbursementItems.forEach((item) =>
+                              updateDisbursementItem(
+                                item.id,
+                                'responsibilityCenter',
+                                opt.value,
+                              ),
+                            )
+                            journalEntries.forEach((entry) =>
+                              updateJournalEntry(entry.id, 'center', opt.value),
+                            )
+                          }}
+                          options={responsibilityCenterOptions}
+                          inputClassName="w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all bg-white border border-red-300 text-black focus:ring-1 focus:ring-red-500"
+                          emptyText={
+                            responsibilityCentersError ||
+                            'No responsibility centers found'
+                          }
+                          disabled={isViewMode}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                }
+              >
                 <div className="w-full flex flex-col gap-[2px] mb-3">
                   <div className="h-[2px] w-full bg-red-600 rounded-full" />
                   <div className="h-[1px] w-full bg-black/10" />
@@ -1162,7 +1202,12 @@ export default function CashDisbursementForm({
                       onClick={() => {
                         const defaultVat = findDefaultVatOption(vatOptions)
                         const defaultWht = findDefaultWhtOption(whtOptions)
-                        addDisbursementItem(false, defaultVat, defaultWht)
+                        addDisbursementItem(
+                          false,
+                          defaultVat,
+                          defaultWht,
+                          bulkResponsibilityCenter,
+                        )
                       }}
                       className="flex-1 py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-2"
                     >
@@ -1172,7 +1217,12 @@ export default function CashDisbursementForm({
                       onClick={() => {
                         const defaultVat = findDefaultVatOption(vatOptions)
                         const defaultWht = findDefaultWhtOption(whtOptions)
-                        addDisbursementItem(true, defaultVat, defaultWht)
+                        addDisbursementItem(
+                          true,
+                          defaultVat,
+                          defaultWht,
+                          bulkResponsibilityCenter,
+                        )
                       }}
                       className="flex-1 py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-black text-black transition-all duration-300 hover:bg-gray-100 hover:border-gray-600 border-gray-400 hover:-translate-y-1 hover:shadow-lg hover:shadow-black/5 flex items-center justify-center gap-2"
                     >
@@ -1339,7 +1389,7 @@ export default function CashDisbursementForm({
                 {!isViewMode && (
                   <div className="flex gap-2 mt-3">
                     <button
-                      onClick={addJournalEntry}
+                      onClick={() => addJournalEntry(bulkResponsibilityCenter)}
                       className="flex-1 py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-2"
                     >
                       <Plus size={14} /> ADD Ledger Row
@@ -1857,34 +1907,45 @@ export default function CashDisbursementForm({
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
-function TableSection({ title, icon, children, defaultCollapsed = false }) {
+function TableSection({
+  title,
+  icon,
+  children,
+  defaultCollapsed = false,
+  headerActions = null,
+}) {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 p-4">
+        <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">{icon}</div>
           <h2 className="text-[15px] font-black uppercase tracking-[1px] text-black">
             {title}
           </h2>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsCollapsed((v) => !v)}
-          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
-        >
-          {isCollapsed ? (
-            <>
-              <Plus size={16} />
-              <span className="text-[11px] font-black uppercase">Show</span>
-            </>
-          ) : (
-            <>
-              <Minus size={16} />
-              <span className="text-[11px] font-black uppercase">Hide</span>
-            </>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {headerActions && (
+            <div className="w-[220px] sm:w-[260px]">{headerActions}</div>
           )}
-        </button>
+          <button
+            type="button"
+            onClick={() => setIsCollapsed((v) => !v)}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+          >
+            {isCollapsed ? (
+              <>
+                <Plus size={16} />
+                <span className="text-[11px] font-black uppercase">Show</span>
+              </>
+            ) : (
+              <>
+                <Minus size={16} />
+                <span className="text-[11px] font-black uppercase">Hide</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
       {!isCollapsed && <div className="px-4 pb-4">{children}</div>}
     </div>

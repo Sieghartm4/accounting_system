@@ -12,11 +12,13 @@ import {
   Layers,
   Landmark,
   Minus,
+  Search,
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
+import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDefaults'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drag to Scroll Hook
@@ -395,34 +397,45 @@ const parsePriceInput = (input) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
-function TableSection({ title, icon, children, defaultCollapsed = false }) {
+function TableSection({
+  title,
+  icon,
+  children,
+  defaultCollapsed = false,
+  headerActions = null,
+}) {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 p-4">
+        <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">{icon}</div>
           <h2 className="text-[15px] font-black uppercase tracking-[1px] text-black">
             {title}
           </h2>
         </div>
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
-        >
-          {isCollapsed ? (
-            <>
-              <Plus size={16} />
-              <span className="text-[11px] font-black uppercase">Show</span>
-            </>
-          ) : (
-            <>
-              <Minus size={16} />
-              <span className="text-[11px] font-black uppercase">Hide</span>
-            </>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {headerActions && (
+            <div className="w-[220px] sm:w-[260px]">{headerActions}</div>
           )}
-        </button>
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+          >
+            {isCollapsed ? (
+              <>
+                <Plus size={16} />
+                <span className="text-[11px] font-black uppercase">Show</span>
+              </>
+            ) : (
+              <>
+                <Minus size={16} />
+                <span className="text-[11px] font-black uppercase">Hide</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {!isCollapsed && <div className="px-4 pb-4">{children}</div>}
@@ -519,6 +532,8 @@ export default function PurchaseForm({
     sublabel: center.department || '',
     value: center.name || '',
   }))
+
+  const [bulkResponsibilityCenter, setBulkResponsibilityCenter] = useState('')
 
   const [journalEntries, setJournalEntries] = useState([
     { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 },
@@ -1307,7 +1322,7 @@ export default function PurchaseForm({
     }
   }, [purchaseItems, products, chartsOfAccounts])
 
-  const addPurchaseItem = (isOther = false) => {
+  const addPurchaseItem = (isOther = false, defaultResponsibilityCenter = '') => {
     if (vatOptions.length === 0 && !vatLoading) {
       loadVatOnDemand()
     }
@@ -1335,20 +1350,20 @@ export default function PurchaseForm({
         wht: '',
         whtSearch: '',
         whtRate: 0,
-        responsibilityCenter: '',
+        responsibilityCenter: defaultResponsibilityCenter || '',
         isOther,
         isNew: true,
       },
     ])
   }
-  const addJournalEntry = () =>
+  const addJournalEntry = (defaultResponsibilityCenter = '') =>
     setJournalEntries((prev) => [
       ...prev,
       {
         id: Date.now(),
         account: '',
         accountSearch: '',
-        center: '',
+        center: defaultResponsibilityCenter || '',
         debit: 0,
         credit: 0,
         isManual: true,
@@ -1420,7 +1435,7 @@ export default function PurchaseForm({
     visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
   }
 
-  const generateJournalEntries = () => {
+  const generateJournalEntries = (defaultResponsibilityCenter = '') => {
     const entries = []
     let totalDebitAmount = 0
     let totalCreditAmount = 0
@@ -1469,7 +1484,13 @@ export default function PurchaseForm({
             id: Date.now() + Math.random(),
             account: selectedCoa.id,
             accountSearch: selectedCoa.name,
-            center: item.responsibilityCenter || '',
+            center: getItemResponsibilityCenter(
+              item,
+              defaultResponsibilityCenter ||
+                bulkResponsibilityCenter ||
+                purchaseItems[0]?.responsibilityCenter ||
+                '',
+            ),
             debit: parseFloat(gross.toFixed(2)),
             credit: 0,
             isManual: false,
@@ -1490,7 +1511,13 @@ export default function PurchaseForm({
           id: Date.now() + Math.random(),
           account: inputVatAccount.id,
           accountSearch: inputVatAccount.name,
-          center: purchaseItems[0]?.responsibilityCenter || '',
+          center: getItemResponsibilityCenter(
+            purchaseItems[0],
+            defaultResponsibilityCenter ||
+              bulkResponsibilityCenter ||
+              purchaseItems[0]?.responsibilityCenter ||
+              '',
+          ),
           debit: parseFloat(totalVatAmount.toFixed(2)),
           credit: 0,
           isManual: false,
@@ -1510,7 +1537,13 @@ export default function PurchaseForm({
           id: Date.now() + Math.random(),
           account: discountAccount.id,
           accountSearch: discountAccount.name,
-          center: purchaseItems[0]?.responsibilityCenter || '',
+          center: getItemResponsibilityCenter(
+            purchaseItems[0],
+            defaultResponsibilityCenter ||
+              bulkResponsibilityCenter ||
+              purchaseItems[0]?.responsibilityCenter ||
+              '',
+          ),
           debit: 0,
           credit: parseFloat(totalDiscountAmount.toFixed(2)),
           isManual: false,
@@ -1534,7 +1567,13 @@ export default function PurchaseForm({
           id: Date.now() + Math.random(),
           account: whtAccount.id,
           accountSearch: whtAccount.name,
-          center: purchaseItems[0]?.responsibilityCenter || '',
+          center: getItemResponsibilityCenter(
+            purchaseItems[0],
+            defaultResponsibilityCenter ||
+              bulkResponsibilityCenter ||
+              purchaseItems[0]?.responsibilityCenter ||
+              '',
+          ),
           debit: 0,
           credit: parseFloat(totalWhtAmount.toFixed(2)),
           isManual: false,
@@ -1550,7 +1589,13 @@ export default function PurchaseForm({
         id: Date.now() + Math.random(),
         account: apAccount.id,
         accountSearch: apAccount.name,
-        center: purchaseItems[0]?.responsibilityCenter || '',
+        center: getItemResponsibilityCenter(
+          purchaseItems[0],
+          defaultResponsibilityCenter ||
+            bulkResponsibilityCenter ||
+            purchaseItems[0]?.responsibilityCenter ||
+            '',
+        ),
         debit: 0,
         credit: parseFloat(apAmount.toFixed(2)),
         isManual: false,
@@ -1789,7 +1834,7 @@ export default function PurchaseForm({
   useEffect(() => {
     // Only auto-generate journal entries in add/edit mode, not in view mode
     if (!isViewMode) {
-      generateJournalEntries()
+      generateJournalEntries(bulkResponsibilityCenter)
     }
   }, [
     purchaseItems,
@@ -2447,7 +2492,44 @@ export default function PurchaseForm({
               className="space-y-4"
             >
               {/* 1. PURCHASE ITEMS */}
-              <TableSection title="Purchase Items" icon={<Wallet size={14} />}>
+              <TableSection
+                title="Purchase Items"
+                icon={<Wallet size={14} />}
+                headerActions={
+                  <div className="w-full">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-red-400 pointer-events-none" />
+                      <div className="pl-8">
+                        <SearchableDropdown
+                          placeholder="Responsibility Center to All"
+                          value={bulkResponsibilityCenter}
+                          onChange={setBulkResponsibilityCenter}
+                          onSelect={(opt) => {
+                            setBulkResponsibilityCenter(opt.value)
+                            purchaseItems.forEach((item) =>
+                              updatePurchaseItem(
+                                item.id,
+                                'responsibilityCenter',
+                                opt.value,
+                              ),
+                            )
+                            journalEntries.forEach((entry) =>
+                              updateJournalEntry(entry.id, 'center', opt.value),
+                            )
+                          }}
+                          options={responsibilityCenterOptions}
+                          inputClassName="w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all bg-white border border-red-300 text-black focus:ring-1 focus:ring-red-500"
+                          emptyText={
+                            responsibilityCentersError ||
+                            'No responsibility centers found'
+                          }
+                          disabled={isViewMode}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                }
+              >
                 <div className="w-full flex flex-col gap-[2px] mb-3">
                   <div className="h-[2px] w-full bg-red-600 rounded-full" />
                   <div className="h-[1px] w-full bg-black/10" />
@@ -2765,7 +2847,9 @@ export default function PurchaseForm({
                 {!isViewMode && (
                   <div className="flex gap-2 mt-3">
                     <button
-                      onClick={() => addPurchaseItem(false)}
+                      onClick={() =>
+                        addPurchaseItem(false, bulkResponsibilityCenter)
+                      }
                       className="flex-1 py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-2"
                     >
                       <Plus size={14} /> ADD Product/Service
@@ -2937,7 +3021,7 @@ export default function PurchaseForm({
                 </div>
                 {!isViewMode && (
                   <button
-                    onClick={addJournalEntry}
+                    onClick={() => addJournalEntry(bulkResponsibilityCenter)}
                     className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1"
                   >
                     <Plus size={15} /> Add Ledger Row

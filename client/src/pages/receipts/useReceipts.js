@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDefaults'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drag to Scroll Hook
@@ -576,7 +577,7 @@ export function useReceiptsForm({
   }, [receiptItems, vatOptions, whtOptions])
 
   // ── Receipt Items CRUD ──
-  const addReceiptItem = (isOther = false) => {
+  const addReceiptItem = (isOther = false, defaultResponsibilityCenter = '') => {
     if (vatOptions.length === 0 && !vatLoading) {
       loadVatOnDemand()
     }
@@ -607,7 +608,7 @@ export function useReceiptsForm({
         wht: '',
         whtSearch: '',
         whtRate: 0,
-        responsibilityCenter: '',
+        responsibilityCenter: defaultResponsibilityCenter || '',
         isOther,
         isNew: true,
       },
@@ -622,14 +623,14 @@ export function useReceiptsForm({
     )
 
   // ── Journal Entries CRUD ──
-  const addJournalEntry = () =>
+  const addJournalEntry = (defaultResponsibilityCenter = '') =>
     setJournalEntries((prev) => [
       ...prev,
       {
         id: Date.now(),
         account: '',
         accountSearch: '',
-        center: '',
+        center: defaultResponsibilityCenter || '',
         debit: 0,
         credit: 0,
         isManual: true,
@@ -744,141 +745,147 @@ export function useReceiptsForm({
   }
 
   // ── Journal Auto-generation ──
-  const generateJournalEntries = useCallback(() => {
-    const entries = []
+  const generateJournalEntries = useCallback(
+    (defaultResponsibilityCenter = '') => {
+      const entries = []
 
-    let paymentAccount = null
-    if (modeOfPayment === 'CASH') {
-      paymentAccount =
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('cash on hand'),
-        ) ||
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('petty cash'),
-        )
-    } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
-      paymentAccount =
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes(bankName.toLowerCase()),
-        ) ||
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('cash in bank'),
-        )
-    }
+      let paymentAccount = null
+      if (modeOfPayment === 'CASH') {
+        paymentAccount =
+          chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('cash on hand'),
+          ) ||
+          chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('petty cash'),
+          )
+      } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
+        paymentAccount =
+          chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes(bankName.toLowerCase()),
+          ) ||
+          chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('cash in bank'),
+          )
+      }
 
-    receiptItems.forEach((item) => {
-      const qty = parseFloat(item.qty) || 0
-      const price = parseFloat(item.price) || 0
-      const discountValue = parseFloat(item.discount) || 0
-      const discountType = item.discountType || 'PERCENT'
-      const vatPct = parseFloat(item.vatRate) || 0
-      const whtPct = parseFloat(item.whtRate) || 0
-      const gross = qty * price
-      const discountAmount =
-        discountType === 'PERCENT'
-          ? gross * (discountValue / 100)
-          : discountValue * qty
-      const discountedAmount = gross - discountAmount
-      const vatAmount = discountedAmount * (vatPct / 100)
-      const whtAmount = discountedAmount * (whtPct / 100)
+      receiptItems.forEach((item) => {
+        const qty = parseFloat(item.qty) || 0
+        const price = parseFloat(item.price) || 0
+        const discountValue = parseFloat(item.discount) || 0
+        const discountType = item.discountType || 'PERCENT'
+        const vatPct = parseFloat(item.vatRate) || 0
+        const whtPct = parseFloat(item.whtRate) || 0
+        const gross = qty * price
+        const discountAmount =
+          discountType === 'PERCENT'
+            ? gross * (discountValue / 100)
+            : discountValue * qty
+        const discountedAmount = gross - discountAmount
+        const vatAmount = discountedAmount * (vatPct / 100)
+        const whtAmount = discountedAmount * (whtPct / 100)
 
-      const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
-      if (selectedCoa && gross > 0) {
+        const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
+        if (selectedCoa && gross > 0) {
+          entries.push({
+            id: Date.now() + Math.random(),
+            account: selectedCoa.id,
+            accountSearch: selectedCoa.name,
+            center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
+            debit: 0,
+            credit: parseFloat(gross.toFixed(2)),
+            isManual: false,
+          })
+        }
+
+        if (vatAmount > 0) {
+          const outputVatAccount = chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('output vat'),
+          )
+          if (outputVatAccount) {
+            entries.push({
+              id: Date.now() + Math.random(),
+              account: outputVatAccount.id,
+              accountSearch: outputVatAccount.name,
+              center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
+              debit: 0,
+              credit: parseFloat(vatAmount.toFixed(2)),
+              isManual: false,
+            })
+          }
+        }
+
+        if (whtAmount > 0) {
+          const whtAccount = chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('creditable withholding tax'),
+          )
+          if (whtAccount) {
+            entries.push({
+              id: Date.now() + Math.random(),
+              account: whtAccount.id,
+              accountSearch: whtAccount.name,
+              center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
+              debit: parseFloat(whtAmount.toFixed(2)),
+              credit: 0,
+              isManual: false,
+            })
+          }
+        }
+
+        if (discountAmount > 0) {
+          const discountAccount = chartsOfAccounts.find((a) =>
+            (a.name || '').toLowerCase().includes('sales discounts'),
+          )
+          if (discountAccount) {
+            entries.push({
+              id: Date.now() + Math.random(),
+              account: discountAccount.id,
+              accountSearch: discountAccount.name,
+              center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
+              debit: parseFloat(discountAmount.toFixed(2)),
+              credit: 0,
+              isManual: false,
+            })
+          }
+        }
+      })
+
+      const totalCashAmount = receiptItems.reduce((sum, item) => {
+        const qty = parseFloat(item.qty) || 0
+        const price = parseFloat(item.price) || 0
+        const discountValue = parseFloat(item.discount) || 0
+        const discountType = item.discountType || 'PERCENT'
+        const vatPct = parseFloat(item.vatRate) || 0
+        const whtPct = parseFloat(item.whtRate) || 0
+        const gross = qty * price
+        const discountAmount =
+          discountType === 'PERCENT'
+            ? gross * (discountValue / 100)
+            : discountValue * qty
+        const discountedAmount = gross - discountAmount
+        const vatAmount = discountedAmount * (vatPct / 100)
+        const whtAmount = discountedAmount * (whtPct / 100)
+        return sum + (discountedAmount + vatAmount - whtAmount)
+      }, 0)
+
+      if (paymentAccount && totalCashAmount > 0) {
         entries.push({
           id: Date.now() + Math.random(),
-          account: selectedCoa.id,
-          accountSearch: selectedCoa.name,
-          center: item.responsibilityCenter || '',
-          debit: 0,
-          credit: parseFloat(gross.toFixed(2)),
+          account: paymentAccount.id,
+          accountSearch: paymentAccount.name,
+          center: getItemResponsibilityCenter(
+            receiptItems[0],
+            defaultResponsibilityCenter,
+          ),
+          debit: parseFloat(totalCashAmount.toFixed(2)),
+          credit: 0,
           isManual: false,
         })
       }
 
-      if (vatAmount > 0) {
-        const outputVatAccount = chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('output vat'),
-        )
-        if (outputVatAccount) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: outputVatAccount.id,
-            accountSearch: outputVatAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: 0,
-            credit: parseFloat(vatAmount.toFixed(2)),
-            isManual: false,
-          })
-        }
-      }
-
-      if (whtAmount > 0) {
-        const whtAccount = chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('creditable withholding tax'),
-        )
-        if (whtAccount) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: whtAccount.id,
-            accountSearch: whtAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: parseFloat(whtAmount.toFixed(2)),
-            credit: 0,
-            isManual: false,
-          })
-        }
-      }
-
-      if (discountAmount > 0) {
-        const discountAccount = chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('sales discounts'),
-        )
-        if (discountAccount) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: discountAccount.id,
-            accountSearch: discountAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: parseFloat(discountAmount.toFixed(2)),
-            credit: 0,
-            isManual: false,
-          })
-        }
-      }
-    })
-
-    const totalCashAmount = receiptItems.reduce((sum, item) => {
-      const qty = parseFloat(item.qty) || 0
-      const price = parseFloat(item.price) || 0
-      const discountValue = parseFloat(item.discount) || 0
-      const discountType = item.discountType || 'PERCENT'
-      const vatPct = parseFloat(item.vatRate) || 0
-      const whtPct = parseFloat(item.whtRate) || 0
-      const gross = qty * price
-      const discountAmount =
-        discountType === 'PERCENT'
-          ? gross * (discountValue / 100)
-          : discountValue * qty
-      const discountedAmount = gross - discountAmount
-      const vatAmount = discountedAmount * (vatPct / 100)
-      const whtAmount = discountedAmount * (whtPct / 100)
-      return sum + (discountedAmount + vatAmount - whtAmount)
-    }, 0)
-
-    if (paymentAccount && totalCashAmount > 0) {
-      entries.push({
-        id: Date.now() + Math.random(),
-        account: paymentAccount.id,
-        accountSearch: paymentAccount.name,
-        center: '',
-        debit: parseFloat(totalCashAmount.toFixed(2)),
-        credit: 0,
-        isManual: false,
-      })
-    }
-
-    setJournalEntries(entries)
-  }, [receiptItems, modeOfPayment, bankName, chartsOfAccounts])
+      setJournalEntries(entries)
+    },
+    [receiptItems, modeOfPayment, bankName, chartsOfAccounts],
+  )
 
   useEffect(() => {
     if (!isDisabled && (!isEditMode || !isViewMode)) {

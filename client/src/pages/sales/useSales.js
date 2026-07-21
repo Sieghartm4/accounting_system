@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDefaults'
 
 export function useSales() {
   const [sales, setSales] = useState([])
@@ -610,7 +611,7 @@ export default function useSalesForm({
   }
 
   // ── Item / entry / attachment mutators ────────────────────────────────────
-  const addSalesItem = (isOther = false) => {
+  const addSalesItem = (isOther = false, defaultResponsibilityCenter = '') => {
     if (vatOptions.length === 0 && !vatLoading) {
       loadVatOnDemand()
     }
@@ -638,21 +639,21 @@ export default function useSalesForm({
         wht: '',
         whtSearch: '',
         whtRate: 0,
-        responsibilityCenter: '',
+        responsibilityCenter: defaultResponsibilityCenter || '',
         isOther,
         isNew: true,
       },
     ])
   }
 
-  const addJournalEntry = () =>
+  const addJournalEntry = (defaultResponsibilityCenter = '') =>
     setJournalEntries((prev) => [
       ...prev,
       {
         id: Date.now(),
         account: '',
         accountSearch: '',
-        center: '',
+        center: defaultResponsibilityCenter || '',
         debit: 0,
         credit: 0,
         isManual: true,
@@ -727,7 +728,7 @@ export default function useSalesForm({
         opt.label?.includes('NON-WHT'),
     )
 
-  const buildAutoJournalEntries = () => {
+  const buildAutoJournalEntries = (defaultResponsibilityCenter = '') => {
     const entries = []
     let totalDebitAmount = 0
     let totalCreditAmount = 0
@@ -769,7 +770,10 @@ export default function useSalesForm({
         id: Date.now() + Math.random(),
         account: arAccount.id,
         accountSearch: arAccount.name || arAccount.account_name || '',
-        center: salesItems[0]?.responsibilityCenter || '',
+        center: getItemResponsibilityCenter(
+          salesItems[0],
+          defaultResponsibilityCenter,
+        ),
         debit: parseFloat(arAmount.toFixed(2)),
         credit: 0,
         isManual: false,
@@ -786,7 +790,10 @@ export default function useSalesForm({
           id: Date.now() + Math.random(),
           account: discountAccount.id,
           accountSearch: discountAccount.name || discountAccount.account_name || '',
-          center: salesItems[0]?.responsibilityCenter || '',
+          center: getItemResponsibilityCenter(
+            salesItems[0],
+            defaultResponsibilityCenter,
+          ),
           debit: parseFloat(totalDiscountAmount.toFixed(2)),
           credit: 0,
           isManual: false,
@@ -808,7 +815,10 @@ export default function useSalesForm({
           id: Date.now() + Math.random(),
           account: whtAccount.id,
           accountSearch: whtAccount.name || whtAccount.account_name || '',
-          center: salesItems[0]?.responsibilityCenter || '',
+          center: getItemResponsibilityCenter(
+            salesItems[0],
+            defaultResponsibilityCenter,
+          ),
           debit: parseFloat(totalWhtAmount.toFixed(2)),
           credit: 0,
           isManual: false,
@@ -826,7 +836,7 @@ export default function useSalesForm({
             id: Date.now() + Math.random(),
             account: selectedCoa.id,
             accountSearch: selectedCoa.name || selectedCoa.account_name || '',
-            center: item.responsibilityCenter || '',
+            center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
             debit: 0,
             credit: parseFloat(gross.toFixed(2)),
             isManual: false,
@@ -846,7 +856,10 @@ export default function useSalesForm({
           account: outputVatAccount.id,
           accountSearch:
             outputVatAccount.name || outputVatAccount.account_name || '',
-          center: salesItems[0]?.responsibilityCenter || '',
+          center: getItemResponsibilityCenter(
+            salesItems[0],
+            defaultResponsibilityCenter,
+          ),
           debit: 0,
           credit: parseFloat(totalVatAmount.toFixed(2)),
           isManual: false,
@@ -860,7 +873,7 @@ export default function useSalesForm({
 
   const regenerateJournalEntries = () => {
     const manualEntries = journalEntries.filter((e) => e.isManual)
-    setJournalEntries([...buildAutoJournalEntries(), ...manualEntries])
+    setJournalEntries([...buildAutoJournalEntries(''), ...manualEntries])
   }
 
   const handlePostTransaction = async () => {
