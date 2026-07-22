@@ -1150,51 +1150,74 @@ const updatePaymentState = async (req, res, next) => {
           updateValues = [nextState, req.context.username, id]
 
           // Special logic for APPROVED state: update related purchase records to PAID
-
-          const query = sql
+          // Get payment_items to find purchase_item_ids
+          const paymentItemsQuery = sql
             .select([
               {
                 col: Accounting.payment_items.selectOptionColumns.purchase_id,
-                as: 'purchase_id',
+                as: 'purchase_item_id',
               },
             ])
-
             .from(Accounting.payment_items.tablename)
-
             .where(Accounting.payment_items.selectOptionColumns.payment_id)
-
             .build()
 
           let payment_items = await Query(
-            query,
+            paymentItemsQuery,
             [id],
             [Accounting.payment_items.prefix_],
           )
 
           console.log('payment_items', payment_items)
 
-          const uniquePurchaseIds = [
-            ...new Set(payment_items.map((item) => item.purchase_id)),
-          ]
+          // Get unique purchase_item_ids
+          const uniquePurchaseItemIds = [
+            ...new Set(payment_items.map((item) => item.purchase_item_id)),
+          ].filter((id) => id !== null && id !== undefined)
 
-          console.log('uniquePurchaseIds', uniquePurchaseIds)
+          console.log('uniquePurchaseItemIds', uniquePurchaseItemIds)
 
-          for (const purchaseId of uniquePurchaseIds) {
-            if (purchaseId) {
+          if (uniquePurchaseItemIds.length > 0) {
+            // Get purchase_ids from purchase_items table
+            const purchaseItemsQuery = sql
+              .select([
+                {
+                  col: Accounting.purchase_items.selectOptionColumns.purchase_id,
+                  as: 'purchase_id',
+                },
+              ])
+              .from(Accounting.purchase_items.tablename)
+              .whereIn(Accounting.purchase_items.selectOptionColumns.id, uniquePurchaseItemIds)
+              .build()
+
+            const purchaseItems = await Query(
+              purchaseItemsQuery,
+              uniquePurchaseItemIds,
+              [Accounting.purchase_items.prefix_],
+            )
+
+            console.log('purchaseItems', purchaseItems)
+
+            // Get unique purchase_ids
+            const uniquePurchaseIds = [
+              ...new Set(purchaseItems.map((item) => item.purchase_id)),
+            ].filter((id) => id !== null && id !== undefined)
+
+            console.log('uniquePurchaseIds', uniquePurchaseIds)
+
+            // Update purchase status to PAID only if current status is UNPAID
+            for (const purchaseId of uniquePurchaseIds) {
               const updatePurchaseQuery = sql
                 .update(Accounting.purchase.tablename)
-
                 .set([Accounting.purchase.selectOptionColumns.status])
-
                 .where(Accounting.purchase.selectOptionColumns.id)
-
+                .andWhere(Accounting.purchase.selectOptionColumns.status)
                 .build()
 
-              const updatePurchaseValues = ['PAID', purchaseId]
+              const updatePurchaseValues = ['PAID', purchaseId, 'UNPAID']
 
-              await connection.execute(updatePurchaseQuery, updatePurchaseValues)
-
-              console.log(`Updated purchase ID ${purchaseId} status to PAID`)
+              const [result] = await connection.execute(updatePurchaseQuery, updatePurchaseValues)
+              console.log(`Updated purchase ID ${purchaseId} status to PAID, affected rows: ${result.affectedRows}`)
             }
           }
 

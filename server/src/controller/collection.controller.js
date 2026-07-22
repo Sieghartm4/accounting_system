@@ -178,13 +178,15 @@ const getSalesCollection = async (req, res, next) => {
         Master.customers.selectOptionColumns.id,
       )
 
-      .andWhereNot(Accounting.sales.selectOptionColumns.status)
-
-      .andWhere(Accounting.sales.selectOptionColumns.state)
+      .where(Accounting.sales.selectOptionColumns.state)
 
       .andWhereNotExists(
-        `SELECT 1 FROM ${Accounting.collection_items.tablename} WHERE ${Accounting.collection_items.selectOptionColumns.sales_id} = ${Accounting.sales.selectOptionColumns.id}`,
+        `SELECT 1 FROM ${Accounting.collection_items.tablename} ci_coll ` +
+          `INNER JOIN ${Accounting.sales_items.tablename} si_inv ON si_inv.${Accounting.sales_items.selectOptionColumns.id} = ci_coll.${Accounting.collection_items.selectOptionColumns.sales_id} ` +
+          `WHERE si_inv.${Accounting.sales_items.selectOptionColumns.sales_id} = ${Accounting.sales.selectOptionColumns.id}`,
       )
+
+      .andWhereNot(Accounting.sales.selectOptionColumns.status)
 
       .build()
 
@@ -1111,51 +1113,74 @@ const updateCollectionState = async (req, res, next) => {
           updateValues = [nextState, req.context.username, id]
 
           // Special logic for APPROVED state: update related sales records to PAID
-
-          const query = sql
+          // Get collection_items to find sales_item_ids
+          const collectionItemsQuery = sql
             .select([
               {
                 col: Accounting.collection_items.selectOptionColumns.sales_id,
-                as: 'sales_id',
+                as: 'sales_item_id',
               },
             ])
-
             .from(Accounting.collection_items.tablename)
-
             .where(Accounting.collection_items.selectOptionColumns.collection_id)
-
             .build()
 
           let collection_items = await Query(
-            query,
+            collectionItemsQuery,
             [id],
             [Accounting.collection_items.prefix_],
           )
 
           console.log('collection_items', collection_items)
 
-          const uniqueSalesIds = [
-            ...new Set(collection_items.map((item) => item.sales_id)),
-          ]
+          // Get unique sales_item_ids
+          const uniqueSalesItemIds = [
+            ...new Set(collection_items.map((item) => item.sales_item_id)),
+          ].filter((id) => id !== null && id !== undefined)
 
-          console.log('uniqueSalesIds', uniqueSalesIds)
+          console.log('uniqueSalesItemIds', uniqueSalesItemIds)
 
-          for (const salesId of uniqueSalesIds) {
-            if (salesId) {
+          if (uniqueSalesItemIds.length > 0) {
+            // Get sales_ids from sales_items table
+            const salesItemsQuery = sql
+              .select([
+                {
+                  col: Accounting.sales_items.selectOptionColumns.sales_id,
+                  as: 'sales_id',
+                },
+              ])
+              .from(Accounting.sales_items.tablename)
+              .whereIn(Accounting.sales_items.selectOptionColumns.id, uniqueSalesItemIds)
+              .build()
+
+            const salesItems = await Query(
+              salesItemsQuery,
+              uniqueSalesItemIds,
+              [Accounting.sales_items.prefix_],
+            )
+
+            console.log('salesItems', salesItems)
+
+            // Get unique sales_ids
+            const uniqueSalesIds = [
+              ...new Set(salesItems.map((item) => item.sales_id)),
+            ].filter((id) => id !== null && id !== undefined)
+
+            console.log('uniqueSalesIds', uniqueSalesIds)
+
+            // Update sales status to PAID only if current status is UNPAID
+            for (const salesId of uniqueSalesIds) {
               const updateSalesQuery = sql
                 .update(Accounting.sales.tablename)
-
                 .set([Accounting.sales.selectOptionColumns.status])
-
                 .where(Accounting.sales.selectOptionColumns.id)
-
+                .andWhere(Accounting.sales.selectOptionColumns.status)
                 .build()
 
-              const updateSalesValues = ['PAID', salesId]
+              const updateSalesValues = ['PAID', salesId, 'UNPAID']
 
-              await connection.execute(updateSalesQuery, updateSalesValues)
-
-              console.log(`Updated sales ID ${salesId} status to PAID`)
+              const [result] = await connection.execute(updateSalesQuery, updateSalesValues)
+              console.log(`Updated sales ID ${salesId} status to PAID, affected rows: ${result.affectedRows}`)
             }
           }
 
