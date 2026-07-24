@@ -69,15 +69,89 @@ const getJournalEntries = async (req, res, next) => {
                           ${Accounting.journal_entries.selectOptionColumns.responsibility_center}, 
                           ${Accounting.journal_entries.selectOptionColumns.type}, 
                           ${Accounting.journal_entries.selectOptionColumns.amount}, 
-                          ${Accounting.journal_entries.selectOptionColumns.date} 
+                          CASE
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' THEN r.${Accounting.receipts.selectOptionColumns.collection_date}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' THEN cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' THEN s.${Accounting.sales.selectOptionColumns.date_delivered}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' THEN c.${Accounting.collections.selectOptionColumns.collection_date}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' THEN p.${Accounting.purchase.selectOptionColumns.date_delivered}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' THEN pay.${Accounting.payments.selectOptionColumns.payment_date}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' THEN a.${Accounting.adjustments.selectOptionColumns.posting_date}
+                            ELSE ${Accounting.journal_entries.selectOptionColumns.date}
+                          END as date
                    FROM ${Accounting.journal_entries.tablename} 
                    INNER JOIN ${Master.charts_of_accounts.tablename} ON ${Master.charts_of_accounts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.coa_id}
-                   AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
+                   LEFT JOIN ${Accounting.receipts.tablename} r
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts'
+                     AND r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Accounting.cash_disbursements.tablename} cd
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements'
+                     AND cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Accounting.sales.tablename} s
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales'
+                     AND s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Accounting.collections.tablename} c
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections'
+                     AND c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Accounting.purchase.tablename} p
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase'
+                     AND p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Accounting.payments.tablename} pay
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments'
+                     AND pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Accounting.adjustments.tablename} a
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments'
+                     AND a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   WHERE ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
                    AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
                    AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL`
+    
+    // Approval filter - only include journal entries from approved documents
+    const approvalFilter = `
+      AND (
+        (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+          SELECT 1 FROM ${Accounting.receipts.tablename} r
+          WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND r.${Accounting.receipts.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+          SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+          WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND cd.${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+          SELECT 1 FROM ${Accounting.sales.tablename} s
+          WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+          SELECT 1 FROM ${Accounting.collections.tablename} c
+          WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+          SELECT 1 FROM ${Accounting.purchase.tablename} p
+          WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND p.${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.payments.tablename} pay
+          WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.adjustments.tablename} a
+          WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND a.${Accounting.adjustments.selectOptionColumns.status} = 'APPROVED'
+        ))
+      )
+    `
+    
     if (whereConditions.length > 0) {
-      sqlQuery += ` WHERE ${whereConditions.join(' AND ')}`
+      sqlQuery += ` AND ${whereConditions.join(' AND ')}`
     }
+    
+    sqlQuery += approvalFilter
 
     sqlQuery += ` ORDER BY ${Accounting.journal_entries.selectOptionColumns.date} DESC`
 

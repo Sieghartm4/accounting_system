@@ -112,6 +112,47 @@ const getTrialBalance = async (req, res, next) => {
       dateFilter = ` AND ${conditions.join(' AND ')}`
     }
 
+    // Approval filter - only include journal entries from approved documents
+    const approvalFilter = `
+      AND (
+        (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+          SELECT 1 FROM ${Accounting.receipts.tablename} r
+          WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND r.${Accounting.receipts.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+          SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+          WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND cd.${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+          SELECT 1 FROM ${Accounting.sales.tablename} s
+          WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+          SELECT 1 FROM ${Accounting.collections.tablename} c
+          WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+          SELECT 1 FROM ${Accounting.purchase.tablename} p
+          WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND p.${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.payments.tablename} pay
+          WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.adjustments.tablename} a
+          WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND a.${Accounting.adjustments.selectOptionColumns.status} = 'APPROVED'
+        ))
+      )
+    `
+
     const trial_balance_query = `
       SELECT 
         ${Master.charts_of_accounts.selectOptionColumns.code} AS 'Account Code',
@@ -128,6 +169,7 @@ const getTrialBalance = async (req, res, next) => {
         AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
         AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
         ${dateFilter}
+        ${approvalFilter}
       GROUP BY
         ${Master.charts_of_accounts.selectOptionColumns.id},
         ${Master.charts_of_accounts.selectOptionColumns.code},
@@ -249,6 +291,47 @@ const getIncomeStatement = async (req, res, next) => {
       dateFilter = ` AND ${conditions.join(' AND ')}`
     }
 
+    // Approval filter - only include journal entries from approved documents
+    const approvalFilter = `
+      AND (
+        (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+          SELECT 1 FROM ${Accounting.receipts.tablename} r
+          WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND r.${Accounting.receipts.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+          SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+          WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND cd.${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+          SELECT 1 FROM ${Accounting.sales.tablename} s
+          WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+          SELECT 1 FROM ${Accounting.collections.tablename} c
+          WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+          SELECT 1 FROM ${Accounting.purchase.tablename} p
+          WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND p.${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.payments.tablename} pay
+          WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.adjustments.tablename} a
+          WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND a.${Accounting.adjustments.selectOptionColumns.status} = 'APPROVED'
+        ))
+      )
+    `
+
     // KEY INSIGHT:
     // Use CREDIT - DEBIT for ALL accounts.
     //
@@ -299,6 +382,7 @@ const getIncomeStatement = async (req, res, next) => {
         AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
         AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
         AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
+        ${approvalFilter}
       GROUP BY
         ${Master.charts_of_accounts.selectOptionColumns.id},
         ${Master.charts_of_accounts.selectOptionColumns.code},
@@ -463,6 +547,47 @@ const getGeneralLedger = async (req, res, next) => {
       dateFilter = ` AND ${conditions.join(' AND ')}`
     }
 
+    // Approval filter - only include journal entries from approved documents
+    const approvalFilter = `
+      AND (
+        (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+          SELECT 1 FROM ${Accounting.receipts.tablename} r
+          WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND r.${Accounting.receipts.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+          SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+          WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND cd.${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+          SELECT 1 FROM ${Accounting.sales.tablename} s
+          WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+          SELECT 1 FROM ${Accounting.collections.tablename} c
+          WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+          SELECT 1 FROM ${Accounting.purchase.tablename} p
+          WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND p.${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.payments.tablename} pay
+          WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.adjustments.tablename} a
+          WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND a.${Accounting.adjustments.selectOptionColumns.status} = 'APPROVED'
+        ))
+      )
+    `
+
     // Query to get all journal entries in chronological order
     const general_ledger_query = `
       SELECT
@@ -511,6 +636,7 @@ const getGeneralLedger = async (req, res, next) => {
         AND a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
       WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
       ${dateFilter}
+      ${approvalFilter}
       AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
       AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
       AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
@@ -684,7 +810,48 @@ const getBalanceSheet = async (req, res, next) => {
       dateFilter = ` AND ${conditions.join(' AND ')}`
     }
 
-    const balance_sheet_query = `SELECT ${Master.charts_of_accounts.selectOptionColumns.code} as 'Account Code', ${Master.charts_of_accounts.selectOptionColumns.name} as 'Account Name', SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as Current FROM ${Master.charts_of_accounts.tablename} LEFT JOIN ${Accounting.journal_entries.tablename} ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id} WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE' AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('ASSETS', 'LIABILITIES', 'EQUITY')${dateFilter} GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.code}, ${Master.charts_of_accounts.selectOptionColumns.name}, ${Master.charts_of_accounts.selectOptionColumns.type} ORDER BY ${Master.charts_of_accounts.selectOptionColumns.type}, ${Master.charts_of_accounts.selectOptionColumns.code}`
+    // Approval filter - only include journal entries from approved documents
+    const approvalFilter = `
+      AND (
+        (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+          SELECT 1 FROM ${Accounting.receipts.tablename} r
+          WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND r.${Accounting.receipts.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+          SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+          WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND cd.${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+          SELECT 1 FROM ${Accounting.sales.tablename} s
+          WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+          SELECT 1 FROM ${Accounting.collections.tablename} c
+          WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+          SELECT 1 FROM ${Accounting.purchase.tablename} p
+          WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND p.${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.payments.tablename} pay
+          WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.adjustments.tablename} a
+          WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND a.${Accounting.adjustments.selectOptionColumns.status} = 'APPROVED'
+        ))
+      )
+    `
+
+    const balance_sheet_query = `SELECT ${Master.charts_of_accounts.selectOptionColumns.code} as 'Account Code', ${Master.charts_of_accounts.selectOptionColumns.name} as 'Account Name', SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as Current FROM ${Master.charts_of_accounts.tablename} LEFT JOIN ${Accounting.journal_entries.tablename} ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id} WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE' AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('ASSETS', 'LIABILITIES', 'EQUITY')${dateFilter}${approvalFilter} GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.code}, ${Master.charts_of_accounts.selectOptionColumns.name}, ${Master.charts_of_accounts.selectOptionColumns.type} ORDER BY ${Master.charts_of_accounts.selectOptionColumns.type}, ${Master.charts_of_accounts.selectOptionColumns.code}`
 
     const balanceSheet = await Query(balance_sheet_query)
 
@@ -716,6 +883,7 @@ const getBalanceSheet = async (req, res, next) => {
         AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
         AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
         AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
+        ${approvalFilter}
       GROUP BY
         ${Master.charts_of_accounts.selectOptionColumns.id},
         ${Master.charts_of_accounts.selectOptionColumns.type}
@@ -1205,6 +1373,47 @@ const getStatementOfComprehensiveIncome = async (req, res, next) => {
         ' BETWEEN ? AND ?'
     }
 
+    // Approval filter - only include journal entries from approved documents
+    const approvalFilter = `
+      AND (
+        (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+          SELECT 1 FROM ${Accounting.receipts.tablename} r
+          WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND r.${Accounting.receipts.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+          SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+          WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND cd.${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+          SELECT 1 FROM ${Accounting.sales.tablename} s
+          WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+          SELECT 1 FROM ${Accounting.collections.tablename} c
+          WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+          SELECT 1 FROM ${Accounting.purchase.tablename} p
+          WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND p.${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.payments.tablename} pay
+          WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.adjustments.tablename} a
+          WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND a.${Accounting.adjustments.selectOptionColumns.status} = 'APPROVED'
+        ))
+      )
+    `
+
     // Get Income Statement data (revenues and expenses)
     const income_statement_query = `
       SELECT 
@@ -1233,6 +1442,7 @@ const getStatementOfComprehensiveIncome = async (req, res, next) => {
            ${dateFilter.replace(' AND ', '')}
       WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
         AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
+        ${approvalFilter}
       GROUP BY
         ${Master.charts_of_accounts.selectOptionColumns.id},
         ${Master.charts_of_accounts.selectOptionColumns.code},
@@ -1292,6 +1502,7 @@ const getStatementOfComprehensiveIncome = async (req, res, next) => {
              OR ${Master.charts_of_accounts.selectOptionColumns.name} LIKE '%Revaluation%'
              OR ${Master.charts_of_accounts.selectOptionColumns.name} LIKE '%Unrealized%'
              OR ${Master.charts_of_accounts.selectOptionColumns.code} LIKE '35%')
+        ${approvalFilter}
       GROUP BY
         ${Master.charts_of_accounts.selectOptionColumns.id},
         ${Master.charts_of_accounts.selectOptionColumns.code},
@@ -1392,6 +1603,47 @@ const getBankReconciliation = async (req, res, next) => {
       dateFilter = ` AND ${conditions.join(' AND ')}`
     }
 
+    // Approval filter - only include journal entries from approved documents
+    const approvalFilter = `
+      AND (
+        (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+          SELECT 1 FROM ${Accounting.receipts.tablename} r
+          WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND r.${Accounting.receipts.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+          SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+          WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND cd.${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+          SELECT 1 FROM ${Accounting.sales.tablename} s
+          WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+          SELECT 1 FROM ${Accounting.collections.tablename} c
+          WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+          SELECT 1 FROM ${Accounting.purchase.tablename} p
+          WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND p.${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.payments.tablename} pay
+          WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.adjustments.tablename} a
+          WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND a.${Accounting.adjustments.selectOptionColumns.status} = 'APPROVED'
+        ))
+      )
+    `
+
     // Get Cash GL Balance (Account codes starting with 1010 are typically cash accounts)
     const cash_balance_query = `
       SELECT 
@@ -1407,6 +1659,7 @@ const getBankReconciliation = async (req, res, next) => {
            ${dateFilter}
       WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
         AND (${Master.charts_of_accounts.selectOptionColumns.code} LIKE '101%' OR ${Master.charts_of_accounts.selectOptionColumns.code} LIKE '102%')
+        ${approvalFilter}
       GROUP BY
         ${Master.charts_of_accounts.selectOptionColumns.id},
         ${Master.charts_of_accounts.selectOptionColumns.code},

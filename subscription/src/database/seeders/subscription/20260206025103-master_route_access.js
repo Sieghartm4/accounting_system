@@ -44,6 +44,7 @@ module.exports = {
       'vendor_transactions',
       'advances',
       'purchase_order',
+      'responsibility_center',
     ]
 
     const seedData = []

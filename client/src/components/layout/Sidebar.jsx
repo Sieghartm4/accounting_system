@@ -357,7 +357,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.masters?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest px-3 mb-2">
                 Internal Systems
               </p>
             )}
@@ -420,7 +420,7 @@ export default function Sidebar({ isCollapsed }) {
                       <Link
                         key={item.name || index}
                         to={`/${item.name}`}
-                        className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                        className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                       >
                         <Icon size={14} /> {item.label || item.name}
                       </Link>
@@ -436,7 +436,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.partners?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest px-3 mb-2">
                 Partners
               </p>
             )}
@@ -481,7 +481,7 @@ export default function Sidebar({ isCollapsed }) {
                     <Link
                       key={item.name || index}
                       to={`/${item.name.replace(/_/g, '-')}`}
-                      className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                      className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
                     </Link>
@@ -497,7 +497,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.receipts?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest px-3 mb-2">
                 Financial Operations
               </p>
             )}
@@ -544,7 +544,7 @@ export default function Sidebar({ isCollapsed }) {
                     <Link
                       key={item.name || index}
                       to={`/${item.name}`}
-                      className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                      className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
                     </Link>
@@ -560,7 +560,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.sales?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest px-3 mb-2">
                 Revenue Management
               </p>
             )}
@@ -609,7 +609,7 @@ export default function Sidebar({ isCollapsed }) {
                     <Link
                       key={item.name || index}
                       to={`/${item.name}`}
-                      className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                      className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
                     </Link>
@@ -625,7 +625,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.purchase?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest px-3 mb-2">
                 Procurement & Treasury
               </p>
             )}
@@ -672,7 +672,7 @@ export default function Sidebar({ isCollapsed }) {
                     <Link
                       key={item.name || index}
                       to={`/${item.name}`}
-                      className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                      className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
                     </Link>
@@ -680,7 +680,7 @@ export default function Sidebar({ isCollapsed }) {
                 })}
                 <Link
                   to="/purchase_order"
-                  className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === '/purchase_order' ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === '/purchase_order' ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                 >
                   <Package size={14} /> Purchase Orders
                 </Link>
@@ -694,7 +694,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.adjustments?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest px-3 mb-2">
                 Adjustments
               </p>
             )}
@@ -743,7 +743,7 @@ export default function Sidebar({ isCollapsed }) {
                     <Link
                       key={item.name || index}
                       to={`/${item.name.replace(/_/g, '-')}`}
-                      className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                      className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
                     </Link>
@@ -759,7 +759,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.reports?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest px-3 mb-2">
                 Reports
               </p>
             )}
@@ -814,7 +814,7 @@ export default function Sidebar({ isCollapsed }) {
                     <Link
                       key={item.name || index}
                       to={`/${item.name.replace(/_/g, '-')}`}
-                      className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                      className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
                     </Link>
@@ -830,7 +830,7 @@ export default function Sidebar({ isCollapsed }) {
         {sidebarItems.settings?.length > 0 && (
           <div className="pt-4">
             {!isCollapsed && (
-              <p className="text-[10px] font-bold text-gray-100 uppercase tracking-widest px-3 mb-2">
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest px-3 mb-2">
                 System
               </p>
             )}
@@ -873,7 +873,7 @@ export default function Sidebar({ isCollapsed }) {
                     <Link
                       key={item.name || index}
                       to={`/${item.name.replace(/_/g, '-')}`}
-                      className={`flex items-center gap-3 py-2 text-sm transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'text-red-500 font-semibold' : 'text-gray-400 hover:text-red-500'}`}
+                      className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
                     </Link>

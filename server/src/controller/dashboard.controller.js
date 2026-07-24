@@ -30,6 +30,47 @@ const getDashboardData = async (req, res, next) => {
       AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
     `;
 
+    // Approval filter - only include journal entries from approved documents
+    const approvalFilter = `
+      AND (
+        (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+          SELECT 1 FROM ${Accounting.receipts.tablename} r
+          WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND r.${Accounting.receipts.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+          SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+          WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND cd.${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+          SELECT 1 FROM ${Accounting.sales.tablename} s
+          WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+          SELECT 1 FROM ${Accounting.collections.tablename} c
+          WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+          SELECT 1 FROM ${Accounting.purchase.tablename} p
+          WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND p.${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.payments.tablename} pay
+          WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.adjustments.tablename} a
+          WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND a.${Accounting.adjustments.selectOptionColumns.status} = 'APPROVED'
+        ))
+      )
+    `;
+
     // ==================== FINANCIAL HEALTH (Quick KPIs) ====================
 
     // Net Income - from Income Statement logic (using subquery to avoid nested aggregates)
@@ -64,6 +105,7 @@ const getDashboardData = async (req, res, next) => {
           AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
           AND (${Accounting.journal_entries.selectOptionColumns.date} >= '${startDate}' 
                OR ${Accounting.journal_entries.selectOptionColumns.date} IS NULL)
+          ${approvalFilter}
         GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.type}
       ) AS account_balances
     `;
@@ -114,6 +156,7 @@ const getDashboardData = async (req, res, next) => {
           AND ${Master.charts_of_accounts.selectOptionColumns.type} = 'Assets'
           AND (${Accounting.journal_entries.selectOptionColumns.date} >= '${startDate}' 
                OR ${Accounting.journal_entries.selectOptionColumns.date} IS NULL)
+          ${approvalFilter}
         GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, 
                  ${Master.charts_of_accounts.selectOptionColumns.code}, 
                  ${Master.charts_of_accounts.selectOptionColumns.name}
@@ -156,6 +199,7 @@ const getDashboardData = async (req, res, next) => {
         ON ${Accounting.collection_items.selectOptionColumns.collection_id} = ${Accounting.collections.selectOptionColumns.id}
       WHERE ${Accounting.collections.selectOptionColumns.collection_date} >= '${startDate}'
         AND ${Accounting.collections.selectOptionColumns.collection_date} <= '${endDate}'
+        AND ${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
     `;
     const collectionsResult = await Query(collections_query);
     const totalCollections = parseFloat(collectionsResult[0]?.totalCollections || 0);
@@ -167,6 +211,7 @@ const getDashboardData = async (req, res, next) => {
     .from(Accounting.cash_disbursements.tablename)
     .where(`${Accounting.cash_disbursements.selectOptionColumns.payment_date} >= '${startDate}'`)
     .andWhere(`${Accounting.cash_disbursements.selectOptionColumns.payment_date} <= '${endDate}'`)
+    .andWhere(`${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'`)
     .build();
     const disbursementsResult = await Query(disbursements_query);
     const totalDisbursements = parseFloat(disbursementsResult[0]?.totalDisbursements || 0);
@@ -181,6 +226,7 @@ const getDashboardData = async (req, res, next) => {
       { col: `COUNT(*)`, as: 'salesCount' }
     ])
     .from(Accounting.sales.tablename)
+    .where(`${Accounting.sales.selectOptionColumns.state} = 'APPROVED'`)
     .build();
     const salesCountResult = await Query(sales_count_query);
     const salesCount = parseInt(salesCountResult[0]?.salesCount || 0);
@@ -190,6 +236,7 @@ const getDashboardData = async (req, res, next) => {
       { col: `COUNT(*)`, as: 'purchaseCount' }
     ])
     .from(Accounting.purchase.tablename)
+    .where(`${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'`)
     .build();
     const purchaseCountResult = await Query(purchase_count_query);
     const purchaseCount = parseInt(purchaseCountResult[0]?.purchaseCount || 0);
@@ -199,6 +246,7 @@ const getDashboardData = async (req, res, next) => {
       { col: `COUNT(*)`, as: 'disbursementCount' }
     ])
     .from(Accounting.cash_disbursements.tablename)
+    .where(`${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'`)
     .build();
     const disbursementCountResult = await Query(disbursement_count_query);
     const disbursementCount = parseInt(disbursementCountResult[0]?.disbursementCount || 0);
@@ -208,7 +256,7 @@ const getDashboardData = async (req, res, next) => {
       { col: `COUNT(*)`, as: 'adjustmentCount' }
     ])
     .from(Accounting.adjustments.tablename)
-    .where(`${Accounting.adjustments.selectOptionColumns.status} = 'POSTED'`)
+    .where(`${Accounting.adjustments.selectOptionColumns.status} = 'APPROVED'`)
     .build();
     const adjustmentCountResult = await Query(adjustment_count_query);
     const adjustmentCount = parseInt(adjustmentCountResult[0]?.adjustmentCount || 0);
@@ -224,6 +272,7 @@ const getDashboardData = async (req, res, next) => {
                  THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS totalCredit
       FROM ${Accounting.journal_entries.tablename}
       WHERE 1=1 ${validJeCondition} /* Enforced Null Checks */
+      ${approvalFilter}
     `;
     const trialBalanceResult = await Query(trial_balance_check_query);
     const totalDebit = parseFloat(trialBalanceResult[0]?.totalDebit || 0);
@@ -248,6 +297,7 @@ const getDashboardData = async (req, res, next) => {
           ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
           ${validJeCondition} /* Enforced Null Checks */
         WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
+          ${approvalFilter}
         GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.type}
       ) AS account_balances
     `;
@@ -304,6 +354,7 @@ const getDashboardData = async (req, res, next) => {
           AND (${Accounting.journal_entries.selectOptionColumns.date} >= '${startDate}' 
                AND ${Accounting.journal_entries.selectOptionColumns.date} <= '${endDate}')
           AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
+          ${approvalFilter}
         GROUP BY SUBSTR(${Accounting.journal_entries.selectOptionColumns.date}, 1, 7), 
                  ${Master.charts_of_accounts.selectOptionColumns.id},
                  ${Master.charts_of_accounts.selectOptionColumns.type}
@@ -322,9 +373,10 @@ const getDashboardData = async (req, res, next) => {
       FROM ${Accounting.collections.tablename}
       LEFT JOIN ${Accounting.collection_items.tablename}
         ON ${Accounting.collection_items.selectOptionColumns.collection_id} = ${Accounting.collections.selectOptionColumns.id}
-      WHERE (${Accounting.collections.selectOptionColumns.collection_date} >= '${startDate}' 
+      WHERE ${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+        AND ((${Accounting.collections.selectOptionColumns.collection_date} >= '${startDate}' 
             AND ${Accounting.collections.selectOptionColumns.collection_date} <= '${endDate}')
-        OR ${Accounting.collections.selectOptionColumns.collection_date} IS NULL
+        OR ${Accounting.collections.selectOptionColumns.collection_date} IS NULL)
       GROUP BY SUBSTR(${Accounting.collections.selectOptionColumns.collection_date}, 1, 7)
       
       UNION ALL
@@ -334,9 +386,10 @@ const getDashboardData = async (req, res, next) => {
         SUBSTR(${Accounting.cash_disbursements.selectOptionColumns.payment_date}, 1, 7) AS month,
         COALESCE(SUM(${Accounting.cash_disbursements.selectOptionColumns.total_amount_due}), 0) AS amount
       FROM ${Accounting.cash_disbursements.tablename}
-      WHERE (${Accounting.cash_disbursements.selectOptionColumns.payment_date} >= '${startDate}' 
+      WHERE ${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'
+        AND ((${Accounting.cash_disbursements.selectOptionColumns.payment_date} >= '${startDate}' 
             AND ${Accounting.cash_disbursements.selectOptionColumns.payment_date} <= '${endDate}')
-        OR ${Accounting.cash_disbursements.selectOptionColumns.payment_date} IS NULL
+        OR ${Accounting.cash_disbursements.selectOptionColumns.payment_date} IS NULL)
       GROUP BY SUBSTR(${Accounting.cash_disbursements.selectOptionColumns.payment_date}, 1, 7)
       
       ORDER BY month, type

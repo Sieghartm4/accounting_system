@@ -259,9 +259,19 @@ const DynamicTable = ({
       )
     }
 
-    // Make amount_due values stand out in red
-    if (header === 'amount_due' && value !== null && value !== undefined) {
-      return <span className="text-red-600 font-black">{String(value)}</span>
+    // Make amount_due values stand out in red with proper accounting format
+    if (header.toLowerCase().includes('amount_due') && value !== null && value !== undefined) {
+      const numValue = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^0-9.-]+/g, ''))
+      const formattedValue = new Intl.NumberFormat('en-PH', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(isNaN(numValue) ? 0 : numValue)
+      return (
+  <span className="font-black">
+    <span className="text-green-600">₱ </span>
+    <span className="text-gray-600">{formattedValue}</span>
+  </span>
+);
     }
 
     if (
