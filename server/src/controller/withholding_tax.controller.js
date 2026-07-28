@@ -335,8 +335,230 @@ const updateWithholdingTax = async (req, res, next) => {
   }
 }
 
+const importWithholdingTax = async (req, res, next) => {
+  try {
+    const { taxes } = req.body
+
+    if (!Array.isArray(taxes) || taxes.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Taxes array is required',
+      })
+    }
+
+    const results = {
+      created: [],
+      updated: [],
+      errors: [],
+    }
+
+    const now = new Date()
+    const auditQueries = []
+
+    for (const tax of taxes) {
+      try {
+        const { id, code, name, rate, tax_account, description, status } = tax
+        const normalizedCode = String(code || '').trim()
+
+        // Validate required fields
+        if (!normalizedCode || !name || rate === undefined || !tax_account || !status) {
+          results.errors.push({
+            tax,
+            message: 'Missing required fields (code, name, rate, tax_account, status)',
+          })
+          continue
+        }
+
+        // Check if tax exists by ID or code
+        let existingTax = null
+        if (id) {
+          const existingQuery = sql
+            .select([
+              Master.withholding_tax.selectOptionColumns.id,
+              Master.withholding_tax.selectOptionColumns.code,
+              Master.withholding_tax.selectOptionColumns.name,
+              Master.withholding_tax.selectOptionColumns.rate,
+              Master.withholding_tax.selectOptionColumns.tax_account,
+              Master.withholding_tax.selectOptionColumns.description,
+              Master.withholding_tax.selectOptionColumns.status,
+            ])
+            .from(Master.withholding_tax.tablename)
+            .where(Master.withholding_tax.selectOptionColumns.id)
+            .build()
+          const existingTaxes = await Query(
+            existingQuery,
+            [id],
+            Master.withholding_tax.prefix_,
+          )
+          existingTax = existingTaxes[0] || null
+        }
+
+        // If not found by ID, check by code
+        if (!existingTax) {
+          const codeQuery = `SELECT ${Master.withholding_tax.selectOptionColumns.id}, ${Master.withholding_tax.selectOptionColumns.code}, ${Master.withholding_tax.selectOptionColumns.name}, ${Master.withholding_tax.selectOptionColumns.rate}, ${Master.withholding_tax.selectOptionColumns.tax_account}, ${Master.withholding_tax.selectOptionColumns.description}, ${Master.withholding_tax.selectOptionColumns.status} FROM ${Master.withholding_tax.tablename} WHERE UPPER(${Master.withholding_tax.selectOptionColumns.code}) = ? LIMIT 1`
+          const codeResults = await Query(
+            codeQuery,
+            [normalizedCode.toUpperCase()],
+            Master.withholding_tax.prefix_,
+          )
+          existingTax = codeResults[0] || null
+        }
+
+        if (existingTax) {
+          // Update existing tax
+          const updateQuery = sql
+            .update(Master.withholding_tax.tablename)
+            .set([
+              Master.withholding_tax.selectOptionColumns.code,
+              Master.withholding_tax.selectOptionColumns.name,
+              Master.withholding_tax.selectOptionColumns.rate,
+              Master.withholding_tax.selectOptionColumns.tax_account,
+              Master.withholding_tax.selectOptionColumns.description,
+              Master.withholding_tax.selectOptionColumns.status,
+            ])
+            .where(Master.withholding_tax.selectOptionColumns.id)
+            .build()
+
+          const queries = [
+            {
+              sql: updateQuery,
+              values: [normalizedCode, name, rate, tax_account, description, status, existingTax.id],
+            },
+          ]
+
+          await Transaction(queries)
+
+          // Build change description
+          const changes = []
+          if (existingTax.code !== normalizedCode) changes.push(`code='${normalizedCode}'`)
+          if (existingTax.name !== name) changes.push(`name='${name}'`)
+          if (existingTax.rate != rate) changes.push(`rate='${rate}'`)
+          if (existingTax.tax_account !== tax_account) changes.push(`tax_account='${tax_account}'`)
+          if (existingTax.description !== description) changes.push(`description='${description}'`)
+          if (existingTax.status !== status) changes.push(`status='${status}'`)
+          const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes'
+
+          // Audit trail for update
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              existingTax.id || null,
+              'WITHHOLDING_TAX',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT UPDATE ID ${existingTax.id}: ${changeDesc}`,
+            ],
+          })
+
+          results.updated.push({
+            id: existingTax.id,
+            code: normalizedCode,
+            name,
+          })
+        } else {
+          // Create new tax
+          const isDuplicateCode = await findWithholdingTaxCodeDuplicate(normalizedCode)
+          if (isDuplicateCode) {
+            results.errors.push({
+              tax,
+              message: 'Withholding tax code already exists',
+            })
+            continue
+          }
+
+          const insertQuery = sql
+            .insert(Master.withholding_tax.tablename, {
+              columns: Master.withholding_tax.insertColumns,
+              prefix: Master.withholding_tax.prefix,
+              isTransaction: true,
+            })
+            .build()
+
+          const queries = [
+            {
+              sql: insertQuery,
+              values: [normalizedCode, name, rate, tax_account, description, status],
+            },
+          ]
+
+          await Transaction(queries)
+
+          const getIdQuery = `SELECT LAST_INSERT_ID() as insertId`
+          const idResult = await Query(getIdQuery)
+          const newTaxId = idResult[0]?.insertId
+
+          if (!newTaxId) {
+            throw new Error('Failed to get Withholding Tax ID from insertion')
+          }
+
+          // Audit trail for create
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              newTaxId || null,
+              'WITHHOLDING_TAX',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT CREATE: ID ${newTaxId}`,
+            ],
+          })
+
+          results.created.push({
+            id: newTaxId,
+            code: normalizedCode,
+            name,
+          })
+        }
+      } catch (error) {
+        console.error('Error processing tax:', tax, error)
+        results.errors.push({
+          tax,
+          message: error.message || 'Failed to process tax',
+        })
+      }
+    }
+
+    // Execute all audit trail queries in a single transaction
+    if (auditQueries.length > 0) {
+      await Transaction(auditQueries)
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.errors.length} errors`,
+      data: results,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error importing withholding tax:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while importing withholding tax',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
 module.exports = {
   getWithholdingTax,
   createWithholdingTax,
   updateWithholdingTax,
+  importWithholdingTax,
 }

@@ -108,6 +108,40 @@ const useVat = () => {
     }
   }
 
+  const importVat = async (vats) => {
+    try {
+      const token = localStorage.getItem('token')
+
+      if (!token) {
+        throw new Error('No authorization token found')
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ vats }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
+        await fetchVat()
+        return { success: true, data: result.data }
+      } else {
+        return { success: false, message: result.message || 'Failed to import VAT' }
+      }
+    } catch (err) {
+      return { success: false, message: err.message }
+    }
+  }
+
   useEffect(() => {
     fetchVat()
   }, [])
@@ -119,6 +153,7 @@ const useVat = () => {
     createVatEntry,
     updateVatEntry,
     refreshVat: fetchVat,
+    importVat,
   }
 }
 

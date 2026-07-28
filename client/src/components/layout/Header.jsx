@@ -99,7 +99,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
       })
       if (response.ok) {
         const result = await response.json()
-        if (result.success) {
+        if (result.success) {''
           setCompanies(result.data)
           if (result.data.length > 0 && !selectedCompany)
             setSelectedCompany(result.data[0])
@@ -622,7 +622,13 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
           ) : null}
 
           <form onSubmit={handleProfileSubmit} className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2">
+            {/* Account Information Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                <User size={18} className="text-red-600" />
+                <h3 className="text-sm font-bold text-gray-800">Account Information</h3>
+              </div>
+              
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-gray-600">
                   Username
@@ -632,10 +638,11 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                   type="text"
                   value={profile.username || ''}
                   onChange={handleProfileChange}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/10"
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/10 hover:border-gray-300"
                   required
                 />
               </div>
+              
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-gray-600">
                   Full Name
@@ -645,45 +652,51 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                   type="text"
                   value={profile.fullname || ''}
                   onChange={handleProfileChange}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/10"
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/10 hover:border-gray-300"
                   required
                 />
               </div>
             </div>
 
-            <div className="space-y-3">
+            {/* Security Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                <Shield size={18} className="text-red-600" />
+                <h3 className="text-sm font-bold text-gray-800">Security</h3>
+              </div>
+              
               {!showChangePasswordFields ? (
                 <button
                   type="button"
                   onClick={() => setShowChangePasswordFields(true)}
-                  className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Change Password
                 </button>
               ) : (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-gray-600">
                       Current Password
                     </label>
                     <input
                       type="password"
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/10"
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/10 hover:border-gray-300"
                       placeholder="Enter current password"
                       required
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-gray-600">
                       New Password
                     </label>
                     <input
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/10"
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/10 hover:border-gray-300"
                       placeholder="Enter new password"
                       required
                     />
@@ -695,35 +708,42 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                       setCurrentPassword('')
                       setNewPassword('')
                     }}
-                    className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     Cancel Password Change
                   </button>
-                </>
+                </div>
               )}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
+            {/* System Information Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                <Shield size={18} className="text-red-600" />
+                <h3 className="text-sm font-bold text-gray-800">System Information</h3>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-600">
                   Role
                 </label>
                 <input
                   type="text"
                   value={profile.access_name || ''}
                   readOnly
-                  className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700 outline-none"
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 outline-none cursor-not-allowed"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
+              
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-600">
                   Status
                 </label>
                 <input
                   type="text"
                   value={profile.status || ''}
                   readOnly
-                  className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-700 outline-none"
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 outline-none cursor-not-allowed"
                 />
               </div>
             </div>
@@ -732,14 +752,14 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
               <button
                 type="button"
                 onClick={() => setShowProfileModal(false)}
-                className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={profileSaving}
-                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
               >
                 {profileSaving ? 'Saving...' : 'Save Changes'}
               </button>

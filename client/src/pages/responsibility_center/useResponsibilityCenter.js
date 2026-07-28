@@ -111,6 +111,41 @@ const useResponsibilityCenter = () => {
     }
   }
 
+  const importResponsibilityCenters = async (centers) => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('No authorization token found')
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/responsibility_center/import`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ centers }),
+        },
+      )
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || `HTTP error! status: ${response.status}`)
+      }
+
+      if (result.success) {
+        await fetchResponsibilityCenters()
+        return { success: true, data: result.data }
+      }
+
+      return { success: false, message: result.message }
+    } catch (err) {
+      return { success: false, message: err.message }
+    }
+  }
+
   useEffect(() => {
     fetchResponsibilityCenters()
   }, [])
@@ -122,6 +157,7 @@ const useResponsibilityCenter = () => {
     createResponsibilityCenter,
     updateResponsibilityCenter,
     refreshResponsibilityCenters: fetchResponsibilityCenters,
+    importResponsibilityCenters,
   }
 }
 

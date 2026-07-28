@@ -5,6 +5,7 @@ const {
   getVendorTransactions,
   createVendor,
   updateVendor,
+  importVendors,
 } = require('../controller/vendor.controller')
 
 const vendorRouter = express.Router()
@@ -14,6 +15,7 @@ vendorRouter.get('/transactions', getVendorTransactions)
 vendorRouter.get('/', getVendors)
 vendorRouter.post('/', createVendor)
 vendorRouter.put('/:id', updateVendor)
+vendorRouter.post('/import', importVendors)
 
 module.exports = {
   vendorRouter,

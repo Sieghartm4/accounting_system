@@ -637,9 +637,328 @@ const updateCustomer = async (req, res, next) => {
   }
 }
 
+const importCustomers = async (req, res, next) => {
+  try {
+    const { customers } = req.body
+
+    if (!Array.isArray(customers) || customers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Customers array is required',
+      })
+    }
+
+    const results = {
+      created: [],
+      updated: [],
+      errors: [],
+    }
+
+    const now = new Date()
+    const auditQueries = []
+    const customerInfoColumns = await getInfoTableColumns('customers_information')
+
+    for (const customer of customers) {
+      try {
+        const { id, code, name, category, type, address, tin, details, contact, status } = customer
+        const normalizedCode = normalizeCodeValue(code)
+        const finalStatus = typeof status !== 'undefined' ? String(status).toUpperCase() : 'ACTIVE'
+
+        // Validate required fields
+        if (!normalizedCode || !name || !address || !tin) {
+          results.errors.push({
+            customer,
+            message: 'Missing required fields (code, name, address, tin)',
+          })
+          continue
+        }
+
+        // Check if customer exists by ID or code
+        let existingCustomer = null
+        if (id) {
+          const existingQuery = sql
+            .select([
+              Master.customers.selectOptionColumns.id,
+              Master.customers.selectOptionColumns.code,
+              Master.customers.selectOptionColumns.name,
+              Master.customers.selectOptionColumns.category,
+              Master.customers.selectOptionColumns.type,
+              Master.customers.selectOptionColumns.status,
+            ])
+            .from(Master.customers.tablename)
+            .where(Master.customers.selectOptionColumns.id)
+            .build()
+          const existingCustomers = await Query(
+            existingQuery,
+            [id],
+            Master.customers.prefix_,
+          )
+          existingCustomer = existingCustomers[0] || null
+        }
+
+        // If not found by ID, check by code
+        if (!existingCustomer) {
+          const codeQuery = `SELECT ${Master.customers.selectOptionColumns.id}, ${Master.customers.selectOptionColumns.code}, ${Master.customers.selectOptionColumns.name}, ${Master.customers.selectOptionColumns.category}, ${Master.customers.selectOptionColumns.type}, ${Master.customers.selectOptionColumns.status} FROM ${Master.customers.tablename} WHERE UPPER(${Master.customers.selectOptionColumns.code}) = ? LIMIT 1`
+          const codeResults = await Query(
+            codeQuery,
+            [normalizedCode.toUpperCase()],
+            Master.customers.prefix_,
+          )
+          existingCustomer = codeResults[0] || null
+        }
+
+        if (existingCustomer) {
+          // Update existing customer
+          const isDuplicateCode = await findCustomerCodeDuplicate(normalizedCode, existingCustomer.id)
+          if (isDuplicateCode) {
+            results.errors.push({
+              customer,
+              message: 'Customer code already exists',
+            })
+            continue
+          }
+
+          const updateQuery = sql
+            .update(Master.customers.tablename)
+            .set([
+              Master.customers.selectOptionColumns.code,
+              Master.customers.selectOptionColumns.name,
+              Master.customers.selectOptionColumns.category,
+              Master.customers.selectOptionColumns.type,
+              Master.customers.selectOptionColumns.status,
+            ])
+            .where(Master.customers.selectOptionColumns.id)
+            .build()
+
+          const queries = [
+            {
+              sql: updateQuery,
+              values: [normalizedCode, name, category, type, finalStatus, existingCustomer.id],
+            },
+          ]
+
+          // Handle info table update
+          const keyColumn = customerInfoColumns.includes('ci_customer_id')
+            ? 'ci_customer_id'
+            : customerInfoColumns.includes('ci_customer_code')
+              ? 'ci_customer_code'
+              : customerInfoColumns.includes('ci_customer_name')
+                ? 'ci_customer_name'
+                : null
+
+          if (keyColumn) {
+            const infoLookupValue =
+              keyColumn === 'ci_customer_id'
+                ? existingCustomer.id
+                : keyColumn === 'ci_customer_code'
+                  ? existingCustomer.code
+                  : existingCustomer.name
+
+            const existingInfoQuery = `SELECT ${keyColumn} FROM customers_information WHERE ${keyColumn} = ?`
+            const existingInfoRows = await Query(existingInfoQuery, [infoLookupValue])
+            const hasInfoRecord = existingInfoRows.length > 0
+
+            if (hasInfoRecord) {
+              const updateInfo = buildCustomerInfoUpdateQuery(
+                customerInfoColumns,
+                keyColumn,
+                infoLookupValue,
+                existingCustomer.code,
+                existingCustomer.name,
+                code,
+                name,
+                address,
+                tin,
+                details,
+                contact,
+              )
+              if (updateInfo) {
+                queries.push(updateInfo)
+              }
+            } else {
+              const customerInfoInsert = buildCustomerInfoInsertQuery(
+                customerInfoColumns,
+                code,
+                name,
+                address,
+                tin,
+                details,
+                contact,
+                keyColumn === 'ci_customer_id' ? existingCustomer.id : undefined,
+              )
+              if (customerInfoInsert) {
+                queries.push(customerInfoInsert)
+              }
+            }
+          }
+
+          await Transaction(queries)
+
+          // Build change description
+          const changes = []
+          if (existingCustomer.code !== normalizedCode) changes.push(`code='${normalizedCode}'`)
+          if (existingCustomer.name !== name) changes.push(`name='${name}'`)
+          if (existingCustomer.category !== category) changes.push(`category='${category}'`)
+          if (existingCustomer.type !== type) changes.push(`type='${type}'`)
+          if (existingCustomer.status !== finalStatus) changes.push(`status='${finalStatus}'`)
+          const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes'
+
+          // Audit trail for update
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              existingCustomer.id || null,
+              'CUSTOMER',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT UPDATE ID ${existingCustomer.id}: ${changeDesc}`,
+            ],
+          })
+
+          results.updated.push({
+            id: existingCustomer.id,
+            code: normalizedCode,
+            name,
+          })
+        } else {
+          // Create new customer
+          const isDuplicateCode = await findCustomerCodeDuplicate(normalizedCode)
+          if (isDuplicateCode) {
+            results.errors.push({
+              customer,
+              message: 'Customer code already exists',
+            })
+            continue
+          }
+
+          const pool = getTenantPool()
+          const connection = await pool.getConnection()
+
+          let newCustomerId = null
+          try {
+            await connection.beginTransaction()
+
+            const insertCustomerQuery = sql
+              .insert(Master.customers.tablename, {
+                columns: Master.customers.insertColumns,
+                prefix: Master.customers.prefix,
+                isTransaction: true,
+              })
+              .build()
+
+            const [customerResult] = await connection.execute(insertCustomerQuery, [
+              normalizedCode || null,
+              name || null,
+              category || null,
+              type || null,
+              finalStatus,
+            ])
+
+            newCustomerId = customerResult.insertId
+            if (!newCustomerId) {
+              throw new Error('Failed to get customer ID from insertion')
+            }
+
+            const customerInfoInsert = buildCustomerInfoInsertQuery(
+              customerInfoColumns,
+              code,
+              name,
+              address,
+              tin,
+              details,
+              contact,
+              newCustomerId,
+            )
+
+            if (customerInfoInsert) {
+              await connection.execute(customerInfoInsert.sql, customerInfoInsert.values)
+            }
+
+            await connection.commit()
+          } catch (error) {
+            if (connection) {
+              try {
+                await connection.rollback()
+              } catch (rollbackError) {
+                console.error('Error rolling back customer import transaction:', rollbackError)
+              }
+            }
+            throw error
+          } finally {
+            if (connection) {
+              connection.release()
+            }
+          }
+
+          // Audit trail for create
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              newCustomerId || null,
+              'CUSTOMER',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT CREATE: ID ${newCustomerId}`,
+            ],
+          })
+
+          results.created.push({
+            id: newCustomerId,
+            code: normalizedCode,
+            name,
+          })
+        }
+      } catch (error) {
+        console.error('Error processing customer:', customer, error)
+        results.errors.push({
+          customer,
+          message: error.message || 'Failed to process customer',
+        })
+      }
+    }
+
+    // Execute all audit trail queries in a single transaction
+    if (auditQueries.length > 0) {
+      await Transaction(auditQueries)
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.errors.length} errors`,
+      data: results,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error importing customers:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while importing customers',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
 module.exports = {
   getCustomers,
   getCustomerTransactions,
   createCustomer,
   updateCustomer,
+  importCustomers,
 }

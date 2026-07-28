@@ -136,12 +136,55 @@ const useChartsOfAccounts = () => {
     }
   }
 
+  const importChartsOfAccounts = async (accounts) => {
+    try {
+      const token = localStorage.getItem('token')
+
+      if (!token) {
+        throw new Error('No authorization token found')
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts/import`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ accounts }),
+        },
+      )
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || `HTTP error! status: ${response.status}`)
+      }
+
+      if (result.success) {
+        // Refresh the charts of accounts list
+        await fetchChartsOfAccounts()
+        return { success: true, data: result.data }
+      } else {
+        return {
+          success: false,
+          message: result.message || 'Failed to import charts of accounts',
+        }
+      }
+    } catch (err) {
+      console.error('Error importing charts of accounts:', err.message)
+      return { success: false, message: err.message }
+    }
+  }
+
   return {
     chartsOfAccounts,
     loading,
     error,
     createChartsOfAccount,
     updateChartsOfAccount,
+    importChartsOfAccounts,
   }
 }
 

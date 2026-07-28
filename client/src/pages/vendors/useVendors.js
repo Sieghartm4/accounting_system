@@ -159,7 +159,41 @@ const useVendors = () => {
     }
   }
 
-  return { vendors, loading, error, createVendor, updateVendor }
+  const importVendors = async (vendors) => {
+    try {
+      const token = localStorage.getItem('token')
+
+      if (!token) {
+        throw new Error('No authorization token found')
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ vendors }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
+        await fetchVendors()
+        return { success: true, data: result.data }
+      } else {
+        return { success: false, message: result.message || 'Failed to import vendors' }
+      }
+    } catch (err) {
+      return { success: false, message: err.message }
+    }
+  }
+
+  return { vendors, loading, error, createVendor, updateVendor, importVendors }
 }
 
 export default useVendors

@@ -348,8 +348,244 @@ const updateVat = async (req, res, next) => {
   }
 }
 
+const importVat = async (req, res, next) => {
+  try {
+    const { vats } = req.body
+
+    if (!Array.isArray(vats) || vats.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'VAT array is required',
+      })
+    }
+
+    const results = {
+      created: [],
+      updated: [],
+      errors: [],
+    }
+
+    const now = new Date()
+    const auditQueries = []
+
+    for (const vat of vats) {
+      try {
+        const { id, code, name, rate, type, sub_type, description, status } = vat
+        const normalizedCode = String(code || '').trim()
+        const normalizedSubType =
+          sub_type === '' || sub_type === null || sub_type === undefined
+            ? null
+            : sub_type
+
+        // Validate required fields
+        if (
+          !normalizedCode ||
+          !name ||
+          rate === undefined ||
+          !type ||
+          !description ||
+          !status
+        ) {
+          results.errors.push({
+            vat,
+            message: 'Missing required fields (code, name, rate, type, description, status)',
+          })
+          continue
+        }
+
+        // Check if VAT exists by ID or code
+        let existingVat = null
+        if (id) {
+          const existingQuery = sql
+            .select([
+              Master.vat.selectOptionColumns.id,
+              Master.vat.selectOptionColumns.code,
+              Master.vat.selectOptionColumns.name,
+              Master.vat.selectOptionColumns.rate,
+              Master.vat.selectOptionColumns.type,
+              Master.vat.selectOptionColumns.sub_type,
+              Master.vat.selectOptionColumns.description,
+              Master.vat.selectOptionColumns.status,
+            ])
+            .from(Master.vat.tablename)
+            .where(Master.vat.selectOptionColumns.id)
+            .build()
+          const existingVats = await Query(
+            existingQuery,
+            [id],
+            Master.vat.prefix_,
+          )
+          existingVat = existingVats[0] || null
+        }
+
+        // If not found by ID, check by code
+        if (!existingVat) {
+          const codeQuery = `SELECT ${Master.vat.selectOptionColumns.id}, ${Master.vat.selectOptionColumns.code}, ${Master.vat.selectOptionColumns.name}, ${Master.vat.selectOptionColumns.rate}, ${Master.vat.selectOptionColumns.type}, ${Master.vat.selectOptionColumns.sub_type}, ${Master.vat.selectOptionColumns.description}, ${Master.vat.selectOptionColumns.status} FROM ${Master.vat.tablename} WHERE UPPER(${Master.vat.selectOptionColumns.code}) = ? LIMIT 1`
+          const codeResults = await Query(
+            codeQuery,
+            [normalizedCode.toUpperCase()],
+            Master.vat.prefix_,
+          )
+          existingVat = codeResults[0] || null
+        }
+
+        if (existingVat) {
+          // Update existing VAT
+          const updateQuery = sql
+            .update(Master.vat.tablename)
+            .set([
+              Master.vat.selectOptionColumns.code,
+              Master.vat.selectOptionColumns.name,
+              Master.vat.selectOptionColumns.rate,
+              Master.vat.selectOptionColumns.type,
+              Master.vat.selectOptionColumns.sub_type,
+              Master.vat.selectOptionColumns.description,
+              Master.vat.selectOptionColumns.status,
+            ])
+            .where(Master.vat.selectOptionColumns.id)
+            .build()
+
+          const queries = [
+            {
+              sql: updateQuery,
+              values: [normalizedCode, name, rate, type, normalizedSubType, description, status, existingVat.id],
+            },
+          ]
+
+          await Transaction(queries)
+
+          // Build change description
+          const changes = []
+          if (existingVat.code !== normalizedCode) changes.push(`code='${normalizedCode}'`)
+          if (existingVat.name !== name) changes.push(`name='${name}'`)
+          if (existingVat.rate != rate) changes.push(`rate='${rate}'`)
+          if (existingVat.type !== type) changes.push(`type='${type}'`)
+          if (existingVat.sub_type !== normalizedSubType) changes.push(`sub_type='${normalizedSubType}'`)
+          if (existingVat.description !== description) changes.push(`description='${description}'`)
+          if (existingVat.status !== status) changes.push(`status='${status}'`)
+          const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes'
+
+          // Audit trail for update
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              existingVat.id || null,
+              'VAT',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT UPDATE ID ${existingVat.id}: ${changeDesc}`,
+            ],
+          })
+
+          results.updated.push({
+            id: existingVat.id,
+            code: normalizedCode,
+            name,
+          })
+        } else {
+          // Create new VAT
+          const isDuplicateCode = await findVatCodeDuplicate(normalizedCode)
+          if (isDuplicateCode) {
+            results.errors.push({
+              vat,
+              message: 'VAT code already exists',
+            })
+            continue
+          }
+
+          const insertQuery = sql
+            .insert(Master.vat.tablename, {
+              columns: Master.vat.insertColumns,
+              prefix: Master.vat.prefix,
+              isTransaction: true,
+            })
+            .build()
+
+          const queries = [
+            {
+              sql: insertQuery,
+              values: [normalizedCode, name, rate, type, normalizedSubType, description, status],
+            },
+          ]
+
+          await Transaction(queries)
+
+          const getIdQuery = `SELECT LAST_INSERT_ID() as insertId`
+          const idResult = await Query(getIdQuery)
+          const newVatId = idResult[0]?.insertId
+
+          if (!newVatId) {
+            throw new Error('Failed to get VAT ID from insertion')
+          }
+
+          // Audit trail for create
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              newVatId || null,
+              'VAT',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT CREATE: ID ${newVatId}`,
+            ],
+          })
+
+          results.created.push({
+            id: newVatId,
+            code: normalizedCode,
+            name,
+          })
+        }
+      } catch (error) {
+        console.error('Error processing VAT:', vat, error)
+        results.errors.push({
+          vat,
+          message: error.message || 'Failed to process VAT',
+        })
+      }
+    }
+
+    // Execute all audit trail queries in a single transaction
+    if (auditQueries.length > 0) {
+      await Transaction(auditQueries)
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.errors.length} errors`,
+      data: results,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error importing VAT:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while importing VAT',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
 module.exports = {
   getVat,
   createVat,
   updateVat,
+  importVat,
 }

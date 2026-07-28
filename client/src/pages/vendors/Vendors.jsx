@@ -9,6 +9,7 @@ import {
   Download,
   Plus,
   Edit2,
+  Upload,
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import RightSideModal from '../../components/RightSideModal'
@@ -18,7 +19,7 @@ import ProtectedAction from '../../components/ProtectedAction'
 import useVendors from './useVendors'
 
 function VendorsContent() {
-  const { vendors, loading, error, createVendor, updateVendor } = useVendors()
+  const { vendors, loading, error, createVendor, updateVendor, importVendors } = useVendors()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingVendor, setEditingVendor] = useState(null)
@@ -34,6 +35,7 @@ function VendorsContent() {
     status: 'active',
   })
   const [toast, setToast] = useState(null)
+  const [importing, setImporting] = useState(false)
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -102,6 +104,141 @@ function VendorsContent() {
     if (digits.length > 9) parts.push(digits.slice(9, 14))
 
     return parts.join('-')
+  }
+
+  const handleExportVendors = () => {
+    try {
+      if (!vendors || vendors.length === 0) {
+        setToast({ type: 'error', message: 'No vendors to export' })
+        return
+      }
+
+      const headers = ['id', 'code', 'name', 'category', 'type', 'address', 'tin', 'details', 'contact', 'status']
+      const csvRows = []
+      csvRows.push(headers.join(','))
+
+      vendors.forEach((row) => {
+        const values = headers.map((h) => {
+          let val = row[h]
+          if (val === null || val === undefined) return ''
+          if (typeof val === 'object') {
+            try {
+              val = JSON.stringify(val)
+            } catch (e) {
+              val = String(val)
+            }
+          }
+          const escaped = String(val).replace(/"/g, '""')
+          return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped
+        })
+        csvRows.push(values.join(','))
+      })
+
+      const csvContent = csvRows.join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `vendors_${Date.now()}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      setToast({ type: 'success', message: 'Export started' })
+    } catch (err) {
+      setToast({ type: 'error', message: 'Failed to export CSV' })
+    }
+  }
+
+  const parseCSV = (csvText) => {
+    const lines = csvText.trim().split('\n')
+    if (lines.length < 2) return []
+
+    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
+    const exclude = new Set(['id', '_id', 'action'])
+    const validHeaders = headers.filter((h) => !exclude.has(h))
+
+    const vendorsList = []
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i])
+      if (values.length !== headers.length) continue
+
+      const vendor = {}
+      validHeaders.forEach((header, index) => {
+        vendor[header] = values[index]
+      })
+      vendorsList.push(vendor)
+    }
+
+    return vendorsList
+  }
+
+  const parseCSVLine = (line) => {
+    const result = []
+    let current = ''
+    let inQuotes = false
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"'
+          i++
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim())
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    result.push(current.trim())
+    return result
+  }
+
+  const handleImportVendors = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+      setToast({ type: 'error', message: 'Please select a CSV file' })
+      return
+    }
+
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const vendorsList = parseCSV(text)
+
+      if (vendorsList.length === 0) {
+        setToast({ type: 'error', message: 'No valid vendors found in CSV' })
+        return
+      }
+
+      const result = await importVendors(vendorsList)
+
+      if (result.success) {
+        const { created, updated, errors } = result.data
+        setToast({
+          type: 'success',
+          message: `Import completed: ${created.length} created, ${updated.length} updated${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
+        })
+      } else {
+        setToast({
+          type: 'error',
+          message: result.message || 'Failed to import vendors',
+        })
+      }
+    } catch (err) {
+      console.error('Import error:', err)
+      setToast({ type: 'error', message: 'Failed to read CSV file' })
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -208,10 +345,26 @@ function VendorsContent() {
           </div>
 
           <div className="flex gap-3">
-            <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
+            <button
+              onClick={handleExportVendors}
+              className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm"
+            >
               <Download size={14} />
               EXPORT LIST
             </button>
+            <ProtectedAction routeName="vendors">
+              <label className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm cursor-pointer">
+                <Upload size={14} />
+                {importing ? 'IMPORTING...' : 'IMPORT'}
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImportVendors}
+                  className="hidden"
+                  disabled={importing}
+                />
+              </label>
+            </ProtectedAction>
             <ProtectedAction routeName="vendors">
               <button
                 onClick={handleAddVendorClick}

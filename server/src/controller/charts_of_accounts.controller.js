@@ -276,8 +276,227 @@ const updateChartsOfAccount = async (req, res, next) => {
   }
 }
 
+const importChartsOfAccounts = async (req, res, next) => {
+  try {
+    const { accounts } = req.body
+
+    if (!Array.isArray(accounts) || accounts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Accounts array is required',
+      })
+    }
+
+    const results = {
+      created: [],
+      updated: [],
+      errors: [],
+    }
+
+    const now = new Date()
+    const auditQueries = []
+
+    for (const account of accounts) {
+      try {
+        const { id, code, name, type, description, status = 'active' } = account
+        const normalizedCode = String(code || '').trim()
+
+        // Validate required fields
+        if (!normalizedCode || !name || !type || !description) {
+          results.errors.push({
+            account,
+            message: 'Missing required fields (code, name, type, description)',
+          })
+          continue
+        }
+
+        // Check if account exists by ID or code
+        let existingAccount = null
+        if (id) {
+          const existingQuery = sql
+            .select([
+              Master.charts_of_accounts.selectOptionColumns.id,
+              Master.charts_of_accounts.selectOptionColumns.code,
+              Master.charts_of_accounts.selectOptionColumns.name,
+              Master.charts_of_accounts.selectOptionColumns.type,
+              Master.charts_of_accounts.selectOptionColumns.description,
+              Master.charts_of_accounts.selectOptionColumns.status,
+            ])
+            .from(Master.charts_of_accounts.tablename)
+            .where(Master.charts_of_accounts.selectOptionColumns.id)
+            .build()
+          const existingAccounts = await Query(
+            existingQuery,
+            [id],
+            Master.charts_of_accounts.prefix_,
+          )
+          existingAccount = existingAccounts[0] || null
+        }
+
+        // If not found by ID, check by code
+        if (!existingAccount) {
+          const codeQuery = `SELECT ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.code}, ${Master.charts_of_accounts.selectOptionColumns.name}, ${Master.charts_of_accounts.selectOptionColumns.type}, ${Master.charts_of_accounts.selectOptionColumns.description}, ${Master.charts_of_accounts.selectOptionColumns.status} FROM ${Master.charts_of_accounts.tablename} WHERE UPPER(${Master.charts_of_accounts.selectOptionColumns.code}) = ? LIMIT 1`
+          const codeResults = await Query(
+            codeQuery,
+            [normalizedCode.toUpperCase()],
+            Master.charts_of_accounts.prefix_,
+          )
+          existingAccount = codeResults[0] || null
+        }
+
+        if (existingAccount) {
+          // Update existing account
+          const updateQuery = sql
+            .update(Master.charts_of_accounts.tablename)
+            .set([
+              Master.charts_of_accounts.selectOptionColumns.code,
+              Master.charts_of_accounts.selectOptionColumns.name,
+              Master.charts_of_accounts.selectOptionColumns.type,
+              Master.charts_of_accounts.selectOptionColumns.description,
+              Master.charts_of_accounts.selectOptionColumns.status,
+            ])
+            .where(Master.charts_of_accounts.selectOptionColumns.id)
+            .build()
+
+          const queries = [
+            {
+              sql: updateQuery,
+              values: [normalizedCode, name, type, description, status, existingAccount.id],
+            },
+          ]
+
+          await Transaction(queries)
+
+          // Build change description
+          const changes = []
+          if (existingAccount.code !== normalizedCode) changes.push(`code='${normalizedCode}'`)
+          if (existingAccount.name !== name) changes.push(`name='${name}'`)
+          if (existingAccount.type !== type) changes.push(`type='${type}'`)
+          if (existingAccount.description !== description) changes.push(`description='${description}'`)
+          if (existingAccount.status !== status) changes.push(`status='${status}'`)
+          const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes'
+
+          // Audit trail for update
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              existingAccount.id || null,
+              'CHARTS_OF_ACCOUNTS',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT UPDATE ID ${existingAccount.id}: ${changeDesc}`,
+            ],
+          })
+
+          results.updated.push({
+            id: existingAccount.id,
+            code: normalizedCode,
+            name,
+          })
+        } else {
+          // Create new account
+          const isDuplicateCode = await findChartCodeDuplicate(normalizedCode)
+          if (isDuplicateCode) {
+            results.errors.push({
+              account,
+              message: 'Account code already exists',
+            })
+            continue
+          }
+
+          const insertQuery = sql
+            .insert(Master.charts_of_accounts.tablename, {
+              columns: Master.charts_of_accounts.insertColumns,
+              prefix: Master.charts_of_accounts.prefix,
+              isTransaction: true,
+            })
+            .build()
+
+          const queries = [
+            {
+              sql: insertQuery,
+              values: [normalizedCode, name, type, description, status],
+            },
+          ]
+
+          await Transaction(queries)
+
+          const getIdQuery = `SELECT LAST_INSERT_ID() as insertId`
+          const idResult = await Query(getIdQuery)
+          const newAccountId = idResult[0]?.insertId
+
+          if (!newAccountId) {
+            throw new Error('Failed to get charts of account ID from insertion')
+          }
+
+          // Audit trail for create
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              newAccountId || null,
+              'CHARTS_OF_ACCOUNTS',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT CREATE: ID ${newAccountId}`,
+            ],
+          })
+
+          results.created.push({
+            id: newAccountId,
+            code: normalizedCode,
+            name,
+          })
+        }
+      } catch (error) {
+        console.error('Error processing account:', account, error)
+        results.errors.push({
+          account,
+          message: error.message || 'Failed to process account',
+        })
+      }
+    }
+
+    // Execute all audit trail queries in a single transaction
+    if (auditQueries.length > 0) {
+      await Transaction(auditQueries)
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.errors.length} errors`,
+      data: results,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error importing charts of accounts:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while importing charts of accounts',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
 module.exports = {
   getChartsOfAccounts,
   createChartsOfAccount,
   updateChartsOfAccount,
+  importChartsOfAccounts,
 }

@@ -315,8 +315,238 @@ const updateResponsibilityCenter = async (req, res, next) => {
   }
 }
 
+const importResponsibilityCenters = async (req, res, next) => {
+  try {
+    const { centers } = req.body
+
+    if (!Array.isArray(centers) || centers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Centers array is required',
+      })
+    }
+
+    const results = {
+      created: [],
+      updated: [],
+      errors: [],
+    }
+
+    const now = new Date()
+    const auditQueries = []
+
+    for (const center of centers) {
+      try {
+        const { id, code, name, department, status } = center
+        const normalizedName = String(name || '').trim()
+        const normalizedStatus = String(status || 'ACTIVE').trim() || 'ACTIVE'
+        let normalizedCode = String(code || '').trim()
+
+        // Validate required fields
+        if (!normalizedName) {
+          results.errors.push({
+            center,
+            message: 'Missing required field (name)',
+          })
+          continue
+        }
+
+        if (!normalizedCode) {
+          normalizedCode = await generateResponsibilityCenterCode(normalizedName)
+        }
+
+        // Check if center exists by ID or code
+        let existingCenter = null
+        if (id) {
+          const existingQuery = sql
+            .select([
+              Accounting.responsibility_center.selectOptionColumns.id,
+              Accounting.responsibility_center.selectOptionColumns.code,
+              Accounting.responsibility_center.selectOptionColumns.name,
+              Accounting.responsibility_center.selectOptionColumns.department,
+              Accounting.responsibility_center.selectOptionColumns.status,
+            ])
+            .from(Accounting.responsibility_center.tablename)
+            .where(Accounting.responsibility_center.selectOptionColumns.id)
+            .build()
+          const existingCenters = await Query(
+            existingQuery,
+            [id],
+            Accounting.responsibility_center.prefix_,
+          )
+          existingCenter = existingCenters[0] || null
+        }
+
+        // If not found by ID, check by code
+        if (!existingCenter) {
+          const codeQuery = `SELECT ${Accounting.responsibility_center.selectOptionColumns.id}, ${Accounting.responsibility_center.selectOptionColumns.code}, ${Accounting.responsibility_center.selectOptionColumns.name}, ${Accounting.responsibility_center.selectOptionColumns.department}, ${Accounting.responsibility_center.selectOptionColumns.status} FROM ${Accounting.responsibility_center.tablename} WHERE UPPER(${Accounting.responsibility_center.selectOptionColumns.code}) = ? LIMIT 1`
+          const codeResults = await Query(
+            codeQuery,
+            [normalizedCode.toUpperCase()],
+            Accounting.responsibility_center.prefix_,
+          )
+          existingCenter = codeResults[0] || null
+        }
+
+        if (existingCenter) {
+          // Update existing center
+          const isDuplicateCode = await findResponsibilityCenterCodeDuplicate(
+            normalizedCode,
+            existingCenter.id,
+          )
+          if (isDuplicateCode) {
+            results.errors.push({
+              center,
+              message: 'Responsibility center code already exists',
+            })
+            continue
+          }
+
+          const updateQuery = sql
+            .update(Accounting.responsibility_center.tablename)
+            .set([
+              Accounting.responsibility_center.selectOptionColumns.code,
+              Accounting.responsibility_center.selectOptionColumns.name,
+              Accounting.responsibility_center.selectOptionColumns.department,
+              Accounting.responsibility_center.selectOptionColumns.status,
+            ])
+            .where(Accounting.responsibility_center.selectOptionColumns.id)
+            .build()
+
+          await Transaction([
+            {
+              sql: updateQuery,
+              values: [normalizedCode, name, department || null, status, existingCenter.id],
+            },
+          ])
+
+          const changes = []
+          if (existingCenter.code !== normalizedCode) changes.push(`code='${normalizedCode}'`)
+          if (existingCenter.name !== name) changes.push(`name='${name}'`)
+          if (existingCenter.department !== department) changes.push(`department='${department}'`)
+          if (existingCenter.status !== status) changes.push(`status='${status}'`)
+          const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes'
+
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              existingCenter.id || null,
+              'RESPONSIBILITY_CENTER',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT UPDATE ID ${existingCenter.id}: ${changeDesc}`,
+            ],
+          })
+
+          results.updated.push({
+            id: existingCenter.id,
+            code: normalizedCode,
+            name,
+          })
+        } else {
+          // Create new center
+          const isDuplicateCode = await findResponsibilityCenterCodeDuplicate(normalizedCode)
+          if (isDuplicateCode) {
+            results.errors.push({
+              center,
+              message: 'Responsibility center code already exists',
+            })
+            continue
+          }
+
+          const queries = []
+          queries.push({
+            sql: sql
+              .insert(Accounting.responsibility_center.tablename, {
+                columns: Accounting.responsibility_center.insertColumns,
+                prefix: Accounting.responsibility_center.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              normalizedCode || null,
+              normalizedName || null,
+              department || null,
+              normalizedStatus || null,
+            ],
+          })
+
+          await Transaction(queries)
+
+          const getIdQuery = `SELECT LAST_INSERT_ID() as insertId`
+          const idResult = await Query(getIdQuery)
+          const newId = idResult[0]?.insertId
+
+          if (!newId) {
+            throw new Error('Failed to get responsibility center ID from insertion')
+          }
+
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              newId || null,
+              'RESPONSIBILITY_CENTER',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT CREATE: ID ${newId}`,
+            ],
+          })
+
+          results.created.push({
+            id: newId,
+            code: normalizedCode,
+            name,
+          })
+        }
+      } catch (error) {
+        console.error('Error processing center:', center, error)
+        results.errors.push({
+          center,
+          message: error.message || 'Failed to process center',
+        })
+      }
+    }
+
+    if (auditQueries.length > 0) {
+      await Transaction(auditQueries)
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.errors.length} errors`,
+      data: results,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error importing responsibility centers:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while importing responsibility centers',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
 module.exports = {
   getResponsibilityCenters,
   createResponsibilityCenter,
   updateResponsibilityCenter,
+  importResponsibilityCenters,
 }

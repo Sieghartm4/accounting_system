@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, ClipboardCheck, ShieldCheck, Clock, ArrowRight, Download, Plus, X, Edit2 } from 'lucide-react';
+import { FileText, ClipboardCheck, ShieldCheck, Clock, ArrowRight, Download, Plus, X, Edit2, Upload } from 'lucide-react';
 import DynamicTable from '../../components/DynamicTable';
 import RouteProtection from '../../components/RouteProtection';
 import ProtectedAction from '../../components/ProtectedAction';
@@ -9,7 +9,7 @@ import DynamicToast from '../../components/DynamicToast';
 import useProforma from './useProforma';
 
 function ProformaContent() {
-  const { proforma, loading, error, chartsOfAccounts, coaLoading, createProformaEntry, updateProformaEntry } = useProforma();
+  const { proforma, loading, error, chartsOfAccounts, coaLoading, createProformaEntry, updateProformaEntry, importProformaEntries } = useProforma();
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -26,6 +26,7 @@ function ProformaContent() {
   });
   const [toast, setToast] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [coaSearchTerm, setCoaSearchTerm] = useState('');
   const [showCoaDropdown, setShowCoaDropdown] = useState(false);
   const coaDropdownRef = useRef(null);
@@ -58,6 +59,96 @@ function ProformaContent() {
     
     setIsSubmitting(false);
   };
+
+  const parseCSV = (csvText) => {
+    const lines = csvText.trim().split('\n')
+    if (lines.length < 2) return []
+
+    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
+    const exclude = new Set(['id', '_id', 'action'])
+    const validHeaders = headers.filter((h) => !exclude.has(h))
+
+    const entries = []
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i])
+      if (values.length !== headers.length) continue
+
+      const entry = {}
+      validHeaders.forEach((header, index) => {
+        entry[header] = values[index]
+      })
+      entries.push(entry)
+    }
+
+    return entries
+  }
+
+  const parseCSVLine = (line) => {
+    const result = []
+    let current = ''
+    let inQuotes = false
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"'
+          i++
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim())
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    result.push(current.trim())
+    return result
+  }
+
+  const handleImportProforma = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+      setToast({ type: 'error', message: 'Please select a CSV file' })
+      return
+    }
+
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const entries = parseCSV(text)
+
+      if (entries.length === 0) {
+        setToast({ type: 'error', message: 'No valid entries found in CSV' })
+        return
+      }
+
+      const result = await importProformaEntries(entries)
+
+      if (result.success) {
+        const { created, updated, errors } = result.data
+        setToast({
+          type: 'success',
+          message: `Import completed: ${created.length} created, ${updated.length} updated${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
+        })
+      } else {
+        setToast({
+          type: 'error',
+          message: result.message || 'Failed to import proforma entries',
+        })
+      }
+    } catch (err) {
+      console.error('Import error:', err)
+      setToast({ type: 'error', message: 'Failed to read CSV file' })
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
+  }
 
   const openModal = (proformaData = null) => {
     if (proformaData) {
@@ -187,6 +278,19 @@ function ProformaContent() {
               <Download size={14} />
               EXPORT DRAFTS
             </button>
+            <ProtectedAction routeName="proforma_entries">
+              <label className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm cursor-pointer">
+                <Upload size={14} />
+                {importing ? 'IMPORTING...' : 'IMPORT DRAFTS'}
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImportProforma}
+                  className="hidden"
+                  disabled={importing}
+                />
+              </label>
+            </ProtectedAction>
             <ProtectedAction routeName="proforma_entries">
               <button onClick={openModal} className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase">
                 <ClipboardCheck size={14} />

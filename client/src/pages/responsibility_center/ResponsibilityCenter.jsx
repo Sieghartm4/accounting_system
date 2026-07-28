@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { MapPin, Plus, Download, Edit2, ShieldCheck, Clock } from 'lucide-react'
+import { MapPin, Plus, Download, Edit2, ShieldCheck, Clock, Upload } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
@@ -15,6 +15,7 @@ function ResponsibilityCenterContent() {
     error,
     createResponsibilityCenter,
     updateResponsibilityCenter,
+    importResponsibilityCenters,
   } = useResponsibilityCenter()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -28,6 +29,7 @@ function ResponsibilityCenterContent() {
   })
   const [toast, setToast] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [importing, setImporting] = useState(false)
 
   const statusOptions = ['ACTIVE', 'INACTIVE']
   const departmentOptions = [
@@ -166,6 +168,96 @@ function ResponsibilityCenterContent() {
     }
   }
 
+  const parseCSV = (csvText) => {
+    const lines = csvText.trim().split('\n')
+    if (lines.length < 2) return []
+
+    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
+    const exclude = new Set(['id', '_id', 'action'])
+    const validHeaders = headers.filter((h) => !exclude.has(h))
+
+    const centers = []
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i])
+      if (values.length !== headers.length) continue
+
+      const center = {}
+      validHeaders.forEach((header, index) => {
+        center[header] = values[index]
+      })
+      centers.push(center)
+    }
+
+    return centers
+  }
+
+  const parseCSVLine = (line) => {
+    const result = []
+    let current = ''
+    let inQuotes = false
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"'
+          i++
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim())
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    result.push(current.trim())
+    return result
+  }
+
+  const handleImportResponsibilityCenter = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+      setToast({ type: 'error', message: 'Please select a CSV file' })
+      return
+    }
+
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const centers = parseCSV(text)
+
+      if (centers.length === 0) {
+        setToast({ type: 'error', message: 'No valid centers found in CSV' })
+        return
+      }
+
+      const result = await importResponsibilityCenters(centers)
+
+      if (result.success) {
+        const { created, updated, errors } = result.data
+        setToast({
+          type: 'success',
+          message: `Import completed: ${created.length} created, ${updated.length} updated${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
+        })
+      } else {
+        setToast({
+          type: 'error',
+          message: result.message || 'Failed to import responsibility centers',
+        })
+      }
+    } catch (err) {
+      console.error('Import error:', err)
+      setToast({ type: 'error', message: 'Failed to read CSV file' })
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
+  }
+
   if (loading) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
@@ -224,6 +316,19 @@ function ResponsibilityCenterContent() {
               <Download size={14} />
               EXPORT DATA
             </button>
+            <ProtectedAction routeName="responsibility_center">
+              <label className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm cursor-pointer">
+                <Upload size={14} />
+                {importing ? 'IMPORTING...' : 'IMPORT DATA'}
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImportResponsibilityCenter}
+                  className="hidden"
+                  disabled={importing}
+                />
+              </label>
+            </ProtectedAction>
             <ProtectedAction routeName="responsibility_center">
               <button
                 onClick={() => openModal()}

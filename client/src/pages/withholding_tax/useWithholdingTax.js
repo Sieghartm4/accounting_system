@@ -117,6 +117,43 @@ const useWithholdingTax = () => {
     }
   }
 
+  const importWithholdingTax = async (taxes) => {
+    try {
+      const token = localStorage.getItem('token')
+
+      if (!token) {
+        throw new Error('No authorization token found')
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/withholding_tax/import`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ taxes }),
+        },
+      )
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || `HTTP error! status: ${response.status}`)
+      }
+
+      if (result.success) {
+        await fetchWithholdingTax()
+        return { success: true, data: result.data }
+      } else {
+        return { success: false, message: result.message || 'Failed to import withholding tax' }
+      }
+    } catch (err) {
+      return { success: false, message: err.message }
+    }
+  }
+
   useEffect(() => {
     fetchWithholdingTax()
   }, [])
@@ -128,6 +165,7 @@ const useWithholdingTax = () => {
     createWithholdingTaxEntry,
     updateWithholdingTaxEntry,
     refreshWithholdingTax: fetchWithholdingTax,
+    importWithholdingTax,
   }
 }
 

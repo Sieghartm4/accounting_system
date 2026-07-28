@@ -154,12 +154,49 @@ const useProforma = () => {
     }
   };
 
+  const importProformaEntries = async (entries) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        throw new Error("No authorization token found");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/proforma_entries/import`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ entries }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        await fetchProforma();
+        return { success: true, data: result.data };
+      } else {
+        return { success: false, message: result.message || 'Failed to import proforma entries' };
+      }
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+  };
+
   useEffect(() => {
     fetchProforma();
     fetchChartsOfAccounts();
   }, []);
 
-  return { proforma, loading, error, chartsOfAccounts, coaLoading, createProformaEntry, updateProformaEntry };
+  return { proforma, loading, error, chartsOfAccounts, coaLoading, createProformaEntry, updateProformaEntry, importProformaEntries };
 };
 
 export default useProforma;

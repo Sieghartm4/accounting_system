@@ -638,9 +638,328 @@ const updateVendor = async (req, res, next) => {
     })
   }
 }
+const importVendors = async (req, res, next) => {
+  try {
+    const { vendors } = req.body
+
+    if (!Array.isArray(vendors) || vendors.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vendors array is required',
+      })
+    }
+
+    const results = {
+      created: [],
+      updated: [],
+      errors: [],
+    }
+
+    const now = new Date()
+    const auditQueries = []
+    const vendorInfoColumns = await getInfoTableColumns('vendors_information')
+
+    for (const vendor of vendors) {
+      try {
+        const { id, code, name, category, type, address, tin, details, contact, status } = vendor
+        const normalizedCode = normalizeCodeValue(code)
+        const finalStatus = typeof status !== 'undefined' ? String(status).toUpperCase() : 'ACTIVE'
+
+        // Validate required fields
+        if (!normalizedCode || !name || !address || !tin) {
+          results.errors.push({
+            vendor,
+            message: 'Missing required fields (code, name, address, tin)',
+          })
+          continue
+        }
+
+        // Check if vendor exists by ID or code
+        let existingVendor = null
+        if (id) {
+          const existingQuery = sql
+            .select([
+              Master.vendors.selectOptionColumns.id,
+              Master.vendors.selectOptionColumns.code,
+              Master.vendors.selectOptionColumns.name,
+              Master.vendors.selectOptionColumns.category,
+              Master.vendors.selectOptionColumns.type,
+              Master.vendors.selectOptionColumns.status,
+            ])
+            .from(Master.vendors.tablename)
+            .where(Master.vendors.selectOptionColumns.id)
+            .build()
+          const existingVendors = await Query(
+            existingQuery,
+            [id],
+            Master.vendors.prefix_,
+          )
+          existingVendor = existingVendors[0] || null
+        }
+
+        // If not found by ID, check by code
+        if (!existingVendor) {
+          const codeQuery = `SELECT ${Master.vendors.selectOptionColumns.id}, ${Master.vendors.selectOptionColumns.code}, ${Master.vendors.selectOptionColumns.name}, ${Master.vendors.selectOptionColumns.category}, ${Master.vendors.selectOptionColumns.type}, ${Master.vendors.selectOptionColumns.status} FROM ${Master.vendors.tablename} WHERE UPPER(${Master.vendors.selectOptionColumns.code}) = ? LIMIT 1`
+          const codeResults = await Query(
+            codeQuery,
+            [normalizedCode.toUpperCase()],
+            Master.vendors.prefix_,
+          )
+          existingVendor = codeResults[0] || null
+        }
+
+        if (existingVendor) {
+          // Update existing vendor
+          const isDuplicateCode = await findVendorCodeDuplicate(normalizedCode, existingVendor.id)
+          if (isDuplicateCode) {
+            results.errors.push({
+              vendor,
+              message: 'Vendor code already exists',
+            })
+            continue
+          }
+
+          const updateQuery = sql
+            .update(Master.vendors.tablename)
+            .set([
+              Master.vendors.selectOptionColumns.code,
+              Master.vendors.selectOptionColumns.name,
+              Master.vendors.selectOptionColumns.category,
+              Master.vendors.selectOptionColumns.type,
+              Master.vendors.selectOptionColumns.status,
+            ])
+            .where(Master.vendors.selectOptionColumns.id)
+            .build()
+
+          const queries = [
+            {
+              sql: updateQuery,
+              values: [normalizedCode, name, category, type, finalStatus, existingVendor.id],
+            },
+          ]
+
+          // Handle info table update
+          const keyColumn = vendorInfoColumns.includes('vi_vendor_id')
+            ? 'vi_vendor_id'
+            : vendorInfoColumns.includes('vi_vendor_code')
+              ? 'vi_vendor_code'
+              : vendorInfoColumns.includes('vi_vendor_name')
+                ? 'vi_vendor_name'
+                : null
+
+          if (keyColumn) {
+            const infoLookupValue =
+              keyColumn === 'vi_vendor_id'
+                ? existingVendor.id
+                : keyColumn === 'vi_vendor_code'
+                  ? existingVendor.code
+                  : existingVendor.name
+
+            const existingInfoQuery = `SELECT ${keyColumn} FROM vendors_information WHERE ${keyColumn} = ?`
+            const existingInfoRows = await Query(existingInfoQuery, [infoLookupValue])
+            const hasInfoRecord = existingInfoRows.length > 0
+
+            if (hasInfoRecord) {
+              const updateInfo = buildVendorInfoUpdateQuery(
+                vendorInfoColumns,
+                keyColumn,
+                infoLookupValue,
+                existingVendor.code,
+                existingVendor.name,
+                code,
+                name,
+                address,
+                tin,
+                details,
+                contact,
+              )
+              if (updateInfo) {
+                queries.push(updateInfo)
+              }
+            } else {
+              const vendorInfoInsert = buildVendorInfoInsertQuery(
+                vendorInfoColumns,
+                code,
+                name,
+                address,
+                tin,
+                details,
+                contact,
+                keyColumn === 'vi_vendor_id' ? existingVendor.id : undefined,
+              )
+              if (vendorInfoInsert) {
+                queries.push(vendorInfoInsert)
+              }
+            }
+          }
+
+          await Transaction(queries)
+
+          // Build change description
+          const changes = []
+          if (existingVendor.code !== normalizedCode) changes.push(`code='${normalizedCode}'`)
+          if (existingVendor.name !== name) changes.push(`name='${name}'`)
+          if (existingVendor.category !== category) changes.push(`category='${category}'`)
+          if (existingVendor.type !== type) changes.push(`type='${type}'`)
+          if (existingVendor.status !== finalStatus) changes.push(`status='${finalStatus}'`)
+          const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes'
+
+          // Audit trail for update
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              existingVendor.id || null,
+              'VENDOR',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT UPDATE ID ${existingVendor.id}: ${changeDesc}`,
+            ],
+          })
+
+          results.updated.push({
+            id: existingVendor.id,
+            code: normalizedCode,
+            name,
+          })
+        } else {
+          // Create new vendor
+          const isDuplicateCode = await findVendorCodeDuplicate(normalizedCode)
+          if (isDuplicateCode) {
+            results.errors.push({
+              vendor,
+              message: 'Vendor code already exists',
+            })
+            continue
+          }
+
+          const pool = getTenantPool()
+          const connection = await pool.getConnection()
+
+          let newVendorId = null
+          try {
+            await connection.beginTransaction()
+
+            const insertVendorQuery = sql
+              .insert(Master.vendors.tablename, {
+                columns: Master.vendors.insertColumns,
+                prefix: Master.vendors.prefix,
+                isTransaction: true,
+              })
+              .build()
+
+            const [vendorResult] = await connection.execute(insertVendorQuery, [
+              normalizedCode || null,
+              name || null,
+              category || null,
+              type || null,
+              finalStatus,
+            ])
+
+            newVendorId = vendorResult.insertId
+            if (!newVendorId) {
+              throw new Error('Failed to get vendor ID from insertion')
+            }
+
+            const vendorInfoInsert = buildVendorInfoInsertQuery(
+              vendorInfoColumns,
+              code,
+              name,
+              address,
+              tin,
+              details,
+              contact,
+              newVendorId,
+            )
+
+            if (vendorInfoInsert) {
+              await connection.execute(vendorInfoInsert.sql, vendorInfoInsert.values)
+            }
+
+            await connection.commit()
+          } catch (error) {
+            if (connection) {
+              try {
+                await connection.rollback()
+              } catch (rollbackError) {
+                console.error('Error rolling back vendor import transaction:', rollbackError)
+              }
+            }
+            throw error
+          } finally {
+            if (connection) {
+              connection.release()
+            }
+          }
+
+          // Audit trail for create
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              newVendorId || null,
+              'VENDOR',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT CREATE: ID ${newVendorId}`,
+            ],
+          })
+
+          results.created.push({
+            id: newVendorId,
+            code: normalizedCode,
+            name,
+          })
+        }
+      } catch (error) {
+        console.error('Error processing vendor:', vendor, error)
+        results.errors.push({
+          vendor,
+          message: error.message || 'Failed to process vendor',
+        })
+      }
+    }
+
+    // Execute all audit trail queries in a single transaction
+    if (auditQueries.length > 0) {
+      await Transaction(auditQueries)
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.errors.length} errors`,
+      data: results,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error importing vendors:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while importing vendors',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
 module.exports = {
   getVendors,
   getVendorTransactions,
   createVendor,
   updateVendor,
+  importVendors,
 }
