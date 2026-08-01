@@ -1318,6 +1318,122 @@ const updatePaymentState = async (req, res, next) => {
   }
 }
 
+const cancelPaymentState = async (req, res, next) => {
+  try {
+    const { updates } = req.body
+
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Updates array is required',
+      })
+    }
+
+    let connection
+
+    try {
+      connection = await getTenantPool().getConnection()
+
+      await connection.beginTransaction()
+
+      const validUpdates = updates.filter(
+        (update) =>
+          update &&
+          update.id &&
+          update.currentState !== 'CANCELLED' &&
+          update.currentState !== 'REJECTED',
+      )
+
+      const invalidUpdates = updates.filter(
+        (update) =>
+          !update ||
+          !update.id ||
+          (update.currentState === 'CANCELLED' || update.currentState === 'REJECTED'),
+      )
+
+      if (validUpdates.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'No payments eligible for cancellation. Only payments not already CANCELLED or REJECTED can be cancelled.',
+          ignored: invalidUpdates.map((u) => ({
+            id: u?.id,
+            currentState: u?.currentState,
+          })),
+        })
+      }
+
+      const updatePromises = validUpdates.map(async (update) => {
+        const { id } = update
+
+        if (!id) {
+          throw new Error('Each update requires id')
+        }
+
+        const nextState = 'CANCELLED'
+
+        const updateQuery = sql
+          .update(Accounting.payments.tablename)
+          .set([Accounting.payments.selectOptionColumns.state])
+          .where(Accounting.payments.selectOptionColumns.id)
+          .build()
+
+        const updateValues = [nextState, id]
+
+        return connection.execute(updateQuery, updateValues)
+      })
+
+      const results = await Promise.all(updatePromises)
+
+      await connection.commit()
+
+      // Audit trail for cancellation
+      const now = new Date()
+
+      const auditQueries = []
+
+      validUpdates.forEach((u) => {
+        auditQueries.push({
+          sql: sql
+            .insert(Master.audit_trail.tablename, {
+              columns: Master.audit_trail.insertColumns,
+              prefix: Master.audit_trail.prefix,
+              isTransaction: true,
+            })
+            .build(),
+          values: [
+            u.id,
+            'PAYMENT_STATE',
+            req.context?.username || null,
+            now.toISOString().split('T')[0],
+            now.toTimeString().split(' ')[0],
+            `STATE UPDATE:${u.currentState} → CANCELLED`,
+          ],
+        })
+      })
+
+      await Transaction(auditQueries)
+
+      res.status(200).json({
+        success: true,
+        message: `${validUpdates.length} payment(s) cancelled successfully`,
+        updated: validUpdates.map((u) => u.id),
+        ignored: invalidUpdates.map((u) => ({
+          id: u?.id,
+          currentState: u?.currentState,
+        })),
+      })
+    } catch (error) {
+      if (connection) await connection.rollback()
+      throw error
+    } finally {
+      if (connection) connection.release()
+    }
+  } catch (error) {
+    next(error)
+  }
+}
+
 const getPrintPayments = async (req, res, next) => {
   const { payment_id } = req.params
 
@@ -3036,6 +3152,8 @@ module.exports = {
   updatePayment,
 
   updatePaymentState,
+
+  cancelPaymentState,
 
   getPrintPayments,
 }

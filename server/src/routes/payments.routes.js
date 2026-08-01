@@ -8,6 +8,7 @@ const {
   createPayment,
   updatePayment,
   updatePaymentState,
+  cancelPaymentState,
   getPrintPayments,
 } = require('../controller/payments.controller')
 
@@ -20,6 +21,7 @@ paymentRouter.get('/purchase-payment', getPurchasePayment)
 paymentRouter.get('/purchase-items-payment', getPurchaseItemsPayment)
 paymentRouter.post('/', createPayment)
 paymentRouter.put('/payment-state', updatePaymentState)
+paymentRouter.put('/cancel-state', cancelPaymentState)
 paymentRouter.put('/:payment_id', updatePayment)
 paymentRouter.get('/:payment_id', getAllPayments)
 

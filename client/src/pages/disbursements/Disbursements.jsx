@@ -312,6 +312,73 @@ function DisbursementsContent() {
         },
       },
       {
+        label: 'Cancel Selected',
+        style: 'orange',
+        onClick: async (selectedRows) => {
+          const cancellableRows = selectedRows.filter(
+            (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
+          )
+
+          if (cancellableRows.length === 0) {
+            setToast({
+              type: 'error',
+              message: 'No disbursements are eligible for cancellation',
+            })
+            return
+          }
+
+          setConfirmModal({
+            isOpen: true,
+            onConfirm: async () => {
+              try {
+                const token = localStorage.getItem('token')
+                if (!token) throw new Error('No authentication token found')
+
+                const updates = cancellableRows.map((row) => ({
+                  id: row.id,
+                  currentState: row.state,
+                }))
+
+                const response = await fetch(
+                  `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/cancel-state`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ updates }),
+                  },
+                )
+
+                const result = await response.json()
+                if (!response.ok)
+                  throw new Error(result.message || 'Failed to cancel disbursements')
+
+                await refetchDisbursements()
+                setToast({
+                  type: 'success',
+                  message:
+                    result.message ||
+                    `${cancellableRows.length} disbursement(s) cancelled successfully`,
+                })
+              } catch (error) {
+                setToast({
+                  type: 'error',
+                  message: error.message || 'Failed to cancel disbursements',
+                })
+              }
+            },
+            title: 'Cancel Disbursements',
+            message: `Are you sure you want to cancel ${cancellableRows.length} disbursement(s)?`,
+            type: 'danger',
+          })
+        },
+      },
+      {
+        separator: true,
+      },
+      {
         // ── Internal Copy → fetch data → generate + download PDF directly
         label: 'Internal Copy',
         icon: <FileText size={14} />,
@@ -333,6 +400,11 @@ function DisbursementsContent() {
         // Show approve button if at least one selected row has state PREPARED or CHECKED
         return selectedRows.some(
           (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+        )
+      }
+      if (action.label === 'Cancel Selected') {
+        return selectedRows.some(
+          (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
         )
       }
       return true // Always show other actions

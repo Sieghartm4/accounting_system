@@ -5,6 +5,7 @@ const {
   getAllSales,
   createSales,
   updateSalesState,
+  cancelSalesState,
   updateSale,
   getPrintSales,
 } = require('../controller/sales.controller')
@@ -18,6 +19,7 @@ salesRouter.get('/print/:sales_id', getPrintSales)
 salesRouter.get('/:id', getAllSales)
 salesRouter.post('/', createSales)
 salesRouter.put('/sales-state', updateSalesState)
+salesRouter.put('/cancel-state', cancelSalesState)
 salesRouter.put('/:sales_id', updateSale)
 
 module.exports = {

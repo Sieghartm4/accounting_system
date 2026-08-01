@@ -614,7 +614,9 @@ const DynamicTable = ({
             ? checkboxActionsFilter(selectedRows)
             : checkboxActions
           ).map((action, i) =>
-            action.type === 'dropdown' ? (
+            action.separator ? (
+              <div key={i} className="w-px h-4 bg-red-200" />
+            ) : action.type === 'dropdown' ? (
               <div key={i} className="flex items-center gap-1.5">
                 {action.icon && <span className="w-3 h-3">{action.icon}</span>}
                 <select

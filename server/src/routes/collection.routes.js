@@ -8,6 +8,7 @@ const {
   createCollection,
   updateCollection,
   updateCollectionState,
+  cancelCollectionState,
   getPrintCollections,
 } = require('../controller/collection.controller')
 
@@ -20,6 +21,7 @@ collectionRouter.get('/sales-items-collection', getSalesItemsCollection)
 collectionRouter.get('/print/:collection_id', getPrintCollections)
 collectionRouter.post('/', createCollection)
 collectionRouter.put('/collection-state', updateCollectionState)
+collectionRouter.put('/cancel-state', cancelCollectionState)
 collectionRouter.put('/:collection_id', updateCollection)
 collectionRouter.get('/:collection_id', getAllCollections)
 

@@ -294,6 +294,81 @@ function PaymentsContent() {
         },
       },
       {
+        label: 'Cancel Selected',
+        style: 'orange',
+        onClick: async (selectedRows) => {
+          const cancellableRows = selectedRows.filter(
+            (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
+          )
+
+          if (cancellableRows.length === 0) {
+            setToast({
+              type: 'error',
+              message: 'No payments are eligible for cancellation',
+            })
+            return
+          }
+
+          setConfirmModal({
+            isOpen: true,
+            onConfirm: async () => {
+              try {
+                console.log('Cancelling payments:', cancellableRows)
+
+                const token = localStorage.getItem('token')
+                if (!token) {
+                  throw new Error('No authentication token found')
+                }
+
+                const updates = cancellableRows.map((row) => ({
+                  id: row.id,
+                  currentState: row.state,
+                }))
+
+                const response = await fetch(
+                  `${import.meta.env.VITE_SERVER_LINK}/payments/cancel-state`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ updates }),
+                  },
+                )
+
+                const result = await response.json()
+
+                if (!response.ok) {
+                  throw new Error(result.message || 'Failed to cancel payments')
+                }
+
+                await refetchPayments()
+
+                setToast({
+                  type: 'success',
+                  message:
+                    result.message ||
+                    `${cancellableRows.length} payment(s) cancelled successfully`,
+                })
+              } catch (error) {
+                console.error('Error cancelling payments:', error)
+                setToast({
+                  type: 'error',
+                  message: error.message || 'Failed to cancel payments',
+                })
+              }
+            },
+            title: 'Cancel Payments',
+            message: `Are you sure you want to cancel ${cancellableRows.length} payment(s)?`,
+            type: 'danger',
+          })
+        },
+      },
+      {
+        separator: true,
+      },
+      {
         label: 'Internal Copy',
         icon: <FileText size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
@@ -311,6 +386,11 @@ function PaymentsContent() {
       if (action.label === 'Approve Selected') {
         return selectedRows.some(
           (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+        )
+      }
+      if (action.label === 'Cancel Selected') {
+        return selectedRows.some(
+          (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
         )
       }
       return true

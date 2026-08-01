@@ -1163,41 +1163,138 @@ const updateSalesState = async (req, res, next) => {
 
       res.status(200).json({
         success: true,
-
-        message: `${results.length} receipt(s) updated successfully`,
-
-        data: {
-          updatedCount: results.length,
-
-          updates: validUpdates.map((update) => ({ id: update.id })),
-        },
-
-        timestamp: new Date().toISOString(),
+        message: `${validUpdates.length} sale(s) updated successfully`,
+        updated: validUpdates.map((u) => u.id),
+        ignored: invalidUpdates.map((u) => ({
+          id: u?.id,
+          currentState: u?.currentState,
+        })),
+        stateTransitions,
       })
     } catch (error) {
-      if (connection) {
-        await connection.rollback()
-      }
-
+      if (connection) await connection.rollback()
       throw error
     } finally {
-      if (connection) {
-        connection.release()
-      }
+      if (connection) connection.release()
     }
   } catch (error) {
-    console.error('Error updating sales:', error)
+    next(error)
+  }
+}
 
-    return res.status(500).json({
-      success: false,
+const cancelSalesState = async (req, res, next) => {
+  try {
+    const { updates } = req.body
 
-      message: 'Server error while updating sales',
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Updates array is required',
+      })
+    }
 
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
-    })
+    let connection
+
+    try {
+      connection = await getTenantPool().getConnection()
+
+      await connection.beginTransaction()
+
+      const validUpdates = updates.filter(
+        (update) =>
+          update &&
+          update.id &&
+          update.currentState !== 'CANCELLED' &&
+          update.currentState !== 'REJECTED',
+      )
+
+      const invalidUpdates = updates.filter(
+        (update) =>
+          !update ||
+          !update.id ||
+          (update.currentState === 'CANCELLED' || update.currentState === 'REJECTED'),
+      )
+
+      if (validUpdates.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'No sales eligible for cancellation. Only sales not already CANCELLED or REJECTED can be cancelled.',
+          ignored: invalidUpdates.map((u) => ({
+            id: u?.id,
+            currentState: u?.currentState,
+          })),
+        })
+      }
+
+      const updatePromises = validUpdates.map(async (update) => {
+        const { id } = update
+
+        if (!id) {
+          throw new Error('Each update requires id')
+        }
+
+        const nextState = 'CANCELLED'
+
+        const updateQuery = sql
+          .update(Accounting.sales.tablename)
+          .set([Accounting.sales.selectOptionColumns.state])
+          .where(Accounting.sales.selectOptionColumns.id)
+          .build()
+
+        const updateValues = [nextState, id]
+
+        return connection.execute(updateQuery, updateValues)
+      })
+
+      const results = await Promise.all(updatePromises)
+
+      await connection.commit()
+
+      // Audit trail for cancellation
+      const now = new Date()
+
+      const auditQueries = []
+
+      validUpdates.forEach((u) => {
+        auditQueries.push({
+          sql: sql
+            .insert(Master.audit_trail.tablename, {
+              columns: Master.audit_trail.insertColumns,
+              prefix: Master.audit_trail.prefix,
+              isTransaction: true,
+            })
+            .build(),
+          values: [
+            u.id,
+            'SALES_STATE',
+            req.context?.username || null,
+            now.toISOString().split('T')[0],
+            now.toTimeString().split(' ')[0],
+            `STATE UPDATE:${u.currentState} → CANCELLED`,
+          ],
+        })
+      })
+
+      await Transaction(auditQueries)
+
+      res.status(200).json({
+        success: true,
+        message: `${validUpdates.length} sale(s) cancelled successfully`,
+        updated: validUpdates.map((u) => u.id),
+        ignored: invalidUpdates.map((u) => ({
+          id: u?.id,
+          currentState: u?.currentState,
+        })),
+      })
+    } catch (error) {
+      if (connection) await connection.rollback()
+      throw error
+    } finally {
+      if (connection) connection.release()
+    }
+  } catch (error) {
+    next(error)
   }
 }
 
@@ -3076,6 +3173,8 @@ module.exports = {
   updateSale,
 
   updateSalesState,
+
+  cancelSalesState,
 
   getPrintSales,
 }

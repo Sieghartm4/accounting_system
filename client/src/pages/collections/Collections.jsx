@@ -278,6 +278,81 @@ function CollectionsContent() {
         },
       },
       {
+        label: 'Cancel Selected',
+        style: 'orange',
+        onClick: async (selectedRows) => {
+          const cancellableRows = selectedRows.filter(
+            (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
+          )
+
+          if (cancellableRows.length === 0) {
+            setToast({
+              type: 'error',
+              message: 'No collections are eligible for cancellation',
+            })
+            return
+          }
+
+          setConfirmModal({
+            isOpen: true,
+            onConfirm: async () => {
+              try {
+                console.log('Cancelling collections:', cancellableRows)
+
+                const token = localStorage.getItem('token')
+                if (!token) {
+                  throw new Error('No authentication token found')
+                }
+
+                const updates = cancellableRows.map((row) => ({
+                  id: row.id,
+                  currentState: row.state,
+                }))
+
+                const response = await fetch(
+                  `${import.meta.env.VITE_SERVER_LINK}/collections/cancel-state`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ updates }),
+                  },
+                )
+
+                const result = await response.json()
+
+                if (!response.ok) {
+                  throw new Error(result.message || 'Failed to cancel collections')
+                }
+
+                await refetchCollections()
+
+                setToast({
+                  type: 'success',
+                  message:
+                    result.message ||
+                    `${cancellableRows.length} collection(s) cancelled successfully`,
+                })
+              } catch (error) {
+                console.error('Error cancelling collections:', error)
+                setToast({
+                  type: 'error',
+                  message: error.message || 'Failed to cancel collections',
+                })
+              }
+            },
+            title: 'Cancel Collections',
+            message: `Are you sure you want to cancel ${cancellableRows.length} collection(s)?`,
+            type: 'danger',
+          })
+        },
+      },
+      {
+        separator: true,
+      },
+      {
         label: 'Internal Copy',
         icon: <FileText size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
@@ -295,6 +370,11 @@ function CollectionsContent() {
       if (action.label === 'Approve Selected') {
         return selectedRows.some(
           (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+        )
+      }
+      if (action.label === 'Cancel Selected') {
+        return selectedRows.some(
+          (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
         )
       }
       return true

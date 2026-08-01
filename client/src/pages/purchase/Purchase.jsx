@@ -298,6 +298,81 @@ function PurchaseContent() {
         },
       },
       {
+        label: 'Cancel Selected',
+        style: 'orange',
+        onClick: async (selectedRows) => {
+          const cancellableRows = selectedRows.filter(
+            (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
+          )
+
+          if (cancellableRows.length === 0) {
+            setToast({
+              type: 'error',
+              message: 'No purchases are eligible for cancellation',
+            })
+            return
+          }
+
+          setConfirmModal({
+            isOpen: true,
+            onConfirm: async () => {
+              try {
+                console.log('Cancelling purchases:', cancellableRows)
+
+                const cancelToken = localStorage.getItem('token')
+                if (!cancelToken) {
+                  throw new Error('No authentication token found')
+                }
+
+                const updates = cancellableRows.map((row) => ({
+                  id: row.id,
+                  currentState: row.state,
+                }))
+
+                const cancelResponse = await fetch(
+                  `${import.meta.env.VITE_SERVER_LINK}/purchase/cancel-state`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${cancelToken}`,
+                    },
+                    body: JSON.stringify({ updates }),
+                  },
+                )
+
+                const cancelResult = await cancelResponse.json()
+
+                if (!cancelResponse.ok) {
+                  throw new Error(cancelResult.message || 'Failed to cancel purchases')
+                }
+
+                await refetchPurchases()
+
+                setToast({
+                  type: 'success',
+                  message:
+                    cancelResult.message ||
+                    `${cancellableRows.length} purchase(s) cancelled successfully`,
+                })
+              } catch (error) {
+                console.error('Error cancelling purchases:', error)
+                setToast({
+                  type: 'error',
+                  message: error.message || 'Failed to cancel purchases',
+                })
+              }
+            },
+            title: 'Cancel Purchases',
+            message: `Are you sure you want to cancel ${cancellableRows.length} purchase(s)?`,
+            type: 'danger',
+          })
+        },
+      },
+      {
+        separator: true,
+      },
+      {
         label: 'Internal Copy',
         icon: <FileText size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
@@ -315,6 +390,11 @@ function PurchaseContent() {
       if (action.label === 'Approve Selected') {
         return selectedRows.some(
           (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+        )
+      }
+      if (action.label === 'Cancel Selected') {
+        return selectedRows.some(
+          (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
         )
       }
       return true

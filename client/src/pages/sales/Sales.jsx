@@ -278,6 +278,82 @@ function SalesContent() {
         },
       },
       {
+        label: 'Cancel Selected',
+        style: 'orange',
+        onClick: async (selectedRows) => {
+          const validRows = selectedRows.filter(
+            (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
+          )
+
+          if (validRows.length === 0) {
+            setToast({
+              type: 'warning',
+              message:
+                'Only sales not already CANCELLED, REJECTED or APPROVED can be cancelled. Please select valid rows.',
+            })
+            return
+          }
+
+          setConfirmModal({
+            isOpen: true,
+            onConfirm: async () => {
+              try {
+                console.log('Cancelling sales:', validRows)
+
+                const token = localStorage.getItem('token')
+                if (!token) {
+                  throw new Error('No authentication token found')
+                }
+
+                const updates = validRows.map((row) => ({
+                  id: row.id,
+                  currentState: row.state,
+                }))
+
+                const response = await fetch(
+                  `${import.meta.env.VITE_SERVER_LINK}/sales/cancel-state`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ updates }),
+                  },
+                )
+
+                const result = await response.json()
+
+                if (!response.ok) {
+                  throw new Error(result.message || 'Failed to cancel sales')
+                }
+
+                await refetchSales()
+
+                setToast({
+                  type: 'success',
+                  message:
+                    result.message ||
+                    `${validRows.length} sale(s) cancelled successfully`,
+                })
+              } catch (error) {
+                console.error('Error cancelling sales:', error)
+                setToast({
+                  type: 'error',
+                  message: error.message || 'Failed to cancel sales',
+                })
+              }
+            },
+            title: 'Cancel Sales',
+            message: `Are you sure you want to cancel ${validRows.length} sale(s)?`,
+            type: 'danger',
+          })
+        },
+      },
+      {
+        separator: true,
+      },
+      {
         label: 'Internal Copy',
         icon: <FileText size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
@@ -295,6 +371,11 @@ function SalesContent() {
       if (action.label === 'Approve Selected') {
         return selectedRows.some(
           (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+        )
+      }
+      if (action.label === 'Cancel Selected') {
+        return selectedRows.some(
+          (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
         )
       }
       return true

@@ -660,6 +660,81 @@ function AdjustmentsContent() {
                 })
               },
             },
+            {
+              label: 'Cancel Selected',
+              style: 'orange',
+              onClick: async (selectedRows) => {
+                const cancellableRows = selectedRows.filter(
+                  (row) => row.status !== 'CANCELLED' && row.status !== 'REJECTED' && row.status !== 'APPROVED',
+                )
+
+                if (cancellableRows.length === 0) {
+                  setToast({
+                    type: 'error',
+                    message: 'No adjustments are eligible for cancellation',
+                  })
+                  return
+                }
+
+                setConfirmModal({
+                  isOpen: true,
+                  onConfirm: async () => {
+                    try {
+                      console.log('Cancelling adjustments:', cancellableRows)
+
+                      const token = localStorage.getItem('token')
+                      if (!token) {
+                        throw new Error('No authentication token found')
+                      }
+
+                      const updates = cancellableRows.map((row) => ({
+                        id: row.id,
+                        currentState: row.status,
+                      }))
+
+                      const response = await fetch(
+                        `${import.meta.env.VITE_SERVER_LINK}/adjustments/cancel-state`,
+                        {
+                          method: 'PUT',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${token}`,
+                          },
+                          body: JSON.stringify({ updates }),
+                        },
+                      )
+
+                      const result = await response.json()
+
+                      if (!response.ok) {
+                        throw new Error(
+                          result.message || 'Failed to cancel adjustments',
+                        )
+                      }
+
+                      // Refresh adjustments data
+                      await refetchAdjustments()
+
+                      setToast({
+                        type: 'success',
+                        message:
+                          result.message ||
+                          `${cancellableRows.length} adjustment(s) cancelled successfully`,
+                      })
+                    } catch (error) {
+                      console.error('Error cancelling adjustments:', error)
+                      setToast({
+                        type: 'error',
+                        message: error.message || 'Failed to cancel adjustments',
+                      })
+                    }
+                  },
+                  title: 'Cancel Adjustments',
+                  message: `Are you sure you want to cancel ${cancellableRows.length} adjustment(s)?`,
+                  type: 'danger',
+                })
+              },
+            },
           ]}
           enableInfiniteScroll={true}
           hasMore={hasMore}
