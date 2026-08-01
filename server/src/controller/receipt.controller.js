@@ -12,6 +12,7 @@ const {
   formatMemoryUsage,
   formatTime,
   DataModeling,
+  getUserFullName,
 } = require('../util/helper.util')
 
 const { Master } = require('../database/model/Master')
@@ -1034,6 +1035,9 @@ const createReceipts = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      // Get user full name from database
+      const userFullName = await getUserFullName(created_by, connection, Master)
+
       // generate receipt id in format CR-MMDDYY-0001 (sequence per day)
       const nowForId = new Date()
       const mm = String(nowForId.getMonth() + 1).padStart(2, '0')
@@ -1090,7 +1094,7 @@ const createReceipts = async (req, res, next) => {
 
         new Date().toISOString().split('T')[0],
 
-        created_by || null,
+        userFullName || null,
 
         checked_by || null,
 
@@ -2335,6 +2339,9 @@ const updateReceiptState = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      // Get user full name from database
+      const userFullName = await getUserFullName(req.context.username, connection, Master)
+
       const updatePromises = updates.map(async (update) => {
         const { id, currentState, changes } = update
 
@@ -2359,7 +2366,7 @@ const updateReceiptState = async (req, res, next) => {
             .where(Accounting.receipts.selectOptionColumns.id)
             .build()
 
-          updateValues = [nextState, req.context.username, id]
+          updateValues = [nextState, userFullName, id]
         } else if (currentState === 'CHECKED') {
           nextState = 'APPROVED'
 
@@ -2372,7 +2379,7 @@ const updateReceiptState = async (req, res, next) => {
             .where(Accounting.receipts.selectOptionColumns.id)
             .build()
 
-          updateValues = [nextState, req.context.username, id]
+          updateValues = [nextState, userFullName, id]
         } else {
           throw new Error(
             `Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`,

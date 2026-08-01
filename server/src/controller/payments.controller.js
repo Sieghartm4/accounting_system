@@ -11,6 +11,7 @@ const {
   formatMemoryUsage,
   formatTime,
   DataModeling,
+  getUserFullName,
 } = require('../util/helper.util')
 
 const { Master } = require('../database/model/Master')
@@ -823,6 +824,9 @@ const createPayment = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      // Get user full name from database
+      const userFullName = await getUserFullName(created_by, connection, Master)
+
       const mainQuery = sql
         .insert(Accounting.payments.tablename, {
           columns: Accounting.payments.insertColumns,
@@ -852,7 +856,7 @@ const createPayment = async (req, res, next) => {
 
         new Date().toISOString().split('T')[0],
 
-        created_by || null,
+        userFullName || null,
 
         null, // checked_by
 
@@ -1103,6 +1107,9 @@ const updatePaymentState = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      // Get user full name from database
+      const userFullName = await getUserFullName(req.context.username, connection, Master)
+
       const updatePromises = updates.map(async (update) => {
         const { id, currentState } = update
 
@@ -1131,7 +1138,7 @@ const updatePaymentState = async (req, res, next) => {
 
             .build()
 
-          updateValues = [nextState, req.context.username, id]
+          updateValues = [nextState, userFullName, id]
         } else if (currentState === 'CHECKED') {
           nextState = 'APPROVED'
 
@@ -1147,7 +1154,7 @@ const updatePaymentState = async (req, res, next) => {
 
             .build()
 
-          updateValues = [nextState, req.context.username, id]
+          updateValues = [nextState, userFullName, id]
 
           // Special logic for APPROVED state: update related purchase records to PAID
           // Get payment_items to find purchase_item_ids

@@ -475,6 +475,36 @@ class SQLQueryBuilder {
   }
 }
 
+/**
+ * Helper function to get user full name from tenant database
+ * @param {string} username - The username to look up
+ * @param {object} connection - The database connection
+ * @param {object} Master - The Master model containing table definitions
+ * @returns {string} - The full name or username if not found
+ */
+const getUserFullName = async (username, connection, Master) => {
+  try {
+    if (!username) return null
+
+    const userQuery = `
+      SELECT ${Master.master_user.selectOptionColumns.fullname} 
+      FROM ${Master.master_user.tablename} 
+      WHERE ${Master.master_user.selectOptionColumns.username} = ?
+    `
+
+    const [userRows] = await connection.execute(userQuery, [username])
+
+    if (userRows && userRows.length > 0) {
+      return userRows[0][Master.master_user.selectOptionColumns.fullname] || username
+    }
+
+    return username
+  } catch (error) {
+    console.error('Error getting user full name:', error)
+    return username
+  }
+}
+
 module.exports = {
   DataModeling,
   formatBytes,
@@ -482,4 +512,5 @@ module.exports = {
   formatTime,
   createQuerySchema,
   SQLQueryBuilder,
+  getUserFullName,
 }

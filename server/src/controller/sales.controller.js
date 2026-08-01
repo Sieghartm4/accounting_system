@@ -12,6 +12,7 @@ const {
   formatMemoryUsage,
   formatTime,
   DataModeling,
+  getUserFullName,
 } = require('../util/helper.util')
 
 const { Master } = require('../database/model/Master')
@@ -739,6 +740,9 @@ const createSales = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      // Get user full name from database
+      const userFullName = await getUserFullName(created_by, connection, Master)
+
       const salesId = await generateSalesId(connection)
 
       const mainQuery = sql
@@ -774,7 +778,7 @@ const createSales = async (req, res, next) => {
 
         new Date().toISOString().split('T')[0],
 
-        created_by || null,
+        userFullName || null,
 
         checked_by || null,
 
@@ -1037,6 +1041,9 @@ const updateSalesState = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      // Get user full name from database
+      const userFullName = await getUserFullName(req.context.username, connection, Master)
+
       const validUpdates = updates.filter(
         (update) =>
           update &&
@@ -1091,7 +1098,7 @@ const updateSalesState = async (req, res, next) => {
 
             .build()
 
-          updateValues = [nextState, req.context.username, id]
+          updateValues = [nextState, userFullName, id]
         } else {
           nextState = 'APPROVED'
 
@@ -1107,7 +1114,7 @@ const updateSalesState = async (req, res, next) => {
 
             .build()
 
-          updateValues = [nextState, req.context.username, id]
+          updateValues = [nextState, userFullName, id]
         }
 
         return connection.execute(updateQuery, updateValues)

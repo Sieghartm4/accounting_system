@@ -537,9 +537,9 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
     const SIG_BODY_H = 46
 
     const signFields = [
-      { label: 'APPROVED BY', value: payment.approved_by },
-      { label: 'CHECKED BY', value: payment.checked_by },
       { label: 'SUBMITTED BY', value: payment.created_by },
+      { label: 'CHECKED BY', value: payment.checked_by },
+      { label: 'APPROVED BY', value: payment.approved_by },
     ]
 
     signFields.forEach((field, i) => {
@@ -556,13 +556,13 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(8.5)
         doc.setTextColor(...BLACK)
-        doc.text(field.value, sx + colW / 2, lineY + 12, { align: 'center' })
+        doc.text(field.value, sx + colW / 2, lineY - 4, { align: 'center' })
       }
 
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(6.5)
       doc.setTextColor(...RED)
-      doc.text(field.label, sx + colW / 2, lineY + 23, { align: 'center' })
+      doc.text(field.label, sx + colW / 2, lineY + 8, { align: 'center' })
     })
 
     y += SIG_BODY_H
@@ -589,7 +589,16 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
       { align: 'right' },
     )
 
-    // ── SAVE
-    doc.save('payment_voucher_' + (payment.id ?? idx) + '_' + copyType + '.pdf')
+    // ── PREVIEW (open in new tab instead of auto-download)
+    const pdfData = doc.output('dataurlstring')
+    const newWindow = window.open()
+    if (newWindow) {
+      newWindow.document.write(
+        `<iframe src="${pdfData}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
+      )
+    } else {
+      // Fallback to download if popup is blocked
+      doc.save('payment_voucher_' + (payment.id ?? idx) + '_' + copyType + '.pdf')
+    }
   }
 }

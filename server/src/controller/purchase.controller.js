@@ -13,6 +13,7 @@ const {
   formatMemoryUsage,
   formatTime,
   DataModeling,
+  getUserFullName,
 } = require('../util/helper.util')
 
 const { Master } = require('../database/model/Master')
@@ -748,6 +749,9 @@ const createPurchase = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      // Get user full name from database
+      const userFullName = await getUserFullName(created_by, connection, Master)
+
       const purchaseId = await generatePurchaseId(connection)
 
       const mainQuery = sql
@@ -782,7 +786,7 @@ const createPurchase = async (req, res, next) => {
 
         new Date().toISOString().split('T')[0],
 
-        created_by || null,
+        userFullName || null,
 
         checked_by || null,
 
@@ -1053,6 +1057,9 @@ const updatePurchaseState = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      // Get user full name from database
+      const userFullName = await getUserFullName(req.context.username, connection, Master)
+
       const updatePromises = updates.map(async (update) => {
         const { id, currentState } = update
 
@@ -1078,7 +1085,7 @@ const updatePurchaseState = async (req, res, next) => {
             .where(Accounting.purchase.selectOptionColumns.id)
             .build()
 
-          updateValues = [nextState, req.context.username, purchaseId]
+          updateValues = [nextState, userFullName, purchaseId]
         } else if (currentState === 'CHECKED') {
           nextState = 'APPROVED'
 
@@ -1091,7 +1098,7 @@ const updatePurchaseState = async (req, res, next) => {
             .where(Accounting.purchase.selectOptionColumns.id)
             .build()
 
-          updateValues = [nextState, req.context.username, purchaseId]
+          updateValues = [nextState, userFullName, purchaseId]
         } else {
           throw new Error(
             `Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`,
