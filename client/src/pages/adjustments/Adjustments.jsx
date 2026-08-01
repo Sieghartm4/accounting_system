@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import DynamicToast from '../../components/DynamicToast'
+import DynamicConfirmModal from '../../components/DynamicConfirmModal'
 import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
 import useAdjustments from './useAdjustments'
@@ -59,6 +60,12 @@ function AdjustmentsContent() {
   const [pendingDateTo, setPendingDateTo] = useState('')
   const [activeDateFrom, setActiveDateFrom] = useState(null)
   const [activeDateTo, setActiveDateTo] = useState(null)
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    onConfirm: null,
+    title: '',
+    message: '',
+  })
 
   const applyDateFilters = async () => {
     const from = pendingDateFrom || null
@@ -346,6 +353,19 @@ function AdjustmentsContent() {
           onClose={() => setToast(null)}
         />
       )}
+      <DynamicConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={() => {
+          if (confirmModal.onConfirm) {
+            confirmModal.onConfirm()
+          }
+          setConfirmModal({ ...confirmModal, isOpen: false })
+        }}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type="warning"
+      />
 
       {/* --- HEADER SECTION --- */}
       <div className="shrink-0">
@@ -570,55 +590,74 @@ function AdjustmentsContent() {
             {
               label: 'Approve Selected',
               onClick: async (selectedRows) => {
-                try {
-                  console.log('Approving adjustments:', selectedRows)
+                const approvableRows = selectedRows.filter(
+                  (row) => row.status === 'PREPARED' || row.status === 'CHECKED',
+                )
 
-                  const token = localStorage.getItem('token')
-                  if (!token) {
-                    throw new Error('No authentication token found')
-                  }
-
-                  const updates = selectedRows.map((row) => ({
-                    id: row.id,
-                    currentState: row.status,
-                  }))
-
-                  const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/adjustments/adjustment-state`,
-                    {
-                      method: 'PUT',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({ updates }),
-                    },
-                  )
-
-                  const result = await response.json()
-
-                  if (!response.ok) {
-                    throw new Error(
-                      result.message || 'Failed to approve adjustments',
-                    )
-                  }
-
-                  // Refresh adjustments data
-                  await refetchAdjustments()
-
-                  setToast({
-                    type: 'success',
-                    message:
-                      result.message ||
-                      `${selectedRows.length} adjustment(s) approved successfully`,
-                  })
-                } catch (error) {
-                  console.error('Error approving adjustments:', error)
+                if (approvableRows.length === 0) {
                   setToast({
                     type: 'error',
-                    message: error.message || 'Failed to approve adjustments',
+                    message: 'No adjustments are eligible for approval',
                   })
+                  return
                 }
+
+                setConfirmModal({
+                  isOpen: true,
+                  onConfirm: async () => {
+                    try {
+                      console.log('Approving adjustments:', approvableRows)
+
+                      const token = localStorage.getItem('token')
+                      if (!token) {
+                        throw new Error('No authentication token found')
+                      }
+
+                      const updates = approvableRows.map((row) => ({
+                        id: row.id,
+                        currentState: row.status,
+                      }))
+
+                      const response = await fetch(
+                        `${import.meta.env.VITE_SERVER_LINK}/adjustments/adjustment-state`,
+                        {
+                          method: 'PUT',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${token}`,
+                          },
+                          body: JSON.stringify({ updates }),
+                        },
+                      )
+
+                      const result = await response.json()
+
+                      if (!response.ok) {
+                        throw new Error(
+                          result.message || 'Failed to approve adjustments',
+                        )
+                      }
+
+                      // Refresh adjustments data
+                      await refetchAdjustments()
+
+                      setToast({
+                        type: 'success',
+                        message:
+                          result.message ||
+                          `${approvableRows.length} adjustment(s) approved successfully`,
+                      })
+                    } catch (error) {
+                      console.error('Error approving adjustments:', error)
+                      setToast({
+                        type: 'error',
+                        message: error.message || 'Failed to approve adjustments',
+                      })
+                    }
+                  },
+                  title: 'Approve Adjustments',
+                  message: `Are you sure you want to approve ${approvableRows.length} adjustment(s)?`,
+                })
               },
             },
           ]}

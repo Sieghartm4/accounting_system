@@ -590,12 +590,14 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
     )
 
     // ── PREVIEW (open in new tab instead of auto-download)
-    const pdfData = doc.output('dataurlstring')
+    const pdfBlob = doc.output('blob')
+    const pdfUrl = URL.createObjectURL(pdfBlob)
     const newWindow = window.open()
     if (newWindow) {
       newWindow.document.write(
-        `<iframe src="${pdfData}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
+        `<iframe src="${pdfUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
       )
+      newWindow.document.close()
     } else {
       // Fallback to download if popup is blocked
       doc.save('payment_voucher_' + (payment.id ?? idx) + '_' + copyType + '.pdf')

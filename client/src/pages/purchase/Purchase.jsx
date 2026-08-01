@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import DynamicToast from '../../components/DynamicToast'
+import DynamicConfirmModal from '../../components/DynamicConfirmModal'
 import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
 import usePurchase from './usePurchase'
@@ -56,6 +57,12 @@ function PurchaseContent() {
   const [activeDateFrom, setActiveDateFrom] = useState(null)
   const [activeDateTo, setActiveDateTo] = useState(null)
   const [prefillPurchaseData, setPrefillPurchaseData] = useState(null)
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    onConfirm: null,
+    title: '',
+    message: '',
+  })
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -223,52 +230,71 @@ function PurchaseContent() {
       {
         label: 'Approve Selected',
         onClick: async (selectedRows) => {
-          try {
-            console.log('Approving purchases:', selectedRows)
+          const approvableRows = selectedRows.filter(
+            (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+          )
 
-            const approveToken = localStorage.getItem('token')
-            if (!approveToken) {
-              throw new Error('No authentication token found')
-            }
-
-            const updates = selectedRows.map((row) => ({
-              id: row.id,
-              currentState: row.state,
-            }))
-
-            const approveResponse = await fetch(
-              `${import.meta.env.VITE_SERVER_LINK}/purchase/purchase-state`,
-              {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${approveToken}`,
-                },
-                body: JSON.stringify({ updates }),
-              },
-            )
-
-            const approveResult = await approveResponse.json()
-
-            if (!approveResponse.ok) {
-              throw new Error(approveResult.message || 'Failed to approve purchases')
-            }
-
-            await refetchPurchases()
-
-            setToast({
-              type: 'success',
-              message:
-                approveResult.message ||
-                `${selectedRows.length} purchase(s) approved successfully`,
-            })
-          } catch (error) {
-            console.error('Error approving purchases:', error)
+          if (approvableRows.length === 0) {
             setToast({
               type: 'error',
-              message: error.message || 'Failed to approve purchases',
+              message: 'No purchases are eligible for approval',
             })
+            return
           }
+
+          setConfirmModal({
+            isOpen: true,
+            onConfirm: async () => {
+              try {
+                console.log('Approving purchases:', approvableRows)
+
+                const approveToken = localStorage.getItem('token')
+                if (!approveToken) {
+                  throw new Error('No authentication token found')
+                }
+
+                const updates = approvableRows.map((row) => ({
+                  id: row.id,
+                  currentState: row.state,
+                }))
+
+                const approveResponse = await fetch(
+                  `${import.meta.env.VITE_SERVER_LINK}/purchase/purchase-state`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${approveToken}`,
+                    },
+                    body: JSON.stringify({ updates }),
+                  },
+                )
+
+                const approveResult = await approveResponse.json()
+
+                if (!approveResponse.ok) {
+                  throw new Error(approveResult.message || 'Failed to approve purchases')
+                }
+
+                await refetchPurchases()
+
+                setToast({
+                  type: 'success',
+                  message:
+                    approveResult.message ||
+                    `${approvableRows.length} purchase(s) approved successfully`,
+                })
+              } catch (error) {
+                console.error('Error approving purchases:', error)
+                setToast({
+                  type: 'error',
+                  message: error.message || 'Failed to approve purchases',
+                })
+              }
+            },
+            title: 'Approve Purchases',
+            message: `Are you sure you want to approve ${approvableRows.length} purchase(s)?`,
+          })
         },
       },
       {
@@ -382,6 +408,19 @@ function PurchaseContent() {
           onClose={() => setToast(null)}
         />
       )}
+      <DynamicConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={() => {
+          if (confirmModal.onConfirm) {
+            confirmModal.onConfirm()
+          }
+          setConfirmModal({ ...confirmModal, isOpen: false })
+        }}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type="warning"
+      />
 
       {/* --- HEADER SECTION --- */}
       <div className="shrink-0">

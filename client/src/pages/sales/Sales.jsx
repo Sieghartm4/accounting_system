@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import DynamicToast from '../../components/DynamicToast'
+import DynamicConfirmModal from '../../components/DynamicConfirmModal'
 import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
 import { useSales } from './useSales'
@@ -51,6 +52,12 @@ function SalesContent() {
   const [pendingDateTo, setPendingDateTo] = useState('')
   const [activeDateFrom, setActiveDateFrom] = useState(null)
   const [activeDateTo, setActiveDateTo] = useState(null)
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    onConfirm: null,
+    title: '',
+    message: '',
+  })
 
   useEffect(() => {
     const id = searchParams.get('id')
@@ -202,65 +209,72 @@ function SalesContent() {
       {
         label: 'Approve Selected',
         onClick: async (selectedRows) => {
-          try {
-            console.log('Approving sales:', selectedRows)
+          const validRows = selectedRows.filter(
+            (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+          )
 
-            const token = localStorage.getItem('token')
-            if (!token) {
-              throw new Error('No authentication token found')
-            }
-
-            const validRows = selectedRows.filter(
-              (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
-            )
-
-            if (validRows.length === 0) {
-              setToast({
-                type: 'warning',
-                message:
-                  'Only PREPARED or CHECKED sales can be bulk approved. Please select valid rows.',
-              })
-              return
-            }
-
-            const updates = validRows.map((row) => ({
-              id: row.id,
-              currentState: row.state,
-            }))
-
-            const response = await fetch(
-              `${import.meta.env.VITE_SERVER_LINK}/sales/sales-state`,
-              {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ updates }),
-              },
-            )
-
-            const result = await response.json()
-
-            if (!response.ok) {
-              throw new Error(result.message || 'Failed to approve sales')
-            }
-
-            await refetchSales()
-
+          if (validRows.length === 0) {
             setToast({
-              type: 'success',
+              type: 'warning',
               message:
-                result.message ||
-                `${validRows.length} sale(s) approved successfully`,
+                'Only PREPARED or CHECKED sales can be bulk approved. Please select valid rows.',
             })
-          } catch (error) {
-            console.error('Error approving sales:', error)
-            setToast({
-              type: 'error',
-              message: error.message || 'Failed to approve sales',
-            })
+            return
           }
+
+          setConfirmModal({
+            isOpen: true,
+            onConfirm: async () => {
+              try {
+                console.log('Approving sales:', validRows)
+
+                const token = localStorage.getItem('token')
+                if (!token) {
+                  throw new Error('No authentication token found')
+                }
+
+                const updates = validRows.map((row) => ({
+                  id: row.id,
+                  currentState: row.state,
+                }))
+
+                const response = await fetch(
+                  `${import.meta.env.VITE_SERVER_LINK}/sales/sales-state`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ updates }),
+                  },
+                )
+
+                const result = await response.json()
+
+                if (!response.ok) {
+                  throw new Error(result.message || 'Failed to approve sales')
+                }
+
+                await refetchSales()
+
+                setToast({
+                  type: 'success',
+                  message:
+                    result.message ||
+                    `${validRows.length} sale(s) approved successfully`,
+                })
+              } catch (error) {
+                console.error('Error approving sales:', error)
+                setToast({
+                  type: 'error',
+                  message: error.message || 'Failed to approve sales',
+                })
+              }
+            },
+            title: 'Approve Sales',
+            message: `Are you sure you want to approve ${validRows.length} sale(s)?`,
+          })
         },
       },
       {
@@ -369,6 +383,19 @@ function SalesContent() {
           onClose={() => setToast(null)}
         />
       )}
+      <DynamicConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={() => {
+          if (confirmModal.onConfirm) {
+            confirmModal.onConfirm()
+          }
+          setConfirmModal({ ...confirmModal, isOpen: false })
+        }}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type="warning"
+      />
 
       {/* --- HEADER SECTION --- */}
       <div className="shrink-0">

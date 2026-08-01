@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import DynamicToast from '../../components/DynamicToast'
+import DynamicConfirmModal from '../../components/DynamicConfirmModal'
 import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
 import useReceipts from './useReceipts'
@@ -49,6 +50,12 @@ function ReceiptsContent() {
   const [pendingDateTo, setPendingDateTo] = useState('')
   const [activeDateFrom, setActiveDateFrom] = useState(null)
   const [activeDateTo, setActiveDateTo] = useState(null)
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    onConfirm: null,
+    title: '',
+    message: '',
+  })
 
   const applyDateFilters = async () => {
     const from = pendingDateFrom || null
@@ -158,57 +165,63 @@ function ReceiptsContent() {
         label: 'Approve Selected',
         icon: <Check size={14} />,
         onClick: async (selectedRows) => {
-          try {
-            const token = localStorage.getItem('token')
-            if (!token) throw new Error('No authentication token found')
+          const approvableRows = selectedRows.filter(
+            (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+          )
 
-            // Filter to only include approvable rows (PREPARED or CHECKED)
-            const approvableRows = selectedRows.filter(
-              (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
-            )
-
-            if (approvableRows.length === 0) {
-              setToast({
-                type: 'error',
-                message: 'No receipts are eligible for approval',
-              })
-              return
-            }
-
-            const updates = approvableRows.map((row) => ({
-              id: row.id,
-              currentState: row.state,
-            }))
-
-            const response = await fetch(
-              `${import.meta.env.VITE_SERVER_LINK}/receipt/receipt-state`,
-              {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ updates }),
-              },
-            )
-
-            const result = await response.json()
-            if (!response.ok)
-              throw new Error(result.message || 'Failed to approve receipts')
-
-            await refetchReceipts()
-            setToast({
-              type: 'success',
-              message:
-                result.message ||
-                `${approvableRows.length} receipt(s) approved successfully`,
-            })
-          } catch (error) {
+          if (approvableRows.length === 0) {
             setToast({
               type: 'error',
-              message: error.message || 'Failed to approve receipts',
+              message: 'No receipts are eligible for approval',
             })
+            return
           }
+
+          setConfirmModal({
+            isOpen: true,
+            onConfirm: async () => {
+              try {
+                const token = localStorage.getItem('token')
+                if (!token) throw new Error('No authentication token found')
+
+                const updates = approvableRows.map((row) => ({
+                  id: row.id,
+                  currentState: row.state,
+                }))
+
+                const response = await fetch(
+                  `${import.meta.env.VITE_SERVER_LINK}/receipt/receipt-state`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ updates }),
+                  },
+                )
+
+                const result = await response.json()
+                if (!response.ok)
+                  throw new Error(result.message || 'Failed to approve receipts')
+
+                await refetchReceipts()
+                setToast({
+                  type: 'success',
+                  message:
+                    result.message ||
+                    `${approvableRows.length} receipt(s) approved successfully`,
+                })
+              } catch (error) {
+                setToast({
+                  type: 'error',
+                  message: error.message || 'Failed to approve receipts',
+                })
+              }
+            },
+            title: 'Approve Receipts',
+            message: `Are you sure you want to approve ${approvableRows.length} receipt(s)?`,
+          })
         },
       },
       {
@@ -353,6 +366,19 @@ function ReceiptsContent() {
           onClose={() => setToast(null)}
         />
       )}
+      <DynamicConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={() => {
+          if (confirmModal.onConfirm) {
+            confirmModal.onConfirm()
+          }
+          setConfirmModal({ ...confirmModal, isOpen: false })
+        }}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type="warning"
+      />
 
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0">

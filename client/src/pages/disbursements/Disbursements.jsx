@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import DynamicToast from '../../components/DynamicToast'
+import DynamicConfirmModal from '../../components/DynamicConfirmModal'
 import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
 import useDisbursements from './useDisbursements'
@@ -52,6 +53,12 @@ function DisbursementsContent() {
   const [activeDateFrom, setActiveDateFrom] = useState(null)
   const [activeDateTo, setActiveDateTo] = useState(null)
   const [prefillDisbursementData, setPrefillDisbursementData] = useState(null)
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    onConfirm: null,
+    title: '',
+    message: '',
+  })
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -243,57 +250,65 @@ function DisbursementsContent() {
         label: 'Approve Selected',
         icon: <Check size={14} />,
         onClick: async (selectedRows) => {
-          try {
-            const token = localStorage.getItem('token')
-            if (!token) throw new Error('No authentication token found')
+          // Filter to only include approvable rows (PREPARED or CHECKED)
+          const approvableRows = selectedRows.filter(
+            (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+          )
 
-            // Filter to only include approvable rows (PREPARED or CHECKED)
-            const approvableRows = selectedRows.filter(
-              (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
-            )
-
-            if (approvableRows.length === 0) {
-              setToast({
-                type: 'error',
-                message: 'No disbursements are eligible for approval',
-              })
-              return
-            }
-
-            const updates = approvableRows.map((row) => ({
-              id: row.id,
-              currentState: row.state,
-            }))
-
-            const response = await fetch(
-              `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/disbursement-state`,
-              {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ updates }),
-              },
-            )
-
-            const result = await response.json()
-            if (!response.ok)
-              throw new Error(result.message || 'Failed to approve disbursements')
-
-            await refetchDisbursements()
-            setToast({
-              type: 'success',
-              message:
-                result.message ||
-                `${approvableRows.length} disbursement(s) approved successfully`,
-            })
-          } catch (error) {
+          if (approvableRows.length === 0) {
             setToast({
               type: 'error',
-              message: error.message || 'Failed to approve disbursements',
+              message: 'No disbursements are eligible for approval',
             })
+            return
           }
+
+          // Show confirmation modal
+          setConfirmModal({
+            isOpen: true,
+            onConfirm: async () => {
+              try {
+                const token = localStorage.getItem('token')
+                if (!token) throw new Error('No authentication token found')
+
+                const updates = approvableRows.map((row) => ({
+                  id: row.id,
+                  currentState: row.state,
+                }))
+
+                const response = await fetch(
+                  `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/disbursement-state`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ updates }),
+                  },
+                )
+
+                const result = await response.json()
+                if (!response.ok)
+                  throw new Error(result.message || 'Failed to approve disbursements')
+
+                await refetchDisbursements()
+                setToast({
+                  type: 'success',
+                  message:
+                    result.message ||
+                    `${approvableRows.length} disbursement(s) approved successfully`,
+                })
+              } catch (error) {
+                setToast({
+                  type: 'error',
+                  message: error.message || 'Failed to approve disbursements',
+                })
+              }
+            },
+            title: 'Approve Disbursements',
+            message: `Are you sure you want to approve ${approvableRows.length} disbursement(s)?`,
+          })
         },
       },
       {
@@ -392,6 +407,19 @@ function DisbursementsContent() {
           onClose={() => setToast(null)}
         />
       )}
+      <DynamicConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={() => {
+          if (confirmModal.onConfirm) {
+            confirmModal.onConfirm()
+          }
+          setConfirmModal({ ...confirmModal, isOpen: false })
+        }}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type="warning"
+      />
 
       {/* --- HEADER SECTION --- */}
       <div className="shrink-0">
