@@ -1100,7 +1100,7 @@ export default function SalesForm({
                       <col style={{ width: '12%' }} />
                       <col style={{ width: '15%' }} />
                       <col style={{ width: '6%' }} />
-                      <col style={{ width: '9%' }} />
+                      <col style={{ width: '14%' }} />
                       <col style={{ width: '8%' }} />
                       <col style={{ width: '9%' }} />
                       <col style={{ width: '12%' }} />
@@ -1236,7 +1236,7 @@ export default function SalesForm({
                             <div className="flex items-center gap-1">
                               <input
                                 disabled={isViewMode}
-                                className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                className={`${tableInput + ' font-black w-28'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                 type="text"
                                 placeholder="0.00"
                                 inputMode="decimal"
