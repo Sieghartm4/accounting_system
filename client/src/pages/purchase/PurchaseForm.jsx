@@ -299,6 +299,7 @@ function computeSummary(items) {
     const discountType = item.discountType || 'PERCENT'
     const vatPct = parseFloat(item.vatRate) || 0
     const whtPct = parseFloat(item.whtRate) || 0
+    const vatType = item.vatType || 'VAT-EX'
 
     const gross = qty * price
     let discAmt = 0
@@ -310,12 +311,23 @@ function computeSummary(items) {
     }
 
     const discounted = gross - discAmt
-    const vatAmt = discounted * (vatPct / 100)
-    const whtAmt = discounted * (whtPct / 100)
+    
+    let vatAmt, netBase
+    if (vatType === 'VAT-INC' && vatPct > 0) {
+      // VAT Inclusive: extract VAT from the discounted amount
+      // Formula: VAT = discounted - (discounted / (1 + vatRate/100))
+      // Net = discounted / (1 + vatRate/100)
+      netBase = discounted / (1 + vatPct / 100)
+      vatAmt = discounted - netBase
+    } else {
+      // VAT Exclusive: VAT is calculated on top of the discounted amount
+      vatAmt = discounted * (vatPct / 100)
+      netBase = discounted
+    }
+    
+    const whtAmt = netBase * (whtPct / 100)
 
     // For VAT-exclusive pricing, VATable sales is the discounted amount (before VAT is added)
-    const netBase = discounted
-
     totalSalesPrice += gross
     totalDiscount += discAmt
     totalDiscounted += discounted
@@ -333,6 +345,38 @@ function computeSummary(items) {
     }
   })
 
+  // Calculate total amount due based on VAT type per item
+  let totalAmountDue = 0
+  items.forEach((item) => {
+    const qty = parseFloat(item.qty) || 0
+    const price = parseFloat(item.price) || 0
+    const discountValue = parseFloat(item.discount) || 0
+    const discountType = item.discountType || 'PERCENT'
+    const vatPct = parseFloat(item.vatRate) || 0
+    const whtPct = parseFloat(item.whtRate) || 0
+    const vatType = item.vatType || 'VAT-EX'
+
+    const gross = qty * price
+    const discAmt = discountType === 'PERCENT' ? gross * (discountValue / 100) : discountValue * qty
+    const discounted = gross - discAmt
+    
+    let netBase, vatAmt
+    if (vatType === 'VAT-INC' && vatPct > 0) {
+      netBase = discounted / (1 + vatPct / 100)
+      vatAmt = discounted - netBase
+    } else {
+      netBase = discounted
+      vatAmt = discounted * (vatPct / 100)
+    }
+    
+    const whtAmt = netBase * (whtPct / 100)
+    
+    // For VAT-INC, amount due is discounted (VAT already included)
+    // For VAT-EX, amount due is netBase + VAT
+    const amountDue = vatType === 'VAT-INC' ? discounted : (netBase + vatAmt)
+    totalAmountDue += (amountDue - whtAmt)
+  })
+
   return {
     totalSalesPrice,
     totalDiscount,
@@ -344,7 +388,7 @@ function computeSummary(items) {
     totalNoVatDiscount,
     totalNetOfVat,
     totalWHT,
-    totalAmountDue: totalDiscounted + totalVAT - totalWHT,
+    totalAmountDue,
   }
 }
 
@@ -1344,6 +1388,7 @@ export default function PurchaseForm({
         price: '',
         discount: 0,
         discountType: 'PERCENT',
+        vatType: 'VAT-EX',
         vat: '',
         vatSearch: '',
         vatRate: 0,
@@ -1452,12 +1497,24 @@ export default function PurchaseForm({
       const discountPct = parseFloat(item.discount) || 0
       const vatPct = parseFloat(item.vatRate) || 0
       const whtPct = parseFloat(item.whtRate) || 0
+      const vatType = item.vatType || 'VAT-EX'
 
       const gross = qty * price
       const discountAmount = gross * (discountPct / 100)
       const discountedAmount = gross - discountAmount
-      const vatAmount = discountedAmount * (vatPct / 100)
-      const whtAmount = discountedAmount * (whtPct / 100)
+      
+      let vatAmount, netBase, whtAmount
+      if (vatType === 'VAT-INC' && vatPct > 0) {
+        // VAT Inclusive: extract VAT from the discounted amount
+        netBase = discountedAmount / (1 + vatPct / 100)
+        vatAmount = discountedAmount - netBase
+      } else {
+        // VAT Exclusive: VAT is calculated on top of the discounted amount
+        vatAmount = discountedAmount * (vatPct / 100)
+        netBase = discountedAmount
+      }
+      
+      whtAmount = netBase * (whtPct / 100)
 
       totalGrossAmount += gross
       totalDiscountAmount += discountAmount
@@ -1477,7 +1534,20 @@ export default function PurchaseForm({
         const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
         const qty = parseFloat(item.qty) || 0
         const price = parseFloat(item.price) || 0
+        const discountPct = parseFloat(item.discount) || 0
+        const vatPct = parseFloat(item.vatRate) || 0
+        const vatType = item.vatType || 'VAT-EX'
+        
         const gross = qty * price
+        const discountAmount = gross * (discountPct / 100)
+        const discountedAmount = gross - discountAmount
+        
+        let netBase
+        if (vatType === 'VAT-INC' && vatPct > 0) {
+          netBase = discountedAmount / (1 + vatPct / 100)
+        } else {
+          netBase = discountedAmount
+        }
 
         if (selectedCoa && gross > 0) {
           entries.push({
@@ -1491,11 +1561,11 @@ export default function PurchaseForm({
                 purchaseItems[0]?.responsibilityCenter ||
                 '',
             ),
-            debit: parseFloat(gross.toFixed(2)),
+            debit: parseFloat(netBase.toFixed(2)),
             credit: 0,
             isManual: false,
           })
-          totalDebitAmount += gross
+          totalDebitAmount += netBase
         }
       }
     })
@@ -1582,9 +1652,39 @@ export default function PurchaseForm({
       }
     }
 
-    // 5. Accounts Payable (CREDIT) - what we owe: discounted + VAT - WHT
+    // 5. Accounts Payable (CREDIT) - what we owe
     if (apAccount && totalDiscountedAmount > 0) {
-      const apAmount = totalDiscountedAmount + totalVatAmount - totalWhtAmount
+      // Calculate total amount owed based on VAT type
+      let totalAmountOwed = 0
+      purchaseItems.forEach((item) => {
+        const qty = parseFloat(item.qty) || 0
+        const price = parseFloat(item.price) || 0
+        const discountPct = parseFloat(item.discount) || 0
+        const vatPct = parseFloat(item.vatRate) || 0
+        const whtPct = parseFloat(item.whtRate) || 0
+        const vatType = item.vatType || 'VAT-EX'
+        
+        const gross = qty * price
+        const discountAmount = gross * (discountPct / 100)
+        const discountedAmount = gross - discountAmount
+        
+        let netBase, vatAmount, whtAmount
+        if (vatType === 'VAT-INC' && vatPct > 0) {
+          netBase = discountedAmount / (1 + vatPct / 100)
+          vatAmount = discountedAmount - netBase
+        } else {
+          netBase = discountedAmount
+          vatAmount = discountedAmount * (vatPct / 100)
+        }
+        
+        whtAmount = netBase * (whtPct / 100)
+        
+        // For VAT-INC, amount owed is discounted (VAT already included)
+        // For VAT-EX, amount owed is netBase + VAT
+        const amountOwed = vatType === 'VAT-INC' ? discountedAmount : (netBase + vatAmount)
+        totalAmountOwed += (amountOwed - whtAmount)
+      })
+      
       entries.push({
         id: Date.now() + Math.random(),
         account: apAccount.id,
@@ -1597,10 +1697,10 @@ export default function PurchaseForm({
             '',
         ),
         debit: 0,
-        credit: parseFloat(apAmount.toFixed(2)),
+        credit: parseFloat(totalAmountOwed.toFixed(2)),
         isManual: false,
       })
-      totalCreditAmount += apAmount
+      totalCreditAmount += totalAmountOwed
     }
 
     setJournalEntries(entries)
@@ -1641,6 +1741,18 @@ export default function PurchaseForm({
         setToast({
           type: 'warning',
           message: 'Please add at least one purchase item',
+        })
+        return
+      }
+
+      // Validate VAT-INC items have VAT selected
+      const hasVatIncWithoutVat = purchaseItems.some(
+        (item) => item.vatType === 'VAT-INC' && (!item.vat || item.vat === '' || item.vat === 0)
+      )
+      if (hasVatIncWithoutVat) {
+        setToast({
+          type: 'warning',
+          message: 'Items with VAT Inclusive pricing must have a VAT rate selected',
         })
         return
       }
@@ -2679,18 +2791,29 @@ export default function PurchaseForm({
                             />
                           </td>
                           <td className="py-1 px-1">
-                            <input
-                              disabled={isViewMode}
-                              className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              type="text"
-                              placeholder="0.00"
-                              inputMode="decimal"
-                              value={formatPriceDisplay(item.price)}
-                              onChange={(e) => {
-                                const parsed = parsePriceInput(e.target.value)
-                                updatePurchaseItem(item.id, 'price', parsed)
-                              }}
-                            />
+                            <div className="flex items-center gap-1">
+                              <input
+                                disabled={isViewMode}
+                                className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                type="text"
+                                placeholder="0.00"
+                                inputMode="decimal"
+                                value={formatPriceDisplay(item.price)}
+                                onChange={(e) => {
+                                  const parsed = parsePriceInput(e.target.value)
+                                  updatePurchaseItem(item.id, 'price', parsed)
+                                }}
+                              />
+                              <select
+                                disabled={isViewMode}
+                                value={item.vatType || 'VAT-EX'}
+                                onChange={(e) => updatePurchaseItem(item.id, 'vatType', e.target.value)}
+                                className={`text-[10px] font-bold px-1 py-1 rounded border ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' : 'bg-white border-gray-200 text-black focus:ring-1 focus:ring-red-500'} outline-none`}
+                              >
+                                <option value="VAT-EX">EX</option>
+                                <option value="VAT-INC">INC</option>
+                              </select>
+                            </div>
                           </td>
                           <td className="py-1 px-1">
                             <div className="relative">

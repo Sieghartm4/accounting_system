@@ -1233,18 +1233,29 @@ export default function SalesForm({
                           </td>
                           {/* Price */}
                           <td className="py-1 px-1">
-                            <input
-                              disabled={isViewMode}
-                              className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              type="text"
-                              placeholder="0.00"
-                              inputMode="decimal"
-                              value={formatPriceDisplay(item.price)}
-                              onChange={(e) => {
-                                const parsed = parsePriceInput(e.target.value)
-                                form.updateSalesItem(item.id, 'price', parsed)
-                              }}
-                            />
+                            <div className="flex items-center gap-1">
+                              <input
+                                disabled={isViewMode}
+                                className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                type="text"
+                                placeholder="0.00"
+                                inputMode="decimal"
+                                value={formatPriceDisplay(item.price)}
+                                onChange={(e) => {
+                                  const parsed = parsePriceInput(e.target.value)
+                                  form.updateSalesItem(item.id, 'price', parsed)
+                                }}
+                              />
+                              <select
+                                disabled={isViewMode}
+                                value={item.vatType || 'VAT-EX'}
+                                onChange={(e) => form.updateSalesItem(item.id, 'vatType', e.target.value)}
+                                className={`text-[10px] font-bold px-1 py-1 rounded border ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' : 'bg-white border-gray-200 text-black focus:ring-1 focus:ring-red-500'} outline-none`}
+                              >
+                                <option value="VAT-EX">EX</option>
+                                <option value="VAT-INC">INC</option>
+                              </select>
+                            </div>
                           </td>
                           {/* Discount */}
                           <td className="py-1 px-1">

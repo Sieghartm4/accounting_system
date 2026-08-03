@@ -1004,19 +1004,30 @@ export default function ReceiptsForm({
                             />
                           </td>
                           <td className="py-1 px-1">
-                            <input
-                              disabled={isDisabled}
-                              className={`${tableInput + ' font-black'} ${isDisabled ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
-                              type="text"
-                              placeholder="0.00"
-                              inputMode="decimal"
-                              value={formatPriceDisplay(item.price)}
-                              onChange={(e) => {
-                                // Pass the raw text to our updated parser
-                                const parsed = parsePriceInput(e.target.value)
-                                updateReceiptItem(item.id, 'price', parsed)
-                              }}
-                            />
+                            <div className="flex items-center gap-1">
+                              <input
+                                disabled={isDisabled}
+                                className={`${tableInput + ' font-black'} ${isDisabled ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                                type="text"
+                                placeholder="0.00"
+                                inputMode="decimal"
+                                value={formatPriceDisplay(item.price)}
+                                onChange={(e) => {
+                                  // Pass the raw text to our updated parser
+                                  const parsed = parsePriceInput(e.target.value)
+                                  updateReceiptItem(item.id, 'price', parsed)
+                                }}
+                              />
+                              <select
+                                disabled={isDisabled}
+                                value={item.vatType || 'VAT-EX'}
+                                onChange={(e) => updateReceiptItem(item.id, 'vatType', e.target.value)}
+                                className={`text-[10px] font-bold px-1 py-1 rounded border ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' : 'bg-white border-gray-200 text-black focus:ring-1 focus:ring-red-500'} outline-none`}
+                              >
+                                <option value="VAT-EX">EX</option>
+                                <option value="VAT-INC">INC</option>
+                              </select>
+                            </div>
                           </td>
                           <td className="py-1 px-1">
                             <div className="relative">
