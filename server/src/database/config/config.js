@@ -7,7 +7,7 @@ const jwt = require('jsonwebtoken')
 let _currentTenantDb = null
 
 const setTenantDb = (db) => { 
-  console.log('🔍 Config - Setting tenant DB to:', db)
+  console.log('🔍 Config - Setting tenant DB to:', db, '(previous value:', _currentTenantDb, ')')
   _currentTenantDb = db 
 }
 const getTenantDbOverride = () => {

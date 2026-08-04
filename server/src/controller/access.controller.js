@@ -28,7 +28,8 @@ const getAccess = async (req, res, next) => {
       .from(Master.master_access.tablename)
       .build()
 
-    const accesses = await Query(query, [], [Master.master_access.prefix_])
+    const tenantDb = req.context?.dbName || req.context?.tenantDb || null
+    const accesses = await Query(query, [], [Master.master_access.prefix_], null, tenantDb)
     res.status(200).json({
       success: true,
       message: 'Accesses retrieved successfully',

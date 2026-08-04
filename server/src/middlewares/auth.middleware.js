@@ -67,15 +67,17 @@ const auth = async (req, res, next) => {
       ...decodedUser,
     }
 
-    // ✅ Set tenant database from JWT for this request
+    // ✅ Set tenant database from JWT for this request (for backward compatibility)
     if (decodedUser.dbName) {
       console.log('🔍 Auth - Setting tenant DB from JWT:', decodedUser.dbName)
+      req.context.dbName = decodedUser.dbName
       CONFIG.setTenantDb(decodedUser.dbName)
     } else if (decodedUser.tenantDb) {
       console.log(
         '🔍 Auth - Setting tenant DB from JWT (legacy field):',
         decodedUser.tenantDb,
       )
+      req.context.dbName = decodedUser.tenantDb
       CONFIG.setTenantDb(decodedUser.tenantDb)
     } else {
       console.log('🔍 Auth - No tenant database found in JWT token')

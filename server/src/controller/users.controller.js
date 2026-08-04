@@ -118,11 +118,8 @@ const createUser = async (req, res, next) => {
       ],
     })
 
-    await Transaction(queries)
-
-    const currentTenantDb =
-      (CONFIG.getTenantDbOverride && CONFIG.getTenantDbOverride()) ||
-      CONFIG[process.env.NODE_ENV].database
+    const currentTenantDb = req.context?.dbName || req.context?.tenantDb || null
+    await Transaction(queries, currentTenantDb)
 
     const adminDbName = process.env._DATABASE_ADMIN
     const adminPassword = DecryptString(process.env._PASSWORD_ADMIN)

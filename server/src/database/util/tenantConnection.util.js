@@ -1,42 +1,58 @@
 const mysql = require('mysql2/promise')
 const CONFIG = require('../config/config')
+const { DecryptString } = require('../../util/cryptography.util')
 
 // Cache pools per tenant to avoid recreating them constantly
 const tenantPools = new Map()
 
 /**
- * Get a MySQL pool for the current tenant
+ * Get a MySQL pool for the current tenant with optional user context
  * This respects the tenant context set by the auth middleware
  */
-const getTenantPool = () => {
-  let tenantDb = CONFIG.getTenantDbOverride ? CONFIG.getTenantDbOverride() : null
+const getTenantPool = (tenantDb = null, userId = null) => {
+  let db
   
-  if (!tenantDb) {
-    console.log('🔍 Tenant Pool - No tenant DB set, using default database')
-    tenantDb = CONFIG[process.env.NODE_ENV].database
+  // If tenantDb is explicitly provided, use it (request-specific)
+  if (tenantDb) {
+    db = tenantDb
+    console.log('🔍 Tenant Pool - Using provided tenantDb:', db)
+  } else {
+    // Fall back to global config (legacy behavior)
+    db = CONFIG.getTenantDbOverride ? CONFIG.getTenantDbOverride() : null
+    if (!db) {
+      console.log('🔍 Tenant Pool - No tenant DB set, using default database')
+      db = CONFIG[process.env.NODE_ENV].database
+    }
   }
   
-  // Check if we already have a pool for this tenant
-  if (tenantPools.has(tenantDb)) {
-    console.log('🔍 Tenant Pool - Reusing existing pool for database:', tenantDb)
-    return tenantPools.get(tenantDb)
+  // Create cache key that includes userId to isolate users in same tenant
+  const cacheKey = userId ? `${db}:${userId}` : db
+  
+  // Check if we already have a pool for this tenant/user combination
+  if (tenantPools.has(cacheKey)) {
+    console.log('🔍 Tenant Pool - Reusing existing pool for:', cacheKey)
+    return tenantPools.get(cacheKey)
   }
   
-  console.log('🔍 Tenant Pool - Creating new pool for database:', tenantDb)
+  console.log('🔍 Tenant Pool - Creating new pool for:', cacheKey)
   
-  // Create a new pool for this tenant
-  const pool = mysql.createPool({
-    host: CONFIG[process.env.NODE_ENV].host,
-    user: CONFIG[process.env.NODE_ENV].username,
-    password: CONFIG[process.env.NODE_ENV].password,
-    database: tenantDb,
-    multipleStatements: CONFIG[process.env.NODE_ENV].dialectOptions.multipleStatements,
-  })
-  
-  // Cache the pool
-  tenantPools.set(tenantDb, pool)
+  const pool = createPoolForDb(db)
+  tenantPools.set(cacheKey, pool)
   
   return pool
+}
+
+/**
+ * Create a pool for a specific database
+ */
+const createPoolForDb = (database) => {
+  return mysql.createPool({
+    host: process.env._HOST_ADMIN,
+    user: process.env._USER_ADMIN,
+    password: DecryptString(process.env._PASSWORD_ADMIN),
+    database: database,
+    multipleStatements: true,
+  })
 }
 
 /**
