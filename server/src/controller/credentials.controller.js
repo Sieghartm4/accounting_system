@@ -115,7 +115,7 @@ const login = async (req, res, next) => {
 
     // Step 2: Query user from tenant database (manual query to fix WHERE clause issue)
 
-    const query = `SELECT mu_id AS id, mu_username AS username, mu_password AS password, mu_fullname AS fullname, mu_access_id AS access_id, ma_access_name AS access 
+    const query = `SELECT mu_id AS id, mu_username AS username, mu_password AS password, mu_fullname AS fullname, mu_access_id AS access_id, mu_email AS email, ma_access_name AS access 
 
                    FROM master_user 
 

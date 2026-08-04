@@ -48,7 +48,7 @@ module.exports = {
         defaultValue: 'UNPAID',
       },
       p_state: {
-        type: Sequelize.ENUM('PREPARED', 'CHECKED', 'APPROVED', 'REJECTED'),
+        type: Sequelize.ENUM('PREPARED', 'CHECKED', 'APPROVED', 'REJECTED', 'CANCELLED'),
         allowNull: false,
         defaultValue: 'PREPARED',
       },

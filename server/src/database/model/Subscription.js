@@ -7,6 +7,7 @@ const Master = {
       "mu_username",
       "mu_password",
       "db_name",
+      "mu_email",
       "mu_status"
     ],
   selectColumns: [
@@ -14,6 +15,7 @@ const Master = {
       "mu_username",
       "mu_password",
       "db_name",
+      "mu_email",
       "mu_status"
   ],
   selectOptionColumns: {
@@ -21,6 +23,7 @@ const Master = {
     username: "mu_username",
     password: "mu_password",
     db_name: "db_name",
+    email: "mu_email",
     status: "mu_status"
   },
   updateOptionColumns: {
@@ -28,6 +31,7 @@ const Master = {
     username: "username",
     password: "password",
     db_name: "db_name",
+    email: "email",
     status: "status"
   },
   selectDateFormatColumns: {
@@ -41,6 +45,7 @@ const Master = {
     username: "STRING",
     password: "TEXT",
     db_name: "STRING",
+    email: "STRING",
     status: "ENUM"
   }
 }

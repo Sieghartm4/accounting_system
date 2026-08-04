@@ -43,7 +43,7 @@ module.exports = {
         allowNull: true
       },
       c_state: {
-        type: Sequelize.ENUM('PREPARED','CHECKED','APPROVED','REJECTED'),
+        type: Sequelize.ENUM('PREPARED','CHECKED','APPROVED','REJECTED', 'CANCELLED'),
         allowNull: false,
         defaultValue: 'PREPARED'
       },

@@ -38,6 +38,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
   const [profile, setProfile] = useState({
     fullname: '',
     username: '',
+    email: '',
     status: '',
     access_id: '',
     access_name: '',
@@ -291,6 +292,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
       const requestBody = {
         fullname: profile.fullname,
         username: profile.username,
+        email: profile.email,
       }
 
       if (showChangePasswordFields) {
@@ -322,6 +324,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
           ...currentUser,
           fullname: result.data.fullname ?? profile.fullname ?? currentUser.fullname,
           username: result.data.username ?? profile.username ?? currentUser.username,
+          email: result.data.email ?? profile.email ?? currentUser.email,
           token: result.data.token ?? currentUser.token,
         }
 
@@ -335,6 +338,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
           ...prev,
           fullname: updatedUser.fullname,
           username: updatedUser.username,
+          email: updatedUser.email,
         }))
         setCurrentPassword('')
         setNewPassword('')
@@ -354,13 +358,32 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
   const handleLogout = async () => {
     try {
       const token = localStorage.getItem('token')
+      const userData = localStorage.getItem('user')
+      const userId = userData ? JSON.parse(userData).id : null
+      
+      const subscriptionUrl =
+        import.meta.env.VITE_SUBSCRIPTION_LINK ||
+        `http://${import.meta.env.VITE_SUBSCRIPTION_URL || 'localhost'}:${import.meta.env.VITE_SUBSCRIPTION_PORT || '5051'}`
+
       if (token) {
+        // Logout from main server
         await fetch(`${import.meta.env.VITE_SERVER_LINK}/credentials/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
+          body: JSON.stringify({ userId }),
+        })
+
+        // Logout from subscription server
+        await fetch(`${subscriptionUrl}/credentials/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ userId }),
         })
       }
     } catch (error) {
@@ -654,6 +677,20 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                   onChange={handleProfileChange}
                   className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/10 hover:border-gray-300"
                   required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-gray-600">
+                  Email
+                </label>
+                <input
+                  name="email"
+                  type="email"
+                  value={profile.email || ''}
+                  onChange={handleProfileChange}
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/10 hover:border-gray-300"
+                  placeholder="Email (optional)"
                 />
               </div>
             </div>

@@ -35,13 +35,43 @@ const pool = mysql.createPool({
 
 require('dotenv').config()
 
-const logout = (req, res, next) => {
-  req.session.jwt = null
-  res.status(200).json({
-    success: true,
-    message: 'Logout successful',
-    timestamp: new Date().toISOString(),
-  })
+const logout = async (req, res, next) => {
+  try {
+    // Clear JWT from session
+    req.session.jwt = null
+
+    // Clear session data from MongoDB
+    const userId = req.user?.userId || req.body?.userId
+    if (userId) {
+      try {
+        const mongoClient = new MongoClient(process.env._SUBSCRIPTION_MONGODB_URL)
+        await mongoClient.connect()
+        const db = mongoClient.db()
+        const sessionCollection = db.collection(
+          process.env._SUBSCRIPTION_SESSION_COLLECTION,
+        )
+
+        await sessionCollection.deleteOne({ userId: userId })
+        await mongoClient.close()
+        console.log('Session data cleared from MongoDB for user:', userId)
+      } catch (mongoError) {
+        console.error('MongoDB session clear error:', mongoError)
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Logout successful',
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Logout error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Logout failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+    })
+  }
 }
 
 const register = async (req, res, next) => {

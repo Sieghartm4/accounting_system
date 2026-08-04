@@ -34,6 +34,7 @@ function UsersContent() {
     fullname: '',
     username: '',
     password: '',
+    email: '',
     access_id: '',
   })
   const [formError, setFormError] = useState('')
@@ -99,7 +100,7 @@ function UsersContent() {
   const openCreateForm = () => {
     setFormError('')
     setFormSuccess('')
-    setFormData({ fullname: '', username: '', password: '', access_id: '' })
+    setFormData({ fullname: '', username: '', password: '', email: '', access_id: '' })
     setAccessSearch('')
     setSelectedAccess({ value: '', label: '' })
     setShowCreateForm(true)
@@ -264,7 +265,7 @@ function UsersContent() {
 
       setFormSuccess('User created successfully.')
       setShowCreateForm(false)
-      setFormData({ fullname: '', username: '', password: '', access_id: '' })
+      setFormData({ fullname: '', username: '', password: '', email: '', access_id: '' })
       setAccessSearch('')
       setSelectedAccess({ value: '', label: '' })
       await fetchUsers()
@@ -359,6 +360,19 @@ function UsersContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="block text-sm font-semibold text-gray-700">
+                  Email
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
+                    className="mt-2 w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-black focus:border-red-500 focus:outline-none"
+                    placeholder="Email (optional)"
+                  />
+                </label>
+
+                <label className="block text-sm font-semibold text-gray-700">
                   Password
                   <input
                     type="password"
@@ -370,7 +384,9 @@ function UsersContent() {
                     placeholder="Password"
                   />
                 </label>
+              </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="block text-sm font-semibold text-gray-700">
                   Access Role
                   <SearchableDropdown

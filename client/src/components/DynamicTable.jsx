@@ -791,7 +791,13 @@ const DynamicTable = ({
                               e.stopPropagation()
                               button.onClick(row)
                             }}
-                            className="flex items-center justify-center w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all border border-blue-500/50 cursor-pointer"
+                            className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all border cursor-pointer ${
+                              button.label.toLowerCase() === 'view'
+                                ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500/50'
+                                : button.label.toLowerCase() === 'edit'
+                                  ? 'bg-orange-600 hover:bg-orange-700 text-white border-orange-500/50'
+                                  : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500/50'
+                            }`}
                             title={button.label}
                           >
                             {button.label.toLowerCase() === 'view' && (

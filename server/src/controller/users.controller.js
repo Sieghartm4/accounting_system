@@ -28,6 +28,7 @@ const getUsers = async (req, res, next) => {
         { col: Master.master_user.selectOptionColumns.id, as: 'id' },
         { col: Master.master_user.selectOptionColumns.fullname, as: 'fullname' },
         { col: Master.master_user.selectOptionColumns.username, as: 'username' },
+        { col: Master.master_user.selectOptionColumns.email, as: 'email' },
         { col: Master.master_user.selectOptionColumns.access_id, as: 'access_id' },
         {
           col: Master.master_access.selectOptionColumns.access_name,
@@ -71,7 +72,7 @@ const getUsers = async (req, res, next) => {
 
 const createUser = async (req, res, next) => {
   try {
-    const { fullname, username, password, access_id } = req.body
+    const { fullname, username, password, email, access_id } = req.body
 
     if (!fullname || !username || !password || !access_id) {
       return res.status(400).json({
@@ -113,6 +114,7 @@ const createUser = async (req, res, next) => {
         normalizedUsername || null,
         encryptedPassword || null,
         access_id || null,
+        email || null,
       ],
     })
 
@@ -152,6 +154,7 @@ const createUser = async (req, res, next) => {
       data: {
         fullname: fullname.trim(),
         username: normalizedUsername,
+        email: email || null,
         access_id,
       },
       timestamp: new Date().toISOString(),
@@ -275,6 +278,7 @@ const getMyProfile = async (req, res, next) => {
         { col: Master.master_user.selectOptionColumns.id, as: 'id' },
         { col: Master.master_user.selectOptionColumns.fullname, as: 'fullname' },
         { col: Master.master_user.selectOptionColumns.username, as: 'username' },
+        { col: Master.master_user.selectOptionColumns.email, as: 'email' },
         { col: Master.master_user.selectOptionColumns.access_id, as: 'access_id' },
         {
           col: Master.master_access.selectOptionColumns.access_name,
@@ -307,6 +311,7 @@ const getMyProfile = async (req, res, next) => {
           { col: Master.master_user.selectOptionColumns.id, as: 'id' },
           { col: Master.master_user.selectOptionColumns.fullname, as: 'fullname' },
           { col: Master.master_user.selectOptionColumns.username, as: 'username' },
+          { col: Master.master_user.selectOptionColumns.email, as: 'email' },
           { col: Master.master_user.selectOptionColumns.access_id, as: 'access_id' },
           {
             col: Master.master_access.selectOptionColumns.access_name,
@@ -388,6 +393,7 @@ const updateMyProfile = async (req, res, next) => {
     const {
       fullname,
       username: newUsername,
+      email,
       current_password,
       new_password,
     } = req.body
@@ -500,6 +506,11 @@ const updateMyProfile = async (req, res, next) => {
       updateValues.push(newUsername.trim())
     }
 
+    if (email !== undefined) {
+      updateColumns.push(Master.master_user.updateOptionColumns.email)
+      updateValues.push(email || null)
+    }
+
     if (new_password) {
       if (!current_password) {
         return res.status(400).json({
@@ -561,10 +572,11 @@ const updateMyProfile = async (req, res, next) => {
     await Query(updateQuery, [...updateValues, identifierValue])
 
     const currentTenantDb = req.context?.dbName || req.context?.tenantDb || null
-    if (oldUsername && currentTenantDb && (newUsername?.trim() || new_password)) {
+    if (oldUsername && currentTenantDb && (newUsername?.trim() || new_password || email !== undefined)) {
       try {
         const adminDbName = process.env._DATABASE_ADMIN
         const adminPassword = DecryptString(process.env._PASSWORD_ADMIN)
+        
         const adminPool = mysql.createPool({
           host: process.env._HOST_ADMIN,
           user: process.env._USER_ADMIN,
@@ -584,6 +596,13 @@ const updateMyProfile = async (req, res, next) => {
             adminUpdateValues.push(newUsername.trim())
           }
 
+          if (email !== undefined) {
+            adminUpdateFields.push(
+              `${SubscriptionMaster.master_user.selectOptionColumns.email} = ?`,
+            )
+            adminUpdateValues.push(email || null)
+          }
+
           if (new_password) {
             adminUpdateFields.push(
               `${SubscriptionMaster.master_user.selectOptionColumns.password} = ?`,
@@ -592,12 +611,13 @@ const updateMyProfile = async (req, res, next) => {
           }
 
           if (adminUpdateFields.length > 0) {
+            // Use db_name only in WHERE clause to find the record, since username may be out of sync
             const adminUpdateSql = `UPDATE ${SubscriptionMaster.master_user.tablename} SET ${adminUpdateFields.join(
               ', ',
-            )} WHERE ${SubscriptionMaster.master_user.selectOptionColumns.username} = ? AND ${SubscriptionMaster.master_user.selectOptionColumns.db_name} = ?`
+            )} WHERE ${SubscriptionMaster.master_user.selectOptionColumns.db_name} = ?`
+            
             await adminPool.execute(adminUpdateSql, [
               ...adminUpdateValues,
-              oldUsername,
               currentTenantDb,
             ])
           }
@@ -617,6 +637,7 @@ const updateMyProfile = async (req, res, next) => {
         { col: Master.master_user.selectOptionColumns.id, as: 'id' },
         { col: Master.master_user.selectOptionColumns.fullname, as: 'fullname' },
         { col: Master.master_user.selectOptionColumns.username, as: 'username' },
+        { col: Master.master_user.selectOptionColumns.email, as: 'email' },
         { col: Master.master_user.selectOptionColumns.access_id, as: 'access_id' },
         {
           col: Master.master_access.selectOptionColumns.access_name,

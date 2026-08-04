@@ -25,6 +25,10 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: false
       },
+      mu_email: {
+        type: Sequelize.STRING(300),
+        allowNull: true
+      },
       mu_status: {
         type: Sequelize.ENUM,
         values: ['active', 'inactive', 'delete'],
