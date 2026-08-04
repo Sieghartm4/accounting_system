@@ -359,6 +359,8 @@ const getMyProfile = async (req, res, next) => {
       routeAccessQuery,
       [users[0].access_id],
       [Master.master_route_access.prefix_],
+      null,
+      tenantDb,
     )
 
     const db_name = req.context?.dbName || req.context?.tenantDb || null
@@ -697,6 +699,8 @@ const updateMyProfile = async (req, res, next) => {
           routeAccessQuery,
           [updatedUser.access_id],
           [Master.master_route_access.prefix_],
+          null,
+          tenantDb,
         )
       : []
 

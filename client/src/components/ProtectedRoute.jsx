@@ -10,6 +10,7 @@ const ProtectedRoute = ({ children, routeName }) => {
     return <Navigate to="/" replace />;
   }
   
+  
   if (!hasRouteAccess(routeName, user)) {
     // Get all accessible routes for this user
     const accessibleRoutes = getAccessibleRoutes(user);
