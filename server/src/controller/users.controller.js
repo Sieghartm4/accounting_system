@@ -135,11 +135,12 @@ const createUser = async (req, res, next) => {
     })
 
     try {
-      const adminInsertSql = `INSERT INTO ${SubscriptionMaster.master_user.tablename} (${SubscriptionMaster.master_user.insertColumns.join(', ')}) VALUES (?, ?, ?, ?)`
+      const adminInsertSql = `INSERT INTO ${SubscriptionMaster.master_user.tablename} (${SubscriptionMaster.master_user.insertColumns.join(', ')}) VALUES (?, ?, ?, ?, ?)`
       const adminValues = [
         normalizedUsername || null,
         encryptedPassword || null,
         currentTenantDb || null,
+        email || null,
         'ACTIVE',
       ]
 
@@ -296,12 +297,15 @@ const getMyProfile = async (req, res, next) => {
       .build()
 
     let users = []
+    const tenantDb = req.context?.dbName || req.context?.tenantDb || null
 
     if (userId) {
       users = await Query(
         profileQuery,
         [userId],
         [Master.master_user.prefix_, Master.master_access.prefix_],
+        null,
+        tenantDb,
       )
     }
 
@@ -332,6 +336,8 @@ const getMyProfile = async (req, res, next) => {
         usernameQuery,
         [username],
         [Master.master_user.prefix_, Master.master_access.prefix_],
+        null,
+        tenantDb,
       )
     }
 
@@ -485,10 +491,13 @@ const updateMyProfile = async (req, res, next) => {
       .where(identifierColumn)
       .build()
 
+    const tenantDb = req.context?.dbName || req.context?.tenantDb || null
     const currentUsers = await Query(
       currentUserQuery,
       [identifierValue],
       [Master.master_user.prefix_],
+      null,
+      tenantDb,
     )
 
     const oldUsername =
@@ -532,6 +541,8 @@ const updateMyProfile = async (req, res, next) => {
         passwordQuery,
         [identifierValue],
         [Master.master_user.prefix_],
+        null,
+        tenantDb,
       )
 
       if (!Array.isArray(existingUsers) || existingUsers.length === 0) {
@@ -569,7 +580,7 @@ const updateMyProfile = async (req, res, next) => {
       .where(identifierColumn)
       .build()
 
-    await Query(updateQuery, [...updateValues, identifierValue])
+    await Query(updateQuery, [...updateValues, identifierValue], null, null, tenantDb)
 
     const currentTenantDb = req.context?.dbName || req.context?.tenantDb || null
     if (oldUsername && currentTenantDb && (newUsername?.trim() || new_password || email !== undefined)) {
@@ -662,6 +673,8 @@ const updateMyProfile = async (req, res, next) => {
       selectStatement,
       [contextUserId || newUsername?.trim() || contextUsername],
       [Master.master_user.prefix_, Master.master_access.prefix_],
+      null,
+      tenantDb,
     )
 
     const updatedUser =

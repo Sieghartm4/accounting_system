@@ -61,18 +61,55 @@ exports.SelectAll = async (tableName, prefix) => {
 }
 
 //@ can be used for universal query SELECT, INSERT, UPDATE, DELETE
-exports.Query = async (sql, params = [], prefixes, tenantPool) => {
+exports.Query = async (sql, params = [], prefixes, tenantPool, tenantDb) => {
   try {
-    const activePool = tenantPool || getTenantPool()
-    const [result] = await activePool.query(sql, params)
-    if (sql.trim().toUpperCase().startsWith('INSERT')) {
-      return { ...result, insertId: result.insertId }
+    let activePool = tenantPool
+    
+    // If tenantDb is provided, create a pool for that specific database
+    if (tenantDb && !tenantPool) {
+      const CONFIG = require('../config/config')
+      const { DecryptString } = require('../../util/cryptography.util')
+      const mysql = require('mysql2/promise')
+      
+      activePool = mysql.createPool({
+        host: process.env._HOST_ADMIN,
+        user: process.env._USER_ADMIN,
+        password: DecryptString(process.env._PASSWORD_ADMIN),
+        database: tenantDb,
+        multipleStatements: true,
+      })
+      
+      // Execute query and close the pool
+      try {
+        const [result] = await activePool.query(sql, params)
+        await activePool.end()
+        
+        if (sql.trim().toUpperCase().startsWith('INSERT')) {
+          return { ...result, insertId: result.insertId }
+        }
+        if (prefixes && sql.trim().toUpperCase().startsWith('SELECT')) {
+          const data = DataModeling(result, prefixes)
+          return data
+        }
+        return result
+      } catch (queryError) {
+        await activePool.end()
+        throw queryError
+      }
+    } else {
+      // Use provided pool or get default pool
+      activePool = activePool || getTenantPool()
+      const [result] = await activePool.query(sql, params)
+      
+      if (sql.trim().toUpperCase().startsWith('INSERT')) {
+        return { ...result, insertId: result.insertId }
+      }
+      if (prefixes && sql.trim().toUpperCase().startsWith('SELECT')) {
+        const data = DataModeling(result, prefixes)
+        return data
+      }
+      return result
     }
-    if (prefixes && sql.trim().toUpperCase().startsWith('SELECT')) {
-      const data = DataModeling(result, prefixes)
-      return data
-    }
-    return result
   } catch (error) {
     logger.error(error)
     console.error('Error executing query:', error)
