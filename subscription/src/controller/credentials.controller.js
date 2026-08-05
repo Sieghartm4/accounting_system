@@ -252,6 +252,8 @@ const login = async (req, res, next) => {
         console.error('MongoDB session save error:', mongoError)
       }
 
+      let tenantUserId = user.id // Default to subscription user ID
+      let tenantUserData = null // Store tenant user data from main server
       try {
         const mainServerUrl = process.env._MAIN_SERVER_URL || 'localhost'
         const mainServerPort = process.env._MAIN_SERVER_PORT || '5050'
@@ -266,7 +268,11 @@ const login = async (req, res, next) => {
 
         console.log('Main server response:', mainServerResponse.data)
 
-        if (mainServerResponse.data) {
+        if (mainServerResponse.data && mainServerResponse.data.data) {
+          // Use tenant database user data from main server response
+          tenantUserId = mainServerResponse.data.data.id || user.id
+          tenantUserData = mainServerResponse.data.data // Store full tenant user data
+
           try {
             const mongoClient = new MongoClient(
               process.env._SUBSCRIPTION_MONGODB_URL,
@@ -290,6 +296,7 @@ const login = async (req, res, next) => {
               {
                 $set: {
                   route_access: routeAccessData,
+                  tenantUserId: tenantUserId, // Store tenant user ID in MongoDB
                   mainServerResponse: {
                     success: mainServerResponse.data.success,
                     message: mainServerResponse.data.message,
@@ -317,7 +324,7 @@ const login = async (req, res, next) => {
 
       const token = jwt.sign(
         {
-          userId: user.id,
+          userId: tenantUserId, // Use tenant database user ID
           username: user.username,
           dbName: user.db_name,
         },
@@ -344,15 +351,23 @@ const login = async (req, res, next) => {
         console.error('Error fetching route access for response:', sessionError)
       }
 
+      // Return tenant database user data if available, otherwise fall back to subscription data
+      const responseData = tenantUserData ? {
+        ...tenantUserData,
+        db_name: user.db_name, // Ensure db_name is from subscription
+        mongodb_url: process.env._MONGODB_URL,
+        token,
+      } : {
+        ...userWithoutPassword,
+        route_access: routeAccess,
+        mongodb_url: process.env._MONGODB_URL,
+        token,
+      }
+
       res.status(200).json({
         success: true,
         message: 'Login successful',
-        data: {
-          ...userWithoutPassword,
-          route_access: routeAccess,
-          mongodb_url: process.env._MONGODB_URL,
-          token,
-        },
+        data: responseData,
         timestamp: new Date().toISOString(),
       })
     })
