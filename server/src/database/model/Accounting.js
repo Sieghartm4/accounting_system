@@ -1332,6 +1332,7 @@ const Accounting = {
     prefix: 'a',
     prefix_: 'a_',
     insertColumns: [
+      'id',
       'document_reference',
       'posting_date',
       'remarks',

@@ -132,7 +132,7 @@ function PaymentsContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/payments/${Number(id)}`,
+          `${import.meta.env.VITE_SERVER_LINK}/payments/${encodeURIComponent(id)}`,
           {
             method: 'GET',
             headers: {

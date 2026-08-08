@@ -10,7 +10,7 @@ module.exports = {
         allowNull: false
       },
       aa_adjustment_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(300),
         allowNull: false,
         references: {
           model: 'adjustments',

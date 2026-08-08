@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import {
   FileText,
@@ -13,6 +14,7 @@ import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 
 export default function GeneralLedger() {
+  const navigate = useNavigate()
   const [ledgerEntries, setLedgerEntries] = useState([])
   const [grandTotalDebit, setGTD] = useState(0)
   const [grandTotalCredit, setGTC] = useState(0)
@@ -107,9 +109,13 @@ export default function GeneralLedger() {
     const groups = []
     let currentGroup = null
     entriesWithBalance.forEach((entry) => {
-      const key = `${entry.date}||${entry.db_name}||${entry.db_id}`
+      const key = `${entry.transaction_type}||${entry.date}||${entry.db_name}||${entry.db_id}`
       if (!currentGroup || currentGroup.key !== key) {
-        currentGroup = { key, entries: [] }
+        currentGroup = { 
+          key, 
+          transaction_type: entry.transaction_type,
+          entries: [] 
+        }
         groups.push(currentGroup)
       }
       currentGroup.entries.push(entry)
@@ -119,6 +125,24 @@ export default function GeneralLedger() {
 
   const totalRows = filteredEntries.length
   const isBalanced = Math.abs(grandTotalDebit - grandTotalCredit) < 0.01
+
+  // Map database names to routes (matching Header.jsx)
+  const routeMap = {
+    receipts: 'receipts',
+    sales: 'sales',
+    collections: 'collections',
+    purchase: 'purchase',
+    cash_disbursements: 'disbursement',
+    payments: 'payments',
+    adjustments: 'adjustments',
+  }
+
+  const handleTransNoClick = (entry) => {
+    const route = routeMap[entry.source]
+    if (route && entry.parent_id) {
+      navigate(`/${route}?id=${encodeURIComponent(entry.parent_id)}`)
+    }
+  }
 
   // ─────────────────────────────────────────────────────────────
   // EXCEL EXPORT — matches on-screen layout
@@ -177,18 +201,18 @@ export default function GeneralLedger() {
       border: BORDER_GROUP,
     })
 
-    // Column letters: A=Date, B=AccountTitle, C=Debit, D=Credit, E=Balance
-    const COLS = ['A', 'B', 'C', 'D', 'E']
+    // Column letters: A=TransactionNo, B=Date, C=AccountTitle, D=Debit, E=Credit, F=Balance
+    const COLS = ['A', 'B', 'C', 'D', 'E', 'F']
     let r = 1 // 1-indexed row
 
     // ── Row 1: Report title bar (black bg) ──
-    ;['A', 'B', 'C', 'D', 'E'].forEach((c) => {
+    ;['A', 'B', 'C', 'D', 'E', 'F'].forEach((c) => {
       setCell(
         ws,
         `${c}${r}`,
         c === 'A'
           ? 'GENERAL LEDGER — CHRONOLOGICAL'
-          : c === 'E'
+          : c === 'F'
             ? isBalanced
               ? 'BALANCED'
               : 'UNBALANCED'
@@ -197,14 +221,14 @@ export default function GeneralLedger() {
           font: {
             bold: true,
             color: {
-              rgb: c === 'E' ? (isBalanced ? '4ADE80' : 'F87171') : 'FFFFFF',
+              rgb: c === 'F' ? (isBalanced ? '4ADE80' : 'F87171') : 'FFFFFF',
             },
             name: 'Calibri',
             sz: c === 'A' ? 13 : 9,
           },
           fill: BLACK_BG,
           alignment: {
-            horizontal: c === 'E' ? 'right' : 'left',
+            horizontal: c === 'F' ? 'right' : 'left',
             vertical: 'center',
           },
         },
@@ -213,20 +237,20 @@ export default function GeneralLedger() {
     r++
 
     // ── Row 2: Period subtitle ──
-    ;['A', 'B', 'C', 'D', 'E'].forEach((c) => {
+    ;['A', 'B', 'C', 'D', 'E', 'F'].forEach((c) => {
       setCell(
         ws,
         `${c}${r}`,
         c === 'A'
           ? `Period: ${formatDate(startDate) || 'All'} — ${formatDate(endDate) || 'All'}`
-          : c === 'E'
+          : c === 'F'
             ? `Generated: ${new Date().toLocaleDateString('en-PH')}`
             : '',
         {
           font: { bold: false, color: { rgb: '6B7280' }, name: 'Calibri', sz: 8 },
           fill: BLACK_BG,
           alignment: {
-            horizontal: c === 'E' ? 'right' : 'left',
+            horizontal: c === 'F' ? 'right' : 'left',
             vertical: 'center',
           },
         },
@@ -238,24 +262,26 @@ export default function GeneralLedger() {
     r++
 
     // ── Row 4: "Amount (₱)" spanning header row ──
-    setCell(ws, `A${r}`, 'DATE', whiteOnBlack(true, 'left'))
+    setCell(ws, `A${r}`, 'TRANS. NO.', whiteOnBlack(true, 'left'))
+    setCell(ws, `B${r}`, 'DATE', whiteOnBlack(true, 'left'))
     setCell(
       ws,
-      `B${r}`,
+      `C${r}`,
       'ACCOUNT TITLE AND EXPLANATIONS',
       whiteOnBlack(true, 'left'),
     )
-    setCell(ws, `C${r}`, 'AMOUNT (₱)', redOnBlack(true, 'center'))
-    setCell(ws, `D${r}`, '', redOnBlack(false, 'center'))
+    setCell(ws, `D${r}`, 'AMOUNT (₱)', redOnBlack(true, 'center'))
     setCell(ws, `E${r}`, '', redOnBlack(false, 'center'))
+    setCell(ws, `F${r}`, '', redOnBlack(false, 'center'))
     r++
 
     // ── Row 5: Debit / Credit / Balance sub-header ──
     setCell(ws, `A${r}`, '', whiteOnBlack(true, 'left'))
     setCell(ws, `B${r}`, '', whiteOnBlack(true, 'left'))
-    setCell(ws, `C${r}`, 'DEBIT', whiteOnBlack(true, 'right'))
-    setCell(ws, `D${r}`, 'CREDIT', whiteOnBlack(true, 'right'))
-    setCell(ws, `E${r}`, 'BALANCE', whiteOnBlack(true, 'right'))
+    setCell(ws, `C${r}`, '', whiteOnBlack(true, 'left'))
+    setCell(ws, `D${r}`, 'DEBIT', whiteOnBlack(true, 'right'))
+    setCell(ws, `E${r}`, 'CREDIT', whiteOnBlack(true, 'right'))
+    setCell(ws, `F${r}`, 'BALANCE', whiteOnBlack(true, 'right'))
     r++
 
     const headerStartRow = 4
@@ -264,6 +290,27 @@ export default function GeneralLedger() {
     // ── Data rows ──
     groupedEntries.forEach((group, gIdx) => {
       const fill = gIdx % 2 === 0 ? 'FFFFFF' : 'F9FAFB'
+      const prevGroup = groupedEntries[gIdx - 1]
+      const showTransactionTitle = !prevGroup || prevGroup.transaction_type !== group.transaction_type
+
+      // Add transaction type title row
+      if (showTransactionTitle) {
+        ;['A', 'B', 'C', 'D', 'E', 'F'].forEach((c) => {
+          setCell(
+            ws,
+            `${c}${r}`,
+            c === 'A' ? group.transaction_type.toUpperCase() : '',
+            {
+              font: { bold: true, color: { rgb: 'FFFFFF' }, name: 'Calibri', sz: 10 },
+              fill: { fgColor: { rgb: '111827' } },
+              alignment: { horizontal: 'left', vertical: 'center' },
+              border: { bottom: { style: 'medium', color: { rgb: 'DC2626' } } },
+            },
+          )
+        })
+        r++
+      }
+
       group.entries.forEach((entry, eIdx) => {
         const isFirst = eIdx === 0
         const isLast = eIdx === group.entries.length - 1
@@ -273,56 +320,62 @@ export default function GeneralLedger() {
         setCell(
           ws,
           `A${r}`,
+          isFirst ? entry.parent_id || '' : '',
+          cellFn(fill, '6B7280', 'left', false),
+        )
+        setCell(
+          ws,
+          `B${r}`,
           isFirst ? formatDate(entry.date) : '',
           cellFn(fill, '111827', 'left', false),
         )
         setCell(
           ws,
-          `B${r}`,
+          `C${r}`,
           `${entry.account_code}  ${entry.account_name}${isCreditLine ? '  (credit)' : ''}`,
           cellFn(fill, isCreditLine ? '6B7280' : '111827', 'left', !isCreditLine),
         )
 
         if (entry.debit !== 0) {
-          ws[`C${r}`] = {
+          ws[`D${r}`] = {
             v: entry.debit,
             t: 'n',
             z: '#,##0.00',
             s: cellFn(fill, '111827', 'right', true),
           }
         } else {
-          setCell(ws, `C${r}`, '—', cellFn(fill, 'D1D5DB', 'right', false))
+          setCell(ws, `D${r}`, '—', cellFn(fill, 'D1D5DB', 'right', false))
         }
 
         if (entry.credit !== 0) {
-          ws[`D${r}`] = {
+          ws[`E${r}`] = {
             v: entry.credit,
             t: 'n',
             z: '#,##0.00',
             s: cellFn(fill, 'DC2626', 'right', true),
           }
         } else {
-          setCell(ws, `D${r}`, '—', cellFn(fill, 'D1D5DB', 'right', false))
+          setCell(ws, `E${r}`, '—', cellFn(fill, 'D1D5DB', 'right', false))
         }
 
         if (isLast) {
           const balColor = entry.runningBalance >= 0 ? '111827' : 'DC2626'
           const balLabel =
             entry.runningBalance > 0 ? ' DR' : entry.runningBalance < 0 ? ' CR' : ''
-          ws[`E${r}`] = {
+          ws[`F${r}`] = {
             v: Math.abs(entry.runningBalance),
             t: 'n',
             z: '#,##0.00',
             s: groupSepCell(fill, balColor, 'right', true),
           }
           // append DR/CR label as a suffix string cell when balance is shown
-          ws[`E${r}`] = {
+          ws[`F${r}`] = {
             v: `${fmt(Math.abs(entry.runningBalance))}${balLabel}`,
             t: 's',
             s: groupSepCell(fill, balColor, 'right', true),
           }
         } else {
-          setCell(ws, `E${r}`, '—', cellFn(fill, 'D1D5DB', 'right', false))
+          setCell(ws, `F${r}`, '—', cellFn(fill, 'D1D5DB', 'right', false))
         }
 
         r++
@@ -338,13 +391,14 @@ export default function GeneralLedger() {
     })
     setCell(ws, `A${r}`, 'TOTAL', footStyle('left'))
     setCell(ws, `B${r}`, `${totalRows} entries`, footStyle('left'))
-    ws[`C${r}`] = {
+    setCell(ws, `C${r}`, '', footStyle('left'))
+    ws[`D${r}`] = {
       v: grandTotalDebit,
       t: 'n',
       z: '#,##0.00',
       s: footStyle('right'),
     }
-    ws[`D${r}`] = {
+    ws[`E${r}`] = {
       v: grandTotalCredit,
       t: 'n',
       z: '#,##0.00',
@@ -354,7 +408,7 @@ export default function GeneralLedger() {
       },
     }
     const netVal = Math.abs(grandTotalDebit - grandTotalCredit)
-    ws[`E${r}`] = {
+    ws[`F${r}`] = {
       v: `${fmt(netVal)} ${isBalanced ? 'BALANCED' : grandTotalDebit > grandTotalCredit ? 'DR' : 'CR'}`,
       t: 's',
       s: {
@@ -369,8 +423,9 @@ export default function GeneralLedger() {
     }
 
     // ── Sheet range & column widths ──
-    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: r, c: 4 } })
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: r, c: 5 } })
     ws['!cols'] = [
+      { wch: 16 }, // Transaction No
       { wch: 14 }, // Date
       { wch: 48 }, // Account Title
       { wch: 18 }, // Debit
@@ -404,7 +459,7 @@ export default function GeneralLedger() {
   // ─────────────────────────────────────────────────────────────
   // PDF EXPORT — matches on-screen layout
   // ─────────────────────────────────────────────────────────────
-  const handleExportPDF = async () => {
+const handleExportPDF = async () => {
     try {
       const { jsPDF } = await import('jspdf')
       const { default: autoTable } = await import('jspdf-autotable')
@@ -418,71 +473,73 @@ export default function GeneralLedger() {
       const M = 36
       let y = renderPDFCompanyHeader(doc, company, W, M)
 
-      // Color palette
-      const BLK = [17, 24, 39]
-      const RED = [220, 38, 38]
-      const GRY = [107, 114, 128]
-      const LGT = [229, 231, 235]
-      const WHT = [255, 255, 255]
-      const GRN = [74, 222, 128]
-      const ORG = [251, 191, 36]
-      const LGRY = [249, 250, 251]
+      // ── Red, Black, White Professional Color Palette ──
+      const BLK = [20, 20, 20]             // Crisp Black for text
+      const WHT = [255, 255, 255]          // Pure White
+      const GRY = [110, 110, 110]          // Gray for secondary text
+      const BORDER = [220, 220, 220]       // Refined clean border color
+      const THEME_RED = [185, 28, 28]      // Deep Corporate Red
+      const GROUP_BG = [245, 247, 250]     // Clean neutral light gray-blue for group headers
+      const TOTAL_BG = [248, 249, 250]     // Clean off-white background for totals
 
-      // ── Title bar (full-width black band) ──
-      doc.setFillColor(...BLK)
-      doc.rect(M, y - 14, W - M * 2, 32, 'F')
-      doc
-        .setFont('helvetica', 'bold')
-        .setFontSize(13)
-        .setTextColor(...WHT)
-      doc.text('GENERAL LEDGER — CHRONOLOGICAL', M + 8, y + 6)
-      doc.setFontSize(8).setTextColor(...(isBalanced ? GRN : RED))
-      doc.text(isBalanced ? 'BALANCED' : 'UNBALANCED', W - M - 8, y + 6, {
-        align: 'right',
-      })
-      y += 32
+      y += 18
 
-      // ── Subtitle bar ──
-      doc.setFillColor(...BLK)
-      doc.rect(M, y - 2, W - M * 2, 18, 'F')
-      doc
-        .setFont('helvetica', 'normal')
-        .setFontSize(8)
-        .setTextColor(...GRY)
-      doc.text(
-        `Period: ${formatDate(startDate) || 'All Dates'} — ${formatDate(endDate) || 'All Dates'}`,
-        M + 8,
-        y + 10,
-      )
-      doc.text(
-        `Generated: ${new Date().toLocaleDateString('en-PH')}   ${totalRows} entries`,
-        W - M - 8,
-        y + 10,
-        { align: 'right' },
-      )
-      y += 22
+      // ── Clean Typography Title Bar ──
+      doc.setFont('helvetica', 'bold').setFontSize(13).setTextColor(...THEME_RED)
+      doc.text('GENERAL LEDGER — CHRONOLOGICAL', M, y)
+      
+      // ── Subtitle Details ──
+      y += 15
+      doc.setFont('helvetica', 'italic').setFontSize(9.5).setTextColor(...BLK)
+      doc.text(`Period: ${formatDate(startDate) || 'All Dates'} — ${formatDate(endDate) || 'All Dates'}`, M, y)
+      
+      y += 13
+      doc.setFont('helvetica', 'normal').setFontSize(8.5).setTextColor(...GRY)
+      doc.text(`Generated: ${new Date().toLocaleDateString('en-PH')}    |    ${totalRows} entries`, M, y)
+      
+      y += 18
 
-      // ── Build table body from grouped entries ──
+      // ── Build table body from grouped entries (Cleaned up redundancy) ──
       const body = []
       groupedEntries.forEach((group, gIdx) => {
+        const prevGroup = groupedEntries[gIdx - 1]
+        const showTransactionTitle = !prevGroup || prevGroup.transaction_type !== group.transaction_type
+
+        // Add transaction type title row
+        if (showTransactionTitle) {
+          body.push({
+            _isTitle: true,
+            transaction_type: group.transaction_type.toUpperCase(),
+          })
+        }
+
         group.entries.forEach((entry, eIdx) => {
           const isFirst = eIdx === 0
           const isLast = eIdx === group.entries.length - 1
           const isCreditLine = entry.debit === 0 && entry.credit !== 0
+
+          // Clean account title display to prevent redundant code/particulars nesting
+          let accountDisplay = entry.account_name || ''
+          if (entry.account_code) {
+            accountDisplay = `${entry.account_code} — ${entry.account_name}`
+          }
+          if (entry.particulars && entry.particulars !== entry.account_name && !entry.particulars.includes(entry.account_code)) {
+            accountDisplay += `\n(${entry.particulars})`
+          }
 
           body.push({
             _isLast: isLast,
             _isCreditLine: isCreditLine,
             _gIdx: gIdx,
             date: isFirst ? formatDate(entry.date) : '',
-            title: entry.account_code
-              ? `${entry.account_code}\n${isCreditLine ? '    ' : ''}${entry.account_name}${entry.particulars ? `\n    (${entry.particulars})` : ''}`
-              : entry.account_name,
-            debit: entry.debit !== 0 ? fmt(entry.debit) : '—',
-            credit: entry.credit !== 0 ? fmt(entry.credit) : '—',
+            parent_id: isFirst ? (entry.parent_id || '') : '',
+            title: accountDisplay,
+            debit: entry.debit !== 0 ? fmt(entry.debit) : '',
+            credit: entry.credit !== 0 ? fmt(entry.credit) : '',
+            // Only show running balance on the last line of the transaction to keep the column clean
             balance: isLast
-              ? `${fmt(Math.abs(entry.runningBalance))}\n${entry.runningBalance > 0 ? 'DR' : entry.runningBalance < 0 ? 'CR' : '—'}`
-              : '—',
+              ? `${fmt(Math.abs(entry.runningBalance))}\n${entry.runningBalance > 0 ? 'DR' : entry.runningBalance < 0 ? 'CR' : ''}`
+              : '',
             _runBal: entry.runningBalance,
             _debitNum: entry.debit,
             _creditNum: entry.credit,
@@ -494,32 +551,17 @@ export default function GeneralLedger() {
         startY: y,
         margin: { left: M, right: M },
         tableWidth: W - M * 2,
+        theme: 'grid', 
+        showFoot: 'lastPage',
 
-        // ── Two-row header matching on-screen ──
+        // ── Header Structure ──
         head: [
-          // Row 1: Date (rowspan hack via empty row 2), Title, "Amount (₱)" spanning 3
           [
-            {
-              content: 'DATE',
-              rowSpan: 2,
-              styles: { halign: 'left', valign: 'middle' },
-            },
-            {
-              content: 'ACCOUNT TITLE AND EXPLANATIONS',
-              rowSpan: 2,
-              styles: { halign: 'left', valign: 'middle' },
-            },
-            {
-              content: 'AMOUNT (₱)',
-              colSpan: 3,
-              styles: {
-                halign: 'center',
-                valign: 'middle',
-                textColor: [239, 68, 68],
-              },
-            },
+            { content: 'TRANS. NO.', rowSpan: 2, styles: { halign: 'left', valign: 'middle' } },
+            { content: 'DATE', rowSpan: 2, styles: { halign: 'left', valign: 'middle' } },
+            { content: 'ACCOUNT TITLE AND EXPLANATIONS', rowSpan: 2, styles: { halign: 'left', valign: 'middle' } },
+            { content: 'AMOUNT', colSpan: 3, styles: { halign: 'center', valign: 'middle' } }, 
           ],
-          // Row 2: Debit / Credit / Balance
           [
             { content: 'DEBIT', styles: { halign: 'right', valign: 'middle' } },
             { content: 'CREDIT', styles: { halign: 'right', valign: 'middle' } },
@@ -527,20 +569,31 @@ export default function GeneralLedger() {
           ],
         ],
 
-        body: body.map((row) => [
-          row.date,
-          row.title,
-          row.debit,
-          row.credit,
-          row.balance,
-        ]),
+        body: body.map((row) => {
+          if (row._isTitle) {
+            return [
+              { 
+                content: row.transaction_type, 
+                colSpan: 6 
+              },
+            ]
+          }
+          return [
+            row.parent_id || '',
+            row.date,
+            row.title,
+            row.debit,
+            row.credit,
+            row.balance,
+          ]
+        }),
 
         foot: [
           [
             {
-              content: 'TOTAL',
-              colSpan: 2,
-              styles: { halign: 'left', fontStyle: 'bold' },
+              content: 'GRAND TOTAL',
+              colSpan: 3,
+              styles: { halign: 'right', fontStyle: 'bold', paddingRight: 15 },
             },
             {
               content: fmt(grandTotalDebit),
@@ -548,129 +601,90 @@ export default function GeneralLedger() {
             },
             {
               content: fmt(grandTotalCredit),
-              styles: {
-                halign: 'right',
-                fontStyle: 'bold',
-                textColor: [252, 165, 165],
-              },
+              styles: { halign: 'right', fontStyle: 'bold' },
             },
             {
-              content: `${fmt(Math.abs(grandTotalDebit - grandTotalCredit))} ${isBalanced ? 'BALANCED' : grandTotalDebit > grandTotalCredit ? 'DR' : 'CR'}`,
+              content: `${fmt(Math.abs(grandTotalDebit - grandTotalCredit))} ${isBalanced ? 'BAL' : grandTotalDebit > grandTotalCredit ? 'DR' : 'CR'}`,
               styles: {
                 halign: 'right',
                 fontStyle: 'bold',
-                textColor: isBalanced ? [74, 222, 128] : [251, 191, 36],
+                textColor: isBalanced ? BLK : THEME_RED, 
               },
             },
           ],
         ],
 
-        theme: 'plain',
-
         headStyles: {
-          fillColor: BLK,
+          fillColor: THEME_RED,
           textColor: WHT,
           fontStyle: 'bold',
           fontSize: 8,
-          cellPadding: { top: 5, bottom: 5, left: 5, right: 5 },
-          lineColor: [55, 65, 81],
+          cellPadding: { top: 7, bottom: 7, left: 6, right: 6 },
+          lineColor: THEME_RED,
           lineWidth: 0.5,
         },
 
         footStyles: {
-          fillColor: BLK,
-          textColor: WHT,
+          fillColor: TOTAL_BG, 
+          textColor: BLK,
           fontStyle: 'bold',
-          fontSize: 9,
-          cellPadding: { top: 6, bottom: 6, left: 5, right: 5 },
-          lineColor: RED,
-          lineWidth: { top: 3, bottom: 0, left: 0, right: 0 },
+          fontSize: 8.5,
+          cellPadding: { top: 8, bottom: 8, left: 6, right: 6 },
+          lineColor: BORDER,
+          lineWidth: 0.5,
         },
 
         styles: {
           fontSize: 8,
-          cellPadding: { top: 4, bottom: 4, left: 5, right: 5 },
-          textColor: [55, 65, 81],
-          lineColor: LGT,
-          lineWidth: 0.3,
-          valign: 'top',
+          cellPadding: { top: 5.5, bottom: 5.5, left: 6, right: 6 },
+          textColor: BLK,
+          fillColor: WHT,
+          lineColor: BORDER,
+          lineWidth: 0.5, 
+          valign: 'middle', 
         },
 
         columnStyles: {
-          0: { cellWidth: 65, halign: 'left' },
-          1: { cellWidth: 'auto', halign: 'left' },
-          2: { cellWidth: 85, halign: 'right', fontStyle: 'bold' },
-          3: { cellWidth: 85, halign: 'right', fontStyle: 'bold' },
-          4: { cellWidth: 90, halign: 'right', fontStyle: 'bold' },
+          0: { cellWidth: 75, halign: 'left' },
+          1: { cellWidth: 65, halign: 'left' },
+          2: { cellWidth: 'auto', halign: 'left' },
+          3: { cellWidth: 85, halign: 'right' },
+          4: { cellWidth: 85, halign: 'right' },
+          5: { cellWidth: 90, halign: 'right' },
         },
 
-        // ── Per-cell styling to replicate on-screen look ──
+        // ── Professional Per-Cell Styling for Group Banners & Indents ──
         didParseCell(data) {
           if (data.section !== 'body') return
           const row = body[data.row.index]
           if (!row) return
 
-          const isEven = row._gIdx % 2 === 0
-          data.cell.styles.fillColor = isEven ? WHT : LGRY
-
-          // Group separator — thicker bottom border on last row of transaction
-          if (row._isLast) {
-            data.cell.styles.lineWidth = {
-              top: 0.3,
-              bottom: 1.5,
-              left: 0.3,
-              right: 0.3,
-            }
-            data.cell.styles.lineColor = [156, 163, 175]
+          // Style Transaction Type Group Banners cleanly with neutral professional tone and dark text
+          if (row._isTitle) {
+            data.cell.styles.fillColor = GROUP_BG
+            data.cell.styles.textColor = BLK
+            data.cell.styles.fontStyle = 'bold'
+            data.cell.styles.fontSize = 8.5 
+            data.cell.styles.cellPadding = { top: 6, bottom: 6, left: 8, right: 6 }
+            return
           }
 
-          // Credit lines indented
-          if (data.column.index === 1 && row._isCreditLine) {
-            data.cell.styles.textColor = [107, 114, 128]
-          }
-
-          // Debit column: black text for values, light gray for dashes
+          // Indent Credit lines in Account Title column for standard accounting presentation
           if (data.column.index === 2) {
-            data.cell.styles.textColor =
-              row._debitNum !== 0 ? [17, 24, 39] : [209, 213, 219]
-          }
-
-          // Credit column: red for values, light gray for dashes
-          if (data.column.index === 3) {
-            data.cell.styles.textColor =
-              row._creditNum !== 0 ? [220, 38, 38] : [209, 213, 219]
-          }
-
-          // Balance column: black DR, red CR, gray for non-last
-          if (data.column.index === 4) {
-            if (row._isLast) {
-              data.cell.styles.textColor =
-                row._runBal >= 0 ? [17, 24, 39] : [220, 38, 38]
-              data.cell.styles.fontStyle = 'bold'
-            } else {
-              data.cell.styles.textColor = [209, 213, 219]
+            if (row._isCreditLine) {
+              data.cell.styles.cellPadding = { left: 22, top: 5.5, bottom: 5.5, right: 6 }
             }
           }
         },
 
-        // ── Page numbers ──
+        // ── Polished Page Footer Layout ──
         didDrawPage(data) {
           const pageCount = doc.internal.getNumberOfPages()
-          doc
-            .setFont('helvetica', 'normal')
-            .setFontSize(7)
-            .setTextColor(...GRY)
-          doc.text(
-            `Page ${data.pageNumber} of ${pageCount}`,
-            W - M,
-            doc.internal.pageSize.getHeight() - 12,
-            { align: 'right' },
-          )
-          doc.text(
-            'GENERAL LEDGER — CONFIDENTIAL',
-            M,
-            doc.internal.pageSize.getHeight() - 12,
-          )
+          doc.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(...GRY)
+          doc.text(`Page ${data.pageNumber} of ${pageCount}`, W - M, doc.internal.pageSize.getHeight() - 15, { align: 'right' })
+          
+          const dateStr = new Date().toISOString().replace(/[-T:\.Z]/g, '').slice(0, 14)
+          doc.text(`GL: ${dateStr}`, M, doc.internal.pageSize.getHeight() - 15)
         },
       })
 
@@ -902,6 +916,7 @@ export default function GeneralLedger() {
           ) : (
             <table className="w-full border-collapse" style={{ minWidth: '800px' }}>
               <colgroup>
+                <col style={{ width: '140px' }} />
                 <col style={{ width: '120px' }} />
                 <col />
                 <col style={{ width: '160px' }} />
@@ -911,6 +926,13 @@ export default function GeneralLedger() {
               </colgroup>
               <thead className="sticky top-0 z-20">
                 <tr style={{ backgroundColor: '#111827' }}>
+                  <th
+                    rowSpan={2}
+                    style={{ backgroundColor: '#111827' }}
+                    className="py-3 px-4 text-[11px] font-black uppercase tracking-widest text-white text-left border-r border-gray-700 align-middle"
+                  >
+                    Trans. No.
+                  </th>
                   <th
                     rowSpan={2}
                     style={{ backgroundColor: '#111827' }}
@@ -956,23 +978,52 @@ export default function GeneralLedger() {
               <tbody>
                 {groupedEntries.map((group, gIdx) => {
                   const rowBg = gIdx % 2 === 0 ? '#ffffff' : '#f9fafb'
-                  return group.entries.map((entry, eIdx) => {
-                    const isFirst = eIdx === 0
-                    const isLast = eIdx === group.entries.length - 1
-                    const isCreditLine = entry.debit === 0 && entry.credit !== 0
-                    return (
-                      <tr
-                        key={`${gIdx}-${eIdx}`}
-                        style={{ backgroundColor: rowBg }}
-                        className={[
-                          isLast ? 'border-b-2 border-gray-300' : '',
-                          'hover:bg-red-50 transition-colors',
-                        ].join(' ')}
-                      >
-                        <td className="py-2.5 px-4 text-[11px] font-bold text-black align-top whitespace-nowrap border-r border-gray-200">
-                          {isFirst ? formatDate(entry.date) : null}
-                        </td>
-                        <td className="py-2.5 px-4 text-[11px] text-gray-800 border-r-2 border-gray-200">
+                  const prevGroup = groupedEntries[gIdx - 1]
+                  const showTransactionTitle = !prevGroup || prevGroup.transaction_type !== group.transaction_type
+
+                  return (
+                    <React.Fragment key={gIdx}>
+                      {showTransactionTitle && (
+                        <tr
+                          key={`title-${gIdx}`}
+                          style={{ backgroundColor: '#111827' }}
+                        >
+                          <td
+                            colSpan={7}
+                            className="py-2 px-4 text-[11px] font-black uppercase tracking-widest text-white border-b-2 border-red-600"
+                          >
+                            {group.transaction_type}
+                          </td>
+                        </tr>
+                      )}
+                      {group.entries.map((entry, eIdx) => {
+                        const isFirst = eIdx === 0
+                        const isLast = eIdx === group.entries.length - 1
+                        const isCreditLine = entry.debit === 0 && entry.credit !== 0
+                        return (
+                          <tr
+                            key={`${gIdx}-${eIdx}`}
+                            style={{ backgroundColor: rowBg }}
+                            className={[
+                              isLast ? 'border-b-2 border-gray-300' : '',
+                              'hover:bg-red-50 transition-colors',
+                            ].join(' ')}
+                          >
+                            <td className="py-2.5 px-4 text-[11px] font-mono align-top whitespace-nowrap border-r border-gray-200">
+                              {isFirst ? (
+                                <button
+                                  onClick={() => handleTransNoClick(entry)}
+                                  className="group flex items-center gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded cursor-pointer font-medium transition-all duration-200"
+                                >
+                                  {entry.parent_id}
+                                  <ArrowUpRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </button>
+                              ) : null}
+                            </td>
+                            <td className="py-2.5 px-4 text-[11px] font-bold text-black align-top whitespace-nowrap border-r border-gray-200">
+                              {isFirst ? formatDate(entry.date) : null}
+                            </td>
+                            <td className="py-2.5 px-4 text-[11px] text-gray-800 border-r-2 border-gray-200">
                           <div
                             className={`flex items-start gap-1 ${isCreditLine ? 'pl-5' : ''}`}
                           >
@@ -1037,7 +1088,9 @@ export default function GeneralLedger() {
                         </td>
                       </tr>
                     )
-                  })
+                  })}
+                    </React.Fragment>
+                  )
                 })}
               </tbody>
             </table>

@@ -413,11 +413,9 @@ const getPurchaseItemsPayment = async (req, res, next) => {
 const getAllPayments = async (req, res, next) => {
   const { payment_id } = req.params
 
-  const paymentId = Number(payment_id)
+  console.log('Received payment_id:', payment_id, 'type:', typeof payment_id)
 
-  console.log('Converted payment_id:', paymentId, 'type:', typeof paymentId)
-
-  if (!payment_id || isNaN(paymentId)) {
+  if (!payment_id) {
     return res.status(400).json({
       success: false,
 
@@ -491,7 +489,7 @@ const getAllPayments = async (req, res, next) => {
 
     let payment = await Query(
       payment_query,
-      [paymentId],
+      [payment_id],
       [
         Accounting.payments.prefix_,
         Master.vendors.prefix_,
@@ -612,7 +610,7 @@ const getAllPayments = async (req, res, next) => {
 
     let payment_items = await Query(
       payment_items_query,
-      [paymentId],
+      [payment_id],
       [Accounting.payment_items.prefix_],
     )
 
@@ -653,7 +651,7 @@ const getAllPayments = async (req, res, next) => {
 
     let payment_journal = await Query(
       payment_journal_query,
-      ['payments', paymentId],
+      ['payments', payment_id],
       [Accounting.journal_entries.prefix_],
     )
 
@@ -689,7 +687,7 @@ const getAllPayments = async (req, res, next) => {
 
     let payment_attachments = await Query(
       payment_attachments_query,
-      [paymentId],
+      [payment_id],
       [Accounting.payment_attachments.prefix_],
     )
 
@@ -905,7 +903,7 @@ const createPayment = async (req, res, next) => {
             .build()
 
           const itemValues = [
-            paymentId,
+            payment_id,
 
             item.purchase_id || null,
 
@@ -937,7 +935,7 @@ const createPayment = async (req, res, next) => {
           const entryValues = [
             'payments',
 
-            paymentId,
+            payment_id,
 
             entry.account_id || null,
 
@@ -967,7 +965,7 @@ const createPayment = async (req, res, next) => {
             .build()
 
           const attachmentValues = [
-            paymentId,
+            payment_id,
 
             attachment.file || null,
 
@@ -1990,9 +1988,7 @@ const getPrintPayments = async (req, res, next) => {
 const updatePayment = async (req, res, next) => {
   const { payment_id } = req.params
 
-  const paymentId = Number(payment_id)
-
-  console.log('Updating payment_id:', paymentId, 'type:', typeof paymentId)
+  console.log('Updating payment_id:', payment_id, 'type:', typeof payment_id)
 
   try {
     const {
@@ -2150,7 +2146,7 @@ const updatePayment = async (req, res, next) => {
         .build()
 
       const [currentPaymentData] = await connection.execute(currentPaymentQuery, [
-        paymentId,
+        payment_id,
       ])
 
       // Fetch current payment items BEFORE updates
@@ -2184,7 +2180,7 @@ const updatePayment = async (req, res, next) => {
 
           .build()
 
-        currentItemsData = await connection.execute(currentItemsQuery, [paymentId])
+        currentItemsData = await connection.execute(currentItemsQuery, [payment_id])
       }
 
       // Fetch current journal entries BEFORE updates
@@ -2225,7 +2221,7 @@ const updatePayment = async (req, res, next) => {
 
         currentJournalData = await Query(
           currentJournalQuery,
-          ['payments', paymentId],
+          ['payments', payment_id],
           [Accounting.journal_entries.prefix_],
         )
       }
@@ -2256,7 +2252,7 @@ const updatePayment = async (req, res, next) => {
         .build()
 
       currentAttachmentsData = await connection.execute(currentAttachmentsQuery, [
-        paymentId,
+        payment_id,
       ])
 
       const updateMainQuery = sql
@@ -2297,7 +2293,7 @@ const updatePayment = async (req, res, next) => {
 
         remarks || null,
 
-        paymentId,
+        payment_id,
       ]
 
       await connection.execute(updateMainQuery, updateMainValues)
@@ -2325,7 +2321,7 @@ const updatePayment = async (req, res, next) => {
 
         const existingEntries = await Query(
           existingEntriesQuery,
-          ['payments', paymentId],
+          ['payments', payment_id],
           [Accounting.journal_entries.prefix_],
         )
 
@@ -2357,7 +2353,7 @@ const updatePayment = async (req, res, next) => {
             await connection.execute(deleteEntriesQuery, [
               entryId,
               'payments',
-              paymentId,
+              payment_id,
             ])
           }
         }
@@ -2418,7 +2414,7 @@ const updatePayment = async (req, res, next) => {
             const insertEntryValues = [
               'payments',
 
-              paymentId,
+              payment_id,
 
               entry.account_id || null,
 
@@ -2446,7 +2442,7 @@ const updatePayment = async (req, res, next) => {
 
           .build()
 
-        await connection.execute(deleteAllEntriesQuery, ['payments', paymentId])
+        await connection.execute(deleteAllEntriesQuery, ['payments', payment_id])
       }
 
       if (attachments && attachments.length > 0) {
@@ -2461,7 +2457,7 @@ const updatePayment = async (req, res, next) => {
 
         const existingAttachments = await Query(
           existingAttachmentsQuery,
-          [paymentId],
+          [payment_id],
           [Accounting.payment_attachments.prefix_],
         )
 
@@ -2568,7 +2564,7 @@ const updatePayment = async (req, res, next) => {
               .build()
 
             const insertAttachmentValues = [
-              paymentId,
+              payment_id,
 
               attachment.file || null,
 
@@ -2929,7 +2925,7 @@ const updatePayment = async (req, res, next) => {
 
       const existingAttachments = await Query(
         existingAttachmentsQuery,
-        [paymentId],
+        [payment_id],
         [Accounting.payment_attachments.prefix_],
       )
 
@@ -3109,7 +3105,7 @@ const updatePayment = async (req, res, next) => {
               .build(),
 
             values: [
-              paymentId,
+              payment_id,
 
               'PAYMENT_UPDATE',
 
@@ -3132,7 +3128,7 @@ const updatePayment = async (req, res, next) => {
 
         message: 'Payment updated successfully',
 
-        data: { id: paymentId },
+        data: { id: payment_id },
 
         timestamp: new Date().toISOString(),
       })

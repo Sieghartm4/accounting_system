@@ -93,7 +93,7 @@ function AdjustmentsContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/adjustments/${Number(id)}`,
+          `${import.meta.env.VITE_SERVER_LINK}/adjustments/${encodeURIComponent(id)}`,
           {
             method: 'GET',
             headers: {

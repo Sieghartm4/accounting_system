@@ -164,8 +164,7 @@ const getAdjustmentById = async (req, res, next) => {
   try {
     const { adjustment_id } = req.params
     console.log('adjustment_id', adjustment_id)
-    const adjustmentId = Number(adjustment_id)
-    if (!adjustment_id || isNaN(adjustmentId)) {
+    if (!adjustment_id) {
       return res.status(400).json({
         success: false,
         message: 'Invalid adjustment ID provided',
@@ -206,7 +205,7 @@ const getAdjustmentById = async (req, res, next) => {
 
     let adjustment = await Query(
       adjustment_query,
-      [adjustmentId],
+      [adjustment_id],
       [Accounting.adjustments.prefix_],
     )
 
@@ -241,7 +240,7 @@ const getAdjustmentById = async (req, res, next) => {
 
     let adjustment_attachments = await Query(
       adjustment_attachments_query,
-      [adjustmentId],
+      [adjustment_id],
       [Accounting.adjustment_attachments.prefix_],
     )
 
@@ -274,7 +273,7 @@ const getAdjustmentById = async (req, res, next) => {
 
     let journal_entries = await Query(
       journal_entries_query,
-      ['adjustments', adjustmentId],
+      ['adjustments', adjustment_id],
       [Accounting.journal_entries.prefix_, Master.charts_of_accounts.prefix_],
     )
 
@@ -330,6 +329,30 @@ const createAdjustment = async (req, res, next) => {
       connection = await getTenantPool().getConnection()
       await connection.beginTransaction()
 
+      // generate adjustment id in format JV-MMDDYY-0001 (sequence per day)
+      const nowForId = new Date()
+      const mm = String(nowForId.getMonth() + 1).padStart(2, '0')
+      const dd = String(nowForId.getDate()).padStart(2, '0')
+      const yy = String(nowForId.getFullYear()).slice(-2)
+      const datePart = `${mm}${dd}${yy}`
+      const idPrefix = `JV-${datePart}-`
+
+      const [existing] = await connection.execute(
+        `SELECT a_id FROM adjustments WHERE a_id LIKE ? ORDER BY a_id DESC LIMIT 1`,
+        [`${idPrefix}%`],
+      )
+
+      let seq = 1
+      if (existing && existing.length > 0) {
+        const lastId = existing[0].a_id
+        const parts = lastId.split('-')
+        const lastSeq = parseInt(parts[parts.length - 1], 10) || 0
+        seq = lastSeq + 1
+      }
+
+      const seqStr = String(seq).padStart(4, '0')
+      const newAdjustmentId = `${idPrefix}${seqStr}`
+
       const mainQuery = sql
         .insert(Accounting.adjustments.tablename, {
           columns: Accounting.adjustments.insertColumns,
@@ -339,6 +362,7 @@ const createAdjustment = async (req, res, next) => {
         .build()
 
       const mainValues = [
+        newAdjustmentId, // a_id
         document_reference || null,
         posting_date || null,
         remarks || null,
@@ -350,8 +374,8 @@ const createAdjustment = async (req, res, next) => {
         approved_by || null,
       ]
 
-      const [mainResult] = await connection.execute(mainQuery, mainValues)
-      const adjustmentId = mainResult.insertId
+      await connection.execute(mainQuery, mainValues)
+      const adjustmentId = newAdjustmentId
 
       if (adjustment_attachments && adjustment_attachments.length > 0) {
         for (const attachment of adjustment_attachments) {
@@ -364,7 +388,7 @@ const createAdjustment = async (req, res, next) => {
             .build()
 
           const attachmentValues = [
-            adjustmentId,
+            adjustment_id,
             attachment.file || null,
             attachment.name || null,
             attachment.remarks || null,
@@ -410,7 +434,7 @@ const createAdjustment = async (req, res, next) => {
 
           const entryValues = [
             'adjustments',
-            adjustmentId,
+            adjustment_id,
             accountId,
             entry.responsibility_center || '',
             type,
@@ -789,8 +813,7 @@ const updateAdjustmentData = async (req, res, next) => {
 
     console.log('Updating adjustment data:', req.body)
 
-    const adjustmentId = Number(adjustment_id)
-    if (!adjustment_id || isNaN(adjustmentId)) {
+    if (!adjustment_id) {
       return res.status(400).json({
         success: false,
         message: 'Invalid adjustment ID provided',
@@ -833,7 +856,7 @@ const updateAdjustmentData = async (req, res, next) => {
 
       const [currentAdjustmentData] = await connection.execute(
         currentAdjustmentQuery,
-        [adjustmentId],
+        [adjustment_id],
       )
 
       // Fetch current journal entries BEFORE updates
@@ -864,7 +887,7 @@ const updateAdjustmentData = async (req, res, next) => {
 
         currentJournalData = await connection.execute(currentJournalQuery, [
           'adjustments',
-          adjustmentId,
+          adjustment_id,
         ])
       }
 
@@ -890,7 +913,7 @@ const updateAdjustmentData = async (req, res, next) => {
         .build()
 
       currentAttachmentsData = await connection.execute(currentAttachmentsQuery, [
-        adjustmentId,
+        adjustment_id,
       ])
 
       // Update adjustment header
@@ -910,7 +933,7 @@ const updateAdjustmentData = async (req, res, next) => {
         posting_date || null,
         remarks || null,
         total_amount || null,
-        adjustmentId,
+        adjustment_id,
       ]
 
       await connection.execute(updateHeaderQuery, headerValues)
@@ -922,7 +945,7 @@ const updateAdjustmentData = async (req, res, next) => {
         .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
         .build()
 
-      await connection.execute(deleteJournalQuery, ['adjustments', adjustmentId])
+      await connection.execute(deleteJournalQuery, ['adjustments', adjustment_id])
 
       // Insert new journal entries
       if (journal_entries && journal_entries.length > 0) {
@@ -940,7 +963,7 @@ const updateAdjustmentData = async (req, res, next) => {
 
           const entryValues = [
             'adjustments',
-            adjustmentId,
+            adjustment_id,
             entry.account_id || null,
             entry.responsibility_center || '',
             type,
@@ -958,7 +981,7 @@ const updateAdjustmentData = async (req, res, next) => {
         .where(Accounting.adjustment_attachments.selectOptionColumns.adjustment_id)
         .build()
 
-      await connection.execute(deleteAttachmentsQuery, [adjustmentId])
+      await connection.execute(deleteAttachmentsQuery, [adjustment_id])
 
       // Insert new attachments
       if (adjustment_attachments && adjustment_attachments.length > 0) {
@@ -972,7 +995,7 @@ const updateAdjustmentData = async (req, res, next) => {
             .build()
 
           const attachmentValues = [
-            adjustmentId,
+            adjustment_id,
             attachment.file || null,
             attachment.name || null,
             attachment.remarks || null,
@@ -1149,7 +1172,7 @@ const updateAdjustmentData = async (req, res, next) => {
 
       const existingAttachments = await Query(
         existingAttachmentsQuery,
-        [adjustmentId],
+        [adjustment_id],
         [Accounting.adjustment_attachments.prefix_],
       )
       const existingAttachmentIds = existingAttachments.map(
@@ -1289,7 +1312,7 @@ const updateAdjustmentData = async (req, res, next) => {
               })
               .build(),
             values: [
-              adjustmentId,
+              adjustment_id,
               'ADJUSTMENT_UPDATE',
               req.context?.username || null,
               now.toISOString().split('T')[0],
@@ -1305,7 +1328,7 @@ const updateAdjustmentData = async (req, res, next) => {
       res.status(200).json({
         success: true,
         message: 'Adjustment updated successfully',
-        data: { id: adjustmentId },
+        data: { id: adjustment_id },
         timestamp: new Date().toISOString(),
       })
     } catch (error) {

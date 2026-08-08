@@ -605,6 +605,16 @@ const getGeneralLedger = async (req, res, next) => {
           WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' THEN a.${Accounting.adjustments.selectOptionColumns.posting_date}
           ELSE ${Accounting.journal_entries.selectOptionColumns.date}
         END AS posted_date,
+        CASE
+          WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' THEN r.${Accounting.receipts.selectOptionColumns.id}
+          WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' THEN cd.${Accounting.cash_disbursements.selectOptionColumns.id}
+          WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' THEN s.${Accounting.sales.selectOptionColumns.id}
+          WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' THEN c.${Accounting.collections.selectOptionColumns.id}
+          WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' THEN p.${Accounting.purchase.selectOptionColumns.id}
+          WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' THEN pay.${Accounting.payments.selectOptionColumns.id}
+          WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' THEN a.${Accounting.adjustments.selectOptionColumns.id}
+          ELSE NULL
+        END AS parent_id,
         ${Accounting.journal_entries.selectOptionColumns.type}               AS entry_type,
         ${Accounting.journal_entries.selectOptionColumns.amount}             AS amount,
         ${Accounting.journal_entries.selectOptionColumns.responsibility_center} AS responsibility_center,
@@ -666,9 +676,22 @@ const getGeneralLedger = async (req, res, next) => {
 
       const sourceKey = `${row.db_name || ''}::${row.db_id || ''}`
 
+      // Convert db_name to readable transaction type
+      const transactionTypeMap = {
+        'receipts': 'Receipt',
+        'cash_disbursements': 'Cash Disbursement',
+        'sales': 'Sales',
+        'collections': 'Collection',
+        'purchase': 'Purchase',
+        'payments': 'Payment',
+        'adjustments': 'Adjustment',
+      }
+      const transactionType = transactionTypeMap[row.db_name] || row.db_name
+
       ledgerEntries.push({
         // show the date only on the first line of each source group
         date: prevSourceKey === sourceKey ? '' : row.posted_date,
+        parent_id: prevSourceKey === sourceKey ? '' : row.parent_id,
         particulars: `${row.account_code} - ${row.account_name}`,
         account_code: row.account_code,
         account_name: row.account_name,
@@ -678,6 +701,7 @@ const getGeneralLedger = async (req, res, next) => {
         balance: runningBalance,
         source: row.db_name,
         source_id: row.db_id,
+        transaction_type: transactionType,
         responsibility_center: row.responsibility_center || '',
       })
 

@@ -402,11 +402,9 @@ const getSalesItemsCollection = async (req, res, next) => {
 const getAllCollections = async (req, res, next) => {
   const { collection_id } = req.params
 
-  const collectionId = Number(collection_id)
+  console.log('Received collection_id:', collection_id, 'type:', typeof collection_id)
 
-  console.log('Converted collection_id:', collectionId, 'type:', typeof collectionId)
-
-  if (!collection_id || isNaN(collectionId)) {
+  if (!collection_id) {
     return res.status(400).json({
       success: false,
 
@@ -487,7 +485,7 @@ const getAllCollections = async (req, res, next) => {
 
     let collection = await Query(
       collection_query,
-      [collectionId],
+      [collection_id],
       [
         Accounting.collections.prefix_,
         Master.customers.prefix_,
@@ -582,7 +580,7 @@ const getAllCollections = async (req, res, next) => {
 
     let collection_items = await Query(
       collection_items_query,
-      [collectionId],
+      [collection_id],
       [Accounting.collection_items.prefix_],
     )
 
@@ -621,7 +619,7 @@ const getAllCollections = async (req, res, next) => {
 
     let collection_journal = await Query(
       collection_journal_query,
-      ['collections', collectionId],
+      ['collections', collection_id],
       [Accounting.journal_entries.prefix_],
     )
 
@@ -663,7 +661,7 @@ const getAllCollections = async (req, res, next) => {
 
     let collection_attachments = await Query(
       collection_attachments_query,
-      [collectionId],
+      [collection_id],
       [Accounting.collection_attachments.prefix_],
     )
 
@@ -855,7 +853,7 @@ const createCollection = async (req, res, next) => {
           const itemQuery = `INSERT INTO ${Accounting.collection_items.tablename} (ci_collection_id, ci_sales_id, ci_amount, ci_witholding_tax) VALUES (?, ?, ?, ?)`
 
           const itemValues = [
-            collectionId,
+            collection_id,
 
             item.sales_id,
 
@@ -887,7 +885,7 @@ const createCollection = async (req, res, next) => {
           const entryValues = [
             'collections',
 
-            collectionId,
+            collection_id,
 
             entry.account_id || null,
 
@@ -917,7 +915,7 @@ const createCollection = async (req, res, next) => {
             .build()
 
           const attachmentValues = [
-            collectionId,
+            collection_id,
 
             attachment.file || null, // Base64 file data
 
@@ -1986,9 +1984,7 @@ const getPrintCollections = async (req, res, next) => {
 const updateCollection = async (req, res, next) => {
   const { collection_id } = req.params
 
-  const collectionId = Number(collection_id)
-
-  console.log('Updating collection_id:', collectionId, 'type:', typeof collectionId)
+  console.log('Updating collection_id:', collection_id, 'type:', typeof collection_id)
 
   try {
     const {
@@ -2138,7 +2134,7 @@ const updateCollection = async (req, res, next) => {
 
       const [currentCollectionData] = await connection.execute(
         currentCollectionQuery,
-        [collectionId],
+        [collection_id],
       )
 
       // Fetch current collection items BEFORE updates
@@ -2168,7 +2164,7 @@ const updateCollection = async (req, res, next) => {
           .build()
 
         currentItemsData = await connection.execute(currentItemsQuery, [
-          collectionId,
+          collection_id,
         ])
       }
 
@@ -2210,7 +2206,7 @@ const updateCollection = async (req, res, next) => {
 
         currentJournalData = await connection.execute(currentJournalQuery, [
           'collections',
-          collectionId,
+          collection_id,
         ])
       }
 
@@ -2243,7 +2239,7 @@ const updateCollection = async (req, res, next) => {
         .build()
 
       currentAttachmentsData = await connection.execute(currentAttachmentsQuery, [
-        collectionId,
+        collection_id,
       ])
 
       const updateMainQuery = sql
@@ -2284,7 +2280,7 @@ const updateCollection = async (req, res, next) => {
 
         remarks || null,
 
-        collectionId,
+        collection_id,
       ]
 
       await connection.execute(updateMainQuery, updateMainValues)
@@ -2307,7 +2303,7 @@ const updateCollection = async (req, res, next) => {
 
         const existingEntries = await Query(
           existingEntriesQuery,
-          ['collections', collectionId],
+          ['collections', collection_id],
           [Accounting.journal_entries.prefix_],
         )
 
@@ -2339,7 +2335,7 @@ const updateCollection = async (req, res, next) => {
             await connection.execute(deleteEntriesQuery, [
               entryId,
               'collections',
-              collectionId,
+              collection_id,
             ])
           }
         }
@@ -2394,7 +2390,7 @@ const updateCollection = async (req, res, next) => {
             const entryValues = [
               'collections',
 
-              collectionId,
+              collection_id,
 
               entry.account_id || null,
 
@@ -2424,7 +2420,7 @@ const updateCollection = async (req, res, next) => {
 
         await connection.execute(deleteAllEntriesQuery, [
           'collections',
-          collectionId,
+          collection_id,
         ])
       }
 
@@ -2440,7 +2436,7 @@ const updateCollection = async (req, res, next) => {
 
         const existingAttachments = await Query(
           existingAttachmentsQuery,
-          [collectionId],
+          [collection_id],
           [Accounting.collection_attachments.prefix_],
         )
 
@@ -2471,7 +2467,7 @@ const updateCollection = async (req, res, next) => {
           for (const attachmentId of attachmentsToDelete) {
             await connection.execute(deleteAttachmentsQuery, [
               attachmentId,
-              collectionId,
+              collection_id,
             ])
           }
         }
@@ -2530,7 +2526,7 @@ const updateCollection = async (req, res, next) => {
               .build()
 
             const attachmentValues = [
-              collectionId,
+              collection_id,
 
               attachment.file || null, // Base64 file data
 
@@ -2560,7 +2556,7 @@ const updateCollection = async (req, res, next) => {
 
           .build()
 
-        await connection.execute(deleteAllAttachmentsQuery, [collectionId])
+        await connection.execute(deleteAllAttachmentsQuery, [collection_id])
       }
 
       // Track changes for audit trail using data fetched earlier
@@ -2796,7 +2792,7 @@ const updateCollection = async (req, res, next) => {
 
       const existingAttachments = await Query(
         existingAttachmentsQuery,
-        [collectionId],
+        [collection_id],
         [Accounting.collection_attachments.prefix_],
       )
       const existingAttachmentIds = existingAttachments.map(
@@ -2941,7 +2937,7 @@ const updateCollection = async (req, res, next) => {
               })
               .build(),
             values: [
-              collectionId,
+              collection_id,
               'COLLECTION_UPDATE',
               req.context?.username || null,
               now.toISOString().split('T')[0],
@@ -2959,7 +2955,7 @@ const updateCollection = async (req, res, next) => {
 
         message: 'Collection updated successfully',
 
-        data: { id: collectionId },
+        data: { id: collection_id },
 
         timestamp: new Date().toISOString(),
       })
