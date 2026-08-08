@@ -800,76 +800,14 @@ export default function GeneralLedger() {
         />
       </div>
 
-      {/* ── TOOLBAR ── */}
-      <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap shadow-sm flex-shrink-0">
-        <div className="flex-1 min-w-[200px] flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 h-8 focus-within:border-red-500 focus-within:bg-white transition-all">
-          <Search size={14} className="text-gray-300 flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search by account code, name, or center..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none text-[12px] font-bold text-black placeholder:text-gray-300 placeholder:font-semibold"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="text-gray-300 hover:text-red-500 text-lg leading-none transition-colors"
-            >
-              ×
-            </button>
-          )}
-        </div>
-        <div className="hidden md:block w-px h-7 bg-gray-100" />
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-            From
-          </span>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
-          />
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-            To
-          </span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
-          />
-        </div>
-        <button
-          onClick={() => {
-            setStartDate('')
-            setEndDate('')
-            setSearchTerm('')
-          }}
-          className="px-4 py-2 border border-gray-900 rounded-xl text-[10px] font-black text-gray-900 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-all bg-white cursor-pointer"
-        >
-          Reset
-        </button>
-        <button
-          onClick={() => {
-            const t = new Date().toISOString().split('T')[0]
-            setStartDate(t)
-            setEndDate(t)
-          }}
-          className="px-4 py-2 bg-black rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-red-600 transition-all cursor-pointer"
-        >
-          Today
-        </button>
-      </div>
-
       {/* ── TABLE CARD ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col flex-1 overflow-hidden min-h-0">
-        {/* Title bar */}
+        {/* Title bar with toolbar */}
         <div
-          className="flex items-center gap-2 px-5 py-3 flex-shrink-0"
+          className="flex items-center gap-2 px-4 py-2 flex-shrink-0 flex-wrap border-b border-gray-500"
           style={{ backgroundColor: '#111827' }}
         >
+          
           <FileText size={14} className="text-gray-500" />
           <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
             General Ledger — Chronological
@@ -877,17 +815,82 @@ export default function GeneralLedger() {
           <span className="text-[10px] font-bold text-gray-500 ml-1">
             {totalRows} entries
           </span>
-          <div className="ml-auto">
+                    <div className="ml-auto">
             {isBalanced ? (
-              <span className="px-2.5 py-1 bg-green-900 text-green-300 text-[9px] font-black uppercase rounded-md tracking-widest">
+              <span className="px-2 py-1 bg-green-900 text-green-300 text-[9px] font-black uppercase rounded-md tracking-widest">
                 Balanced
               </span>
             ) : (
-              <span className="px-2.5 py-1 border border-red-500 text-red-400 text-[9px] font-black uppercase rounded-md tracking-widest">
+              <span className="px-2 py-1 border border-red-500 text-red-400 text-[9px] font-black uppercase rounded-md tracking-widest">
                 Unbalanced
               </span>
             )}
           </div>
+          {/* Toolbar inline */}
+          <div className="flex items-center gap-2 ml-4 flex-wrap">
+            <div className="flex-1 min-w-[180px] flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 h-8 focus-within:border-red-500 transition-all">
+              <Search size={14} className="text-gray-400 flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Search by account code, name, or center..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="flex-1 bg-transparent border-none outline-none text-[11px] font-bold text-black placeholder:text-gray-400 placeholder:font-semibold"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="text-gray-400 hover:text-red-500 text-sm leading-none transition-colors"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            
+            <div className="hidden md:flex items-center gap-2">
+              <span className="text-[10px] font-black text-gray-300 uppercase tracking-[1px]">
+                From
+              </span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-2 py-1.5 border border-gray-300 rounded bg-white text-[11px] font-bold text-black outline-none focus:border-red-500 transition-all"
+              />
+              <span className="text-[10px] font-black text-gray-300 uppercase tracking-[1px]">
+                To
+              </span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-2 py-1.5 border border-gray-300 rounded bg-white text-[11px] font-bold text-black outline-none focus:border-red-500 transition-all"
+              />
+            </div>
+            
+            <button
+              onClick={() => {
+                setStartDate('')
+                setEndDate('')
+                setSearchTerm('')
+              }}
+              className="px-3 py-1.5 border border-red-600 rounded text-[10px] font-black text-red-600 uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all bg-white cursor-pointer"
+            >
+              Reset
+            </button>
+            <button
+              onClick={() => {
+                const t = new Date().toISOString().split('T')[0]
+                setStartDate(t)
+                setEndDate(t)
+              }}
+              className="px-3 py-1.5 bg-emerald-600 rounded text-[10px] font-black text-white uppercase tracking-widest hover:bg-emerald-700 transition-all cursor-pointer"
+            >
+              Today
+            </button>
+          </div>
+          
+
         </div>
 
         {/* Scrollable body */}
@@ -904,6 +907,7 @@ export default function GeneralLedger() {
                 <col style={{ width: '160px' }} />
                 <col style={{ width: '160px' }} />
                 <col style={{ width: '160px' }} />
+                <col style={{ width: '180px' }} />
               </colgroup>
               <thead className="sticky top-0 z-20">
                 <tr style={{ backgroundColor: '#111827' }}>
@@ -921,13 +925,6 @@ export default function GeneralLedger() {
                   >
                     Account Title and Explanations
                   </th>
-                  <th
-                    colSpan={3}
-                    style={{ backgroundColor: '#111827' }}
-                    className="py-2 px-4 text-[10px] font-black uppercase tracking-[3px] text-red-500 text-center border-b border-gray-700"
-                  >
-                    Amount (₱)
-                  </th>
                 </tr>
                 <tr style={{ backgroundColor: '#111827' }}>
                   <th
@@ -944,9 +941,15 @@ export default function GeneralLedger() {
                   </th>
                   <th
                     style={{ backgroundColor: '#111827' }}
-                    className="py-2 px-4 text-[11px] font-black uppercase tracking-widest text-white text-right"
+                    className="py-2 px-4 text-[11px] font-black uppercase tracking-widest text-white text-right border-r border-gray-700"
                   >
                     Balance
+                  </th>
+                  <th
+                    style={{ backgroundColor: '#111827' }}
+                    className="py-2 px-4 text-[11px] font-black uppercase tracking-widest text-white text-right"
+                  >
+                    Resp. Center
                   </th>
                 </tr>
               </thead>
@@ -1029,6 +1032,9 @@ export default function GeneralLedger() {
                             <span className="text-gray-200">—</span>
                           )}
                         </td>
+                        <td className="py-2.5 px-4 text-right text-[11px] font-bold text-gray-600 align-middle">
+                          {entry.responsibility_center || <span className="text-gray-300">—</span>}
+                        </td>
                       </tr>
                     )
                   })
@@ -1040,44 +1046,35 @@ export default function GeneralLedger() {
 
         {/* Pinned footer */}
         <div
-          className="flex-shrink-0 border-t-4 border-red-600"
+          className="flex-shrink-0 border-t-2 border-red-600"
           style={{ backgroundColor: '#111827' }}
         >
           <div
-            className="px-6 py-4 grid grid-cols-3 gap-6"
+            className="px-6 py-2.5 grid grid-cols-3 gap-4"
             style={{ minWidth: '800px' }}
           >
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[2px] text-gray-400 mb-1">
+              <p className="text-[9px] font-black uppercase tracking-[2px] text-gray-400 mb-0.5">
                 Total Debit
               </p>
-              <p className="text-[18px] font-black text-white font-mono">
+              <p className="text-[15px] font-black text-white font-mono leading-tight">
                 PHP {fmt(grandTotalDebit)}
               </p>
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[2px] text-gray-400 mb-1">
+              <p className="text-[9px] font-black uppercase tracking-[2px] text-gray-400 mb-0.5">
                 Total Credit
               </p>
-              <p className="text-[18px] font-black text-red-400 font-mono">
+              <p className="text-[15px] font-black text-red-400 font-mono leading-tight">
                 PHP {fmt(grandTotalCredit)}
               </p>
             </div>
             <div className="text-right">
-              <p className="text-[10px] font-black uppercase tracking-[2px] text-gray-400 mb-1">
-                Net (Dr − Cr)
+              <p className="text-[9px] font-black uppercase tracking-[2px] text-gray-400 mb-0.5">
+                Net Balance
               </p>
-              <p
-                className={`text-[18px] font-black font-mono ${isBalanced ? 'text-green-400' : 'text-orange-400'}`}
-              >
-                PHP {fmt(Math.abs(grandTotalDebit - grandTotalCredit))}
-                <span className="text-[11px] ml-2">
-                  {grandTotalDebit > grandTotalCredit
-                    ? 'DR'
-                    : grandTotalCredit > grandTotalDebit
-                      ? 'CR'
-                      : 'BALANCED'}
-                </span>
+              <p className="text-[15px] font-black text-emerald-400 font-mono leading-tight">
+                PHP {fmt(grandTotalDebit - grandTotalCredit)}
               </p>
             </div>
           </div>

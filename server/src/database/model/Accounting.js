@@ -263,6 +263,7 @@ const Accounting = {
     prefix: 'c',
     prefix_: 'c_',
     insertColumns: [
+      'id',
       'customer_id',
       'document_reference',
       'mode_of_payment',
@@ -1163,6 +1164,7 @@ const Accounting = {
     prefix: 'c',
     prefix_: 'c_',
     insertColumns: [
+      'id',
       'vendor_id',
       'document_reference',
       'mode_of_payment',

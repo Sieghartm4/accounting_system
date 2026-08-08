@@ -520,9 +520,9 @@ export default function IncomeStatement() {
     )
 
   return (
-    <div className="flex flex-col gap-3 bg-[#F3F4F6] min-h-full custom-scrollbar">
+    <div className="flex flex-col gap-3 bg-[#F3F4F6] h-full custom-scrollbar">
       {/* HEADER */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-black rounded-xl shrink-0">
             <FileText size={22} className="text-red-500" />
@@ -573,7 +573,7 @@ export default function IncomeStatement() {
       </div>
 
       {/* STAT CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-shrink-0">
         <StatCard
           iconBg="bg-green-50"
           iconColor="text-green-600"
@@ -604,7 +604,7 @@ export default function IncomeStatement() {
       </div>
 
       {/* TOOLBAR */}
-      <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-4 flex-wrap shadow-sm">
+      <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-4 flex-wrap shadow-sm flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className="p-1.5 bg-red-100 rounded-lg text-red-600">
             <Calendar size={14} />
@@ -652,18 +652,17 @@ export default function IncomeStatement() {
       </div>
 
       {/* CONTENT GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
         {/* REVENUE TABLE */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col custom-scrollbar">
-          <div className="flex items-center gap-2 px-5 py-3 bg-black">
+          <div className="flex items-center gap-2 px-5 py-3 bg-black flex-shrink-0">
             <TrendingUp size={14} className="text-green-500" />
             <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
               Revenues
             </span>
           </div>
           <div
-            className="overflow-y-auto custom-scrollbar"
-            style={{ maxHeight: '570px' }}
+            className="overflow-y-auto custom-scrollbar flex-1 min-h-0"
           >
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-gray-50 z-10">
@@ -712,15 +711,14 @@ export default function IncomeStatement() {
 
         {/* EXPENSES TABLE */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col custom-scrollbar">
-          <div className="flex items-center gap-2 px-5 py-3 bg-black">
+          <div className="flex items-center gap-2 px-5 py-3 bg-black flex-shrink-0">
             <TrendingDown size={14} className="text-red-500" />
             <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
               Expenses
             </span>
           </div>
           <div
-            className="overflow-y-auto custom-scrollbar"
-            style={{ maxHeight: '570px' }}
+            className="overflow-y-auto custom-scrollbar flex-1 min-h-0"
           >
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-gray-50 z-10">

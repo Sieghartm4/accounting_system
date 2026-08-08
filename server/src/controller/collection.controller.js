@@ -775,6 +775,30 @@ const createCollection = async (req, res, next) => {
       // Get user full name from database
       const userFullName = await getUserFullName(created_by, connection, Master)
 
+      // generate collection id in format CL-MMDDYY-0001 (sequence per day)
+      const nowForId = new Date()
+      const mm = String(nowForId.getMonth() + 1).padStart(2, '0')
+      const dd = String(nowForId.getDate()).padStart(2, '0')
+      const yy = String(nowForId.getFullYear()).slice(-2)
+      const datePart = `${mm}${dd}${yy}`
+      const idPrefix = `CL-${datePart}-`
+
+      const [existing] = await connection.execute(
+        `SELECT c_id FROM collections WHERE c_id LIKE ? ORDER BY c_id DESC LIMIT 1`,
+        [`${idPrefix}%`],
+      )
+
+      let seq = 1
+      if (existing && existing.length > 0) {
+        const lastId = existing[0].c_id
+        const parts = lastId.split('-')
+        const lastSeq = parseInt(parts[parts.length - 1], 10) || 0
+        seq = lastSeq + 1
+      }
+
+      const seqStr = String(seq).padStart(4, '0')
+      const newCollectionId = `${idPrefix}${seqStr}`
+
       const mainQuery = sql
         .insert(Accounting.collections.tablename, {
           columns: Accounting.collections.insertColumns,
@@ -786,6 +810,7 @@ const createCollection = async (req, res, next) => {
         .build()
 
       const mainValues = [
+        newCollectionId, // c_id
         customer_id || null,
 
         document_reference || ' ',
@@ -811,9 +836,9 @@ const createCollection = async (req, res, next) => {
         null, // approved_by
       ]
 
-      const [mainResult] = await connection.execute(mainQuery, mainValues)
+      await connection.execute(mainQuery, mainValues)
 
-      const collectionId = mainResult.insertId
+      const collectionId = newCollectionId
 
       if (collection_items && collection_items.length > 0) {
         for (const item of collection_items) {
