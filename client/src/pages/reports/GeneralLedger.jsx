@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import {
   FileText,
@@ -15,6 +15,7 @@ import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 
 export default function GeneralLedger() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [ledgerEntries, setLedgerEntries] = useState([])
   const [grandTotalDebit, setGTD] = useState(0)
   const [grandTotalCredit, setGTC] = useState(0)
@@ -24,16 +25,27 @@ export default function GeneralLedger() {
   const [endDate, setEndDate] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const [filterAccountCode, setFilterAccountCode] = useState('')
+  const [filterType, setFilterType] = useState('')
   const { company } = useCompany()
 
+  // Read URL parameters on mount
   useEffect(() => {
-    fetchGeneralLedger()
-  }, [])
+    const accountCode = searchParams.get('account_code')
+    const type = searchParams.get('type')
+    const start = searchParams.get('start_date')
+    const end = searchParams.get('end_date')
+
+    if (accountCode) setFilterAccountCode(accountCode)
+    if (type) setFilterType(type)
+    if (start) setStartDate(start)
+    if (end) setEndDate(end)
+  }, [searchParams])
 
   useEffect(() => {
     const t = setTimeout(() => fetchGeneralLedger(), 500)
     return () => clearTimeout(t)
-  }, [startDate, endDate])
+  }, [startDate, endDate, filterAccountCode, filterType])
 
   const fetchGeneralLedger = async () => {
     try {
@@ -43,6 +55,8 @@ export default function GeneralLedger() {
       const params = new URLSearchParams()
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
+      if (filterAccountCode) params.append('account_code', filterAccountCode)
+      if (filterType) params.append('type', filterType)
       const url = `${import.meta.env.VITE_SERVER_LINK}/reports/general-ledger${params.toString() ? '?' + params.toString() : ''}`
       const response = await fetch(url, {
         headers: {

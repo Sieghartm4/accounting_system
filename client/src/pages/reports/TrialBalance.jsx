@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Table2,
@@ -13,6 +14,7 @@ import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 
 export default function TrialBalance() {
+  const navigate = useNavigate()
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -21,6 +23,15 @@ export default function TrialBalance() {
   const [searchTerm, setSearchTerm] = useState('')
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const { company } = useCompany()
+
+  const handleAmountClick = (accountCode, amount, type) => {
+    const params = new URLSearchParams()
+    params.append('account_code', accountCode)
+    params.append('type', type)
+    if (startDate) params.append('start_date', startDate)
+    if (endDate) params.append('end_date', endDate)
+    navigate(`/general-ledger?${params.toString()}`)
+  }
 
   useEffect(() => {
     fetchTrialBalance()
@@ -627,14 +638,26 @@ export default function TrialBalance() {
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-[16px] font-black text-black border-l border-gray-200">
                       {parseFloat(row.DEBIT) > 0 ? (
-                        fmt(row.DEBIT)
+                        <button
+                          onClick={() => handleAmountClick(row['Account Code'], row.DEBIT, 'debit')}
+                          className="hover:text-red-600 hover:underline cursor-pointer transition-colors"
+                          title="View in General Ledger"
+                        >
+                          {fmt(row.DEBIT)}
+                        </button>
                       ) : (
                         <span className="text-gray-200">—</span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-[16px] font-black text-red-600 border-l border-gray-200">
                       {parseFloat(row.CREDIT) > 0 ? (
-                        fmt(row.CREDIT)
+                        <button
+                          onClick={() => handleAmountClick(row['Account Code'], row.CREDIT, 'credit')}
+                          className="hover:text-black hover:underline cursor-pointer transition-colors"
+                          title="View in General Ledger"
+                        >
+                          {fmt(row.CREDIT)}
+                        </button>
                       ) : (
                         <span className="text-gray-200">—</span>
                       )}

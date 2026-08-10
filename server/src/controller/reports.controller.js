@@ -445,12 +445,13 @@ const getIncomeStatement = async (req, res, next) => {
 
 const getGeneralLedger = async (req, res, next) => {
   try {
-    const { start_date, end_date } = req.query
+    const { start_date, end_date, account_code, amount, type } = req.query
 
     let startDate = start_date
     let endDate = end_date
 
-    if (!start_date && !end_date) {
+    // Only set default dates if no dates AND no filter parameters are provided
+    if (!start_date && !end_date && !account_code && !amount && !type) {
       const now = new Date()
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
@@ -647,6 +648,8 @@ const getGeneralLedger = async (req, res, next) => {
       WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
       ${dateFilter}
       ${approvalFilter}
+      ${account_code ? `AND ${Master.charts_of_accounts.selectOptionColumns.code} = '${account_code}'` : ''}
+      ${type ? `AND ${Accounting.journal_entries.selectOptionColumns.type} = '${type.toUpperCase()}'` : ''}
       AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
       AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
       AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
