@@ -84,12 +84,10 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Set default date range
+  // Set default date range (empty to allow searching without date filters)
   useEffect(() => {
-    const today = new Date()
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
-    setSearchStartDate(firstDay.toISOString().split('T')[0])
-    setSearchEndDate(today.toISOString().split('T')[0])
+    setSearchStartDate('')
+    setSearchEndDate('')
   }, [])
 
   const fetchCompanies = async () => {
@@ -112,7 +110,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
   }
 
   const handleSearch = async () => {
-    if (!searchQuery.trim() || !searchStartDate || !searchEndDate) {
+    if (!searchQuery.trim()) {
       return
     }
 
@@ -122,6 +120,11 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     const allowedRoutes = Object.keys(SEARCH_ROUTE_DOCUMENT_TYPE_MAP).filter(
       (route) => accessibleRoutes.includes(route),
     )
+
+    // Always include adjustments in search regardless of route access
+    if (!allowedRoutes.includes('adjustments')) {
+      allowedRoutes.push('adjustments')
+    }
 
     if (allowedRoutes.length === 0) {
       setSearchResults([])
@@ -133,11 +136,15 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     try {
       const token = localStorage.getItem('token')
       const params = new URLSearchParams({
-        startDate: searchStartDate,
-        endDate: searchEndDate,
         search: searchQuery.trim(),
         allowedRoutes: allowedRoutes.join(','),
       })
+
+      // Only include dates if they are set
+      if (searchStartDate && searchEndDate) {
+        params.append('startDate', searchStartDate)
+        params.append('endDate', searchEndDate)
+      }
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/reports/search?${params}`,
@@ -520,7 +527,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                                   className="text-red-600 mt-0.5 shrink-0"
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
+                                  <div className="flex items-center justify-between mb-1">
                                     <span className="text-xs font-semibold text-gray-900">
                                       {result.document_type}
                                     </span>
@@ -528,21 +535,27 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                                       {result.document_date}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-gray-700 font-medium truncate">
-                                    {result.document_reference}
-                                  </p>
-                                  <p className="text-xs text-gray-500 truncate">
-                                    {result.customer_name || result.vendor_name}
-                                  </p>
-                                  {result.amount && (
-                                    <p className="text-xs font-semibold text-red-600">
-                                      ₱
-                                      {parseFloat(result.amount).toLocaleString(
-                                        'en-PH',
-                                        { minimumFractionDigits: 2 },
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs text-gray-700 font-medium truncate">
+                                        {result.id}
+                                      </p>
+                                      <p className="text-xs text-gray-500 truncate">
+                                        {result.customer_name || result.vendor_name}
+                                      </p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      {result.amount && (
+                                        <p className="text-xs font-semibold text-red-600">
+                                          ₱
+                                          {parseFloat(result.amount).toLocaleString(
+                                            'en-PH',
+                                            { minimumFractionDigits: 2 },
+                                          )}
+                                        </p>
                                       )}
-                                    </p>
-                                  )}
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>

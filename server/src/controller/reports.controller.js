@@ -1017,15 +1017,11 @@ const getSearch = async (req, res, next) => {
     allowedRoutes.length > 0 ? allowedRoutes : defaultSearchRoutes,
   )
 
-  try {
-    if (!startDate || !endDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Start date and end date are required',
-        timestamp: new Date().toISOString(),
-      })
-    }
+  // Treat empty strings as undefined for date filtering
+  const effectiveStartDate = (startDate && startDate.trim() !== '') ? startDate : null
+  const effectiveEndDate = (endDate && endDate.trim() !== '') ? endDate : null
 
+  try {
     if (!search || search.trim() === '') {
       return res.status(400).json({
         success: false,
@@ -1054,6 +1050,7 @@ const getSearch = async (req, res, next) => {
       FROM ${Accounting.sales.tablename} sal
       LEFT JOIN ${Master.customers.tablename} cust ON sal.${Accounting.sales.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id}
       WHERE (
+        sal.${Accounting.sales.selectOptionColumns.id} LIKE ? OR
         sal.${Accounting.sales.selectOptionColumns.document_reference} LIKE ? OR 
         cust.${Master.customers.selectOptionColumns.name} LIKE ? OR
         sal.${Accounting.sales.selectOptionColumns.remarks} LIKE ? OR
@@ -1061,19 +1058,22 @@ const getSearch = async (req, res, next) => {
         sal.${Accounting.sales.selectOptionColumns.state} LIKE ? OR
         CAST(sal.${Accounting.sales.selectOptionColumns.total_amount_due} AS CHAR) LIKE ?
       )
-        AND sal.${Accounting.sales.selectOptionColumns.date_delivered} BETWEEN ? AND ?
+        ${effectiveStartDate && effectiveEndDate ? `AND sal.${Accounting.sales.selectOptionColumns.date_delivered} BETWEEN ? AND ?` : ''}
     `
 
-      const salesResults = await Query(salesQuery, [
+      const salesParams = [
         searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
-        startDate,
-        endDate,
-      ])
+        searchTerm,
+      ]
+      if (effectiveStartDate && effectiveEndDate) {
+        salesParams.push(effectiveStartDate, effectiveEndDate)
+      }
+      const salesResults = await Query(salesQuery, salesParams)
       results.push(...salesResults)
     }
 
@@ -1097,6 +1097,7 @@ const getSearch = async (req, res, next) => {
       FROM ${Accounting.collections.tablename} coll
       LEFT JOIN ${Master.customers.tablename} cust ON coll.${Accounting.collections.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id}
       WHERE (
+        coll.${Accounting.collections.selectOptionColumns.id} LIKE ? OR
         coll.${Accounting.collections.selectOptionColumns.document_reference} LIKE ? OR 
         cust.${Master.customers.selectOptionColumns.name} LIKE ? OR
         coll.${Accounting.collections.selectOptionColumns.remarks} LIKE ? OR
@@ -1106,10 +1107,10 @@ const getSearch = async (req, res, next) => {
         coll.${Accounting.collections.selectOptionColumns.bank_name} LIKE ? OR
         coll.${Accounting.collections.selectOptionColumns.check_number} LIKE ?
       )
-        AND coll.${Accounting.collections.selectOptionColumns.collection_date} BETWEEN ? AND ?
+        ${effectiveStartDate && effectiveEndDate ? `AND coll.${Accounting.collections.selectOptionColumns.collection_date} BETWEEN ? AND ?` : ''}
     `
 
-      const collectionsResults = await Query(collectionsQuery, [
+      const collectionsParams = [
         searchTerm,
         searchTerm,
         searchTerm,
@@ -1118,9 +1119,12 @@ const getSearch = async (req, res, next) => {
         searchTerm,
         searchTerm,
         searchTerm,
-        startDate,
-        endDate,
-      ])
+        searchTerm,
+      ]
+      if (effectiveStartDate && effectiveEndDate) {
+        collectionsParams.push(effectiveStartDate, effectiveEndDate)
+      }
+      const collectionsResults = await Query(collectionsQuery, collectionsParams)
       results.push(...collectionsResults)
     }
 
@@ -1144,6 +1148,7 @@ const getSearch = async (req, res, next) => {
       FROM ${Accounting.receipts.tablename} rec
       LEFT JOIN ${Master.customers.tablename} cust ON rec.${Accounting.receipts.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id}
       WHERE (
+        rec.${Accounting.receipts.selectOptionColumns.id} LIKE ? OR
         rec.${Accounting.receipts.selectOptionColumns.document_reference} LIKE ? OR 
         cust.${Master.customers.selectOptionColumns.name} LIKE ? OR
         rec.${Accounting.receipts.selectOptionColumns.remarks} LIKE ? OR
@@ -1154,10 +1159,10 @@ const getSearch = async (req, res, next) => {
         rec.${Accounting.receipts.selectOptionColumns.bank_name} LIKE ? OR
         rec.${Accounting.receipts.selectOptionColumns.check_number} LIKE ?
       )
-        AND rec.${Accounting.receipts.selectOptionColumns.collection_date} BETWEEN ? AND ?
+        ${effectiveStartDate && effectiveEndDate ? `AND rec.${Accounting.receipts.selectOptionColumns.collection_date} BETWEEN ? AND ?` : ''}
     `
 
-      const receiptsResults = await Query(receiptsQuery, [
+      const receiptsParams = [
         searchTerm,
         searchTerm,
         searchTerm,
@@ -1167,9 +1172,12 @@ const getSearch = async (req, res, next) => {
         searchTerm,
         searchTerm,
         searchTerm,
-        startDate,
-        endDate,
-      ])
+        searchTerm,
+      ]
+      if (effectiveStartDate && effectiveEndDate) {
+        receiptsParams.push(effectiveStartDate, effectiveEndDate)
+      }
+      const receiptsResults = await Query(receiptsQuery, receiptsParams)
       results.push(...receiptsResults)
     }
 
@@ -1190,6 +1198,7 @@ const getSearch = async (req, res, next) => {
       FROM ${Accounting.purchase.tablename} pur
       LEFT JOIN ${Master.vendors.tablename} vend ON pur.${Accounting.purchase.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id}
       WHERE (
+        pur.${Accounting.purchase.selectOptionColumns.id} LIKE ? OR
         pur.${Accounting.purchase.selectOptionColumns.document_reference} LIKE ? OR 
         vend.${Master.vendors.selectOptionColumns.name} LIKE ? OR
         pur.${Accounting.purchase.selectOptionColumns.remarks} LIKE ? OR
@@ -1197,19 +1206,22 @@ const getSearch = async (req, res, next) => {
         pur.${Accounting.purchase.selectOptionColumns.state} LIKE ? OR
         CAST(pur.${Accounting.purchase.selectOptionColumns.total_amount_due} AS CHAR) LIKE ?
       )
-        AND pur.${Accounting.purchase.selectOptionColumns.date_delivered} BETWEEN ? AND ?
+        ${effectiveStartDate && effectiveEndDate ? `AND pur.${Accounting.purchase.selectOptionColumns.date_delivered} BETWEEN ? AND ?` : ''}
     `
 
-      const purchaseResults = await Query(purchaseQuery, [
+      const purchaseParams = [
         searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
-        startDate,
-        endDate,
-      ])
+        searchTerm,
+      ]
+      if (effectiveStartDate && effectiveEndDate) {
+        purchaseParams.push(effectiveStartDate, effectiveEndDate)
+      }
+      const purchaseResults = await Query(purchaseQuery, purchaseParams)
       results.push(...purchaseResults)
     }
 
@@ -1233,6 +1245,7 @@ const getSearch = async (req, res, next) => {
       FROM ${Accounting.cash_disbursements.tablename} cd
       LEFT JOIN ${Master.vendors.tablename} vend ON cd.${Accounting.cash_disbursements.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id}
       WHERE (
+        cd.${Accounting.cash_disbursements.selectOptionColumns.id} LIKE ? OR
         cd.${Accounting.cash_disbursements.selectOptionColumns.document_reference} LIKE ? OR 
         vend.${Master.vendors.selectOptionColumns.name} LIKE ? OR
         cd.${Accounting.cash_disbursements.selectOptionColumns.remarks} LIKE ? OR
@@ -1243,10 +1256,10 @@ const getSearch = async (req, res, next) => {
         cd.${Accounting.cash_disbursements.selectOptionColumns.bank_name} LIKE ? OR
         cd.${Accounting.cash_disbursements.selectOptionColumns.check_number} LIKE ?
       )
-        AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} BETWEEN ? AND ?
+        ${effectiveStartDate && effectiveEndDate ? `AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} BETWEEN ? AND ?` : ''}
     `
 
-      const cashDisbursementsResults = await Query(cashDisbursementsQuery, [
+      const cashDisbursementsParams = [
         searchTerm,
         searchTerm,
         searchTerm,
@@ -1256,9 +1269,12 @@ const getSearch = async (req, res, next) => {
         searchTerm,
         searchTerm,
         searchTerm,
-        startDate,
-        endDate,
-      ])
+        searchTerm,
+      ]
+      if (effectiveStartDate && effectiveEndDate) {
+        cashDisbursementsParams.push(effectiveStartDate, effectiveEndDate)
+      }
+      const cashDisbursementsResults = await Query(cashDisbursementsQuery, cashDisbursementsParams)
       results.push(...cashDisbursementsResults)
     }
 
@@ -1282,6 +1298,7 @@ const getSearch = async (req, res, next) => {
       FROM ${Accounting.payments.tablename} pay
       LEFT JOIN ${Master.vendors.tablename} vend ON pay.${Accounting.payments.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id}
       WHERE (
+        pay.${Accounting.payments.selectOptionColumns.id} LIKE ? OR
         pay.${Accounting.payments.selectOptionColumns.document_reference} LIKE ? OR 
         vend.${Master.vendors.selectOptionColumns.name} LIKE ? OR
         pay.${Accounting.payments.selectOptionColumns.remarks} LIKE ? OR
@@ -1291,10 +1308,10 @@ const getSearch = async (req, res, next) => {
         pay.${Accounting.payments.selectOptionColumns.bank_name} LIKE ? OR
         pay.${Accounting.payments.selectOptionColumns.check_number} LIKE ?
       )
-        AND pay.${Accounting.payments.selectOptionColumns.payment_date} BETWEEN ? AND ?
+        ${effectiveStartDate && effectiveEndDate ? `AND pay.${Accounting.payments.selectOptionColumns.payment_date} BETWEEN ? AND ?` : ''}
     `
 
-      const paymentsResults = await Query(paymentsQuery, [
+      const paymentsParams = [
         searchTerm,
         searchTerm,
         searchTerm,
@@ -1303,9 +1320,12 @@ const getSearch = async (req, res, next) => {
         searchTerm,
         searchTerm,
         searchTerm,
-        startDate,
-        endDate,
-      ])
+        searchTerm,
+      ]
+      if (effectiveStartDate && effectiveEndDate) {
+        paymentsParams.push(effectiveStartDate, effectiveEndDate)
+      }
+      const paymentsResults = await Query(paymentsQuery, paymentsParams)
       results.push(...paymentsResults)
     }
 
@@ -1326,24 +1346,28 @@ const getSearch = async (req, res, next) => {
         adj.${Accounting.adjustments.selectOptionColumns.created_by} as created_by
       FROM ${Accounting.adjustments.tablename} adj
       WHERE (
+        adj.${Accounting.adjustments.selectOptionColumns.id} LIKE ? OR
         adj.${Accounting.adjustments.selectOptionColumns.document_reference} LIKE ? OR
         adj.${Accounting.adjustments.selectOptionColumns.remarks} LIKE ? OR
         adj.${Accounting.adjustments.selectOptionColumns.created_by} LIKE ? OR
         adj.${Accounting.adjustments.selectOptionColumns.status} LIKE ? OR
         CAST(adj.${Accounting.adjustments.selectOptionColumns.total_amount} AS CHAR) LIKE ?
       )
-        AND adj.${Accounting.adjustments.selectOptionColumns.posting_date} BETWEEN ? AND ?
+        ${effectiveStartDate && effectiveEndDate ? `AND adj.${Accounting.adjustments.selectOptionColumns.posting_date} BETWEEN ? AND ?` : ''}
     `
 
-      const adjustmentsResults = await Query(adjustmentsQuery, [
+      const adjustmentsParams = [
         searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
         searchTerm,
-        startDate,
-        endDate,
-      ])
+        searchTerm,
+      ]
+      if (effectiveStartDate && effectiveEndDate) {
+        adjustmentsParams.push(effectiveStartDate, effectiveEndDate)
+      }
+      const adjustmentsResults = await Query(adjustmentsQuery, adjustmentsParams)
       results.push(...adjustmentsResults)
     }
 

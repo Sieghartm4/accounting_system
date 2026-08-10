@@ -85,7 +85,7 @@ function PurchaseContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/purchase/${Number(id)}`,
+          `${import.meta.env.VITE_SERVER_LINK}/purchase/${encodeURIComponent(id)}`,
           {
             method: 'GET',
             headers: {
@@ -642,7 +642,7 @@ function PurchaseContent() {
                   }
 
                   const viewResponse = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/purchase/${row.id}`,
+                    `${import.meta.env.VITE_SERVER_LINK}/purchase/${encodeURIComponent(row.id)}`,
                     {
                       method: 'GET',
                       headers: {
@@ -686,7 +686,7 @@ function PurchaseContent() {
                   }
 
                   const editResponse = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/purchase/${row.id}`,
+                    `${import.meta.env.VITE_SERVER_LINK}/purchase/${encodeURIComponent(row.id)}`,
                     {
                       method: 'GET',
                       headers: {
