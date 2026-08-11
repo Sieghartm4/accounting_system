@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-const formatLocalDate = (d) => {
+export const formatLocalDate = (d) => {
   const year = d.getFullYear()
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
@@ -516,7 +516,9 @@ export function useBankReconciliation(selectedReconciliation) {
       )
 
       const result = await response.json()
+      console.log('Journal entries response:', result)
       if (result.success) {
+        console.log('First journal entry sample:', result.data?.[0])
         setJournalEntries(result.data || [])
       } else {
         setJournalEntries([])
@@ -557,9 +559,10 @@ export function useBankReconciliation(selectedReconciliation) {
       )
 
       const result = await response.json()
-
+      console.log('Journal entries by COA response:', result)
       if (result.success) {
         const entries = result.data || []
+        console.log('First COA journal entry sample:', entries[0])
         if (entries.length === 0 && allowFallback && start && end) {
           console.warn(
             'No COA-specific journal entries found, falling back to all journal entries in range',
@@ -691,6 +694,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
     fetchReconciliationItems()
     fetchAvailableMonths()
+    fetchAdjustments()
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -767,6 +771,87 @@ export function useBankReconciliation(selectedReconciliation) {
       }
     } catch {
       showToastMsg('Server error while updating bank balance', 'error')
+    }
+  }
+
+  const handleDeleteBankItem = async (itemId) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/item/${itemId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      const result = await response.json()
+      if (result.success) {
+        await fetchReconciliationItems()
+        showToastMsg('Bank statement item deleted successfully')
+      } else {
+        showToastMsg(result.message || 'Failed to delete bank statement item', 'error')
+      }
+    } catch {
+      showToastMsg('Server error while deleting bank statement item', 'error')
+    }
+  }
+
+  const handleMatchBankToLedger = async (bankItemId, ledgerId) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/match`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            bankItemId,
+            ledgerId,
+          }),
+        },
+      )
+      const result = await response.json()
+      if (result.success) {
+        await fetchReconciliationItems()
+        await fetchJournalEntries()
+        showToastMsg('Bank item matched to ledger successfully')
+      } else {
+        showToastMsg(result.message || 'Failed to match bank to ledger', 'error')
+      }
+    } catch {
+      showToastMsg('Server error while matching bank to ledger', 'error')
+    }
+  }
+
+  const handleUnmatchBankFromLedger = async (bankItemId) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/unmatch/${bankItemId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+      const result = await response.json()
+      if (result.success) {
+        await fetchReconciliationItems()
+        await fetchJournalEntries()
+        showToastMsg('Bank item unmatched successfully')
+      } else {
+        showToastMsg(result.message || 'Failed to unmatch bank from ledger', 'error')
+      }
+    } catch {
+      showToastMsg('Server error while unmatching bank from ledger', 'error')
     }
   }
 
@@ -1113,13 +1198,8 @@ export function useBankReconciliation(selectedReconciliation) {
 
             description: bankAdjustmentForm.description,
 
-            // for error adjustments, respect user-selected direction by sending signed amount
-            amount:
-              bankAdjustmentForm.type === 'error_bank'
-                ? bankAdjustmentForm.direction === 'add'
-                  ? amount
-                  : -amount
-                : amount,
+            // for error adjustments, send positive amount (user can select type to indicate direction)
+            amount: amount,
 
             side: 'BANK',
           }),
@@ -1183,13 +1263,8 @@ export function useBankReconciliation(selectedReconciliation) {
 
             description: bookAdjustmentForm.description,
 
-            // for error adjustments, respect user-selected direction by sending signed amount
-            amount:
-              bookAdjustmentForm.type === 'error_book'
-                ? bookAdjustmentForm.direction === 'add'
-                  ? amount
-                  : -amount
-                : amount,
+            // for error adjustments, send positive amount (user can select type to indicate direction)
+            amount: amount,
 
             side: 'BOOK',
           }),
@@ -1271,6 +1346,86 @@ export function useBankReconciliation(selectedReconciliation) {
       }
     } catch {
       showToastMsg('Server error while removing book adjustment', 'error')
+    }
+  }
+
+  // Matching functionality
+  const handleCreateMatch = async (stmtIds, bookIds) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/match/add`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            br_id: selectedReconciliation.id,
+            stmt_item_ids: stmtIds,
+            book_item_ids: bookIds,
+          }),
+        },
+      )
+
+      const result = await response.json()
+      if (result.success) {
+        await fetchReconciliationItems()
+        showToastMsg('Items matched successfully')
+      } else {
+        showToastMsg(result.message || 'Failed to match items', 'error')
+      }
+    } catch {
+      showToastMsg('Server error while matching items', 'error')
+    }
+  }
+
+  const handleDeleteMatch = async (matchId) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/match/${matchId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      const result = await response.json()
+      if (result.success) {
+        await fetchReconciliationItems()
+        showToastMsg('Match removed successfully')
+      } else {
+        showToastMsg(result.message || 'Failed to remove match', 'error')
+      }
+    } catch {
+      showToastMsg('Server error while removing match', 'error')
+    }
+  }
+
+  const fetchMatches = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/matches`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      const result = await response.json()
+      if (result.success) {
+        return result.data || []
+      }
+      return []
+    } catch {
+      console.error('Failed to fetch matches')
+      return []
     }
   }
 
@@ -1867,6 +2022,11 @@ export function useBankReconciliation(selectedReconciliation) {
 
     showItemModal,
 
+    // Matching functions
+    handleCreateMatch,
+    handleDeleteMatch,
+    fetchMatches,
+
     setShowItemModal,
 
     editingItem,
@@ -1938,6 +2098,12 @@ export function useBankReconciliation(selectedReconciliation) {
     handleUpdateBankStatementBalance,
 
     handleUpdateGeneralLedgerBalance,
+
+    handleDeleteBankItem,
+
+    handleMatchBankToLedger,
+
+    handleUnmatchBankFromLedger,
 
     handleAddOrUpdateItem,
 

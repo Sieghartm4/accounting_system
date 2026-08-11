@@ -370,6 +370,12 @@ const getBankReconciliationDetail = async (req, res, next) => {
         },
 
         {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.ledger_id,
+
+          as: 'ledger_id',
+        },
+
+        {
           col: Accounting.bank_reconciliation_items.selectOptionColumns.created_by,
 
           as: 'created_by',
@@ -723,7 +729,9 @@ const updateBankReconciliationItem = async (req, res, next) => {
       if (date !== undefined) {
         updateColumns.push('bri_date')
 
-        updateValues.push(date)
+        // Convert ISO date to YYYY-MM-DD format for MySQL
+        const formattedDate = date ? new Date(date).toISOString().split('T')[0] : null
+        updateValues.push(formattedDate)
       }
 
       if (description !== undefined) {
@@ -1470,65 +1478,52 @@ const deleteAdjustmentBalance = async (req, res, next) => {
       })
     }
 
-    try {
-      const existingQuery = sql
-
-        .select([
-          {
-            col: Accounting.adjustment_balance.selectOptionColumns.id,
-
-            as: 'id',
-          },
-        ])
-
-        .from(Accounting.adjustment_balance.tablename)
-
-        .where(Accounting.adjustment_balance.selectOptionColumns.id, '=', '?')
-
-        .build()
-
-      const existingAdjustments = await Query(existingQuery, [adjustmentId])
-
-      if (!existingAdjustments || existingAdjustments.length === 0) {
-        return res.status(404).json({
-          success: false,
-
-          message: 'Adjustment balance not found',
-        })
-      }
-
-      const deleteQuery = sql
-
-        .delete(Accounting.adjustment_balance.tablename)
-
-        .where(Accounting.adjustment_balance.selectOptionColumns.id, '=', '?')
-
-        .build()
-
-      const queries = [
+    const checkQuery = sql
+      .select([
         {
-          sql: deleteQuery,
-
-          values: [adjustmentId],
+          col: Accounting.adjustment_balance.selectOptionColumns.id,
+          as: 'id',
         },
-      ]
+      ])
+      .from(Accounting.adjustment_balance.tablename)
+      .where(Accounting.adjustment_balance.selectOptionColumns.id, '=', '?')
+      .build()
 
-      await Transaction(queries)
+    const existing = await Query(checkQuery, [adjustmentId])
 
-      res.status(200).json({
-        success: true,
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({
+        success: false,
 
-        message: 'Adjustment balance deleted successfully',
-
-        data: {
-          id: adjustmentId,
-        },
-
-        timestamp: new Date().toISOString(),
+        message: 'Adjustment balance not found',
       })
-    } catch (error) {
-      throw error
     }
+
+    const deleteQuery = sql
+      .delete(Accounting.adjustment_balance.tablename)
+      .where(Accounting.adjustment_balance.selectOptionColumns.id, '=', '?')
+      .build()
+
+    const queries = [
+      {
+        sql: deleteQuery,
+        values: [adjustmentId],
+      },
+    ]
+
+    await Transaction(queries)
+
+    res.status(200).json({
+      success: true,
+
+      message: 'Adjustment balance deleted successfully',
+
+      data: {
+        id: adjustmentId,
+      },
+
+      timestamp: new Date().toISOString(),
+    })
   } catch (error) {
     console.error('Error deleting adjustment balance:', error)
 
@@ -1537,6 +1532,78 @@ const deleteAdjustmentBalance = async (req, res, next) => {
 
       message: 'Server error while deleting adjustment balance',
 
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const deleteBankReconciliationItem = async (req, res, next) => {
+  try {
+    const { id } = req.params
+
+    const itemId = Number(id)
+
+    if (!Number.isInteger(itemId) || itemId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid bank reconciliation item id',
+      })
+    }
+
+    const checkQuery = sql
+      .select([
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.id,
+          as: 'id',
+        },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.br_id,
+          as: 'br_id',
+        },
+      ])
+      .from(Accounting.bank_reconciliation_items.tablename)
+      .where(Accounting.bank_reconciliation_items.selectOptionColumns.id, '=', '?')
+      .build()
+
+    const existing = await Query(checkQuery, [itemId])
+
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bank reconciliation item not found',
+      })
+    }
+
+    const deleteQuery = sql
+      .delete(Accounting.bank_reconciliation_items.tablename)
+      .where(Accounting.bank_reconciliation_items.selectOptionColumns.id, '=', '?')
+      .build()
+
+    const queries = [
+      {
+        sql: deleteQuery,
+        values: [itemId],
+      },
+    ]
+
+    await Transaction(queries)
+
+    res.status(200).json({
+      success: true,
+      message: 'Bank reconciliation item deleted successfully',
+      data: {
+        id: itemId,
+      },
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error deleting bank reconciliation item:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while deleting bank reconciliation item',
       error:
         process.env.NODE_ENV === 'development'
           ? error.message
@@ -1673,6 +1740,180 @@ const getBankReconciliationSummary = async (req, res, next) => {
   }
 }
 
+const matchBankToLedger = async (req, res, next) => {
+  try {
+    const { bankItemId, ledgerId } = req.body
+
+    if (!bankItemId || !ledgerId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bank item ID and ledger ID are required',
+      })
+    }
+
+    const bankItemNum = Number(bankItemId)
+    const ledgerNum = Number(ledgerId)
+
+    if (!Number.isInteger(bankItemNum) || bankItemNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid bank reconciliation item ID',
+      })
+    }
+
+    if (!Number.isInteger(ledgerNum) || ledgerNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ledger ID',
+      })
+    }
+
+    // Check if bank item exists
+    const checkBankQuery = sql
+      .select([
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.id,
+          as: 'id',
+        },
+      ])
+      .from(Accounting.bank_reconciliation_items.tablename)
+      .where(Accounting.bank_reconciliation_items.selectOptionColumns.id, '=', '?')
+      .build()
+
+    const bankItem = await Query(checkBankQuery, [bankItemNum])
+
+    if (!bankItem || bankItem.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bank reconciliation item not found',
+      })
+    }
+
+    // Check if ledger entry exists
+    const checkLedgerQuery = sql
+      .select([
+        {
+          col: 'je_id',
+          as: 'id',
+        },
+      ])
+      .from('journal_entries')
+      .where('je_id', '=', '?')
+      .build()
+
+    const ledgerEntry = await Query(checkLedgerQuery, [ledgerNum])
+
+    if (!ledgerEntry || ledgerEntry.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Journal entry not found',
+      })
+    }
+
+    // Update bank item with ledger_id
+    const updateColumns = [Accounting.bank_reconciliation_items.selectOptionColumns.ledger_id]
+    const updateValues = [ledgerNum]
+
+    const updateQuery = sql
+      .update(Accounting.bank_reconciliation_items.tablename)
+      .set(updateColumns)
+      .where(Accounting.bank_reconciliation_items.selectOptionColumns.id, '=', '?')
+      .build()
+
+    updateValues.push(bankItemNum)
+
+    await Transaction([
+      { sql: updateQuery, values: updateValues },
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Bank item matched to ledger successfully',
+      data: {
+        bankItemId: bankItemNum,
+        ledgerId: ledgerNum,
+      },
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error matching bank to ledger:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while matching bank to ledger',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+    })
+  }
+}
+
+const unmatchBankFromLedger = async (req, res, next) => {
+  try {
+    const { id } = req.params
+    const itemId = Number(id)
+
+    if (!Number.isInteger(itemId) || itemId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid bank reconciliation item ID',
+      })
+    }
+
+    // Check if bank item exists
+    const checkQuery = sql
+      .select([
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.id,
+          as: 'id',
+        },
+        {
+          col: Accounting.bank_reconciliation_items.selectOptionColumns.ledger_id,
+          as: 'ledger_id',
+        },
+      ])
+      .from(Accounting.bank_reconciliation_items.tablename)
+      .where(Accounting.bank_reconciliation_items.selectOptionColumns.id, '=', '?')
+      .build()
+
+    const existing = await Query(checkQuery, [itemId])
+
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bank reconciliation item not found',
+      })
+    }
+
+    // Update bank item to set ledger_id to null
+    const updateColumns = [Accounting.bank_reconciliation_items.selectOptionColumns.ledger_id]
+    const updateValues = [null]
+
+    const updateQuery = sql
+      .update(Accounting.bank_reconciliation_items.tablename)
+      .set(updateColumns)
+      .where(Accounting.bank_reconciliation_items.selectOptionColumns.id, '=', '?')
+      .build()
+
+    updateValues.push(itemId)
+
+    await Transaction([
+      { sql: updateQuery, values: updateValues },
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: 'Bank item unmatched successfully',
+      data: { id: itemId },
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error unmatching bank from ledger:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while unmatching bank from ledger',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+    })
+  }
+}
+
 module.exports = {
   getBankReconciliations,
 
@@ -1698,5 +1939,11 @@ module.exports = {
 
   deleteAdjustmentBalance,
 
+  deleteBankReconciliationItem,
+
   getAvailableSummaryMonths,
+
+  matchBankToLedger,
+
+  unmatchBankFromLedger,
 }

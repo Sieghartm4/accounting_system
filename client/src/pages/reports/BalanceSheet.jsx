@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   BarChart3,
   Download,
@@ -8,12 +9,14 @@ import {
   PieChart,
   Layers,
   Briefcase,
+  ArrowUpRight,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 
 export default function BalanceSheet() {
+  const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -79,6 +82,29 @@ export default function BalanceSheet() {
       month: 'short',
       day: '2-digit',
     })
+  }
+
+  const handleAccountNameClick = (accountCode) => {
+    const params = new URLSearchParams()
+    params.append('account_code', accountCode)
+    if (startDate) params.append('start_date', startDate)
+    if (endDate) params.append('end_date', endDate)
+    navigate(`/general-ledger?${params.toString()}`)
+  }
+
+  const handleBalanceClick = (accountCode) => {
+    const params = new URLSearchParams()
+    params.append('account_code', accountCode)
+    if (startDate) params.append('start_date', startDate)
+    if (endDate) params.append('end_date', endDate)
+    navigate(`/general-ledger?${params.toString()}`)
+  }
+
+  const handleNetIncomeClick = () => {
+    const params = new URLSearchParams()
+    if (startDate) params.append('start_date', startDate)
+    if (endDate) params.append('end_date', endDate)
+    navigate(`/income-statement?${params.toString()}`)
   }
 
   const handleExportExcel = () => {
@@ -609,6 +635,9 @@ export default function BalanceSheet() {
     total,
     totalLabel,
     netIncome,
+    onAccountNameClick,
+    onBalanceClick,
+    onNetIncomeClick,
   }) => (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full custom-scrollbar">
       <div className="flex items-center gap-2 px-5 py-3 bg-black">
@@ -645,12 +674,38 @@ export default function BalanceSheet() {
                   </p>
                 </td>
                 <td className="py-3 px-5">
-                  <p className="text-[13px] font-bold text-black">
+                  <button
+                    onClick={() => {
+                      const accountName = item['Account Name']?.toLowerCase() || ''
+                      if (accountName.includes('net income')) {
+                        onNetIncomeClick()
+                      } else {
+                        onAccountNameClick(item['Account Code'])
+                      }
+                    }}
+                    className="group flex items-center gap-1.5 text-[13px] font-bold text-black hover:text-orange-600 hover:bg-orange-50 hover:underline cursor-pointer transition-all rounded px-2 py-1 text-left"
+                    title={item['Account Name']?.toLowerCase().includes('net income') ? 'View in Income Statement' : 'View in General Ledger'}
+                  >
                     {item['Account Name']}
-                  </p>
+                    <ArrowUpRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
                 </td>
                 <td className="py-3 px-5 text-right font-mono text-[15px] font-black text-black">
-                  {fmt(item.Current)}
+                  <button
+                    onClick={() => {
+                      const accountName = item['Account Name']?.toLowerCase() || ''
+                      if (accountName.includes('net income')) {
+                        onNetIncomeClick()
+                      } else {
+                        onBalanceClick(item['Account Code'])
+                      }
+                    }}
+                    className="group flex items-center justify-end gap-1.5 hover:text-orange-600 hover:bg-orange-50 hover:underline cursor-pointer transition-all rounded px-2 py-1"
+                    title={item['Account Name']?.toLowerCase().includes('net income') ? 'View in Income Statement' : 'View in General Ledger'}
+                  >
+                    {fmt(item.Current)}
+                    <ArrowUpRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
                 </td>
               </tr>
             ))}
@@ -778,6 +833,8 @@ export default function BalanceSheet() {
           items={data.assets}
           total={data.totalAssets}
           totalLabel="Sum of Assets"
+          onAccountNameClick={handleAccountNameClick}
+          onBalanceClick={handleBalanceClick}
         />
         <Section
           title="Liabilities"
@@ -786,6 +843,8 @@ export default function BalanceSheet() {
           items={data.liabilities}
           total={data.totalLiabilities}
           totalLabel="Sum of Liabilities"
+          onAccountNameClick={handleAccountNameClick}
+          onBalanceClick={handleBalanceClick}
         />
         <Section
           title="Equity"
@@ -794,6 +853,9 @@ export default function BalanceSheet() {
           items={data.equity}
           total={data.totalEquity}
           totalLabel="Sum of Equity"
+          onAccountNameClick={handleAccountNameClick}
+          onBalanceClick={handleBalanceClick}
+          onNetIncomeClick={handleNetIncomeClick}
         />
       </div>
 
@@ -851,11 +913,13 @@ export default function BalanceSheet() {
                 <span className="text-sm font-medium text-gray-600">
                   Current Period Net Income:
                 </span>
-                <span
-                  className={`text-lg font-semibold ${data.netIncome >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                <button
+                  onClick={handleNetIncomeClick}
+                  className={`text-lg font-semibold ${data.netIncome >= 0 ? 'text-green-600' : 'text-red-600'} hover:underline cursor-pointer transition-colors`}
+                  title="View in Income Statement"
                 >
                   ₱ {fmt(data.netIncome)}
-                </span>
+                </button>
               </div>
             )}
 

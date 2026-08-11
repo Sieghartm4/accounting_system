@@ -78,7 +78,31 @@ const getJournalEntries = async (req, res, next) => {
                             WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' THEN pay.${Accounting.payments.selectOptionColumns.payment_date}
                             WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' THEN a.${Accounting.adjustments.selectOptionColumns.posting_date}
                             ELSE ${Accounting.journal_entries.selectOptionColumns.date}
-                          END as date
+                          END as date,
+                          CASE
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' THEN r.${Accounting.receipts.selectOptionColumns.document_reference}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' THEN cd.${Accounting.cash_disbursements.selectOptionColumns.document_reference}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' THEN s.${Accounting.sales.selectOptionColumns.document_reference}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' THEN c.${Accounting.collections.selectOptionColumns.document_reference}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' THEN p.${Accounting.purchase.selectOptionColumns.document_reference}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' THEN pay.${Accounting.payments.selectOptionColumns.document_reference}
+                            ELSE NULL
+                          END as document_reference,
+                          CASE
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' THEN r.${Accounting.receipts.selectOptionColumns.check_number}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' THEN cd.${Accounting.cash_disbursements.selectOptionColumns.check_number}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' THEN c.${Accounting.collections.selectOptionColumns.check_number}
+                            ELSE NULL
+                          END as check_number,
+                          CASE
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' THEN cust.${Master.customers.selectOptionColumns.name}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' THEN cust.${Master.customers.selectOptionColumns.name}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' THEN cust.${Master.customers.selectOptionColumns.name}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' THEN vend.${Master.vendors.selectOptionColumns.name}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' THEN vend.${Master.vendors.selectOptionColumns.name}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' THEN vend.${Master.vendors.selectOptionColumns.name}
+                            ELSE NULL
+                          END as payee_name
                    FROM ${Accounting.journal_entries.tablename} 
                    INNER JOIN ${Master.charts_of_accounts.tablename} ON ${Master.charts_of_accounts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.coa_id}
                    LEFT JOIN ${Accounting.receipts.tablename} r
@@ -102,6 +126,18 @@ const getJournalEntries = async (req, res, next) => {
                    LEFT JOIN ${Accounting.adjustments.tablename} a
                      ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments'
                      AND a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Master.customers.tablename} cust
+                     ON (
+                       (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND r.${Accounting.receipts.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id})
+                       OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND s.${Accounting.sales.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id})
+                       OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND c.${Accounting.collections.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id})
+                     )
+                   LEFT JOIN ${Master.vendors.tablename} vend
+                     ON (
+                       (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND cd.${Accounting.cash_disbursements.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id})
+                       OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND p.${Accounting.purchase.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id})
+                       OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND pay.${Accounting.payments.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id})
+                     )
                    WHERE ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
                    AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
                    AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL`
@@ -163,10 +199,22 @@ const getJournalEntries = async (req, res, next) => {
     const journalEntries = await Query(
       sqlQuery,
       values,
-      Accounting.journal_entries.prefix_,
+      [
+        Accounting.journal_entries.prefix_,
+        Master.charts_of_accounts.prefix_,
+        Accounting.receipts.prefix_,
+        Accounting.cash_disbursements.prefix_,
+        Accounting.sales.prefix_,
+        Accounting.collections.prefix_,
+        Accounting.purchase.prefix_,
+        Accounting.payments.prefix_,
+        Accounting.adjustments.prefix_,
+        Master.customers.prefix_,
+        Master.vendors.prefix_,
+      ],
     )
 
-    console.log(journalEntries)
+    console.log('Journal entries with payee data:', JSON.stringify(journalEntries.slice(0, 3), null, 2))
     res.status(200).json({
       success: true,
       message: 'Journal entries retrieved successfully',
@@ -317,9 +365,63 @@ const getJournalEntriesByCoaId = async (req, res, next) => {
                           ${Accounting.journal_entries.selectOptionColumns.responsibility_center}, 
                           ${Accounting.journal_entries.selectOptionColumns.type}, 
                           ${Accounting.journal_entries.selectOptionColumns.amount}, 
-                          ${Accounting.journal_entries.selectOptionColumns.date} 
+                          ${Accounting.journal_entries.selectOptionColumns.date},
+                          CASE
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' THEN r.${Accounting.receipts.selectOptionColumns.document_reference}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' THEN cd.${Accounting.cash_disbursements.selectOptionColumns.document_reference}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' THEN s.${Accounting.sales.selectOptionColumns.document_reference}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' THEN c.${Accounting.collections.selectOptionColumns.document_reference}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' THEN p.${Accounting.purchase.selectOptionColumns.document_reference}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' THEN pay.${Accounting.payments.selectOptionColumns.document_reference}
+                            ELSE NULL
+                          END as document_reference,
+                          CASE
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' THEN r.${Accounting.receipts.selectOptionColumns.check_number}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' THEN cd.${Accounting.cash_disbursements.selectOptionColumns.check_number}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' THEN c.${Accounting.collections.selectOptionColumns.check_number}
+                            ELSE NULL
+                          END as check_number,
+                          CASE
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' THEN cust.${Master.customers.selectOptionColumns.name}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' THEN cust.${Master.customers.selectOptionColumns.name}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' THEN cust.${Master.customers.selectOptionColumns.name}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' THEN vend.${Master.vendors.selectOptionColumns.name}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' THEN vend.${Master.vendors.selectOptionColumns.name}
+                            WHEN ${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' THEN vend.${Master.vendors.selectOptionColumns.name}
+                            ELSE NULL
+                          END as payee_name
                    FROM ${Accounting.journal_entries.tablename} 
                    INNER JOIN ${Master.charts_of_accounts.tablename} ON ${Master.charts_of_accounts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.coa_id}
+                   LEFT JOIN ${Accounting.receipts.tablename} r
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts'
+                     AND r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Accounting.cash_disbursements.tablename} cd
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements'
+                     AND cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Accounting.sales.tablename} s
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales'
+                     AND s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Accounting.collections.tablename} c
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections'
+                     AND c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Accounting.purchase.tablename} p
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase'
+                     AND p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Accounting.payments.tablename} pay
+                     ON ${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments'
+                     AND pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                   LEFT JOIN ${Master.customers.tablename} cust
+                     ON (
+                       (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND r.${Accounting.receipts.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id})
+                       OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND s.${Accounting.sales.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id})
+                       OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND c.${Accounting.collections.selectOptionColumns.customer_id} = cust.${Master.customers.selectOptionColumns.id})
+                     )
+                   LEFT JOIN ${Master.vendors.tablename} vend
+                     ON (
+                       (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND cd.${Accounting.cash_disbursements.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id})
+                       OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND p.${Accounting.purchase.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id})
+                       OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND pay.${Accounting.payments.selectOptionColumns.vendor_id} = vend.${Master.vendors.selectOptionColumns.id})
+                     )
                    WHERE ${whereConditions.join(' AND ')}
                    ORDER BY ${Accounting.journal_entries.selectOptionColumns.date} ASC`
 
@@ -333,7 +435,17 @@ const getJournalEntriesByCoaId = async (req, res, next) => {
     const journalEntries = await Query(sqlQuery, values, [
       Accounting.journal_entries.prefix_,
       Master.charts_of_accounts.prefix_,
+      Accounting.receipts.prefix_,
+      Accounting.cash_disbursements.prefix_,
+      Accounting.sales.prefix_,
+      Accounting.collections.prefix_,
+      Accounting.purchase.prefix_,
+      Accounting.payments.prefix_,
+      Master.customers.prefix_,
+      Master.vendors.prefix_,
     ])
+
+    console.log('Journal entries by COA with payee data:', JSON.stringify(journalEntries.slice(0, 3), null, 2))
 
     console.log(
       `Fetched ${journalEntries.length} journal entries for COA ID ${coaIdNum}`,

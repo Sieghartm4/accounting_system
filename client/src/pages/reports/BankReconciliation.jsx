@@ -10,6 +10,10 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  ShieldCheck,
+  Upload,
+  Lock,
+  Activity,
 } from 'lucide-react'
 import DynamicToast from '../../components/DynamicToast'
 import BankReconciliationDetail from './BankReconciliationDetail'
@@ -428,42 +432,22 @@ export default function BankReconciliation() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-[#F3F4F6]"
+      className="min-h-screen bg-[#f4f5f7] text-zinc-900 font-sans antialiased selection:bg-red-600 selection:text-white pb-12"
     >
-      <div className="max-w-8xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 flex justify-between items-start gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-black rounded-xl flex-shrink-0">
-              <Scale className="w-5 h-5 text-red-500" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black text-black tracking-tighter leading-none">
-                Bank <span className="text-red-600 italic">Reconciliation</span>
-              </h1>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[2px] mt-1">
-                Two-Section Book-to-Bank Matching
-              </p>
-            </div>
-          </div>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => {
-              setCreateFormData({
-                bank_account: '',
-                coa_id: '',
-                bank_statement_balance: '',
-              })
-              setShowCreateModal(true)
-            }}
-            className="bg-black text-white px-5 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center gap-2 hover:bg-red-600 transition-all shadow-sm"
-          >
-            <Plus size={15} />
-            New Reconciliation
-          </motion.button>
+      {/* Toast Notification Banner */}
+      {showToast && (
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl text-white font-medium text-sm transition-all duration-300 animate-bounce ${
+          toastType === 'error' ? 'bg-red-700 border border-red-500' : 
+          toastType === 'info' ? 'bg-zinc-800 border border-zinc-700' : 'bg-red-600 border border-red-500'
+        }`}>
+          {toastType === 'error' ? <AlertCircle className="w-5 h-5 text-white" /> : <CheckCircle2 className="w-5 h-5 text-white" />}
+          <span>{toastMessage}</span>
         </div>
+      )}
 
+      {/* Main Workspace Container */}
+      <main className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        
         {/* Method explanation banner */}
         <div className="bg-white border border-gray-100 rounded-2xl p-4 mb-5 shadow-sm">
           <div className="flex items-start gap-4 flex-wrap">
@@ -633,19 +617,19 @@ export default function BankReconciliation() {
             </button>
           </div>
         ) : (
-          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-            <div className="px-5 py-3 bg-black border-b-4 border-red-600 flex items-center justify-between gap-3">
+          <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-5 py-3 bg-[#09090b] border-b-4 border-red-600 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Building2 size={14} className="text-red-500" />
                 <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
                   Bank Accounts
                 </span>
-                <span className="text-[10px] font-bold text-gray-500 ml-1">
+                <span className="text-[10px] font-bold text-zinc-500 ml-1">
                   {reconciliations.length} reconciliation
                   {reconciliations.length === 1 ? '' : 's'}
                 </span>
               </div>
-              <span className="text-[10px] font-black text-gray-500 uppercase tracking-[2px]">
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[2px]">
                 Select an account to open the reconciliation worksheet
               </span>
             </div>
@@ -674,7 +658,7 @@ export default function BankReconciliation() {
                       <motion.button
                         type="button"
                         key={r.id}
-                        className="group text-left bg-white rounded-xl border border-gray-200 hover:border-black hover:shadow-md transition-all overflow-hidden"
+                        className="group text-left bg-white rounded-xl border border-zinc-200 hover:border-zinc-900 hover:shadow-md transition-all overflow-hidden"
                         onClick={() => {
                           setSelectedReconciliation(r)
                           setView('detail')
@@ -684,14 +668,14 @@ export default function BankReconciliation() {
                         transition={{ delay: i * 0.04 }}
                         whileHover={{ y: -2 }}
                       >
-                        <div className="h-1 bg-black group-hover:bg-red-600 transition-colors" />
+                        <div className="h-1 bg-zinc-900 group-hover:bg-red-600 transition-colors" />
                         <div className="p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="font-black text-black text-[15px] leading-tight truncate">
+                              <p className="font-black text-zinc-900 text-[15px] leading-tight truncate">
                                 {r.account_name || 'Unnamed Cash Account'}
                               </p>
-                              <p className="text-[11px] text-gray-400 mt-1 font-mono truncate">
+                              <p className="text-[11px] text-zinc-400 mt-1 font-mono truncate">
                                 {r.bank_account || 'No bank reference'}
                               </p>
                             </div>
@@ -700,7 +684,7 @@ export default function BankReconciliation() {
                                 ${
                                   isReconciled
                                     ? 'bg-emerald-50 text-emerald-500 group-hover:bg-emerald-600 group-hover:text-white'
-                                    : 'bg-gray-50 text-gray-300 group-hover:bg-black group-hover:text-red-500'
+                                    : 'bg-zinc-50 text-zinc-300 group-hover:bg-zinc-900 group-hover:text-red-500'
                                 }`}
                             >
                               {isReconciled ? (
@@ -744,7 +728,7 @@ export default function BankReconciliation() {
                               </div>
                             )}
 
-                          <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
+                          <div className="mt-3 flex items-center justify-between border-t border-zinc-100 pt-3">
                             <span
                               className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1
                               ${isReconciled ? 'bg-emerald-100 text-emerald-700' : 'bg-red-50 text-red-700'}`}
@@ -760,7 +744,7 @@ export default function BankReconciliation() {
                                 </>
                               )}
                             </span>
-                            <span className="text-[10px] font-black text-gray-400 group-hover:text-red-600 uppercase tracking-[2px] transition">
+                            <span className="text-[10px] font-black text-zinc-400 group-hover:text-red-600 uppercase tracking-[2px] transition">
                               Open →
                             </span>
                           </div>
@@ -773,7 +757,7 @@ export default function BankReconciliation() {
             </div>
           </div>
         )}
-      </div>
+      </main>
 
       {/* Create Modal */}
       <AnimatePresence>
@@ -880,14 +864,6 @@ export default function BankReconciliation() {
           </div>
         )}
       </AnimatePresence>
-
-      {showToast && (
-        <DynamicToast
-          message={toastMessage}
-          type={toastType}
-          onClose={() => setShowToast(false)}
-        />
-      )}
     </motion.div>
   )
 }

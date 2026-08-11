@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Table2,
@@ -9,12 +10,15 @@ import {
   RefreshCcw,
   Calendar,
   FileText,
+  ArrowUpRight,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 
 export default function IncomeStatement() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -22,6 +26,14 @@ export default function IncomeStatement() {
   const [endDate, setEndDate] = useState('')
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const { company } = useCompany()
+
+  // Read URL parameters on mount
+  useEffect(() => {
+    const start = searchParams.get('start_date')
+    const end = searchParams.get('end_date')
+    if (start) setStartDate(start)
+    if (end) setEndDate(end)
+  }, [searchParams])
 
   const netIncomeColorClass =
     data?.netIncome >= 0 ? 'text-green-600' : 'text-red-600'
@@ -77,6 +89,22 @@ export default function IncomeStatement() {
       month: 'short',
       day: '2-digit',
     })
+  }
+
+  const handleAccountNameClick = (accountCode) => {
+    const params = new URLSearchParams()
+    params.append('account_code', accountCode)
+    if (startDate) params.append('start_date', startDate)
+    if (endDate) params.append('end_date', endDate)
+    navigate(`/general-ledger?${params.toString()}`)
+  }
+
+  const handleAmountClick = (accountCode) => {
+    const params = new URLSearchParams()
+    params.append('account_code', accountCode)
+    if (startDate) params.append('start_date', startDate)
+    if (endDate) params.append('end_date', endDate)
+    navigate(`/general-ledger?${params.toString()}`)
   }
 
   const handleExportExcel = () => {
@@ -687,12 +715,24 @@ export default function IncomeStatement() {
                       </p>
                     </td>
                     <td className="py-3 px-5">
-                      <p className="text-[13px] font-bold text-black">
+                      <button
+                        onClick={() => handleAccountNameClick(item['Account Code'])}
+                        className="group flex items-center gap-1.5 text-[13px] font-bold text-black hover:text-red-600 hover:bg-red-50 hover:underline cursor-pointer transition-all rounded px-2 py-1 text-left"
+                        title="View in General Ledger"
+                      >
                         {item['Account Name']}
-                      </p>
+                        <ArrowUpRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
                     </td>
                     <td className="py-3 px-5 text-right font-mono text-[15px] font-black text-black">
-                      {fmt(item.Current)}
+                      <button
+                        onClick={() => handleAmountClick(item['Account Code'])}
+                        className="group flex items-center justify-end gap-1.5 hover:text-red-600 hover:bg-red-50 hover:underline cursor-pointer transition-all rounded px-2 py-1"
+                        title="View in General Ledger"
+                      >
+                        {fmt(item.Current)}
+                        <ArrowUpRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -743,12 +783,24 @@ export default function IncomeStatement() {
                       </p>
                     </td>
                     <td className="py-3 px-5">
-                      <p className="text-[13px] font-bold text-black">
+                      <button
+                        onClick={() => handleAccountNameClick(item['Account Code'])}
+                        className="group flex items-center gap-1.5 text-[13px] font-bold text-black hover:text-red-600 hover:bg-red-50 hover:underline cursor-pointer transition-all rounded px-2 py-1 text-left"
+                        title="View in General Ledger"
+                      >
                         {item['Account Name']}
-                      </p>
+                        <ArrowUpRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
                     </td>
                     <td className="py-3 px-5 text-right font-mono text-[15px] font-black text-red-600">
-                      {fmt(item.Current)}
+                      <button
+                        onClick={() => handleAmountClick(item['Account Code'])}
+                        className="group flex items-center justify-end gap-1.5 hover:text-black hover:bg-red-50 hover:underline cursor-pointer transition-all rounded px-2 py-1"
+                        title="View in General Ledger"
+                      >
+                        {fmt(item.Current)}
+                        <ArrowUpRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
                     </td>
                   </tr>
                 ))}

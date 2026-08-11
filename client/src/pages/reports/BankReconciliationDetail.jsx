@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useMemo } from 'react'
 // eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion'
 import {
@@ -21,6 +21,31 @@ import {
   Info,
   TrendingUp,
   TrendingDown,
+  Layers,
+  PieChart,
+  ArrowUpRight,
+  Zap,
+  Filter,
+  CheckSquare,
+  Square,
+  RotateCcw,
+  Upload,
+  Lock,
+  BookOpen,
+  XCircle,
+  ChevronRight,
+  ChevronDown,
+  Sliders,
+  Eye,
+  DollarSign,
+  List,
+  Sparkles,
+  ShieldCheck,
+  Activity,
+  CreditCard,
+  ArrowDownLeft,
+  Settings,
+  Unlock,
 } from 'lucide-react'
 import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
@@ -31,12 +56,28 @@ import {
   isBankSectionItem,
   getItemAmount,
   fmt,
+  formatLocalDate,
 } from './useBankReconciliation'
 
 export default function BankReconciliationDetail({
   selectedReconciliation,
   onBack,
 }) {
+  const [activeTab, setActiveTab] = useState('reconcile') // 'reconcile', 'statements', 'ledger', 'report'
+  const [selectedStmtIds, setSelectedStmtIds] = useState([])
+  const [selectedBookIds, setSelectedBookIds] = useState([])
+  const [showOnlyUnmatched, setShowOnlyUnmatched] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all') // 'all', 'unmatched', 'matched'
+  const [cardShadowMode, setCardShadowMode] = useState('elevated')
+  const [toastMessage, setToastMessage] = useState(null)
+
+  // Modals state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isNewEntryModalOpen, setIsNewEntryModalOpen] = useState(false)
+  const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false)
+  const [selectedStmtForEntry, setSelectedStmtForEntry] = useState(null)
+
   const {
     reconData,
     items,
@@ -63,8 +104,8 @@ export default function BankReconciliationDetail({
     setBookSearchTerm,
     showToast,
     setShowToast,
-    toastMessage,
-    setToastMessage,
+    toastMessage: hookToastMessage,
+    setToastMessage: setHookToastMessage,
     toastType,
     setToastType,
     bankSectionFilter,
@@ -80,6 +121,9 @@ export default function BankReconciliationDetail({
     fetchReconciliationItems,
     handleUpdateBankStatementBalance,
     handleUpdateGeneralLedgerBalance,
+    handleDeleteBankItem,
+    handleMatchBankToLedger,
+    handleUnmatchBankFromLedger,
     handleAddOrUpdateItem,
     handleEditItem,
     handleDeleteItem,
@@ -132,7 +176,183 @@ export default function BankReconciliationDetail({
     bookCardAdditions,
     bookCardDeductions,
     bookCardErrors,
+    // Matching functions
+    handleCreateMatch,
+    handleDeleteMatch,
+    fetchMatches,
   } = useBankReconciliation(selectedReconciliation)
+
+  // Trigger Toast Notification
+  const triggerToast = (msg, type = 'success') => {
+    setToastMessage({ text: msg, type })
+    setTimeout(() => setToastMessage(null), 3500)
+  }
+
+  // Filtered Items for current account
+  const currentStmtItems = useMemo(() => {
+    return items.filter(item => {
+      if (showOnlyUnmatched && item.status === 'matched') return false
+      if (statusFilter !== 'all' && item.status !== statusFilter) return false
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase()
+        return (
+          (item.description || item.bri_description || '').toLowerCase().includes(q) ||
+          (item.reference_number || item.bri_reference_number || '').toLowerCase().includes(q) ||
+          getItemAmount(item).toString().includes(q)
+        )
+      }
+      return true
+    })
+  }, [items, showOnlyUnmatched, statusFilter, searchQuery])
+
+  const currentBookItems = useMemo(() => {
+    return journalEntries.filter(item => {
+      if (showOnlyUnmatched && item.status === 'matched') return false
+      if (statusFilter !== 'all' && item.status !== statusFilter) return false
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase()
+        return (
+          (item.description || '').toLowerCase().includes(q) ||
+          (item.trans_no || '').toLowerCase().includes(q) ||
+          (item.db_name || '').toLowerCase().includes(q) ||
+          (parseFloat(item.amount) || 0).toString().includes(q)
+        )
+      }
+      return true
+    })
+  }, [journalEntries, showOnlyUnmatched, statusFilter, searchQuery])
+
+  // Calculate totals for selection
+  const selectedStmtTotal = useMemo(() => {
+    return selectedStmtIds.reduce((sum, id) => {
+      const item = items.find(i => i.id === id)
+      return sum + (item ? getItemAmount(item) : 0)
+    }, 0)
+  }, [selectedStmtIds, items])
+
+  const selectedBookTotal = useMemo(() => {
+    return selectedBookIds.reduce((sum, id) => {
+      const item = journalEntries.find(i => i.id === id)
+      return sum + (item ? (parseFloat(item.amount) || 0) : 0)
+    }, 0)
+  }, [selectedBookIds, journalEntries])
+
+  const selectedDifference = Math.round((selectedStmtTotal - selectedBookTotal) * 100) / 100
+
+  // Toggle selection handlers
+  const toggleSelectStmt = (id) => {
+    setSelectedStmtIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
+
+  const toggleSelectBook = (id) => {
+    setSelectedBookIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
+
+  // Auto-match function
+  const handleAutoMatch = async () => {
+    let matchCount = 0
+    const unmatchedStmts = items.filter(i => i.status !== 'matched')
+    const unmatchedBooks = journalEntries.filter(i => i.status !== 'matched')
+
+    // Simple amount-based matching
+    unmatchedStmts.forEach(stmt => {
+      const stmtAmount = getItemAmount(stmt)
+      const matchingBook = unmatchedBooks.find(
+        b => Math.abs(parseFloat(b.amount) || 0) === Math.abs(stmtAmount)
+      )
+
+      if (matchingBook) {
+        // Call the match API
+        handleCreateMatch([stmt.id], [matchingBook.id])
+        matchCount++
+      }
+    })
+
+    if (matchCount > 0) {
+      triggerToast(`⚡ Smart Auto-Match created ${matchCount} new transaction pair matches!`)
+    } else {
+      triggerToast('No eligible auto-matches found based on exact amount rules.', 'info')
+    }
+  }
+
+  // Manual match execution
+  const handleMatchSelected = async () => {
+    if (selectedStmtIds.length === 0 || selectedBookIds.length === 0) {
+      triggerToast('Please select at least one item from Bank Statement and one from Book Ledger', 'error')
+      return
+    }
+
+    if (Math.abs(selectedDifference) > 0.01) {
+      triggerToast(`Selected amounts do not balance! Variance: ₱${selectedDifference.toFixed(2)}`, 'error')
+      return
+    }
+
+    // Match each bank item to its corresponding ledger item (1-to-1 matching)
+    for (let i = 0; i < selectedStmtIds.length; i++) {
+      const bankItemId = selectedStmtIds[i]
+      const ledgerId = selectedBookIds[i]
+      if (bankItemId && ledgerId) {
+        await handleMatchBankToLedger(bankItemId, ledgerId)
+      }
+    }
+
+    setSelectedStmtIds([])
+    setSelectedBookIds([])
+    triggerToast(`Successfully matched ${selectedStmtIds.length} items!`)
+  }
+
+  // Unmatch a specific item
+  const handleUnmatch = async (bankItemId) => {
+    if (!bankItemId) return
+    await handleUnmatchBankFromLedger(bankItemId)
+    triggerToast('Transaction link removed. Item returned to unmatched status.')
+  }
+
+  // Create GL Book entry directly from Bank Statement item
+  const handleCreateBookEntryFromStmt = (stmtItem) => {
+    setSelectedStmtForEntry(stmtItem)
+    setIsNewEntryModalOpen(true)
+  }
+
+  const handleSaveNewBookEntry = async (entryData) => {
+    // Create the book entry via the existing item creation logic
+    await handleAddOrUpdateItem({
+      ...entryData,
+      item_type: 'book_adjustment',
+      section: 'BOOK',
+    })
+
+    // Match it with the statement item
+    if (selectedStmtForEntry) {
+      await handleCreateMatch([selectedStmtForEntry.id], [entryData.id])
+    }
+
+    setIsNewEntryModalOpen(false)
+    setSelectedStmtForEntry(null)
+    triggerToast('GL Adjustment entry posted and reconciled successfully!')
+  }
+
+  // Calculate reconcile percentage
+  const totalItemsCount = items.length + journalEntries.length
+  const matchedItemsCount = items.filter(i => i.status === 'matched').length + journalEntries.filter(i => i.status === 'matched').length
+  const reconcilePercentage = totalItemsCount > 0 ? Math.round((matchedItemsCount / totalItemsCount) * 100) : 100
+
+  // Calculate unrecorded bank credits and debits (unmatched statement items)
+  const unrecordedBankCredits = useMemo(() => {
+    return items
+      .filter(i => i.status === 'unmatched' && getItemAmount(i) > 0)
+      .reduce((sum, i) => sum + getItemAmount(i), 0)
+  }, [items, getItemAmount])
+
+  const unrecordedBankDebits = useMemo(() => {
+    return items
+      .filter(i => i.status === 'unmatched' && getItemAmount(i) < 0)
+      .reduce((sum, i) => sum + Math.abs(getItemAmount(i)), 0)
+  }, [items, getItemAmount])
 
   const [ocrLoading, setOcrLoading] = React.useState(false)
   const [ocrError, setOcrError] = React.useState('')
@@ -409,1338 +629,949 @@ export default function BankReconciliationDetail({
     }
   }
 
+  // Helper function for BookOpen icon
+  const BookOpenIcon = (props) => (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+  )
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen bg-gray-50"
-    >
-      <div className="max-w-8xl mx-auto">
-        {/* Back + Header */}
-        <div className="mb-6">
-          <motion.button
-            whileHover={{ x: -3 }}
-            onClick={onBack}
-            className="mb-4 text-sm text-gray-500 hover:text-gray-900 flex items-center gap-1.5 font-medium transition"
-          >
-            <ArrowLeft size={15} /> Back to Reconciliations
-          </motion.button>
-          <div className="flex justify-between items-start flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gray-900 rounded-lg flex items-center justify-center">
-                <Scale className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-black text-gray-900 tracking-tight">
-                  Bank Reconciliation
-                </h1>
-                <p className="text-gray-500 text-sm">
-                  {reconData.account_name} — {reconData.bank_account}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => fetchReconciliationItems()}
-                className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
-              >
-                <RefreshCw size={14} /> Refresh
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => {
-                  resetItemForm()
-                  setEditingItem(null)
-                  setShowItemModal(true)
-                }}
-                className="bg-gray-900 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-gray-800 transition"
-              >
-                <Plus size={16} /> Add Reconciling Item
-              </motion.button>
-              {hasSavedSummary && (
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => handleExportSummaryPdf()}
-                  className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-blue-700 transition"
-                >
-                  <Download size={16} /> Export PDF
-                </motion.button>
-              )}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => handleSaveSummary()}
-                className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-emerald-700 transition"
-              >
-                <FileText size={16} /> Save Summary
-              </motion.button>
-            </div>
-          </div>
+    <div className="min-h-screen bg-[#f4f5f7] text-zinc-900 font-sans antialiased selection:bg-red-600 selection:text-white pb-12">
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl text-white font-medium text-sm transition-all duration-300 animate-bounce ${toastMessage.type === 'error' ? 'bg-red-700 border border-red-500' :
+            toastMessage.type === 'info' ? 'bg-zinc-800 border border-zinc-700' : 'bg-red-600 border border-red-500'
+          }`}>
+          {toastMessage.type === 'error' ? <AlertCircle className="w-5 h-5 text-white" /> : <CheckCircle2 className="w-5 h-5 text-white" />}
+          <span>{toastMessage.text}</span>
         </div>
+      )}
 
+
+      {/* Main Workspace Container */}
+      <main className="max-w-[1700px] mx-auto ">
+        
         {/* Month Filter */}
-        <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 mb-4 flex items-center gap-3 flex-wrap shadow-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Calendar size={15} />
-            </div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-              Reconciliation Period
-            </p>
-          </div>
-          <div className="hidden md:block w-px h-8 bg-gray-100" />
-          <div className="flex items-center gap-2 flex-wrap">
-            {availableMonthsLoading ? (
-              <div className="flex items-center gap-2 text-gray-400 text-sm">
-                <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
-                Loading periods...
-              </div>
-            ) : availableMonths.length === 0 ? (
-              <p className="text-gray-500 text-sm">No saved periods available</p>
-            ) : (
-              <>
-                <select
-                  value={`${detailStartDate}|${detailEndDate}`}
-                  onChange={(e) => {
-                    const selected = availableMonths.find(
-                      (m) => `${m.start_date}|${m.end_date}` === e.target.value,
-                    )
-                    if (selected) {
-                      setDetailStartDate(selected.start_date)
-                      setDetailEndDate(selected.end_date)
-                    }
-                  }}
-                  className="px-3 py-2 border border-gray-100 rounded-xl bg-white text-sm font-bold text-black outline-none focus:border-blue-500 focus:bg-blue-50 transition-all cursor-pointer"
-                >
-                  <option value="" disabled>
-                    Select a month...
-                  </option>
-                  {availableMonths.map((month, idx) => (
-                    <option
-                      key={idx}
-                      value={`${month.start_date}|${month.end_date}`}
-                    >
-                      {month.label}
-                    </option>
-                  ))}
-                </select>
-                {detailStartDate && detailEndDate && (
-                  <span className="text-xs font-semibold text-gray-600 bg-blue-50 px-3 py-1.5 rounded-lg">
-                    {new Date(detailStartDate).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}{' '}
-                    -{' '}
-                    {new Date(detailEndDate).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Status Banner */}
-        <motion.div
-          initial={{ y: 10, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className={`rounded-2xl border-2 p-5 mb-6 ${isReconciled ? 'border-emerald-500 bg-emerald-50' : 'border-red-500 bg-red-50'}`}
-        >
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              {isReconciled ? (
-                <CheckCircle2 className="text-emerald-600" size={32} />
-              ) : (
-                <AlertCircle className="text-red-600" size={32} />
-              )}
-              <div>
-                <p
-                  className={`font-black text-lg ${isReconciled ? 'text-emerald-800' : 'text-red-800'}`}
-                >
-                  {isReconciled
-                    ? '✓ RECONCILED — Adjusted book adjustments equals adjusted book balance'
-                    : '⚠ NOT RECONCILED — Adjusted balances do not match'}
-                </p>
-                <p
-                  className={`text-sm mt-0.5 ${isReconciled ? 'text-emerald-600' : 'text-red-600'}`}
-                >
-                  {isReconciled
-                    ? 'Both adjusted balances equal ₱' + fmt(adjustedBankBalance)
-                    : `Difference of ₱${fmt(Math.abs(reconDifference))} — review bank and book adjustments below`}
-                </p>
-              </div>
-            </div>
-            <div
-              className={`text-right font-mono ${isReconciled ? 'text-emerald-800' : 'text-red-800'}`}
-            >
-              <p className="text-[10px] font-black uppercase tracking-wider opacity-60">
-                Unreconciled Difference
-              </p>
-              <p className="text-3xl font-black">
-                ₱{fmt(Math.abs(reconDifference))}
-              </p>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Two-Section Reconciliation Statement */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 mb-6">
-          {/* Section 1: Bank Balance */}
-          <motion.div
-            initial={{ y: 16, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm"
-          >
-            <div className="bg-blue-900 px-5 py-4 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-5 h-5 rounded bg-blue-700 flex items-center justify-center text-white font-black text-xs">
-                    1
-                  </span>
-                  <p className="text-white font-black text-sm uppercase tracking-wider">
-                    BANK BALANCE RECONCILIATION
-                  </p>
-                </div>
-                <p className="text-blue-300 text-xs">
-                  Bank balance adjusted for deposits and outstanding checks
-                </p>
-                {detailStartDate && detailEndDate && (
-                  <p className="text-blue-400 text-[10px] mt-1">
-                    Period: {detailStartDate} to {detailEndDate}
-                  </p>
-                )}
-              </div>
-              <Building2 className="text-blue-400" size={22} />
-            </div>
-            <div className="p-5">
-              <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                <div>
-                  <p className="text-sm font-bold text-gray-800">
-                    Ending Balance per Bank Statement
-                  </p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">
-                    Editable base bank statement closing amount
-                  </p>
-                </div>
-                <div className="text-right">
-                  {editingBankBalance ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-400 text-sm">₱</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={bankBalanceInput}
-                        onChange={(e) => setBankBalanceInput(e.target.value)}
-                        className="w-32 px-2 py-1 border border-blue-500 rounded-lg text-sm font-mono font-bold outline-none text-right"
-                        autoFocus
-                      />
-                      <button
-                        onClick={handleUpdateBankStatementBalance}
-                        className="text-emerald-600 hover:text-emerald-700"
-                      >
-                        <Check size={16} />
-                      </button>
-                      <button
-                        onClick={() => setEditingBankBalance(false)}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      className="font-black font-mono text-blue-700 text-xl hover:underline"
-                      onClick={() => {
-                        setBankBalanceInput(bankStatementEndingBalance.toFixed(2))
-                        setEditingBankBalance(true)
-                      }}
-                      title="Click to update bank statement balance"
-                    >
-                      ₱{fmt(bankStatementEndingBalance)}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Bank Adjustments Section */}
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    Bank Adjustments
-                  </p>
-                  <button
-                    onClick={() =>
-                      setShowBankAdjustmentForm(!showBankAdjustmentForm)
-                    }
-                    className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                  >
-                    <Plus size={12} />
-                    {showBankAdjustmentForm ? 'Cancel' : 'Add Adjustment'}
-                  </button>
-                </div>
-
-                {showBankAdjustmentForm && (
-                  <div className="bg-gray-50 rounded-xl p-3 mb-3 border border-gray-200">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                          Adjustment Type
-                        </label>
-                        <select
-                          value={bankAdjustmentForm.type}
-                          onChange={(e) =>
-                            setBankAdjustmentForm({
-                              ...bankAdjustmentForm,
-                              type: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-blue-500"
-                        >
-                          <option value="">Select type...</option>
-                          <optgroup label="Bank Side">
-                            <option value="deposits_in_transit">
-                              Deposit in Transit (add)
-                            </option>
-                            <option value="outstanding_checks">
-                              Outstanding Check (less)
-                            </option>
-                            <option value="error_bank">
-                              Bank Error / Correction (add/less)
-                            </option>
-                          </optgroup>
-                        </select>
-                      </div>
-                      {bankAdjustmentForm.type === 'error_bank' && (
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Effect
-                          </label>
-                          <select
-                            value={bankAdjustmentForm.direction}
-                            onChange={(e) =>
-                              setBankAdjustmentForm({
-                                ...bankAdjustmentForm,
-                                direction: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-blue-500"
-                          >
-                            <option value="add">Add (increase)</option>
-                            <option value="less">Less (decrease)</option>
-                          </select>
-                        </div>
-                      )}
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                          Amount
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={bankAdjustmentForm.amount}
-                          onChange={(e) =>
-                            setBankAdjustmentForm({
-                              ...bankAdjustmentForm,
-                              amount: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-                    <div className="mb-3">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                        Description (optional)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Enter description..."
-                        value={bankAdjustmentForm.description}
-                        onChange={(e) =>
-                          setBankAdjustmentForm({
-                            ...bankAdjustmentForm,
-                            description: e.target.value,
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleAddBankAdjustment}
-                        className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 transition"
-                      >
-                        Add Adjustment
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowBankAdjustmentForm(false)
-                          setBankAdjustmentForm({
-                            type: '',
-                            description: '',
-                            amount: '',
-                          })
-                        }}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-100 transition"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Bank-specific adjustment lists now rendered under each Add/Less row */}
-              </div>
-
-              <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <TrendingUp size={15} className="text-emerald-500" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">
-                      Add: Deposits in Transit
-                    </p>
-                    <p className="text-[10px] text-gray-400">
-                      Bank-side debits waiting to clear the statement
-                    </p>
-                  </div>
-                </div>
-                <div className="w-48 text-right">
-                  <div className="font-bold font-mono text-emerald-600">
-                    + ₱{fmt(depositsInTransit + bankCardAdditions)}
-                  </div>
-                </div>
-              </div>
-
-              {/* List deposits adjustments under the Add row */}
-              {bankAdjustments.filter((adj) => adj.type === 'deposits_in_transit')
-                .length > 0 && (
-                <div className="mt-2 space-y-1 mb-3">
-                  {bankAdjustments
-                    .filter((adj) => adj.type === 'deposits_in_transit')
-                    .map((adj) => {
-                      const meta = getItemMeta(adj.type)
-                      return (
-                        <div
-                          key={adj.id}
-                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
-                        >
-                          <div className="text-sm text-gray-700">
-                            {adj.description || meta.label}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="font-mono font-bold text-emerald-600">
-                              + ₱{fmt(adj.amount)}
-                            </div>
-                            <button
-                              onClick={() => handleRemoveBankAdjustment(adj.id)}
-                              className="text-gray-400 hover:text-red-500"
-                              title="Delete adjustment"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-
-              <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <TrendingDown size={15} className="text-rose-500" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">
-                      Less: Outstanding Checks
-                    </p>
-                    <p className="text-[10px] text-gray-400">
-                      Bank-side credits still pending clearance
-                    </p>
-                  </div>
-                </div>
-                <div className="w-48 text-right">
-                  <div className="font-bold font-mono text-rose-600">
-                    − ₱{fmt(outstandingChecks + bankCardDeductions)}
-                  </div>
-                </div>
-              </div>
-
-              {/* List outstanding check adjustments under the Less row */}
-              {bankAdjustments.filter((adj) => adj.type === 'outstanding_checks')
-                .length > 0 && (
-                <div className="mt-2 space-y-1 mb-3">
-                  {bankAdjustments
-                    .filter((adj) => adj.type === 'outstanding_checks')
-                    .map((adj) => {
-                      const meta = getItemMeta(adj.type)
-                      return (
-                        <div
-                          key={adj.id}
-                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
-                        >
-                          <div className="text-sm text-gray-700">
-                            {adj.description || meta.label}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="font-mono font-bold text-rose-600">
-                              − ₱{fmt(adj.amount)}
-                            </div>
-                            <button
-                              onClick={() => handleRemoveBankAdjustment(adj.id)}
-                              className="text-gray-400 hover:text-red-500"
-                              title="Delete adjustment"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-
-              {bankCardErrors !== 0 && (
-                <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                  <div className="flex items-center gap-2">
-                    <Info size={15} className="text-amber-500" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">
-                        Add/Less: Bank Error Corrections
-                      </p>
-                      <p className="text-[10px] text-gray-400">
-                        Corrections for bank errors
-                      </p>
-                    </div>
-                  </div>
-                  <span
-                    className={`font-bold font-mono ${bankCardErrors >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
-                  >
-                    {bankCardErrors >= 0 ? '+' : '−'} ₱
-                    {fmt(Math.abs(bankCardErrors))}
-                  </span>
-                </div>
-              )}
-
-              {/* List individual bank error adjustments under the error summary */}
-              {bankAdjustments.filter((adj) => adj.type === 'error_bank').length >
-                0 && (
-                <div className="mt-2 space-y-1 mb-3">
-                  {bankAdjustments
-                    .filter((adj) => adj.type === 'error_bank')
-                    .map((adj) => {
-                      const sign = (parseFloat(adj.amount) || 0) >= 0 ? '+' : '−'
-                      const color =
-                        (parseFloat(adj.amount) || 0) >= 0
-                          ? 'text-emerald-600'
-                          : 'text-rose-600'
-                      return (
-                        <div
-                          key={adj.id}
-                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
-                        >
-                          <div className="text-sm text-gray-700">
-                            {adj.description || 'Bank Error'}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className={`font-mono font-bold ${color}`}>
-                              {sign} ₱{fmt(Math.abs(adj.amount))}
-                            </div>
-                            <button
-                              onClick={() => handleRemoveBankAdjustment(adj.id)}
-                              className="text-gray-400 hover:text-red-500"
-                              title="Delete adjustment"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-
-              <div className="mt-4 pt-4 border-t-2 border-blue-900 flex justify-between items-center bg-blue-50 -mx-5 px-5 py-3">
-                <div>
-                  <p className="text-sm font-black text-blue-900 uppercase tracking-wide">
-                    ADJUSTED BANK BALANCE
-                  </p>
-                  <p className="text-[10px] text-blue-600 mt-0.5">
-                    Bank ending balance after reconciling deposits and checks
-                  </p>
-                </div>
-                <span className="text-2xl font-black text-blue-900 font-mono">
-                  ₱{fmt(adjustedBankBalance)}
-                </span>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Section 2: Book Balance */}
-          <motion.div
-            initial={{ y: 16, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.15 }}
-            className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm"
-          >
-            <div className="bg-violet-900 px-5 py-4 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-5 h-5 rounded bg-violet-700 flex items-center justify-center text-white font-black text-xs">
-                    2
-                  </span>
-                  <p className="text-white font-black text-sm uppercase tracking-wider">
-                    BOOK BALANCE RECONCILIATION
-                  </p>
-                </div>
-                <p className="text-violet-300 text-xs">
-                  GL book records reconciled to bank reconciling items
-                </p>
-                {detailStartDate && detailEndDate && (
-                  <p className="text-violet-400 text-[10px] mt-1">
-                    Period: {detailStartDate} to {detailEndDate}
-                  </p>
-                )}
-              </div>
-              <FileText className="text-violet-400" size={22} />
-            </div>
-            <div className="p-5">
-              <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                <div>
-                  <p className="text-sm font-bold text-gray-800">
-                    Ending Balance per General Ledger
-                  </p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">
-                    Editable base general ledger ending balance
-                  </p>
-                </div>
-                <div className="text-right">
-                  {editingBookBalance ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-400 text-sm">₱</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={bookBalanceInput}
-                        onChange={(e) => setBookBalanceInput(e.target.value)}
-                        className="w-32 px-2 py-1 border border-violet-500 rounded-lg text-sm font-mono font-bold outline-none text-right"
-                        autoFocus
-                      />
-                      <button
-                        onClick={handleUpdateGeneralLedgerBalance}
-                        className="text-emerald-600 hover:text-emerald-700"
-                      >
-                        <Check size={16} />
-                      </button>
-                      <button
-                        onClick={() => setEditingBookBalance(false)}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      className="font-black font-mono text-violet-700 text-xl hover:underline"
-                      onClick={() => {
-                        setBookBalanceInput(endingBookBalance.toFixed(2))
-                        setEditingBookBalance(true)
-                      }}
-                      title="Click to update general ledger balance"
-                    >
-                      ₱{fmt(endingBookBalance)}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Book Adjustments Section */}
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    Book Adjustments
-                  </p>
-                  <button
-                    onClick={() =>
-                      setShowBookAdjustmentForm(!showBookAdjustmentForm)
-                    }
-                    className="text-xs font-bold text-violet-600 hover:text-violet-700 flex items-center gap-1"
-                  >
-                    <Plus size={12} />
-                    {showBookAdjustmentForm ? 'Cancel' : 'Add Adjustment'}
-                  </button>
-                </div>
-
-                {showBookAdjustmentForm && (
-                  <div className="bg-gray-50 rounded-xl p-3 mb-3 border border-gray-200">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                          Adjustment Type
-                        </label>
-                        <select
-                          value={bookAdjustmentForm.type}
-                          onChange={(e) =>
-                            setBookAdjustmentForm({
-                              ...bookAdjustmentForm,
-                              type: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-violet-500"
-                        >
-                          <option value="">Select type...</option>
-                          <optgroup label="Book Side">
-                            <option value="interest_income">
-                              Interest Earned (add)
-                            </option>
-                            <option value="credit_memo">
-                              Bank Credit Memo / EFT (add)
-                            </option>
-                            <option value="bank_charges">
-                              Bank Service Fee (less)
-                            </option>
-                            <option value="nsf_checks">
-                              NSF / Bounced Check (less)
-                            </option>
-                            <option value="debit_memo">
-                              Bank Debit Memo (less)
-                            </option>
-                            <option value="error_book">
-                              Book Error / Correction (add/less)
-                            </option>
-                          </optgroup>
-                        </select>
-                      </div>
-                      {bookAdjustmentForm.type === 'error_book' && (
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                            Effect
-                          </label>
-                          <select
-                            value={bookAdjustmentForm.direction}
-                            onChange={(e) =>
-                              setBookAdjustmentForm({
-                                ...bookAdjustmentForm,
-                                direction: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-violet-500"
-                          >
-                            <option value="add">Add (increase)</option>
-                            <option value="less">Less (decrease)</option>
-                          </select>
-                        </div>
-                      )}
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                          Amount
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={bookAdjustmentForm.amount}
-                          onChange={(e) =>
-                            setBookAdjustmentForm({
-                              ...bookAdjustmentForm,
-                              amount: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-violet-500"
-                        />
-                      </div>
-                    </div>
-                    <div className="mb-3">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                        Description (optional)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Enter description..."
-                        value={bookAdjustmentForm.description}
-                        onChange={(e) =>
-                          setBookAdjustmentForm({
-                            ...bookAdjustmentForm,
-                            description: e.target.value,
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-black bg-white outline-none focus:border-violet-500"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleAddBookAdjustment}
-                        className="flex-1 bg-violet-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-violet-700 transition"
-                      >
-                        Add Adjustment
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowBookAdjustmentForm(false)
-                          setBookAdjustmentForm({
-                            type: '',
-                            description: '',
-                            amount: '',
-                          })
-                        }}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-100 transition"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Book-specific adjustment lists are rendered under Add/Less rows below */}
-              </div>
-
-              <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <TrendingUp size={15} className="text-emerald-500" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">
-                      Add: Book Additions
-                    </p>
-                    <p className="text-[10px] text-gray-400">
-                      Book-side debits that increase the GL balance
-                    </p>
-                  </div>
-                </div>
-                <div className="w-48 text-right">
-                  <div className="font-bold font-mono text-emerald-600">
-                    + ₱{fmt(bookAdditions + bookCardAdditions)}
-                  </div>
-                </div>
-              </div>
-
-              {/* List book additions under the Add row */}
-              {bookAdjustments.filter(
-                (adj) => getItemMeta(adj.type).effect === 'add',
-              ).length > 0 && (
-                <div className="mt-2 space-y-1 mb-3">
-                  {bookAdjustments
-                    .filter((adj) => getItemMeta(adj.type).effect === 'add')
-                    .map((adj) => {
-                      const meta = getItemMeta(adj.type)
-                      return (
-                        <div
-                          key={adj.id}
-                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
-                        >
-                          <div className="text-sm text-gray-700">
-                            {adj.description || meta.label}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="font-mono font-bold text-emerald-600">
-                              + ₱{fmt(adj.amount)}
-                            </div>
-                            <button
-                              onClick={() => handleRemoveBookAdjustment(adj.id)}
-                              className="text-gray-400 hover:text-red-500"
-                              title="Delete adjustment"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-
-              <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <TrendingDown size={15} className="text-rose-500" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">
-                      Less: Book Deductions
-                    </p>
-                    <p className="text-[10px] text-gray-400">
-                      Book-side credits that decrease the GL balance
-                    </p>
-                  </div>
-                </div>
-                <div className="w-48 text-right">
-                  <div className="font-bold font-mono text-rose-600">
-                    − ₱{fmt(bookDeductions + bookCardDeductions)}
-                  </div>
-                </div>
-              </div>
-
-              {/* List book deductions under the Less row */}
-              {bookAdjustments.filter(
-                (adj) => getItemMeta(adj.type).effect === 'deduct',
-              ).length > 0 && (
-                <div className="mt-2 space-y-1 mb-3">
-                  {bookAdjustments
-                    .filter((adj) => getItemMeta(adj.type).effect === 'deduct')
-                    .map((adj) => {
-                      const meta = getItemMeta(adj.type)
-                      return (
-                        <div
-                          key={adj.id}
-                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
-                        >
-                          <div className="text-sm text-gray-700">
-                            {adj.description || meta.label}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="font-mono font-bold text-rose-600">
-                              − ₱{fmt(adj.amount)}
-                            </div>
-                            <button
-                              onClick={() => handleRemoveBookAdjustment(adj.id)}
-                              className="text-gray-400 hover:text-red-500"
-                              title="Delete adjustment"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-
-              {(bookErrorAdjustments !== 0 || bookCardErrors !== 0) && (
-                <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                  <div className="flex items-center gap-2">
-                    <Info size={15} className="text-amber-500" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">
-                        Add/Less: Book Error Corrections
-                      </p>
-                      <p className="text-[10px] text-gray-400">
-                        Corrections for recording errors in the GL
-                      </p>
-                    </div>
-                  </div>
-                  <span
-                    className={`font-bold font-mono ${bookErrorAdjustments + bookCardErrors >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
-                  >
-                    {bookErrorAdjustments + bookCardErrors >= 0 ? '+' : '−'} ₱
-                    {fmt(Math.abs(bookErrorAdjustments + bookCardErrors))}
-                  </span>
-                </div>
-              )}
-
-              {/* List individual book error adjustments under the error summary */}
-              {bookAdjustments.filter((adj) => adj.type === 'error_book').length >
-                0 && (
-                <div className="mt-2 space-y-1 mb-3">
-                  {bookAdjustments
-                    .filter((adj) => adj.type === 'error_book')
-                    .map((adj) => {
-                      const sign = (parseFloat(adj.amount) || 0) >= 0 ? '+' : '−'
-                      const color =
-                        (parseFloat(adj.amount) || 0) >= 0
-                          ? 'text-emerald-600'
-                          : 'text-rose-600'
-                      return (
-                        <div
-                          key={adj.id}
-                          className="flex items-center justify-between bg-white px-3 py-1 rounded"
-                        >
-                          <div className="text-sm text-gray-700">
-                            {adj.description || 'Book Error'}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className={`font-mono font-bold ${color}`}>
-                              {sign} ₱{fmt(Math.abs(adj.amount))}
-                            </div>
-                            <button
-                              onClick={() => handleRemoveBookAdjustment(adj.id)}
-                              className="text-gray-400 hover:text-red-500"
-                              title="Delete adjustment"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-
-              <div className="mt-4 pt-4 border-t-2 border-violet-900 flex justify-between items-center bg-violet-50 -mx-5 px-5 py-3">
-                <div>
-                  <p className="text-sm font-black text-violet-900 uppercase tracking-wide">
-                    Adjusted Book Balance
-                  </p>
-                  <p className="text-[10px] text-violet-600 mt-0.5">
-                    Must equal the Adjusted Bank Balance to reconcile
-                  </p>
-                </div>
-                <span className="text-2xl font-black text-violet-900 font-mono">
-                  ₱{fmt(adjustedBookBalance)}
-                </span>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Equality Check Row */}
-        <div
-          className={`rounded-2xl border-2 p-4 mb-6 flex items-center justify-between flex-wrap gap-4 ${isReconciled ? 'bg-emerald-50 border-emerald-300' : 'bg-amber-50 border-amber-300'}`}
-        >
+        <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between gap-3 flex-wrap shadow-sm">
           <div className="flex items-center gap-3">
-            <div
-              className={`px-4 py-3 rounded-xl text-center ${isReconciled ? 'bg-blue-100' : 'bg-blue-50'}`}
+            <button
+              onClick={() => window.history.back()}
+              className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition"
             >
-              <p className="text-[9px] font-black text-blue-500 uppercase tracking-[2px]">
-                Adjusted Book Adjustments
-              </p>
-              <p className="font-black font-mono text-blue-900 text-lg">
-                ₱{fmt(adjustedBankBalance)}
-              </p>
-            </div>
-            <div
-              className={`font-black text-2xl ${isReconciled ? 'text-emerald-600' : 'text-amber-500'}`}
-            >
-              {isReconciled ? '=' : '≠'}
-            </div>
-            <div
-              className={`px-4 py-3 rounded-xl text-center ${isReconciled ? 'bg-violet-100' : 'bg-violet-50'}`}
-            >
-              <p className="text-[9px] font-black text-violet-500 uppercase tracking-[2px]">
-                Adjusted Book
-              </p>
-              <p className="font-black font-mono text-violet-900 text-lg">
-                ₱{fmt(adjustedBookBalance)}
-              </p>
-            </div>
-            {!isReconciled && (
-              <div className="px-4 py-3 bg-red-50 rounded-xl text-center border border-red-200">
-                <p className="text-[9px] font-black text-red-500 uppercase tracking-[2px]">
-                  Difference
-                </p>
-                <p className="font-black font-mono text-red-700 text-lg">
-                  ₱{fmt(Math.abs(reconDifference))}
-                </p>
+              <ArrowLeft size={16} />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Calendar size={15} />
               </div>
-            )}
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
+                Reconciliation Period
+              </p>
+            </div>
           </div>
-          <p
-            className={`text-sm font-bold ${isReconciled ? 'text-emerald-700' : 'text-amber-700'}`}
-          >
-            {isReconciled
-              ? '✓ Both adjusted balances match. Reconciliation is complete.'
-              : 'Add more reconciling items until both adjusted balances are equal.'}
-          </p>
+          <div className="flex items-center gap-3">
+            <div className="hidden md:block w-px h-8 bg-gray-100" />
+            <div className="flex items-center gap-2 flex-wrap">
+              {availableMonthsLoading ? (
+                <div className="flex items-center gap-2 text-gray-400 text-sm">
+                  <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+                  Loading periods...
+                </div>
+              ) : availableMonths.length === 0 ? (
+                <p className="text-gray-500 text-sm">No saved periods available</p>
+              ) : (
+                <>
+                  <select
+                    value={`${detailStartDate}|${detailEndDate}`}
+                    onChange={(e) => {
+                      const selected = availableMonths.find(
+                        (m) => `${m.start_date}|${m.end_date}` === e.target.value,
+                      )
+                      if (selected) {
+                        setDetailStartDate(selected.start_date)
+                        setDetailEndDate(selected.end_date)
+                      }
+                    }}
+                    className="px-3 py-2 border border-gray-100 rounded-xl bg-white text-sm font-bold text-black outline-none focus:border-blue-500 focus:bg-blue-50 transition-all cursor-pointer"
+                  >
+                    <option value="" disabled>
+                      Select a month...
+                    </option>
+                    {availableMonths.map((month, idx) => (
+                      <option
+                        key={idx}
+                        value={`${month.start_date}|${month.end_date}`}
+                      >
+                        {month.label}
+                      </option>
+                    ))}
+                  </select>
+                  {detailStartDate && detailEndDate && (
+                    <span className="text-xs font-semibold text-gray-600 bg-blue-50 px-3 py-1.5 rounded-lg">
+                      {new Date(detailStartDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}{' '}
+                      -{' '}
+                      {new Date(detailEndDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+            <button
+              onClick={handleSaveSummary}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md transition"
+            >
+              Save Summary
+            </button>
+          </div>
         </div>
 
-        {/* Reconciling Items Table */}
-        <motion.div
-          initial={{ y: 16, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.25 }}
-          className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm mb-6"
-        >
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <h2 className="font-black text-gray-900 text-sm uppercase tracking-wider">
-                All Reconciling Items
-                <span className="text-gray-400 font-normal normal-case ml-2 text-sm tracking-normal">
-                  ({visibleBankItems.length} of {items.length})
-                </span>
-              </h2>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                Bank section items adjust the bank statement; Book section items
-                adjust the GL balance
-              </p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 h-9 focus-within:border-gray-900 focus-within:bg-white transition-all">
-                <Search size={14} className="text-gray-300 flex-shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Search items..."
-                  value={bankSearchTerm}
-                  onChange={(e) => setBankSearchTerm(e.target.value)}
-                  className="w-44 bg-transparent border-none outline-none text-[12px] font-bold text-black placeholder:text-gray-300"
-                />
-                {bankSearchTerm && (
-                  <button
-                    onClick={() => setBankSearchTerm('')}
-                    className="text-gray-300 hover:text-red-500"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-              <div className="flex bg-gray-100 rounded-lg p-0.5 text-xs font-bold">
-                {[
-                  ['all', 'All'],
-                  ['bank', 'Bank Side'],
-                  ['book', 'Book Side'],
-                ].map(([val, label]) => (
-                  <button
-                    key={val}
-                    onClick={() => setBankSectionFilter(val)}
-                    className={`px-3 py-1.5 rounded-md transition ${bankSectionFilter === val ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
+        {/* Navigation Tabs Bar */}
+        <div className="flex items-center justify-between border-b border-zinc-300 mb-6 pb-2">
+          <div className="flex space-x-2 sm:space-x-4">
+            <button
+              onClick={() => setActiveTab('reconcile')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-bold transition-all border-b-2 ${activeTab === 'reconcile'
+                  ? 'border-red-600 text-red-600 bg-white shadow-sm'
+                  : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60'
+                }`}
+            >
+              <Layers className="w-4 h-4" />
+              <span>Reconciliation Matching Engine</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('statements')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-bold transition-all border-b-2 ${activeTab === 'statements'
+                  ? 'border-red-600 text-red-600 bg-white shadow-sm'
+                  : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60'
+                }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>Bank Statement Feed ({items.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('ledger')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-bold transition-all border-b-2 ${activeTab === 'ledger'
+                  ? 'border-red-600 text-red-600 bg-white shadow-sm'
+                  : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60'
+                }`}
+            >
+              <Scale className="w-4 h-4" />
+              <span>General Ledger Records ({journalEntries.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('report')}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-bold transition-all border-b-2 ${activeTab === 'report'
+                  ? 'border-red-600 text-red-600 bg-white shadow-sm'
+                  : 'border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60'
+                }`}
+            >
+              <PieChart className="w-4 h-4" />
+              <span>Audit & Summary Sheet</span>
+            </button>
           </div>
 
-          {itemsLoading ? (
-            <div className="flex items-center justify-center p-12">
-              <Loader className="w-8 h-8 text-gray-400 animate-spin" />
+          <div className="hidden md:flex items-center space-x-2 text-xs font-mono text-zinc-500">
+            <span>PROGRESS:</span>
+            <div className="w-32 bg-zinc-200 h-2 rounded-full overflow-hidden">
+              <div
+                className="bg-red-600 h-full transition-all duration-500"
+                style={{ width: `${reconcilePercentage}%` }}
+              ></div>
             </div>
-          ) : visibleBankItems.length === 0 ? (
-            <div className="p-12 text-center">
-              <Scale className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm font-medium">
-                No reconciling items yet
-              </p>
-              <p className="text-gray-400 text-xs mt-1">
-                Click "Add Reconciling Item" to add bank or book adjustments
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    {[
-                      'Date',
-                      'Details',
-                      'Reference',
-                      'Description',
-                      'Debit',
-                      'Credit',
-                      'Actions',
-                    ].map((h, i) => (
-                      <th
-                        key={h}
-                        className={`px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider ${h === 'Actions' ? 'text-center' : i >= 5 ? 'text-right' : 'text-left'}`}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleBankItems.map((item, idx) => {
-                    const detailsValue =
-                      item.bri_details || item.details || item.item_type
-                    const meta = getItemMeta(detailsValue)
-                    const isBank = isBankSectionItem(detailsValue)
-                    const debitValue = parseFloat(item.debit || 0)
-                    const creditValue = parseFloat(item.credit || 0)
-                    return (
-                      <motion.tr
-                        key={item.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: idx * 0.025 }}
-                        className="border-b border-gray-50 hover:bg-gray-50 transition group"
-                      >
-                        <td className="px-5 py-3.5 text-sm text-gray-600 whitespace-nowrap">
-                          {new Date(item.date).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${meta.badge}`}
-                          >
-                            {meta.label}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-sm text-gray-500 font-mono">
-                          {item.reference_number || '—'}
-                        </td>
-                        <td className="px-5 py-3.5 text-sm text-gray-700 max-w-xs truncate">
-                          {item.description || '—'}
-                        </td>
-                        <td className="px-5 py-3.5 text-sm font-bold font-mono text-right text-gray-900">
-                          {debitValue !== 0 ? `₱${fmt(debitValue)}` : '—'}
-                        </td>
-                        <td className="px-5 py-3.5 text-sm font-bold font-mono text-right text-gray-900">
-                          {creditValue !== 0 ? `₱${fmt(creditValue)}` : '—'}
-                        </td>
-                        <td className="px-5 py-3.5 text-center">
-                          <div className="flex items-center justify-center gap-2 transition">
-                            <button
-                              onClick={() => handleEditItem(item)}
-                              className="text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-200 px-2 py-1 rounded-lg transition"
-                              aria-label="Edit item"
-                            >
-                              <Edit size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="text-xs font-bold text-red-400 hover:text-red-600 border border-red-100 hover:border-red-300 px-2 py-1 rounded-lg transition"
-                              aria-label="Delete item"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </td>
-                      </motion.tr>
-                    )
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-gray-50 border-t-2 border-gray-900">
-                    <td
-                      colSpan="5"
-                      className="px-5 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider"
-                    >
-                      Bank Side Total Impact &rarr;
-                    </td>
-                    <td colSpan="2" className="px-5 py-3 text-right">
-                      <div className="space-y-1">
-                        <div className="text-xs text-blue-600 font-bold font-mono">
-                          Bank adj: +₱{fmt(depositsInTransit)} −₱
-                          {fmt(outstandingChecks)}
-                        </div>
-                        <div className="text-xs text-violet-600 font-bold font-mono">
-                          Book adj: +₱{fmt(bookAdditions)} −₱{fmt(bookDeductions)}
-                        </div>
+            <span className="font-bold text-zinc-800">{reconcilePercentage}%</span>
+          </div>
+        </div>
+
+
+        {/* Tab Content */}
+        {activeTab === 'reconcile' && (
+          <div className="space-y-6">
+            {/* Top Reconciliation Dynamic Calculation Header Card */}
+            <div className="bg-white rounded-2xl border border-zinc-200/90 p-6 shadow-xl shadow-zinc-200/60">
+
+              {/* Header Title Bar inside Card */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-100">
+                <div className="flex items-center space-x-3">
+                  <span className="px-3 py-1 bg-zinc-900 text-white font-mono text-[11px] font-bold tracking-widest uppercase rounded">
+                    FORMULA CONTROL BLOCK
+                  </span>
+                  <h2 className="text-base font-bold text-zinc-900">
+                    Bank Statement vs. General Ledger Reconciliation
+                  </h2>
+                </div>
+
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={handleAutoMatch}
+                    className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-white transition-all shadow-md active:scale-95"
+                  >
+                    <Zap className="w-4 h-4 text-red-500" />
+                    <span>Run Smart Auto-Match</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowOnlyUnmatched(!showOnlyUnmatched);
+                    }}
+                    className={`inline-flex items-center space-x-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${showOnlyUnmatched
+                        ? 'bg-red-50 border-red-300 text-red-700'
+                        : 'bg-zinc-100 border-zinc-200 text-zinc-700 hover:bg-zinc-200'
+                      }`}
+                  >
+                    <Filter className="w-3.5 h-3.5" />
+                    <span>{showOnlyUnmatched ? 'Showing Unmatched Only' : 'Show All Items'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Math Reconciliation Summary Breakdown - Side by Side Cards */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-5">
+
+                {/* Bank Statement Calculation Block */}
+                <div className="lg:col-span-5 bg-zinc-50/80 rounded-xl p-4 border border-zinc-200/80">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-mono font-bold text-zinc-500 uppercase tracking-wider">
+                      BANK STATEMENT RECONCILIATION
+                    </span>
+                    <span className="px-2 py-0.5 text-[10px] font-bold bg-zinc-200 text-zinc-700 rounded">
+                      BANK FEED
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs font-mono">
+                    <div className="flex justify-between py-1 border-b border-zinc-200/60">
+                      <span className="text-zinc-600">Ending Statement Balance</span>
+                      <span className="font-bold text-zinc-900">₱{fmt(bankStatementEndingBalance)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-zinc-200/60 text-emerald-700">
+                      <span>(+) Deposits in Transit</span>
+                      <span className="font-bold">+₱{fmt(depositsInTransit)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-zinc-200/60 text-red-600">
+                      <span>(-) Outstanding Checks</span>
+                      <span className="font-bold">-₱{fmt(outstandingChecks)}</span>
+                    </div>
+
+                    {/* Bank Adjustments List */}
+                    {bankAdjustments.length > 0 && (
+                      <div className="mt-3 pt-2 border-t border-zinc-200/60">
+                        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Bank Adjustments</div>
+                        {bankAdjustments.map((adj, idx) => {
+                          const isAdd = adj.type === 'deposits_in_transit' || (adj.type === 'error_bank' && adj.amount >= 0)
+                          const displayAmount = Math.abs(adj.amount)
+                          const typeLabel = adj.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                          return (
+                            <div key={adj.id || idx} className="flex justify-between items-center py-1 text-zinc-600">
+                              <span className={`${isAdd ? 'text-emerald-700' : 'text-red-600'}`}>
+                                {isAdd ? '(+) ' : '(-) '}{typeLabel} - {adj.description}
+                              </span>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className={isAdd ? 'text-emerald-600' : 'text-red-600'}>
+                                  {isAdd ? '+' : '-'}₱{fmt(displayAmount)}
+                                </span>
+                                <button
+                                  onClick={() => handleRemoveBankAdjustment(adj.id)}
+                                  className="text-zinc-400 hover:text-red-600"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
-                    </td>
-                    <td />
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
-        </motion.div>
+                    )}
 
-        {/* General Ledger — Book Records */}
-        <motion.div
-          initial={{ y: 16, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm"
-        >
-          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-violet-600 rounded flex items-center justify-center">
-                <FileText className="w-3.5 h-3.5 text-white" />
+                    <div className="flex justify-between pt-2 text-sm font-bold bg-white p-2 rounded border border-zinc-200">
+                      <span className="text-zinc-900">Adjusted Bank Balance</span>
+                      <span className="text-red-600 font-mono">₱{fmt(adjustedBankBalance)}</span>
+                    </div>
+
+                    {/* Add Bank Adjustment Button */}
+                    <button
+                      onClick={() => setShowBankAdjustmentForm(true)}
+                      className="mt-2 w-full py-1.5 text-xs font-bold text-zinc-600 border border-zinc-300 rounded-lg hover:bg-zinc-50 hover:text-zinc-900 transition flex items-center justify-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add Bank Adjustment
+                    </button>
+                  </div>
+                </div>
+
+                {/* Variance Counter Indicator Box */}
+                <div className="lg:col-span-2 flex flex-col items-center justify-center p-4 rounded-xl bg-zinc-900 text-white border border-zinc-800 shadow-inner">
+                  <span className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase font-bold mb-1">
+                    NET VARIANCE
+                  </span>
+
+                  <div className={`text-xl lg:text-2xl font-mono font-extrabold ${Math.abs(reconDifference) === 0 ? 'text-emerald-400' : 'text-red-500'}`}>
+                    ₱{fmt(Math.abs(reconDifference))}
+                  </div>
+
+                  <div className="mt-2">
+                    {Math.abs(reconDifference) === 0 ? (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>BALANCED</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
+                        <AlertCircle className="w-3 h-3" />
+                        <span>DISCREPANCY</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* General Ledger Calculation Block */}
+                <div className="lg:col-span-5 bg-zinc-50/80 rounded-xl p-4 border border-zinc-200/80">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-mono font-bold text-zinc-500 uppercase tracking-wider">
+                      BOOK LEDGER RECONCILIATION
+                    </span>
+                    <span className="px-2 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded">
+                      BOOK GL
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs font-mono">
+                    <div className="flex justify-between py-1 border-b border-zinc-200/60">
+                      <span className="text-zinc-600">Ending Book GL Balance</span>
+                      <span className="font-bold text-zinc-900">₱{fmt(endingBookBalance)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-zinc-200/60 text-emerald-700">
+                      <span>(+) Unrecorded Bank Credits</span>
+                      <span className="font-bold">+₱{fmt(unrecordedBankCredits)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-zinc-200/60 text-red-600">
+                      <span>(-) Unrecorded Bank Charges</span>
+                      <span className="font-bold">-₱{fmt(unrecordedBankDebits)}</span>
+                    </div>
+
+                    {/* Book Adjustments List */}
+                    {bookAdjustments.length > 0 && (
+                      <div className="mt-3 pt-2 border-t border-zinc-200/60">
+                        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Book Adjustments</div>
+                        {bookAdjustments.map((adj, idx) => {
+                          const isAdd = adj.type === 'interest_earned' || adj.type === 'bank_credit_memo' || (adj.type === 'error_book' && adj.amount >= 0)
+                          const displayAmount = Math.abs(adj.amount)
+                          const typeLabel = adj.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                          return (
+                            <div key={adj.id || idx} className="flex justify-between items-center py-1 text-zinc-600">
+                              <span className={`${isAdd ? 'text-emerald-700' : 'text-red-600'}`}>
+                                {isAdd ? '(+) ' : '(-) '}{typeLabel} - {adj.description}
+                              </span>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className={isAdd ? 'text-emerald-600' : 'text-red-600'}>
+                                  {isAdd ? '+' : '-'}₱{fmt(displayAmount)}
+                                </span>
+                                <button
+                                  onClick={() => handleRemoveBookAdjustment(adj.id)}
+                                  className="text-zinc-400 hover:text-red-600"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    <div className="flex justify-between pt-2 text-sm font-bold bg-white p-2 rounded border border-zinc-200">
+                      <span className="text-zinc-900">Adjusted Book Balance</span>
+                      <span className="text-red-600 font-mono">₱{fmt(adjustedBookBalance)}</span>
+                    </div>
+
+                    {/* Add Book Adjustment Button */}
+                    <button
+                      onClick={() => setShowBookAdjustmentForm(true)}
+                      className="mt-2 w-full py-1.5 text-xs font-bold text-zinc-600 border border-zinc-300 rounded-lg hover:bg-zinc-50 hover:text-zinc-900 transition flex items-center justify-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add Book Adjustment
+                    </button>
+                  </div>
+                </div>
+
               </div>
-              <div>
-                <h3 className="font-black text-sm text-gray-900 uppercase tracking-wider">
-                  General Ledger — Book Records
-                </h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  GL Balance: ₱{fmt(endingBookBalance)}
-                </p>
-              </div>
+
+              {/* Selection Match Action Floating Bar when items are selected */}
+              {(selectedStmtIds.length > 0 || selectedBookIds.length > 0) && (
+                <div className="mt-5 p-4 bg-red-950 text-white rounded-xl border border-red-700 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in shadow-xl">
+                  <div className="flex items-center space-x-4 text-xs font-mono">
+                    <div>
+                      <span className="text-zinc-400">Statement Selected ({selectedStmtIds.length}):</span>
+                      <span className="font-bold ml-1.5 text-white">₱{fmt(selectedStmtTotal)}</span>
+                    </div>
+                    <div className="text-zinc-500">vs</div>
+                    <div>
+                      <span className="text-zinc-400">Book Selected ({selectedBookIds.length}):</span>
+                      <span className="font-bold ml-1.5 text-white">₱{fmt(selectedBookTotal)}</span>
+                    </div>
+                    <div className="pl-3 border-l border-red-800">
+                      <span className="text-zinc-400">Variance:</span>
+                      <span className={`font-bold ml-1.5 ${Math.abs(selectedDifference) === 0 ? 'text-emerald-400' : 'text-red-300'}`}>
+                        ₱{fmt(Math.abs(selectedDifference))}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => {
+                        setSelectedStmtIds([]);
+                        setSelectedBookIds([]);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs bg-red-900 hover:bg-red-800 text-zinc-200 border border-red-700"
+                    >
+                      Clear Selection
+                    </button>
+
+                    <button
+                      onClick={handleMatchSelected}
+                      disabled={Math.abs(selectedDifference) > 0.01}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md ${Math.abs(selectedDifference) === 0
+                          ? 'bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer'
+                          : 'bg-zinc-700 text-zinc-400 cursor-not-allowed opacity-60'
+                        }`}
+                    >
+                      Match Selected Transactions
+                    </button>
+                  </div>
+                </div>
+              )}
+
             </div>
-            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 h-9 focus-within:border-gray-900 focus-within:bg-white transition-all">
-              <Search size={14} className="text-gray-300 flex-shrink-0" />
-              <input
-                type="text"
-                placeholder="Search GL..."
-                value={bookSearchTerm}
-                onChange={(e) => setBookSearchTerm(e.target.value)}
-                className="w-36 bg-transparent border-none outline-none text-[12px] font-bold text-black placeholder:text-gray-300"
-              />
+
+            {/* DUAL PANE COMPARISON TABLE WORKSPACE */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+              {/* LEFT PANE: BANK STATEMENT ITEMS */}
+              <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-md">
+
+                {/* Header Block Inspired by Red Header Block in Design Suite */}
+                <div className="bg-red-600 text-white p-4 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className="px-2.5 py-0.5 rounded bg-black/20 text-[10px] font-mono uppercase font-bold tracking-wider">
+                      STATEMENT SIDE
+                    </span>
+                    <h3 className="font-bold text-sm">Bank Statement Transactions</h3>
+                  </div>
+                  <span className="text-xs font-mono bg-white/10 px-2 py-1 rounded text-white">
+                    {currentStmtItems.length} Records
+                  </span>
+                </div>
+
+                {/* Table Header Filter & Search */}
+                <div className="p-3 bg-zinc-50 border-b border-zinc-200 flex items-center space-x-3">
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search description, ref # or amount..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600"
+                    />
+                  </div>
+                </div>
+
+                {/* Statement List */}
+                <div className="divide-y divide-zinc-100 h-[calc(100vh-420px)] overflow-y-auto">
+                  {currentStmtItems.length === 0 ? (
+                    <div className="p-8 text-center text-zinc-500 text-xs font-mono">
+                      No bank statement items matching search filter.
+                    </div>
+                  ) : (
+                    currentStmtItems.map(item => {
+                      const isSelected = selectedStmtIds.includes(item.id);
+                      const amount = getItemAmount(item);
+                      const isDebit = amount >= 0;
+                      const isMatched = item.ledger_id !== null && item.ledger_id !== undefined;
+                      const displayDate = item.date || item.bri_date ? formatLocalDate(new Date(item.date || item.bri_date)) : '-';
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={`p-3.5 flex items-center justify-between text-xs transition-colors ${isMatched
+                              ? 'bg-emerald-50/40 hover:bg-emerald-50/70'
+                              : isSelected
+                                ? 'bg-red-50/80 border-l-4 border-red-600'
+                                : 'hover:bg-zinc-50'
+                            }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            {/* Checkbox for selection */}
+                            {!isMatched ? (
+                              <button
+                                onClick={() => toggleSelectStmt(item.id)}
+                                className="text-zinc-400 hover:text-red-600 transition-colors"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-4 h-4 text-red-600" />
+                                ) : (
+                                  <Square className="w-4 h-4" />
+                                )}
+                              </button>
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                            )}
+
+                            <div>
+                              <div className="font-semibold text-zinc-900 flex items-center space-x-2">
+                                <span>{item.description || item.bri_description || item.details || 'No description'}</span>
+                              </div>
+                              <div className="text-[10px] text-zinc-500 font-mono mt-0.5 flex items-center space-x-2">
+                                <span>{displayDate}</span>
+                                <span>•</span>
+                                <span>Ref: {item.reference_number || item.bri_reference_number || '-'}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right flex items-center space-x-3">
+                            <div>
+                              <div className={`font-mono font-bold ${isDebit ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                                {isDebit ? '+' : ''}₱{fmt(Math.abs(amount))}
+                              </div>
+                              <div className="text-[10px]">
+                                {isMatched ? (
+                                  <span className="text-emerald-700 font-bold font-mono">MATCHED</span>
+                                ) : (
+                                  <span className="text-amber-600 font-bold font-mono">UNMATCHED</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            {isMatched ? (
+                              <button
+                                onClick={() => handleUnmatch(item.id)}
+                                title="Unmatch Item"
+                                className="p-1 rounded text-zinc-400 hover:text-red-600 hover:bg-zinc-100"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleCreateBookEntryFromStmt(item)}
+                                title="Create GL Entry from this item"
+                                className="px-2 py-1 bg-zinc-900 hover:bg-black text-white text-[10px] font-bold rounded shadow-sm"
+                              >
+                                + GL Entry
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+              </div>
+
+              {/* RIGHT PANE: GENERAL LEDGER BOOK ITEMS */}
+              <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-md">
+
+                {/* Header Block Inspired by Dark Carbon Header Block in Design Suite */}
+                <div className="bg-zinc-900 text-white p-4 flex items-center justify-between border-b border-zinc-800">
+                  <div className="flex items-center space-x-3">
+                    <span className="px-2.5 py-0.5 rounded bg-red-600 text-white text-[10px] font-mono uppercase font-bold tracking-wider">
+                      BOOK SIDE
+                    </span>
+                    <h3 className="font-bold text-sm">General Ledger Records</h3>
+                  </div>
+                  <span className="text-xs font-mono bg-zinc-800 px-2 py-1 rounded text-zinc-300">
+                    {currentBookItems.length} Records
+                  </span>
+                </div>
+
+                {/* Table Header Filter & Search */}
+                <div className="p-3 bg-zinc-50 border-b border-zinc-200 flex items-center space-x-3">
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search payee, check # or amount..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-800"
+                    />
+                  </div>
+                </div>
+
+                {/* Book Ledger List */}
+                <div className="divide-y divide-zinc-100 h-[calc(100vh-420px)] overflow-y-auto">
+                  {currentBookItems.length === 0 ? (
+                    <div className="p-8 text-center text-zinc-500 text-xs font-mono">
+                      No general ledger records matching search filter.
+                    </div>
+                  ) : (
+                    currentBookItems.map(entry => {
+                      const isSelected = selectedBookIds.includes(entry.id);
+                      const amount = parseFloat(entry.amount) || 0;
+                      const isDebit = amount >= 0;
+                      const isMatched = items.some(item => item.ledger_id === entry.id);
+                      const checkRef = entry.check_number || entry.document_reference || '-';
+                      const payeeMemo = [entry.payee_name, entry.responsibility_center].filter(Boolean).join(' - ') || entry.description || 'No description';
+                      const displayDate = entry.date ? formatLocalDate(new Date(entry.date)) : '-';
+
+                      return (
+                        <div
+                          key={entry.id}
+                          className={`p-3.5 flex items-center justify-between text-xs transition-colors ${isMatched
+                              ? 'bg-emerald-50/40 hover:bg-emerald-50/70'
+                              : isSelected
+                                ? 'bg-zinc-100/90 border-l-4 border-zinc-900'
+                                : 'hover:bg-zinc-50'
+                            }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            {/* Checkbox for selection */}
+                            {!isMatched ? (
+                              <button
+                                onClick={() => toggleSelectBook(entry.id)}
+                                className="text-zinc-400 hover:text-zinc-900 transition-colors"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-4 h-4 text-zinc-900" />
+                                ) : (
+                                  <Square className="w-4 h-4" />
+                                )}
+                              </button>
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                            )}
+
+                            <div>
+                              <div className="font-semibold text-zinc-900 flex items-center space-x-2">
+                                <span>{payeeMemo}</span>
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
+                                  {entry.db_name || entry.category || 'General'}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-zinc-500 font-mono mt-0.5 flex items-center space-x-2">
+                                <span>{entry.date}</span>
+                                <span>•</span>
+                                <span>Chk #: {checkRef}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right flex items-center space-x-3">
+                            <div>
+                              <div className={`font-mono font-bold ${isDebit ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                                {isDebit ? '+' : ''}₱{fmt(Math.abs(amount))}
+                              </div>
+                              <div className="text-[10px]">
+                                {isMatched ? (
+                                  <span className="text-emerald-700 font-bold font-mono">MATCHED</span>
+                                ) : (
+                                  <span className="text-zinc-500 font-bold font-mono">
+                                    {isDebit ? 'DEP IN TRANSIT' : 'OUTSTANDING CHK'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Unmatch Action */}
+                            {isMatched && (
+                              <button
+                                onClick={() => {
+                                  const matchedBankItem = items.find(item => item.ledger_id === entry.id);
+                                  if (matchedBankItem) {
+                                    handleUnmatch(matchedBankItem.id);
+                                  }
+                                }}
+                                title="Unmatch Item"
+                                className="p-1 rounded text-zinc-400 hover:text-red-600 hover:bg-zinc-100"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+              </div>
+
             </div>
           </div>
+        )}
 
-          {journalEntriesLoading ? (
-            <div className="p-8 flex items-center justify-center">
-              <Loader className="w-8 h-8 text-gray-300 animate-spin" />
+        {/* Statements Tab */}
+        {activeTab === 'statements' && (
+          <div className="bg-white rounded-2xl border border-zinc-200 p-6 shadow-md">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-base font-bold text-zinc-900">Imported Bank Statement Feed</h3>
+                <p className="text-xs text-zinc-500 font-mono mt-1">Raw transactions imported directly from bank API feed</p>
+              </div>
+
+              <button
+                onClick={() => setShowItemModal(true)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md"
+              >
+                + Add Manual / Upload Image
+              </button>
             </div>
-          ) : visibleJournalEntries.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-400 text-sm font-medium">
-                No journal entries found
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    {[
-                      'Date',
-                      'Reference / DB',
-                      'Responsibility Center',
-                      'Debit (+)',
-                      'Credit (−)',
-                    ].map((h, i) => (
-                      <th
-                        key={h}
-                        className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider ${i >= 3 ? 'text-right' : 'text-left'}`}
-                      >
-                        {h}
-                      </th>
-                    ))}
+
+            <div className="overflow-x-auto border border-zinc-200 rounded-xl h-[calc(100vh-350px)] overflow-y-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="bg-zinc-900 text-white uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="p-3">Date</th>
+                    <th className="p-3">Reference #</th>
+                    <th className="p-3">Description</th>
+                    <th className="p-3">Type</th>
+                    <th className="p-3 text-right">Amount</th>
+                    <th className="p-3 text-center">Status</th>
+                    <th className="p-3 text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {visibleJournalEntries.map((entry) => {
-                    const isDebit = entry.type?.toLowerCase() === 'debit'
-                    return (
-                      <motion.tr
-                        key={entry.id}
-                        className="border-b border-gray-50 hover:bg-violet-50/30 transition"
-                      >
-                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-                          {new Date(entry.date).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-700 font-mono font-medium">
-                          {entry.db_name || '—'}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-600">
-                          {entry.responsibility_center || '—'}
-                        </td>
-                        <td
-                          className={`px-4 py-3 text-right text-xs font-mono font-bold ${isDebit ? 'text-blue-700' : 'text-gray-300'}`}
-                        >
-                          {isDebit ? `₱${fmt(entry.amount)}` : '—'}
-                        </td>
-                        <td
-                          className={`px-4 py-3 text-right text-xs font-mono font-bold ${!isDebit ? 'text-rose-600' : 'text-gray-300'}`}
-                        >
-                          {!isDebit ? `₱${fmt(entry.amount)}` : '—'}
-                        </td>
-                      </motion.tr>
-                    )
-                  })}
+                <tbody className="divide-y divide-zinc-200">
+                  {items.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="p-8 text-center text-zinc-500 text-xs font-mono">
+                        No bank statement items available.
+                      </td>
+                    </tr>
+                  ) : (
+                    items.map(i => {
+                      const amount = getItemAmount(i)
+                      const isDebit = amount >= 0
+                      const displayDate = i.date || i.bri_date ? formatLocalDate(new Date(i.date || i.bri_date)) : '-'
+                      return (
+                        <tr key={i.id} className="hover:bg-zinc-50">
+                          <td className="p-3">{displayDate}</td>
+                          <td className="p-3 font-semibold text-zinc-600">{i.reference_number || i.bri_reference_number || '-'}</td>
+                          <td className="p-3 font-sans font-medium text-zinc-900">{i.description || i.bri_description || i.details || 'No description'}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isDebit ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-100 text-zinc-700'}`}>
+                              {isDebit ? 'CR' : 'DR'}
+                            </span>
+                          </td>
+                          <td className={`p-3 text-right font-bold ${isDebit ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                            ₱{fmt(Math.abs(amount))}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${i.status === 'matched' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                              {(i.status || 'unmatched').toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center space-x-1  p-1">
+                              <button
+                                onClick={() => handleEditItem(i)}
+                                className="p-1.5 rounded text-blue-600 bg-white transition-colors"
+                                title="Edit item"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBankItem(i.id)}
+                                className="p-1.5 rounded text-red-600 bg-white transition-colors"
+                                title="Delete item"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
                 </tbody>
-                <tfoot>
-                  <tr className="bg-gray-50 border-t-2 border-violet-900">
-                    <td
-                      colSpan="3"
-                      className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider"
-                    >
-                      TOTALS
-                    </td>
-                    <td className="px-4 py-3 text-right text-xs font-black text-blue-700 font-mono">
-                      ₱{fmt(glDebits)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-xs font-black text-rose-600 font-mono">
-                      ₱{fmt(glCredits)}
-                    </td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
-          )}
-        </motion.div>
-      </div>
+          </div>
+        )}
+
+        {/* Ledger Tab */}
+        {activeTab === 'ledger' && (
+          <div className="bg-white rounded-2xl border border-zinc-200 p-6 shadow-md">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-base font-bold text-zinc-900">General Ledger (GL) Postings</h3>
+                <p className="text-xs text-zinc-500 font-mono mt-1">Company internal accounting entries for this account</p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setSelectedStmtForEntry(null);
+                  setIsNewEntryModalOpen(true);
+                }}
+                className="px-4 py-2 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs font-bold shadow-md"
+              >
+                + Post Manual GL Entry
+              </button>
+            </div>
+
+            <div className="overflow-x-auto border border-zinc-200 rounded-xl h-[calc(100vh-350px)] overflow-y-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="bg-red-600 text-white uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="p-3">Date</th>
+                    <th className="p-3">Check / Ref #</th>
+                    <th className="p-3">Payee / Memo</th>
+                    <th className="p-3">Category</th>
+                    <th className="p-3 text-right">Amount</th>
+                    <th className="p-3 text-center">Reconciliation Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200">
+                  {journalEntries.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="p-8 text-center text-zinc-500 text-xs font-mono">
+                        No general ledger entries available.
+                      </td>
+                    </tr>
+                  ) : (
+                    journalEntries.map(i => {
+                      const isDebit = i.type?.toLowerCase() === 'debit'
+                      const amount = parseFloat(i.amount) || 0
+                      const checkRef = i.check_number || i.document_reference || '-'
+                      const payeeMemo = [i.payee_name, i.responsibility_center].filter(Boolean).join(' - ') || i.description || 'No description'
+                      const displayDate = i.date ? formatLocalDate(new Date(i.date)) : '-'
+                      return (
+                        <tr key={i.id} className="hover:bg-zinc-50">
+                          <td className="p-3">{displayDate}</td>
+                          <td className="p-3 font-semibold text-zinc-600">{checkRef}</td>
+                          <td className="p-3 font-sans font-medium text-zinc-900">{payeeMemo}</td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 rounded bg-zinc-100 text-zinc-800 text-[10px] border border-zinc-200">
+                              {i.db_name || i.category || 'General'}
+                            </span>
+                          </td>
+                          <td className={`p-3 text-right font-bold ${isDebit ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                            ₱{fmt(Math.abs(amount))}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${i.status === 'matched' ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-100 text-zinc-700'
+                              }`}>
+                              {i.status === 'matched' ? 'RECONCILED' : 'OPEN'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Report Tab */}
+        {activeTab === 'report' && (
+          <div className="bg-white rounded-2xl border border-zinc-200 p-8 shadow-xl max-w-4xl mx-auto font-sans">
+            <div className="border-b-2 border-zinc-900 pb-6 mb-6 flex items-start justify-between">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="bg-red-600 text-white text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold">
+                    OFFICIAL FINANCIAL AUDIT
+                  </span>
+                  <span className="text-zinc-400 font-mono text-xs">REF-RECON-{new Date().getFullYear()}-{String(new Date().getMonth() + 1).padStart(2, '0')}</span>
+                </div>
+                <h1 className="text-2xl font-extrabold text-zinc-900 mt-2">Bank Reconciliation Summary Report</h1>
+                <p className="text-xs text-zinc-500 font-mono mt-1">Period Ending {reconData.period_end_date || new Date().toLocaleDateString()} • Prepared for Enterprise Treasury Audit</p>
+              </div>
+
+              <div className="text-right">
+                <div className="text-xs text-zinc-500 font-mono">ACCOUNT</div>
+                <div className="font-bold text-zinc-900 text-sm">{reconData.account_name || 'Bank Account'}</div>
+                <div className="text-xs font-mono text-red-600">{reconData.bank_account || 'No bank reference'}</div>
+              </div>
+            </div>
+
+            {/* Formal Statement Breakdown Table */}
+            <div className="space-y-6 text-sm">
+              <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200 space-y-3 font-mono">
+                <div className="flex justify-between font-bold text-zinc-900 text-base border-b border-zinc-300 pb-2">
+                  <span>Balance per Bank Statement (A)</span>
+                  <span>₱{fmt(bankStatementEndingBalance)}</span>
+                </div>
+
+                <div className="pl-4 space-y-1 text-xs">
+                  <div className="flex justify-between text-emerald-700">
+                    <span>Add: Deposits in Transit</span>
+                    <span>+₱{fmt(depositsInTransit)}</span>
+                  </div>
+                  <div className="flex justify-between text-red-600">
+                    <span>Less: Outstanding Checks</span>
+                    <span>-₱{fmt(outstandingChecks)}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between font-extrabold text-red-600 text-base pt-2 border-t border-zinc-300 bg-white p-2 rounded">
+                  <span>Adjusted Bank Balance</span>
+                  <span>₱{fmt(adjustedBankBalance)}</span>
+                </div>
+              </div>
+
+              <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200 space-y-3 font-mono">
+                <div className="flex justify-between font-bold text-zinc-900 text-base border-b border-zinc-300 pb-2">
+                  <span>Balance per General Ledger Books (B)</span>
+                  <span>₱{fmt(endingBookBalance)}</span>
+                </div>
+
+                <div className="pl-4 space-y-1 text-xs">
+                  <div className="flex justify-between text-emerald-700">
+                    <span>Add: Unrecorded Bank Direct Credits</span>
+                    <span>+₱{fmt(unrecordedBankCredits)}</span>
+                  </div>
+                  <div className="flex justify-between text-red-600">
+                    <span>Less: Unrecorded Service Charges / Debits</span>
+                    <span>-₱{fmt(unrecordedBankDebits)}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between font-extrabold text-red-600 text-base pt-2 border-t border-zinc-300 bg-white p-2 rounded">
+                  <span>Adjusted Book Balance</span>
+                  <span>₱{fmt(adjustedBookBalance)}</span>
+                </div>
+              </div>
+
+              {/* Final Variance Row */}
+              <div className={`p-4 rounded-xl border flex items-center justify-between font-mono font-bold ${Math.abs(reconDifference) === 0 ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-red-50 border-red-300 text-red-900'
+                }`}>
+                <span>NET UNRECONCILED DIFFERENCE (A - B):</span>
+                <span className="text-lg">₱{fmt(Math.abs(reconDifference))}</span>
+              </div>
+            </div>
+
+            {/* Print & Export Actions */}
+            <div className="mt-8 pt-6 border-t border-zinc-200 flex justify-between items-center">
+              <span className="text-xs text-zinc-400 font-mono">STATUS: {Math.abs(reconDifference) === 0 ? 'FULLY RECONCILED ✅' : 'PENDING MATCHES ⚠️'}</span>
+
+              <button
+                onClick={() => window.print()}
+                className="px-5 py-2.5 bg-zinc-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-md flex items-center space-x-2"
+              >
+                <Download className="w-4 h-4" />
+                <span>Print / Save Audit PDF</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+      </main>
 
       {/* Add / Edit Item Modal */}
       <RightSideModal
@@ -2125,13 +1956,329 @@ export default function BankReconciliationDetail({
         </div>
       </RightSideModal>
 
+      {/* MODAL 2: NEW GL ADJUSTMENT ENTRY */}
+      {isNewEntryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            <div className="px-6 py-4 bg-zinc-900 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Plus className="text-red-400" size={20} />
+                <div>
+                  <h3 className="text-white font-black text-lg">New GL Adjustment Entry</h3>
+                  <p className="text-zinc-400 text-xs">Post manual journal entry</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsNewEntryModalOpen(false)}
+                className="text-zinc-400 hover:text-white transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-2">Account</label>
+                <select className="w-full px-4 py-2.5 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-red-500">
+                  <option>Select account...</option>
+                  <option>Cash - BPI Checking</option>
+                  <option>Cash - BDO Savings</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-2">Description</label>
+                <input
+                  type="text"
+                  placeholder="Enter description..."
+                  className="w-full px-4 py-2.5 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 mb-2">Debit</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    className="w-full px-4 py-2.5 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 mb-2">Credit</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    className="w-full px-4 py-2.5 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={() => setIsNewEntryModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 border border-zinc-300 rounded-lg text-zinc-700 text-sm font-bold hover:bg-zinc-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setIsNewEntryModalOpen(false)
+                    showToast({ type: 'success', text: 'GL entry posted successfully' })
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition"
+                >
+                  Post Entry
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: FINALIZE PERIOD */}
+      {isFinalizeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            <div className="px-6 py-4 bg-zinc-900 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Lock className="text-red-400" size={20} />
+                <div>
+                  <h3 className="text-white font-black text-lg">Finalize Reconciliation Period</h3>
+                  <p className="text-zinc-400 text-xs">Lock and complete this reconciliation</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsFinalizeModalOpen(false)}
+                className="text-zinc-400 hover:text-white transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={18} />
+                  <div>
+                    <p className="text-sm font-bold text-amber-900">Warning</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      Finalizing will lock this reconciliation period. You will not be able to make further changes.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3 mb-6">
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-600">Ending Balance</span>
+                  <span className="font-mono font-bold text-zinc-900">₱{fmt(bankStatementEndingBalance)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-600">Adjusted Balance</span>
+                  <span className="font-mono font-bold text-zinc-900">₱{fmt(adjustedBankBalance)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-600">Variance</span>
+                  <span className={`font-mono font-bold ${Math.abs(reconDifference) === 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    ₱{fmt(Math.abs(reconDifference))}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setIsFinalizeModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 border border-zinc-300 rounded-lg text-zinc-700 text-sm font-bold hover:bg-zinc-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setIsFinalizeModalOpen(false)
+                    showToast({ type: 'success', text: 'Reconciliation period finalized' })
+                  }}
+                  disabled={Math.abs(reconDifference) > 0.01}
+                  className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-bold transition ${Math.abs(reconDifference) === 0
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-zinc-300 text-zinc-500 cursor-not-allowed'
+                    }`}
+                >
+                  Finalize Period
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: BANK ADJUSTMENT FORM */}
+      {showBankAdjustmentForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="px-6 py-4 bg-zinc-900 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Plus className="text-red-400" size={20} />
+                <div>
+                  <h3 className="text-white font-black text-lg">Add Bank Adjustment</h3>
+                  <p className="text-zinc-400 text-xs">Add manual adjustment to bank statement</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBankAdjustmentForm(false)}
+                className="text-zinc-400 hover:text-white transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-2">Bank Side - Adjustment Type</label>
+                <select
+                  value={bankAdjustmentForm.type}
+                  onChange={(e) => setBankAdjustmentForm({ ...bankAdjustmentForm, type: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                >
+                  <option value="">Select type...</option>
+                  <option value="deposits_in_transit">Deposit in Transit (add)</option>
+                  <option value="outstanding_checks">Outstanding Check (less)</option>
+                  <option value="error_bank">Bank Error / Correction (add/less)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-2">Description</label>
+                <input
+                  type="text"
+                  value={bankAdjustmentForm.description}
+                  onChange={(e) => setBankAdjustmentForm({ ...bankAdjustmentForm, description: e.target.value })}
+                  placeholder="Enter description..."
+                  className="w-full px-4 py-2.5 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-2">Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₱</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={bankAdjustmentForm.amount}
+                    onChange={(e) => setBankAdjustmentForm({ ...bankAdjustmentForm, amount: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full pl-8 pr-4 py-2.5 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowBankAdjustmentForm(false)}
+                  className="flex-1 px-4 py-2.5 border border-zinc-300 rounded-lg text-zinc-700 text-sm font-bold hover:bg-zinc-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    handleAddBankAdjustment()
+                    setShowBankAdjustmentForm(false)
+                    setBankAdjustmentForm({ type: '', description: '', amount: '' })
+                    triggerToast('Bank adjustment added successfully')
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition"
+                >
+                  Add Adjustment
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: BOOK ADJUSTMENT FORM */}
+      {showBookAdjustmentForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="px-6 py-4 bg-zinc-900 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Plus className="text-red-400" size={20} />
+                <div>
+                  <h3 className="text-white font-black text-lg">Add Book Adjustment</h3>
+                  <p className="text-zinc-400 text-xs">Add manual adjustment to general ledger</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBookAdjustmentForm(false)}
+                className="text-zinc-400 hover:text-white transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-2">Book Side - Adjustment Type</label>
+                <select
+                  value={bookAdjustmentForm.type}
+                  onChange={(e) => setBookAdjustmentForm({ ...bookAdjustmentForm, type: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                >
+                  <option value="">Select type...</option>
+                  <option value="interest_earned">Interest Earned (add)</option>
+                  <option value="bank_credit_memo">Bank Credit Memo / EFT (add)</option>
+                  <option value="service_fees">Bank Service Fee (less)</option>
+                  <option value="nsf_fees">NSF / Bounced Check (less)</option>
+                  <option value="bank_debit_memo">Bank Debit Memo (less)</option>
+                  <option value="error_book">Book Error / Correction (add/less)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-2">Description</label>
+                <input
+                  type="text"
+                  value={bookAdjustmentForm.description}
+                  onChange={(e) => setBookAdjustmentForm({ ...bookAdjustmentForm, description: e.target.value })}
+                  placeholder="Enter description..."
+                  className="w-full px-4 py-2.5 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 mb-2">Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">₱</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={bookAdjustmentForm.amount}
+                    onChange={(e) => setBookAdjustmentForm({ ...bookAdjustmentForm, amount: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full pl-8 pr-4 py-2.5 border border-zinc-300 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowBookAdjustmentForm(false)}
+                  className="flex-1 px-4 py-2.5 border border-zinc-300 rounded-lg text-zinc-700 text-sm font-bold hover:bg-zinc-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    handleAddBookAdjustment()
+                    setShowBookAdjustmentForm(false)
+                    setBookAdjustmentForm({ type: '', description: '', amount: '' })
+                    triggerToast('Book adjustment added successfully')
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition"
+                >
+                  Add Adjustment
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showToast && (
         <DynamicToast
-          message={toastMessage}
-          type={toastType}
+          message={toastMessage?.text || toastMessage || ''}
+          type={toastMessage?.type || toastType}
           onClose={() => setShowToast(false)}
         />
       )}
-    </motion.div>
+    </div>
   )
 }

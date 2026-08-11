@@ -1511,6 +1511,7 @@ const Accounting = {
       'bri_debit',
       'bri_credit',
       'bri_balance',
+      'bri_ledger_id',
       'bri_created_by',
     ],
     selectOptionColumns: {
@@ -1523,6 +1524,7 @@ const Accounting = {
       debit: 'bri_debit',
       credit: 'bri_credit',
       balance: 'bri_balance',
+      ledger_id: 'bri_ledger_id',
       created_by: 'bri_created_by',
     },
     updateOptionColumns: {
@@ -1535,6 +1537,7 @@ const Accounting = {
       debit: 'debit',
       credit: 'credit',
       balance: 'balance',
+      ledger_id: 'ledger_id',
       created_by: 'created_by',
     },
     selectDateFormatColumns: {},
@@ -1549,6 +1552,7 @@ const Accounting = {
       debit: 'DECIMAL',
       credit: 'DECIMAL',
       balance: 'DECIMAL',
+      ledger_id: 'INTEGER',
       created_by: 'STRING',
     },
   },

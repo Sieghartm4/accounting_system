@@ -25,7 +25,13 @@ const {
 
   deleteAdjustmentBalance,
 
+  deleteBankReconciliationItem,
+
   getAvailableSummaryMonths,
+
+  matchBankToLedger,
+
+  unmatchBankFromLedger,
 } = require('../controller/bank_reconciliation.controller')
 
 const bankReconciliationRouter = express.Router()
@@ -82,5 +88,13 @@ bankReconciliationRouter.put(
 )
 
 bankReconciliationRouter.delete('/adjustment/:id', deleteAdjustmentBalance)
+
+bankReconciliationRouter.delete('/item/:id', deleteBankReconciliationItem)
+
+// Match bank item to ledger entry
+bankReconciliationRouter.post('/match', matchBankToLedger)
+
+// Unmatch bank item from ledger entry
+bankReconciliationRouter.delete('/unmatch/:id', unmatchBankFromLedger)
 
 module.exports = { bankReconciliationRouter }

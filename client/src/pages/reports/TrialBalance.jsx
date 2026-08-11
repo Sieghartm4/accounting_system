@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Search,
   RefreshCcw,
+  ArrowUpRight,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import useCompany from '../company/useCompany'
@@ -28,6 +29,14 @@ export default function TrialBalance() {
     const params = new URLSearchParams()
     params.append('account_code', accountCode)
     params.append('type', type)
+    if (startDate) params.append('start_date', startDate)
+    if (endDate) params.append('end_date', endDate)
+    navigate(`/general-ledger?${params.toString()}`)
+  }
+
+  const handleAccountNameClick = (accountCode) => {
+    const params = new URLSearchParams()
+    params.append('account_code', accountCode)
     if (startDate) params.append('start_date', startDate)
     if (endDate) params.append('end_date', endDate)
     navigate(`/general-ledger?${params.toString()}`)
@@ -634,16 +643,24 @@ export default function TrialBalance() {
                       {row['Account Code']}
                     </td>
                     <td className="py-3 px-4 text-[13px] font-bold text-black">
-                      {row['Account Name']}
+                      <button
+                        onClick={() => handleAccountNameClick(row['Account Code'])}
+                        className="group flex items-center gap-1.5 hover:text-red-600 hover:bg-red-50 hover:underline cursor-pointer transition-all rounded px-2 py-1 text-left"
+                        title="View in General Ledger"
+                      >
+                        {row['Account Name']}
+                        <ArrowUpRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-[16px] font-black text-black border-l border-gray-200">
                       {parseFloat(row.DEBIT) > 0 ? (
                         <button
                           onClick={() => handleAmountClick(row['Account Code'], row.DEBIT, 'debit')}
-                          className="hover:text-red-600 hover:underline cursor-pointer transition-colors"
+                          className="group flex items-center justify-end gap-1.5 hover:text-red-600 hover:bg-red-50 hover:underline cursor-pointer transition-all rounded px-2 py-1"
                           title="View in General Ledger"
                         >
                           {fmt(row.DEBIT)}
+                          <ArrowUpRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
                       ) : (
                         <span className="text-gray-200">—</span>
@@ -653,10 +670,11 @@ export default function TrialBalance() {
                       {parseFloat(row.CREDIT) > 0 ? (
                         <button
                           onClick={() => handleAmountClick(row['Account Code'], row.CREDIT, 'credit')}
-                          className="hover:text-black hover:underline cursor-pointer transition-colors"
+                          className="group flex items-center justify-end gap-1.5 hover:text-black hover:bg-red-50 hover:underline cursor-pointer transition-all rounded px-2 py-1"
                           title="View in General Ledger"
                         >
                           {fmt(row.CREDIT)}
+                          <ArrowUpRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
                       ) : (
                         <span className="text-gray-200">—</span>
