@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import {
   ArrowLeft,
   Edit,
+  Edit2,
   Plus,
   RefreshCw,
   AlertCircle,
@@ -44,6 +45,7 @@ import {
   Activity,
   CreditCard,
   ArrowDownLeft,
+  Link2,
   Settings,
   Unlock,
 } from 'lucide-react'
@@ -70,7 +72,21 @@ export default function BankReconciliationDetail({
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // 'all', 'unmatched', 'matched'
   const [cardShadowMode, setCardShadowMode] = useState('elevated')
-  const [toastMessage, setToastMessage] = useState(null)
+  const [showToastState, setShowToastState] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState('success')
+
+  const showToast = (msg, type = 'success') => {
+    if (typeof msg === 'object') {
+      setToastMessage(msg.text || '')
+      setToastType(msg.type || 'success')
+    } else {
+      setToastMessage(msg)
+      setToastType(type)
+    }
+    setShowToastState(true)
+    setTimeout(() => setShowToastState(false), 3500)
+  }
 
   // Modals state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -102,18 +118,14 @@ export default function BankReconciliationDetail({
     setBankSearchTerm,
     bookSearchTerm,
     setBookSearchTerm,
-    showToast,
-    setShowToast,
-    toastMessage: hookToastMessage,
-    setToastMessage: setHookToastMessage,
-    toastType,
-    setToastType,
     bankSectionFilter,
     setBankSectionFilter,
     editingBankBalance,
     setEditingBankBalance,
     bankBalanceInput,
     setBankBalanceInput,
+    reconciliationMethod,
+    setReconciliationMethod,
     editingBookBalance,
     setEditingBookBalance,
     bookBalanceInput,
@@ -133,12 +145,13 @@ export default function BankReconciliationDetail({
     removeItemFormRow,
     depositsInTransit,
     outstandingChecks,
+    matchedBankAmount,
+    unmatchedBankAmount,
+    matchedGLAmount,
+    unmatchedGLAmount,
     bankErrors,
     bankStatementEndingBalance,
     adjustedBankBalance,
-    glDebits,
-    glCredits,
-    unadjustedBookBalance,
     endingBookBalance,
     bookAdditions,
     bookDeductions,
@@ -155,6 +168,9 @@ export default function BankReconciliationDetail({
     setBankAdjustments,
     bookAdjustments,
     setBookAdjustments,
+    suggestedAdjustments,
+    setSuggestedAdjustments,
+    generateSuggestedAdjustments,
     showBankAdjustmentForm,
     setShowBankAdjustmentForm,
     showBookAdjustmentForm,
@@ -173,19 +189,116 @@ export default function BankReconciliationDetail({
     bankCardAdditions,
     bankCardDeductions,
     bankCardErrors,
-    bookCardAdditions,
-    bookCardDeductions,
-    bookCardErrors,
     // Matching functions
     handleCreateMatch,
     handleDeleteMatch,
     fetchMatches,
   } = useBankReconciliation(selectedReconciliation)
 
-  // Trigger Toast Notification
-  const triggerToast = (msg, type = 'success') => {
-    setToastMessage({ text: msg, type })
-    setTimeout(() => setToastMessage(null), 3500)
+  // Helper function to check if bank item and GL entry have opposite debit/credit directions
+  const isValidDebitCreditMatch = (bankItem, glEntry) => {
+    const bankDebit = parseFloat(bankItem.bri_debit || bankItem.debit || 0) || 0
+    const bankCredit = parseFloat(bankItem.bri_credit || bankItem.credit || 0) || 0
+    const bankAmount = parseFloat(bankItem.amount || 0) || 0
+    const glType = (glEntry.type || '').toUpperCase()
+    const glAmount = parseFloat(glEntry.amount || 0) || 0
+    
+    console.log('isValidDebitCreditMatch detailed:', {
+      bankItem: { 
+        id: bankItem.id, 
+        description: bankItem.description,
+        debit: bankDebit, 
+        credit: bankCredit,
+        amount: bankAmount,
+        bri_debit: bankItem.bri_debit,
+        bri_credit: bankItem.bri_credit
+      },
+      glEntry: { 
+        id: glEntry.id, 
+        db_name: glEntry.db_name,
+        type: glType, 
+        amount: glAmount,
+        check_number: glEntry.check_number,
+        debit: glEntry.debit,
+        credit: glEntry.credit
+      }
+    })
+    
+    // Determine bank item direction from debit/credit fields first, then amount
+    let bankIsCredit = false
+    let bankIsDebit = false
+    
+    if (bankCredit > 0 && bankDebit === 0) {
+      bankIsCredit = true
+    } else if (bankDebit > 0 && bankCredit === 0) {
+      bankIsDebit = true
+    } else if (bankAmount !== 0) {
+      // If no debit/credit fields, use amount sign
+      bankIsCredit = bankAmount > 0
+      bankIsDebit = bankAmount < 0
+    }
+    
+    // GL entry direction from type field
+    const glIsDebit = glType === 'DEBIT'
+    const glIsCredit = glType === 'CREDIT'
+    
+    const isValid = (bankIsCredit && glIsDebit) || (bankIsDebit && glIsCredit)
+    console.log('isValidDebitCreditMatch result:', { bankIsCredit, glIsDebit, bankIsDebit, glIsCredit, isValid })
+    
+    // Valid if: bank credit (positive amount/deposit) + GL debit (receipt) OR bank debit (negative amount/withdrawal) + GL credit (payment)
+    return isValid
+  }
+
+  // Helper function to check reference/check number match
+  const hasMatchingReference = (bankItem, glEntry) => {
+    const bankRef = (bankItem.reference_number || bankItem.bri_reference_number || '').toLowerCase()
+    const glRef = (glEntry.check_number || glEntry.document_reference || '').toLowerCase()
+    return bankRef && glRef && bankRef === glRef
+  }
+
+  // Check if current selections have valid debit/credit matching
+  const isSelectionValidForMatching = useMemo(() => {
+    if (selectedStmtIds.length === 0 || selectedBookIds.length === 0) return false
+    
+    const ledgerId = selectedBookIds[0]
+    const glEntry = journalEntries.find(entry => entry.id === ledgerId)
+    
+    if (!glEntry) {
+      console.log('isSelectionValidForMatching: No GL entry found for ledgerId', ledgerId)
+      return false
+    }
+    
+    console.log('isSelectionValidForMatching check:', { selectedStmtIds, selectedBookIds, glEntry })
+    
+    // Check all selected bank items against the GL entry
+    for (const bankItemId of selectedStmtIds) {
+      const bankItem = items.find(item => item.id === bankItemId)
+      console.log('Bank item validation:', { bankItemId, bankItem, found: !!bankItem })
+      if (!bankItem) {
+        console.log('Bank item not found')
+        return false
+      }
+      const isValid = isValidDebitCreditMatch(bankItem, glEntry)
+      console.log('Bank item validation result:', { bankItemId, isValid })
+      if (!isValid) {
+        return false
+      }
+    }
+    
+    console.log('isSelectionValidForMatching: returning true')
+    return true
+  }, [selectedStmtIds, selectedBookIds, items, journalEntries])
+
+  // Generate consistent color for match groups based on ledger_id
+  const getMatchColor = (ledgerId) => {
+    if (!ledgerId) return null
+    const colors = [
+      'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 
+      'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500',
+      'bg-orange-500', 'bg-cyan-500', 'bg-lime-500', 'bg-rose-500'
+    ]
+    const hash = ledgerId.toString().split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    return colors[hash % colors.length]
   }
 
   // Filtered Items for current account
@@ -226,14 +339,16 @@ export default function BankReconciliationDetail({
   const selectedStmtTotal = useMemo(() => {
     return selectedStmtIds.reduce((sum, id) => {
       const item = items.find(i => i.id === id)
-      return sum + (item ? getItemAmount(item) : 0)
+      // Use absolute amount for matching comparison
+      return sum + (item ? Math.abs(getItemAmount(item)) : 0)
     }, 0)
   }, [selectedStmtIds, items])
 
   const selectedBookTotal = useMemo(() => {
     return selectedBookIds.reduce((sum, id) => {
       const item = journalEntries.find(i => i.id === id)
-      return sum + (item ? (parseFloat(item.amount) || 0) : 0)
+      // Use absolute amount for matching comparison
+      return sum + (item ? Math.abs(parseFloat(item.amount) || 0) : 0)
     }, 0)
   }, [selectedBookIds, journalEntries])
 
@@ -252,64 +367,157 @@ export default function BankReconciliationDetail({
     )
   }
 
-  // Auto-match function
+  // Auto-match function with proper accounting rules
   const handleAutoMatch = async () => {
     let matchCount = 0
-    const unmatchedStmts = items.filter(i => i.status !== 'matched')
-    const unmatchedBooks = journalEntries.filter(i => i.status !== 'matched')
+    const unmatchedStmts = items.filter(i => i.ledger_id === null || i.ledger_id === undefined)
+    const unmatchedBooks = journalEntries.filter(entry => !items.some(item => item.ledger_id === entry.id))
 
-    // Simple amount-based matching
-    unmatchedStmts.forEach(stmt => {
-      const stmtAmount = getItemAmount(stmt)
+    console.log('Auto-match starting:', { unmatchedStmtsCount: unmatchedStmts.length, unmatchedBooksCount: unmatchedBooks.length })
+
+    // Collect all matches first, then execute them
+    const matchesToMake = []
+
+    // First try reference number matching (highest priority)
+    // Must also have matching or reasonably close amounts (using absolute values)
+    // Iterate in reverse to safely splice during iteration
+    for (let i = unmatchedStmts.length - 1; i >= 0; i--) {
+      const stmt = unmatchedStmts[i]
+      const stmtAmount = Math.abs(getItemAmount(stmt))
       const matchingBook = unmatchedBooks.find(
-        b => Math.abs(parseFloat(b.amount) || 0) === Math.abs(stmtAmount)
+        b => hasMatchingReference(stmt, b) && 
+             isValidDebitCreditMatch(stmt, b) &&
+             Math.abs(Math.abs(parseFloat(b.amount) || 0) - stmtAmount) < 0.01
       )
 
       if (matchingBook) {
-        // Call the match API
-        handleCreateMatch([stmt.id], [matchingBook.id])
-        matchCount++
+        matchesToMake.push({ stmtId: stmt.id, bookId: matchingBook.id, type: 'reference' })
+        unmatchedStmts.splice(i, 1)
+        const bookIndex = unmatchedBooks.indexOf(matchingBook)
+        if (bookIndex > -1) unmatchedBooks.splice(bookIndex, 1)
       }
-    })
+    }
+
+    console.log('After reference matching:', { matchesFound: matchesToMake.length, remainingStmts: unmatchedStmts.length, remainingBooks: unmatchedBooks.length })
+
+    // Then try exact amount matching with opposite debit/credit directions
+    // Compare absolute amounts for matching
+    // Iterate in reverse to safely splice during iteration
+    for (let i = unmatchedStmts.length - 1; i >= 0; i--) {
+      const stmt = unmatchedStmts[i]
+      const stmtAmount = Math.abs(getItemAmount(stmt))
+      console.log('Checking bank item for amount match:', { 
+        stmtId: stmt.id, 
+        stmtAmount, 
+        stmtDescription: stmt.description 
+      })
+      
+      const matchingBook = unmatchedBooks.find(
+        b => {
+          const bookAmount = Math.abs(parseFloat(b.amount) || 0)
+          const amountMatch = Math.abs(bookAmount - stmtAmount) < 0.01
+          const debitCreditMatch = isValidDebitCreditMatch(stmt, b)
+          console.log('  Checking GL entry:', { 
+            bookId: b.id, 
+            bookAmount, 
+            amountMatch, 
+            debitCreditMatch,
+            bookDescription: b.description 
+          })
+          return amountMatch && debitCreditMatch
+        }
+      )
+
+      if (matchingBook) {
+        matchesToMake.push({ stmtId: stmt.id, bookId: matchingBook.id, type: 'amount' })
+        unmatchedStmts.splice(i, 1)
+        const bookIndex = unmatchedBooks.indexOf(matchingBook)
+        if (bookIndex > -1) unmatchedBooks.splice(bookIndex, 1)
+        console.log('  Match found and added:', { stmtId: stmt.id, bookId: matchingBook.id })
+      } else {
+        console.log('  No match found for bank item:', stmt.id)
+      }
+    }
+
+    console.log('After amount matching:', { totalMatches: matchesToMake.length, matches: matchesToMake })
+
+    // Execute all matches (skip refresh during bulk matching)
+    for (const match of matchesToMake) {
+      await handleMatchBankToLedger(match.stmtId, match.bookId, null, true)
+      matchCount++
+    }
+
+    // Many-to-one matching disabled to prevent false matches
+    // Only exact 1-to-1 matches by reference or amount are allowed
+
+    // Refresh data after matching
+    await fetchReconciliationItems()
 
     if (matchCount > 0) {
-      triggerToast(`⚡ Smart Auto-Match created ${matchCount} new transaction pair matches!`)
+      showToast({ type: 'success', text: `⚡ Smart Auto-Match created ${matchCount} new transaction pair matches!` })
     } else {
-      triggerToast('No eligible auto-matches found based on exact amount rules.', 'info')
+      showToast({ type: 'info', text: 'No eligible auto-matches found based on reference, amount, and debit/credit rules.' })
     }
   }
 
   // Manual match execution
   const handleMatchSelected = async () => {
     if (selectedStmtIds.length === 0 || selectedBookIds.length === 0) {
-      triggerToast('Please select at least one item from Bank Statement and one from Book Ledger', 'error')
+      showToast({ type: 'error', text: 'Please select at least one item from Bank Statement and one from Book Ledger' })
       return
     }
 
-    if (Math.abs(selectedDifference) > 0.01) {
-      triggerToast(`Selected amounts do not balance! Variance: ₱${selectedDifference.toFixed(2)}`, 'error')
-      return
-    }
-
-    // Match each bank item to its corresponding ledger item (1-to-1 matching)
+    // Validate debit/credit matching rules for all selected items
+    const ledgerId = selectedBookIds[0]
+    const glEntry = journalEntries.find(entry => entry.id === ledgerId)
+    
     for (let i = 0; i < selectedStmtIds.length; i++) {
       const bankItemId = selectedStmtIds[i]
-      const ledgerId = selectedBookIds[i]
-      if (bankItemId && ledgerId) {
-        await handleMatchBankToLedger(bankItemId, ledgerId)
+      const bankItem = items.find(item => item.id === bankItemId)
+      
+      if (bankItem && glEntry && !isValidDebitCreditMatch(bankItem, glEntry)) {
+        showToast({ 
+          type: 'error', 
+          text: 'Invalid match: Bank deposits (credits) must match GL receipts (debits). Bank withdrawals (debits) must match GL payments (credits).' 
+        })
+        return
       }
     }
 
+    // Allow partial matching - don't require exact balance
+    // But warn if there's a significant variance
+    if (Math.abs(selectedDifference) > 0.01) {
+      showToast({ type: 'warning', text: `Partial match: variance of ₱${selectedDifference.toFixed(2)} will remain as Deposits in Transit` })
+    }
+
+    // Match bank items to ledger items (supports many-to-one and partial matching)
+    for (let i = 0; i < selectedStmtIds.length; i++) {
+      const bankItemId = selectedStmtIds[i]
+      const bankItem = items.find(item => item.id === bankItemId)
+      if (bankItemId && ledgerId && bankItem) {
+        // Get the actual amount being matched for this bank item
+        const matchedAmount = getItemAmount(bankItem)
+        await handleMatchBankToLedger(bankItemId, ledgerId, matchedAmount)
+      }
+    }
+
+    // Refresh data after matching to ensure calculations are updated
+    await fetchReconciliationItems()
+    await fetchJournalEntries()
+
     setSelectedStmtIds([])
     setSelectedBookIds([])
-    triggerToast(`Successfully matched ${selectedStmtIds.length} items!`)
+    showToast({ type: 'success', text: `Successfully matched ${selectedStmtIds.length} items!` })
   }
 
   // Unmatch a specific item
   const handleUnmatch = async (bankItemId) => {
     if (!bankItemId) return
     await handleUnmatchBankFromLedger(bankItemId)
-    triggerToast('Transaction link removed. Item returned to unmatched status.')
+    // Refresh data after unmatching to ensure calculations are updated
+    await fetchReconciliationItems()
+    await fetchJournalEntries()
+    showToast({ type: 'success', text: 'Transaction link removed. Item returned to unmatched status.' })
   }
 
   // Create GL Book entry directly from Bank Statement item
@@ -333,26 +541,18 @@ export default function BankReconciliationDetail({
 
     setIsNewEntryModalOpen(false)
     setSelectedStmtForEntry(null)
-    triggerToast('GL Adjustment entry posted and reconciled successfully!')
+    showToast({ type: 'success', text: 'GL Adjustment entry posted and reconciled successfully!' })
   }
 
   // Calculate reconcile percentage
   const totalItemsCount = items.length + journalEntries.length
-  const matchedItemsCount = items.filter(i => i.status === 'matched').length + journalEntries.filter(i => i.status === 'matched').length
+  const matchedBankItems = items.filter(i => i.ledger_id !== null && i.ledger_id !== undefined).length
+  const matchedBookItems = journalEntries.filter(entry => items.some(item => item.ledger_id === entry.id)).length
+  const matchedItemsCount = matchedBankItems + matchedBookItems
   const reconcilePercentage = totalItemsCount > 0 ? Math.round((matchedItemsCount / totalItemsCount) * 100) : 100
 
-  // Calculate unrecorded bank credits and debits (unmatched statement items)
-  const unrecordedBankCredits = useMemo(() => {
-    return items
-      .filter(i => i.status === 'unmatched' && getItemAmount(i) > 0)
-      .reduce((sum, i) => sum + getItemAmount(i), 0)
-  }, [items, getItemAmount])
-
-  const unrecordedBankDebits = useMemo(() => {
-    return items
-      .filter(i => i.status === 'unmatched' && getItemAmount(i) < 0)
-      .reduce((sum, i) => sum + Math.abs(getItemAmount(i)), 0)
-  }, [items, getItemAmount])
+  // Note: unrecordedBankCredits and unrecordedBankDebits are now calculated in useBankReconciliation.js
+  // as bookAdditions and bookDeductions from unmatched bank statement items
 
   const [ocrLoading, setOcrLoading] = React.useState(false)
   const [ocrError, setOcrError] = React.useState('')
@@ -614,15 +814,11 @@ export default function BankReconciliationDetail({
       }
 
       setItemFormRows(parsedRows)
-      setShowToast(true)
-      setToastType('success')
-      setToastMessage(`Imported ${parsedRows.length} OCR row(s).`)
+      showToast({ type: 'success', text: `Imported ${parsedRows.length} OCR row(s).` })
     } catch (error) {
       console.error('[OCR] error:', error)
       setOcrError(error?.message || 'Failed to import OCR rows.')
-      setShowToast(true)
-      setToastType('error')
-      setToastMessage(error?.message || 'Failed to import OCR rows.')
+      showToast({ type: 'error', text: error?.message || 'Failed to import OCR rows.' })
     } finally {
       setOcrLoading(false)
       if (event.target) event.target.value = ''
@@ -638,15 +834,6 @@ export default function BankReconciliationDetail({
 
   return (
     <div className="min-h-screen bg-[#f4f5f7] text-zinc-900 font-sans antialiased selection:bg-red-600 selection:text-white pb-12">
-      {/* Toast Notification Banner */}
-      {toastMessage && (
-        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl text-white font-medium text-sm transition-all duration-300 animate-bounce ${toastMessage.type === 'error' ? 'bg-red-700 border border-red-500' :
-            toastMessage.type === 'info' ? 'bg-zinc-800 border border-zinc-700' : 'bg-red-600 border border-red-500'
-          }`}>
-          {toastMessage.type === 'error' ? <AlertCircle className="w-5 h-5 text-white" /> : <CheckCircle2 className="w-5 h-5 text-white" />}
-          <span>{toastMessage.text}</span>
-        </div>
-      )}
 
 
       {/* Main Workspace Container */}
@@ -656,7 +843,7 @@ export default function BankReconciliationDetail({
         <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between gap-3 flex-wrap shadow-sm">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => window.history.back()}
+              onClick={() => onBack?.()}
               className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition"
             >
               <ArrowLeft size={16} />
@@ -678,25 +865,36 @@ export default function BankReconciliationDetail({
                   <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
                   Loading periods...
                 </div>
-              ) : availableMonths.length === 0 ? (
-                <p className="text-gray-500 text-sm">No saved periods available</p>
               ) : (
                 <>
                   <select
-                    value={`${detailStartDate}|${detailEndDate}`}
+                    value={availableMonths.some(m => m.start_date === detailStartDate && m.end_date === detailEndDate)
+                      ? `${detailStartDate}|${detailEndDate}`
+                      : 'new_period'}
                     onChange={(e) => {
-                      const selected = availableMonths.find(
-                        (m) => `${m.start_date}|${m.end_date}` === e.target.value,
-                      )
-                      if (selected) {
-                        setDetailStartDate(selected.start_date)
-                        setDetailEndDate(selected.end_date)
+                      if (e.target.value === 'new_period') {
+                        // Set to next month for new period
+                        const currentEndDate = new Date(detailEndDate)
+                        const nextMonthStart = new Date(currentEndDate.getFullYear(), currentEndDate.getMonth() + 1, 1)
+                        const nextMonthEnd = new Date(currentEndDate.getFullYear(), currentEndDate.getMonth() + 2, 0)
+                        const nextMonthStartStr = nextMonthStart.toISOString().split('T')[0]
+                        const nextMonthEndStr = nextMonthEnd.toISOString().split('T')[0]
+                        setDetailStartDate(nextMonthStartStr)
+                        setDetailEndDate(nextMonthEndStr)
+                      } else {
+                        const selected = availableMonths.find(
+                          (m) => `${m.start_date}|${m.end_date}` === e.target.value,
+                        )
+                        if (selected) {
+                          setDetailStartDate(selected.start_date)
+                          setDetailEndDate(selected.end_date)
+                        }
                       }
                     }}
                     className="px-3 py-2 border border-gray-100 rounded-xl bg-white text-sm font-bold text-black outline-none focus:border-blue-500 focus:bg-blue-50 transition-all cursor-pointer"
                   >
-                    <option value="" disabled>
-                      Select a month...
+                    <option value="new_period" className="text-blue-600 font-bold">
+                      + New Period
                     </option>
                     {availableMonths.map((month, idx) => (
                       <option
@@ -726,9 +924,10 @@ export default function BankReconciliationDetail({
             </div>
             <button
               onClick={handleSaveSummary}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md transition"
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md transition"
             >
-              Save Summary
+              <Lock size={14} />
+              Finalize Period
             </button>
           </div>
         </div>
@@ -838,6 +1037,22 @@ export default function BankReconciliationDetail({
               {/* Math Reconciliation Summary Breakdown - Side by Side Cards */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-5">
 
+                {/* Reconciliation Method Selector */}
+                <div className="lg:col-span-12 flex items-center justify-between mb-2">
+                  <span className="text-xs font-mono font-bold text-zinc-500 uppercase tracking-wider">
+                    RECONCILIATION METHOD
+                  </span>
+                  <select
+                    value={reconciliationMethod}
+                    onChange={(e) => setReconciliationMethod(e.target.value)}
+                    className="px-3 py-1.5 text-xs font-bold border border-zinc-300 rounded-lg bg-white focus:outline-none focus:border-red-500"
+                  >
+                    <option value="adjusted_balance">Adjusted Balance Method</option>
+                    <option value="bank_to_book">Bank-to-Book Method</option>
+                    <option value="book_to_bank">Book-to-Bank Method</option>
+                  </select>
+                </div>
+
                 {/* Bank Statement Calculation Block */}
                 <div className="lg:col-span-5 bg-zinc-50/80 rounded-xl p-4 border border-zinc-200/80">
                   <div className="flex items-center justify-between mb-3">
@@ -850,18 +1065,75 @@ export default function BankReconciliationDetail({
                   </div>
 
                   <div className="space-y-2 text-xs font-mono">
-                    <div className="flex justify-between py-1 border-b border-zinc-200/60">
-                      <span className="text-zinc-600">Ending Statement Balance</span>
-                      <span className="font-bold text-zinc-900">₱{fmt(bankStatementEndingBalance)}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-zinc-200/60 text-emerald-700">
-                      <span>(+) Deposits in Transit</span>
-                      <span className="font-bold">+₱{fmt(depositsInTransit)}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-zinc-200/60 text-red-600">
-                      <span>(-) Outstanding Checks</span>
-                      <span className="font-bold">-₱{fmt(outstandingChecks)}</span>
-                    </div>
+                    {reconciliationMethod === 'adjusted_balance' || reconciliationMethod === 'bank_to_book' ? (
+                      <>
+                        <div className="flex justify-between py-1 border-b border-zinc-200/60 items-center">
+                          <span className="text-zinc-600">Ending Statement Balance</span>
+                          {editingBankBalance ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                value={bankBalanceInput}
+                                onChange={(e) => setBankBalanceInput(e.target.value)}
+                                className="w-24 px-2 py-1 text-right border border-zinc-300 rounded text-xs font-mono"
+                                placeholder="0.00"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleUpdateBankStatementBalance()
+                                  } else if (e.key === 'Escape') {
+                                    setEditingBankBalance(false)
+                                    setBankBalanceInput('')
+                                  }
+                                }}
+                              />
+                              <button
+                                onClick={handleUpdateBankStatementBalance}
+                                className="text-emerald-600 hover:text-emerald-700 font-bold text-xs"
+                              >
+                                ✓
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingBankBalance(false)
+                                  setBankBalanceInput('')
+                                }}
+                                className="text-red-600 hover:text-red-700 font-bold text-xs"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-zinc-900">₱{fmt(bankStatementEndingBalance)}</span>
+                              <button
+                                onClick={() => {
+                                  setBankBalanceInput(bankStatementEndingBalance.toString())
+                                  setEditingBankBalance(true)
+                                }}
+                                className="text-zinc-400 hover:text-zinc-600"
+                                title="Edit bank statement balance"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-zinc-200/60 text-emerald-700">
+                          <span>(+) Deposits in Transit</span>
+                          <span className="font-bold">+₱{fmt(depositsInTransit)}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-zinc-200/60 text-red-600">
+                          <span>(-) Outstanding Checks</span>
+                          <span className="font-bold">-₱{fmt(outstandingChecks)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex justify-between py-1 border-b border-zinc-200/60 text-zinc-500 italic">
+                        <span>Starting from Book Balance</span>
+                        <span>→</span>
+                      </div>
+                    )}
 
                     {/* Bank Adjustments List */}
                     {bankAdjustments.length > 0 && (
@@ -898,9 +1170,43 @@ export default function BankReconciliationDetail({
                       <span className="text-red-600 font-mono">₱{fmt(adjustedBankBalance)}</span>
                     </div>
 
+                    {/* Suggested Adjustments from Partial Matching */}
+                    {suggestedAdjustments.length > 0 && (
+                      <div className="mt-3 pt-2 border-t border-zinc-200/60">
+                        <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+                          <Zap className="w-3 h-3" />
+                          Suggested Adjustments
+                        </div>
+                        {suggestedAdjustments.map((adj) => (
+                          <div key={adj.id} className="flex justify-between items-center py-1 text-zinc-600 bg-amber-50 px-2 rounded mb-1">
+                            <span className="text-xs">
+                              {adj.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} - {adj.description}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-amber-700">
+                                ₱{fmt(adj.amount)}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  handleAddBankAdjustment(adj.type, adj.description, adj.amount)
+                                  setSuggestedAdjustments(suggestedAdjustments.filter(a => a.id !== adj.id))
+                                }}
+                                className="text-xs font-bold text-amber-600 hover:text-amber-800 bg-amber-100 px-2 py-0.5 rounded"
+                              >
+                                Accept
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {/* Add Bank Adjustment Button */}
                     <button
-                      onClick={() => setShowBankAdjustmentForm(true)}
+                      onClick={() => {
+                        generateSuggestedAdjustments()
+                        setShowBankAdjustmentForm(true)
+                      }}
                       className="mt-2 w-full py-1.5 text-xs font-bold text-zinc-600 border border-zinc-300 rounded-lg hover:bg-zinc-50 hover:text-zinc-900 transition flex items-center justify-center gap-1"
                     >
                       <Plus className="w-3 h-3" />
@@ -926,10 +1232,17 @@ export default function BankReconciliationDetail({
                         <span>BALANCED</span>
                       </span>
                     ) : (
-                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
-                        <AlertCircle className="w-3 h-3" />
-                        <span>DISCREPANCY</span>
-                      </span>
+                      <div className="flex flex-col items-center space-y-1">
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>DISCREPANCY</span>
+                        </span>
+                        <span className="text-[9px] text-zinc-400 font-mono">
+                          {adjustedBankBalance > adjustedBookBalance
+                            ? `Bank ahead by ₱${fmt(adjustedBankBalance - adjustedBookBalance)}`
+                            : `Book ahead by ₱${fmt(adjustedBookBalance - adjustedBankBalance)}`}
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -946,18 +1259,27 @@ export default function BankReconciliationDetail({
                   </div>
 
                   <div className="space-y-2 text-xs font-mono">
-                    <div className="flex justify-between py-1 border-b border-zinc-200/60">
-                      <span className="text-zinc-600">Ending Book GL Balance</span>
-                      <span className="font-bold text-zinc-900">₱{fmt(endingBookBalance)}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-zinc-200/60 text-emerald-700">
-                      <span>(+) Unrecorded Bank Credits</span>
-                      <span className="font-bold">+₱{fmt(unrecordedBankCredits)}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-zinc-200/60 text-red-600">
-                      <span>(-) Unrecorded Bank Charges</span>
-                      <span className="font-bold">-₱{fmt(unrecordedBankDebits)}</span>
-                    </div>
+                    {reconciliationMethod === 'adjusted_balance' || reconciliationMethod === 'book_to_bank' ? (
+                      <>
+                        <div className="flex justify-between py-1 border-b border-zinc-200/60">
+                          <span className="text-zinc-600">Ending Book GL Balance</span>
+                          <span className="font-bold text-zinc-900">₱{fmt(endingBookBalance)}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-zinc-200/60 text-emerald-700">
+                          <span>(+) Unrecorded Bank Credits</span>
+                          <span className="font-bold">+₱{fmt(bookAdditions)}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-zinc-200/60 text-red-600">
+                          <span>(-) Unrecorded Bank Charges</span>
+                          <span className="font-bold">-₱{fmt(bookDeductions)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex justify-between py-1 border-b border-zinc-200/60 text-zinc-500 italic">
+                        <span>Target: Ending Book GL Balance</span>
+                        <span>→</span>
+                      </div>
+                    )}
 
                     {/* Book Adjustments List */}
                     {bookAdjustments.length > 0 && (
@@ -1041,11 +1363,12 @@ export default function BankReconciliationDetail({
 
                     <button
                       onClick={handleMatchSelected}
-                      disabled={Math.abs(selectedDifference) > 0.01}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md ${Math.abs(selectedDifference) === 0
+                      disabled={Math.abs(selectedDifference) > 0.01 || !isSelectionValidForMatching}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md ${Math.abs(selectedDifference) === 0 && isSelectionValidForMatching
                           ? 'bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer'
                           : 'bg-zinc-700 text-zinc-400 cursor-not-allowed opacity-60'
                         }`}
+                      title={!isSelectionValidForMatching ? 'Invalid match: Bank deposits (credits) must match GL receipts (debits). Bank withdrawals (debits) must match GL payments (credits).' : ''}
                     >
                       Match Selected Transactions
                     </button>
@@ -1098,14 +1421,23 @@ export default function BankReconciliationDetail({
                     currentStmtItems.map(item => {
                       const isSelected = selectedStmtIds.includes(item.id);
                       const amount = getItemAmount(item);
-                      const isDebit = amount >= 0;
+                      const debit = parseFloat(item.bri_debit || item.debit || 0) || 0;
+                      const credit = parseFloat(item.bri_credit || item.credit || 0) || 0;
+                      const isCredit = credit > 0 && debit === 0;
+                      const isDebit = debit > 0 && credit === 0;
                       const isMatched = item.ledger_id !== null && item.ledger_id !== undefined;
                       const displayDate = item.date || item.bri_date ? formatLocalDate(new Date(item.date || item.bri_date)) : '-';
+                      
+                      // Find the matched GL entry
+                      const matchedGLEntry = isMatched ? journalEntries.find(entry => entry.id === item.ledger_id) : null;
+                      // Get match color based on ledger_id
+                      const matchColor = getMatchColor(item.ledger_id);
 
                       return (
                         <div
                           key={item.id}
-                          className={`p-3.5 flex items-center justify-between text-xs transition-colors ${isMatched
+                          onClick={() => !isMatched && toggleSelectStmt(item.id)}
+                          className={`p-3.5 flex items-center justify-between text-xs transition-colors cursor-pointer ${isMatched
                               ? 'bg-emerald-50/40 hover:bg-emerald-50/70'
                               : isSelected
                                 ? 'bg-red-50/80 border-l-4 border-red-600'
@@ -1116,7 +1448,10 @@ export default function BankReconciliationDetail({
                             {/* Checkbox for selection */}
                             {!isMatched ? (
                               <button
-                                onClick={() => toggleSelectStmt(item.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleSelectStmt(item.id)
+                                }}
                                 className="text-zinc-400 hover:text-red-600 transition-colors"
                               >
                                 {isSelected ? (
@@ -1132,19 +1467,28 @@ export default function BankReconciliationDetail({
                             <div>
                               <div className="font-semibold text-zinc-900 flex items-center space-x-2">
                                 <span>{item.description || item.bri_description || item.details || 'No description'}</span>
+                                <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${isCredit ? 'bg-emerald-100 text-emerald-700' : isDebit ? 'bg-red-100 text-red-700' : 'bg-zinc-100 text-zinc-600'}`}>
+                                  {isCredit ? 'CREDIT' : isDebit ? 'DEBIT' : 'N/A'}
+                                </span>
                               </div>
                               <div className="text-[10px] text-zinc-500 font-mono mt-0.5 flex items-center space-x-2">
                                 <span>{displayDate}</span>
                                 <span>•</span>
                                 <span>Ref: {item.reference_number || item.bri_reference_number || '-'}</span>
                               </div>
+                              {isMatched && matchedGLEntry && (
+                                <div className="text-[9px] text-emerald-600 font-mono mt-1 flex items-center space-x-1">
+                                  <Link2 className="w-3 h-3" />
+                                  <span>→ GL: {matchedGLEntry.check_number || matchedGLEntry.document_reference || `ID ${matchedGLEntry.id}`} (₱{fmt(Math.abs(parseFloat(matchedGLEntry.amount) || 0))})</span>
+                                </div>
+                              )}
                             </div>
                           </div>
 
                           <div className="text-right flex items-center space-x-3">
                             <div>
-                              <div className={`font-mono font-bold ${isDebit ? 'text-emerald-600' : 'text-zinc-900'}`}>
-                                {isDebit ? '+' : ''}₱{fmt(Math.abs(amount))}
+                              <div className={`font-mono font-bold ${isCredit ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                                {isCredit ? '+' : isDebit ? '-' : ''}₱{fmt(Math.abs(amount))}
                               </div>
                               <div className="text-[10px]">
                                 {isMatched ? (
@@ -1153,6 +1497,10 @@ export default function BankReconciliationDetail({
                                   <span className="text-amber-600 font-bold font-mono">UNMATCHED</span>
                                 )}
                               </div>
+                              {/* Color indicator for matched items */}
+                              {isMatched && matchColor && (
+                                <div className={`h-1.5 w-16 rounded-full ${matchColor} mt-1`} />
+                              )}
                             </div>
 
                             {/* Actions */}
@@ -1221,17 +1569,30 @@ export default function BankReconciliationDetail({
                   ) : (
                     currentBookItems.map(entry => {
                       const isSelected = selectedBookIds.includes(entry.id);
+                      // GL entries use type field (DEBIT/CREDIT) and amount field
                       const amount = parseFloat(entry.amount) || 0;
-                      const isDebit = amount >= 0;
+                      const entryType = (entry.type || '').toUpperCase();
                       const isMatched = items.some(item => item.ledger_id === entry.id);
                       const checkRef = entry.check_number || entry.document_reference || '-';
                       const payeeMemo = [entry.payee_name, entry.responsibility_center].filter(Boolean).join(' - ') || entry.description || 'No description';
                       const displayDate = entry.date ? formatLocalDate(new Date(entry.date)) : '-';
 
+                      // Determine if this is an inflow or outflow based on type field (DEBIT/CREDIT)
+                      const dbType = (entry.db_name || entry.category || '').toLowerCase();
+                      // DEBIT entries are inflows (receipts), CREDIT entries are outflows (contra-accounts/adjustments)
+                      const isInflow = entryType === 'DEBIT' || ((dbType.includes('receipt') || dbType.includes('collection')) && entryType !== 'CREDIT');
+                      const isOutflow = entryType === 'CREDIT' || dbType.includes('payment') || dbType.includes('disbursement');
+                      
+                      // Find all matched bank items for this GL entry
+                      const matchedBankItems = isMatched ? items.filter(item => item.ledger_id === entry.id) : [];
+                      // Get match color based on entry.id (which is the ledger_id for bank items)
+                      const matchColor = getMatchColor(entry.id);
+
                       return (
                         <div
                           key={entry.id}
-                          className={`p-3.5 flex items-center justify-between text-xs transition-colors ${isMatched
+                          onClick={() => !isMatched && toggleSelectBook(entry.id)}
+                          className={`p-3.5 flex items-center justify-between text-xs transition-colors cursor-pointer ${isMatched
                               ? 'bg-emerald-50/40 hover:bg-emerald-50/70'
                               : isSelected
                                 ? 'bg-zinc-100/90 border-l-4 border-zinc-900'
@@ -1242,7 +1603,10 @@ export default function BankReconciliationDetail({
                             {/* Checkbox for selection */}
                             {!isMatched ? (
                               <button
-                                onClick={() => toggleSelectBook(entry.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleSelectBook(entry.id)
+                                }}
                                 className="text-zinc-400 hover:text-zinc-900 transition-colors"
                               >
                                 {isSelected ? (
@@ -1258,6 +1622,9 @@ export default function BankReconciliationDetail({
                             <div>
                               <div className="font-semibold text-zinc-900 flex items-center space-x-2">
                                 <span>{payeeMemo}</span>
+                                <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${entryType === 'DEBIT' ? 'bg-emerald-100 text-emerald-700' : entryType === 'CREDIT' ? 'bg-red-100 text-red-700' : 'bg-zinc-100 text-zinc-600'}`}>
+                                  {entryType || 'N/A'}
+                                </span>
                                 <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
                                   {entry.db_name || entry.category || 'General'}
                                 </span>
@@ -1267,23 +1634,37 @@ export default function BankReconciliationDetail({
                                 <span>•</span>
                                 <span>Chk #: {checkRef}</span>
                               </div>
+                              {isMatched && matchedBankItems.length > 0 && (
+                                <div className="text-[9px] text-emerald-600 font-mono mt-1 flex flex-col space-y-0.5">
+                                  {matchedBankItems.map(bankItem => (
+                                    <div key={bankItem.id} className="flex items-center space-x-1">
+                                      <Link2 className="w-3 h-3" />
+                                      <span>→ Bank: {bankItem.reference_number || bankItem.bri_reference_number || `ID ${bankItem.id}`} (₱{fmt(Math.abs(getItemAmount(bankItem)))})</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
 
                           <div className="text-right flex items-center space-x-3">
                             <div>
-                              <div className={`font-mono font-bold ${isDebit ? 'text-emerald-600' : 'text-zinc-900'}`}>
-                                {isDebit ? '+' : ''}₱{fmt(Math.abs(amount))}
+                              <div className={`font-mono font-bold ${isInflow ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                                {isInflow ? '+' : isOutflow ? '-' : ''}₱{fmt(Math.abs(amount))}
                               </div>
                               <div className="text-[10px]">
                                 {isMatched ? (
                                   <span className="text-emerald-700 font-bold font-mono">MATCHED</span>
                                 ) : (
                                   <span className="text-zinc-500 font-bold font-mono">
-                                    {isDebit ? 'DEP IN TRANSIT' : 'OUTSTANDING CHK'}
+                                    {isInflow ? 'DEP IN TRANSIT' : isOutflow ? 'OUTSTANDING CHK' : 'CREDIT ADJUSTMENT'}
                                   </span>
                                 )}
                               </div>
+                              {/* Color indicator for matched items */}
+                              {isMatched && matchColor && (
+                                <div className={`h-1.5 w-16 rounded-full ${matchColor} mt-1`} />
+                              )}
                             </div>
 
                             {/* Unmatch Action */}
@@ -1354,7 +1735,11 @@ export default function BankReconciliationDetail({
                   ) : (
                     items.map(i => {
                       const amount = getItemAmount(i)
-                      const isDebit = amount >= 0
+                      const debit = parseFloat(i.bri_debit || i.debit || 0) || 0
+                      const credit = parseFloat(i.bri_credit || i.credit || 0) || 0
+                      // Determine type based on actual debit/credit fields from DB
+                      const isCredit = credit > 0 && debit === 0
+                      const isDebit = debit > 0 && credit === 0
                       const displayDate = i.date || i.bri_date ? formatLocalDate(new Date(i.date || i.bri_date)) : '-'
                       return (
                         <tr key={i.id} className="hover:bg-zinc-50">
@@ -1362,11 +1747,11 @@ export default function BankReconciliationDetail({
                           <td className="p-3 font-semibold text-zinc-600">{i.reference_number || i.bri_reference_number || '-'}</td>
                           <td className="p-3 font-sans font-medium text-zinc-900">{i.description || i.bri_description || i.details || 'No description'}</td>
                           <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isDebit ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-100 text-zinc-700'}`}>
-                              {isDebit ? 'CR' : 'DR'}
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isCredit ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-100 text-zinc-700'}`}>
+                              {isCredit ? 'CR' : isDebit ? 'DR' : '-'}
                             </span>
                           </td>
-                          <td className={`p-3 text-right font-bold ${isDebit ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                          <td className={`p-3 text-right font-bold ${isCredit ? 'text-emerald-600' : 'text-zinc-900'}`}>
                             ₱{fmt(Math.abs(amount))}
                           </td>
                           <td className="p-3 text-center">
@@ -1534,11 +1919,11 @@ export default function BankReconciliationDetail({
                 <div className="pl-4 space-y-1 text-xs">
                   <div className="flex justify-between text-emerald-700">
                     <span>Add: Unrecorded Bank Direct Credits</span>
-                    <span>+₱{fmt(unrecordedBankCredits)}</span>
+                    <span>+₱{fmt(bookAdditions)}</span>
                   </div>
                   <div className="flex justify-between text-red-600">
                     <span>Less: Unrecorded Service Charges / Debits</span>
-                    <span>-₱{fmt(unrecordedBankDebits)}</span>
+                    <span>-₱{fmt(bookDeductions)}</span>
                   </div>
                 </div>
 
@@ -2176,7 +2561,7 @@ export default function BankReconciliationDetail({
                     handleAddBankAdjustment()
                     setShowBankAdjustmentForm(false)
                     setBankAdjustmentForm({ type: '', description: '', amount: '' })
-                    triggerToast('Bank adjustment added successfully')
+                    showToast({ type: 'success', text: 'Bank adjustment added successfully' })
                   }}
                   className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition"
                 >
@@ -2260,7 +2645,7 @@ export default function BankReconciliationDetail({
                     handleAddBookAdjustment()
                     setShowBookAdjustmentForm(false)
                     setBookAdjustmentForm({ type: '', description: '', amount: '' })
-                    triggerToast('Book adjustment added successfully')
+                    showToast({ type: 'success', text: 'Book adjustment added successfully' })
                   }}
                   className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition"
                 >
@@ -2272,11 +2657,11 @@ export default function BankReconciliationDetail({
         </div>
       )}
 
-      {showToast && (
+      {showToastState && (
         <DynamicToast
           message={toastMessage?.text || toastMessage || ''}
           type={toastMessage?.type || toastType}
-          onClose={() => setShowToast(false)}
+          onClose={() => setShowToastState(false)}
         />
       )}
     </div>

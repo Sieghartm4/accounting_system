@@ -43,13 +43,6 @@ export default function BankReconciliation() {
   })
   const [reconciliationSummaries, setReconciliationSummaries] = useState({})
 
-  const showToastMessage = (message, type = 'success') => {
-    setToastMessage(message)
-    setToastType(type)
-    setShowToast(true)
-    setTimeout(() => setShowToast(false), 3000)
-  }
-
   const formatLocalDate = (d) => {
     const year = d.getFullYear()
     const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -74,13 +67,46 @@ export default function BankReconciliation() {
 
   const fetchReconciliationSummaries = async (reconciliationsList) => {
     const token = localStorage.getItem('token')
-    const [startDate, endDate] = getCurrentMonthRange()
-    const queryString = buildDateQuery(startDate, endDate)
     const summaries = {}
 
     await Promise.all(
       reconciliationsList.map(async (reconciliation) => {
         try {
+          // Fetch saved months to determine the new/open period
+          const monthsResponse = await fetch(
+            `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliation.id}/summary-months`,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          )
+          const monthsResult = await monthsResponse.json()
+
+          // Calculate the new/open period date range
+          let startDate, endDate
+          if (monthsResult.success && monthsResult.data && monthsResult.data.length > 0) {
+            const savedMonths = [...monthsResult.data].sort(
+              (a, b) => new Date(b.end_date) - new Date(a.end_date),
+            )
+            const latestSaved = savedMonths[0]
+            
+            const latestEndLocal = new Date(latestSaved.end_date)
+            const latestEndLocalStr = formatLocalDate(latestEndLocal)
+            const periodStart = new Date(latestEndLocalStr)
+            
+            const periodEnd = new Date(periodStart)
+            periodEnd.setDate(periodStart.getDate() + 29)
+            
+            startDate = formatLocalDate(periodStart)
+            endDate = formatLocalDate(periodEnd)
+          } else {
+            [startDate, endDate] = getCurrentMonthRange()
+          }
+          
+          const queryString = buildDateQuery(startDate, endDate)
+
           const detailResponse = await fetch(
             `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliation.id}${queryString}`,
             {
@@ -135,28 +161,97 @@ export default function BankReconciliation() {
             (item) => getItemSection(item) === 'BOOK',
           )
 
-          const depositsInTransit = bankSectionItems
-            .filter(
-              (item) =>
-                (item.bri_details || item.details || item.item_type) ===
-                'deposits_in_transit',
-            )
-            .reduce((sum, item) => {
-              const debit = Math.abs(parseFloat(item.bri_debit || item.debit || 0))
-              return sum + debit
+          // Calculate deposits in transit from journal entries (same as detail page)
+          const depositsInTransit = journalEntries
+            .filter(entry => {
+              const dbType = (entry.db_name || entry.category || '').toLowerCase()
+              const entryType = (entry.type || '').toUpperCase()
+              return (dbType.includes('receipt') || dbType.includes('collection')) && entryType === 'DEBIT'
+            })
+            .reduce((sum, entry) => {
+              const entryAmount = parseFloat(entry.amount) || 0
+              const matchedAmount = items
+                .filter(item => item.ledger_id === entry.id)
+                .reduce((matchedSum, item) => {
+                  const matchedAmt = parseFloat(item.matched_amount || item.amount || 0) || 0
+                  if (matchedAmt !== 0) return matchedSum + matchedAmt
+                  // Fallback to debit/credit fields
+                  const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+                  const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+                  return matchedSum + Math.abs(debit - credit)
+                }, 0)
+              
+              // Also add unmatched bank items with matching reference numbers (partial clears)
+              const glRef = (entry.check_number || entry.document_reference || '').toLowerCase()
+              const partialClearAmount = items
+                .filter(item => (item.ledger_id === null || item.ledger_id === undefined))
+                .filter(item => {
+                  const bankRef = (item.reference_number || item.bri_reference_number || '').toLowerCase()
+                  return bankRef && glRef && bankRef === glRef
+                })
+                .reduce((partialSum, item) => {
+                  const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+                  const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+                  const amount = parseFloat(item.amount || 0) || 0
+                  const netAmount = amount !== 0 ? Math.abs(amount) : Math.abs(debit - credit)
+                  return partialSum + netAmount
+                }, 0)
+              
+              const totalCleared = matchedAmount + partialClearAmount
+              const unmatchedRemainder = Math.max(0, entryAmount - totalCleared)
+              return sum + unmatchedRemainder
             }, 0)
 
-          const outstandingChecks = bankSectionItems
-            .filter(
-              (item) =>
-                (item.bri_details || item.details || item.item_type) ===
-                'outstanding_checks',
-            )
-            .reduce((sum, item) => {
-              const credit = Math.abs(
-                parseFloat(item.bri_credit || item.credit || 0),
-              )
-              return sum + credit
+          // Calculate outstanding checks from journal entries (same as detail page)
+          const outstandingChecks = journalEntries
+            .filter(entry => {
+              const dbType = (entry.db_name || entry.category || '').toLowerCase()
+              const entryType = (entry.type || '').toUpperCase()
+              return (dbType.includes('payment') || dbType.includes('disbursement') && entryType === 'DEBIT') ||
+                     ((dbType.includes('receipt') || dbType.includes('collection')) && entryType === 'CREDIT')
+            })
+            .reduce((sum, entry) => {
+              const entryAmount = Math.abs(parseFloat(entry.amount) || 0)
+              const matchedItems = items.filter(item => item.ledger_id === entry.id)
+              const matchedAmount = matchedItems.reduce((matchedSum, item) => {
+                const matchedAmt = parseFloat(item.matched_amount || item.amount || 0) || 0
+                if (matchedAmt !== 0) return matchedSum + matchedAmt
+                // Fallback to debit/credit fields
+                const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+                const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+                return matchedSum + Math.abs(debit - credit)
+              }, 0)
+              
+              // Also add unmatched bank items with matching reference numbers (partial clears)
+              const glRef = (entry.check_number || entry.document_reference || '').toLowerCase()
+              const partialClearAmount = items
+                .filter(item => (item.ledger_id === null || item.ledger_id === undefined))
+                .filter(item => {
+                  const bankRef = (item.reference_number || item.bri_reference_number || '').toLowerCase()
+                  return bankRef && glRef && bankRef === glRef
+                })
+                .reduce((partialSum, item) => {
+                  const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+                  const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+                  const amount = parseFloat(item.amount || 0) || 0
+                  const netAmount = amount !== 0 ? Math.abs(amount) : Math.abs(debit - credit)
+                  return partialSum + netAmount
+                }, 0)
+              
+              const totalCleared = matchedAmount + partialClearAmount
+              const unmatchedRemainder = Math.max(0, entryAmount - totalCleared)
+              console.log('Outstanding check entry:', {
+                entryId: entry.id,
+                dbType: entry.db_name || entry.category,
+                entryType: entry.type,
+                entryAmount,
+                matchedItems: matchedItems.map(i => ({ id: i.id, ledger_id: i.ledger_id, amount: i.amount })),
+                matchedAmount,
+                partialClearAmount,
+                totalCleared,
+                unmatchedRemainder
+              })
+              return sum + unmatchedRemainder
             }, 0)
 
           const bookAdditions = bookSectionItems
@@ -241,22 +336,61 @@ export default function BankReconciliation() {
             ? glDebits - glCredits
             : parseFloat(detailResult.data.running_balance || 0)
 
-          const adjustedBankBalance =
-            parseFloat(detailResult.data.bank_statement_balance || 0) +
-            depositsInTransit -
-            outstandingChecks +
-            bankCardAdditions -
-            bankCardDeductions +
-            bankCardErrors
+          // Calculate bank card adjustments total (same as detail page)
+          const bankCardAdjustmentsTotal = adjustments
+            .filter((adj) => adj.side === 'BANK')
+            .reduce((sum, adj) => {
+              const amount = parseFloat(adj.amount) || 0
+              if (adj.direction === 'less' || adj.type === 'outstanding_checks' || adj.type === 'service_fees' || (adj.type === 'error_bank' && amount < 0)) {
+                return sum - Math.abs(amount)
+              }
+              return sum + Math.abs(amount)
+            }, 0)
 
-          const adjustedBookBalance =
-            endingBookBalance +
-            bookAdditions +
-            bookCardAdditions -
-            bookDeductions -
-            bookCardDeductions +
-            bookErrorAdjustments +
-            bookCardErrors
+          // Calculate book card adjustments total (same as detail page)
+          const bookCardAdjustmentsTotal = adjustments
+            .filter((adj) => adj.side === 'BOOK')
+            .reduce((sum, adj) => {
+              const amount = parseFloat(adj.amount) || 0
+              if (adj.direction === 'less' || adj.type === 'outstanding_checks' || adj.type === 'service_fees' || (adj.type === 'error_book' && amount < 0)) {
+                return sum - Math.abs(amount)
+              }
+              return sum + Math.abs(amount)
+            }, 0)
+
+          // Calculate bank statement ending balance from all bank items (same as detail page)
+          const bankStatementEndingBalance = bankSectionItems.reduce((sum, item) => {
+            const amount = parseFloat(item.amount || 0) || 0
+            if (amount !== 0) return sum + amount
+            const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+            const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+            return sum + (debit - credit)
+          }, 0)
+
+          console.log('Bank statement ending balance calculation:', {
+            bankStatementEndingBalance,
+            bankSectionItems: bankSectionItems.map(i => ({
+              id: i.id,
+              debit: i.bri_debit || i.debit,
+              credit: i.bri_credit || i.credit,
+              amount: i.amount
+            }))
+          })
+
+          console.log('Adjusted balance calculation:', {
+            bankStatementEndingBalance,
+            depositsInTransit,
+            outstandingChecks,
+            bankCardAdjustmentsTotal,
+            endingBookBalance,
+            bookAdditions,
+            bookDeductions,
+            bookCardAdjustmentsTotal
+          })
+
+          // Use the same calculation as detail page (adjusted_balance method)
+          const adjustedBankBalance = bankStatementEndingBalance + depositsInTransit - outstandingChecks + bankCardAdjustmentsTotal
+          const adjustedBookBalance = endingBookBalance + bookAdditions - bookDeductions + bookCardAdjustmentsTotal
 
           const reconDifference = adjustedBookBalance - adjustedBankBalance
 
@@ -307,11 +441,15 @@ export default function BankReconciliation() {
         fetchReconciliationSummaries(list)
       } else {
         setError('Failed to fetch bank reconciliations')
-        showToastMessage('Failed to load reconciliations', 'error')
+        setShowToast(true)
+        setToastType('error')
+        setToastMessage('Failed to load reconciliations')
       }
     } catch {
       setError('Server error while fetching reconciliations')
-      showToastMessage('Failed to load reconciliations', 'error')
+      setShowToast(true)
+      setToastType('error')
+      setToastMessage('Failed to load reconciliations')
     } finally {
       setLoading(false)
     }
@@ -341,7 +479,9 @@ export default function BankReconciliation() {
 
   const handleCreateReconciliation = async () => {
     if (!createFormData.bank_account || !createFormData.coa_id) {
-      showToastMessage('Please fill all required fields', 'error')
+      setShowToast(true)
+      setToastType('error')
+      setToastMessage('Please fill all required fields')
       return
     }
     try {
@@ -354,17 +494,14 @@ export default function BankReconciliation() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            bank_account: createFormData.bank_account,
-            coa_id: parseInt(createFormData.coa_id),
-            bank_statement_balance:
-              parseFloat(createFormData.bank_statement_balance) || 0,
-          }),
+          body: JSON.stringify(createFormData),
         },
       )
       const result = await res.json()
       if (result.success) {
-        showToastMessage('Bank reconciliation created successfully')
+        setShowToast(true)
+        setToastType('success')
+        setToastMessage('Bank reconciliation created successfully')
         setShowCreateModal(false)
         setCreateFormData({
           bank_account: '',
@@ -373,13 +510,14 @@ export default function BankReconciliation() {
         })
         fetchReconciliations()
       } else {
-        showToastMessage(
-          result.message || 'Failed to create reconciliation',
-          'error',
-        )
+        setShowToast(true)
+        setToastType('error')
+        setToastMessage(result.message || 'Failed to create reconciliation')
       }
     } catch {
-      showToastMessage('Server error while creating reconciliation', 'error')
+      setShowToast(true)
+      setToastType('error')
+      setToastMessage('Server error while creating reconciliation')
     }
   }
 
@@ -401,19 +539,25 @@ export default function BankReconciliation() {
   // Both sides should equal each other when reconciled
   const totalBankStatement = reconciliations.reduce((sum, r) => {
     const summary = reconciliationSummaries[r.id] || {}
+    // Use adjusted bank balance (net variance)
     const bankValue =
-      typeof summary.bankStatementBalance === 'number'
-        ? summary.bankStatementBalance
-        : parseFloat(r.bank_statement_balance || 0)
+      typeof summary.adjustedBankBalance === 'number'
+        ? summary.adjustedBankBalance
+        : typeof summary.bankStatementBalance === 'number'
+          ? summary.bankStatementBalance
+          : parseFloat(r.bank_statement_balance || 0)
     return sum + bankValue
   }, 0)
 
   const totalBookBalance = reconciliations.reduce((sum, r) => {
     const summary = reconciliationSummaries[r.id] || {}
+    // Use adjusted book balance (net variance)
     const bookValue =
-      typeof summary.glBalance === 'number'
-        ? summary.glBalance
-        : parseFloat(r.running_balance || 0)
+      typeof summary.adjustedBookBalance === 'number'
+        ? summary.adjustedBookBalance
+        : typeof summary.glBalance === 'number'
+          ? summary.glBalance
+          : parseFloat(r.running_balance || 0)
     return sum + bookValue
   }, 0)
 
@@ -434,17 +578,6 @@ export default function BankReconciliation() {
       animate={{ opacity: 1 }}
       className="min-h-screen bg-[#f4f5f7] text-zinc-900 font-sans antialiased selection:bg-red-600 selection:text-white pb-12"
     >
-      {/* Toast Notification Banner */}
-      {showToast && (
-        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl text-white font-medium text-sm transition-all duration-300 animate-bounce ${
-          toastType === 'error' ? 'bg-red-700 border border-red-500' : 
-          toastType === 'info' ? 'bg-zinc-800 border border-zinc-700' : 'bg-red-600 border border-red-500'
-        }`}>
-          {toastType === 'error' ? <AlertCircle className="w-5 h-5 text-white" /> : <CheckCircle2 className="w-5 h-5 text-white" />}
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* Main Workspace Container */}
       <main className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         
@@ -638,11 +771,9 @@ export default function BankReconciliation() {
                 <AnimatePresence>
                   {reconciliations.map((r, i) => {
                     const summary = reconciliationSummaries[r.id] || {}
-                    const bankStatement =
-                      summary.bankStatementBalance ??
-                      parseFloat(r.bank_statement_balance || 0)
-                    const glBalance =
-                      summary.glBalance ?? parseFloat(r.running_balance || 0)
+                    // Always use adjusted balances for display
+                    const bankStatement = summary.adjustedBankBalance ?? 0
+                    const glBalance = summary.adjustedBookBalance ?? 0
                     const effectiveDiff =
                       typeof summary.reconDifference === 'number'
                         ? summary.reconDifference
@@ -864,6 +995,14 @@ export default function BankReconciliation() {
           </div>
         )}
       </AnimatePresence>
+
+      {showToast && (
+        <DynamicToast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setShowToast(false)}
+        />
+      )}
     </motion.div>
   )
 }
