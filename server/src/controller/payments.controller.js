@@ -903,7 +903,7 @@ const createPayment = async (req, res, next) => {
             .build()
 
           const itemValues = [
-            payment_id,
+            paymentId,
 
             item.purchase_id || null,
 
@@ -935,7 +935,7 @@ const createPayment = async (req, res, next) => {
           const entryValues = [
             'payments',
 
-            payment_id,
+            paymentId,
 
             entry.account_id || null,
 
@@ -965,7 +965,7 @@ const createPayment = async (req, res, next) => {
             .build()
 
           const attachmentValues = [
-            payment_id,
+            paymentId,
 
             attachment.file || null,
 

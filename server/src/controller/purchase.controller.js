@@ -246,21 +246,26 @@ const regeneratePaymentsJournalEntries = async (connection, paymentIds = []) => 
 
 const getPurchase = async (req, res, next) => {
   try {
+    // pagination params
+    const { offset, limit, dateFrom, dateTo, date_from, date_to } = req.query
+    const purchaseDateFrom = dateFrom || date_from
+    const purchaseDateTo = dateTo || date_to
+    const shouldPaginate = offset !== undefined && limit !== undefined
+    const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
+    const limitNum = shouldPaginate
+      ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
+      : null
+
+    const { status } = req.query || {}
+    const excludePaid = status === 'NOT PAID'
+
     const query = sql
       .select([
         { col: Accounting.purchase.selectOptionColumns.id, as: 'id' },
 
+        { col: Accounting.purchase.selectOptionColumns.vendor_id, as: 'vendor_id' },
+
         { col: Master.vendors.selectOptionColumns.name, as: 'vendor' },
-
-        {
-          col: Master.vendors_information.selectOptionColumns.address,
-          as: 'vendor_address',
-        },
-
-        {
-          col: Master.vendors_information.selectOptionColumns.tin,
-          as: 'vendor_tin',
-        },
 
         {
           col: Accounting.purchase.selectOptionColumns.document_reference,
@@ -296,30 +301,23 @@ const getPurchase = async (req, res, next) => {
         Master.vendors.selectOptionColumns.id,
       )
 
-      .leftJoin(
-        Master.vendors_information.tablename,
-        `${Master.vendors_information.tablename}.${Master.vendors_information.selectOptionColumns.vendor_id}`,
-        `${Master.vendors.tablename}.${Master.vendors.selectOptionColumns.id}`,
-      )
-
       .build()
-
-    // pagination params
-    const { offset, limit, dateFrom, dateTo, date_from, date_to } = req.query
-    const purchaseDateFrom = dateFrom || date_from
-    const purchaseDateTo = dateTo || date_to
-    const shouldPaginate = offset !== undefined && limit !== undefined
-    const offsetNum = shouldPaginate ? Math.max(0, parseInt(offset, 10) || 0) : 0
-    const limitNum = shouldPaginate
-      ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
-      : null
 
     const purchaseDateColumn = `DATE(${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.date_delivered})`
     let whereClause = ''
     const queryParams = []
 
+    // Filter out purchases that already have payments when status is 'NOT PAID'
+    if (excludePaid) {
+      whereClause += ` WHERE NOT EXISTS (SELECT 1 FROM ${Accounting.payment_items.tablename} pi INNER JOIN ${Accounting.purchase_items.tablename} pi_items ON pi_items.${Accounting.purchase_items.selectOptionColumns.id} = pi.${Accounting.payment_items.selectOptionColumns.purchase_id} WHERE pi_items.${Accounting.purchase_items.selectOptionColumns.purchase_id} = ${Accounting.purchase.tablename}.${Accounting.purchase.selectOptionColumns.id})`
+    }
+
     if (purchaseDateFrom) {
-      whereClause += ` WHERE ${purchaseDateColumn} >= ?`
+      if (whereClause) {
+        whereClause += ` AND ${purchaseDateColumn} >= ?`
+      } else {
+        whereClause += ` WHERE ${purchaseDateColumn} >= ?`
+      }
       queryParams.push(purchaseDateFrom)
     }
 

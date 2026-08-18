@@ -286,6 +286,8 @@ export default function CollectionsForm({
   isViewMode = false,
   isEditMode = false,
   collectionData = null,
+  preSelectedSales = null, // New prop for auto-filling from To Be Collected
+  preSelectedSalesItems = null, // Fetched sales items for the selected sales
 }) {
   // ── Collection items ──────────────────────────────────────────────────────
   // Each item shape (what lives in state):
@@ -548,11 +550,88 @@ export default function CollectionsForm({
     }
   }, [isModalOpen])
 
+  // Auto-fill form from preSelectedSales (To Be Collected feature)
+  useEffect(() => {
+    if (preSelectedSales && preSelectedSales.length > 0 && !isViewMode && !isEditMode && customers.length > 0) {
+      console.log('Auto-filling form from preSelectedSales:', preSelectedSales)
+      console.log('Auto-filling form from preSelectedSalesItems:', preSelectedSalesItems)
+      console.log('Available customers:', customers)
+
+      // Set customer from first sale - find matching customer by name to get ID
+      const firstSale = preSelectedSales[0]
+      const customerName = firstSale.customer_name || firstSale.customer || ''
+      console.log('Looking for customer with name:', customerName)
+
+      const matchingCustomer = customers.find(
+        (c) => c.name === customerName || c.customer_name === customerName || c.code === customerName
+      )
+
+      if (matchingCustomer) {
+        console.log('Found matching customer:', matchingCustomer)
+        setSelectedCustomer(matchingCustomer.id)
+        setCustomerSearch(matchingCustomer.name || matchingCustomer.customer_name)
+      } else {
+        console.log('No matching customer found, using name as fallback')
+        setSelectedCustomer('')
+        setCustomerSearch(customerName)
+      }
+
+      // Use fetched sales items if available, otherwise create placeholder items
+      if (preSelectedSalesItems && preSelectedSalesItems.length > 0) {
+        console.log('Using fetched sales items')
+        const items = preSelectedSalesItems.map((item, index) => {
+          console.log('Processing sales item:', item)
+          const gross = parseFloat(item.sales_price) || 0
+          const discount = parseFloat(item.discount) || 0
+          const vat = parseFloat(item.vat) || 0
+          const wht = parseFloat(item.witholding_tax) || 0
+          const amount = gross - discount + vat - wht
+          console.log(`Calculated: gross=${gross}, discount=${discount}, vat=${vat}, wht=${wht}, amount=${amount}`)
+          return {
+            id: `auto-${index}`,
+            salesItemId: item.sales_id || item.id,
+            invoiceRef: item.document_reference || '',
+            description: item.product_service_name || item.name || '',
+            responsibilityCenter: item.responsibility_center || '',
+            gross: gross,
+            discAmt: discount,
+            vatAmt: vat,
+            whtAmount: wht,
+            amount: amount,
+            isOther: false,
+          }
+        })
+        setCollectionItems(items)
+        console.log('Auto-filled collection items from fetched data:', items)
+      } else {
+        console.log('No fetched items, using placeholder')
+        // Fallback to placeholder items
+        const items = preSelectedSales.map((sale, index) => ({
+          id: `auto-${index}`,
+          salesItemId: sale.id,
+          invoiceRef: sale.doc_ref || sale.document_reference || '',
+          description: `Sales Payment - ${sale.id}`,
+          responsibilityCenter: '',
+          gross: parseFloat(sale.amount_due) || 0,
+          discAmt: 0,
+          vatAmt: 0,
+          whtAmount: 0,
+          amount: parseFloat(sale.amount_due) || 0,
+          isOther: false,
+        }))
+        setCollectionItems(items)
+        console.log('Auto-filled collection items from placeholder data:', items)
+      }
+    }
+  }, [preSelectedSales, preSelectedSalesItems, isViewMode, isEditMode, customers])
+
   // Populate form with collection data when in view or edit mode
   useEffect(() => {
     if ((isViewMode || isEditMode) && collectionData) {
       console.log('Populating form with collection data:', collectionData)
       console.log('collectionData structure:', Object.keys(collectionData))
+      console.log('collectionData items:', collectionData.items)
+      console.log('collectionData journal:', collectionData.journal)
 
       // Populate basic collection info - handle different data structures
       let collection = null

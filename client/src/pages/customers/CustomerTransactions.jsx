@@ -24,7 +24,7 @@ function CustomerTransactionsContent() {
   if (viewingCustomer) {
     return (
       <CustomerTransactionDetail
-        customerId={viewingCustomer.id}
+        customerId={viewingCustomer.name}
         customerName={viewingCustomer.name}
         onBack={() => setViewingCustomer(null)}
       />

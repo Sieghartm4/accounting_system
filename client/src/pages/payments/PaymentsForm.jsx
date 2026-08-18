@@ -348,6 +348,8 @@ export default function PaymentsForm({
   isViewMode = false,
   isEditMode = false,
   paymentData = null,
+  preSelectedPurchases = null, // New prop for auto-filling from To Be Paid
+  preSelectedPurchaseItems = null, // Fetched purchase items for the selected purchases
 }) {
   // ── Payment items ──────────────────────────────────────────────────────
   // Each item shape (what lives in state):
@@ -641,6 +643,106 @@ export default function PaymentsForm({
       setSelectedPurchases([])
     }
   }, [isModalOpen])
+
+  // Auto-fill form from preSelectedPurchases (To Be Paid feature)
+  useEffect(() => {
+    if (preSelectedPurchases && preSelectedPurchases.length > 0 && !isViewMode && !isEditMode && vendors.length > 0) {
+      console.log('=== AUTO-FILL DEBUG ===')
+      console.log('preSelectedPurchases:', JSON.stringify(preSelectedPurchases, null, 2))
+      console.log('preSelectedPurchaseItems:', preSelectedPurchaseItems)
+      console.log('Available vendors:', JSON.stringify(vendors, null, 2))
+
+      // Set vendor from first purchase - find matching vendor by name to get ID
+      const firstPurchase = preSelectedPurchases[0]
+      console.log('First purchase:', JSON.stringify(firstPurchase, null, 2))
+
+      const vendorName = firstPurchase.vendor_name || firstPurchase.vendor || ''
+      const vendorId = firstPurchase.vendor_id || ''
+      console.log('Extracted vendorName:', vendorName)
+      console.log('Extracted vendorId:', vendorId)
+
+      console.log('Searching for vendor match...')
+      console.log('Checking vendor.name === vendorName for each vendor:')
+      vendors.forEach(v => {
+        console.log(`  - Vendor ID: ${v.id}, Name: "${v.name}" matches? ${v.name === vendorName}`)
+      })
+
+      const matchingVendor = vendors.find(v => v.name === vendorName || v.id === vendorId)
+      if (matchingVendor) {
+        console.log('✓ Found matching vendor:', matchingVendor)
+        setSelectedVendor(matchingVendor.id)
+        setVendorSearch(matchingVendor.name) // Also set the display value
+      } else {
+        console.log('✗ No matching vendor found')
+        console.log('Available vendor names:', vendors.map(v => v.name))
+        console.log('Available vendor IDs:', vendors.map(v => v.id))
+        if (vendors.length > 0) {
+          console.log('Using first vendor as fallback:', vendors[0])
+          setSelectedVendor(vendors[0].id)
+          setVendorSearch(vendors[0].name) // Also set the display value
+        }
+      }
+
+      // Use fetched purchase items if available, otherwise create placeholder items
+      if (preSelectedPurchaseItems && preSelectedPurchaseItems.length > 0) {
+        console.log('Using fetched purchase items')
+        const items = preSelectedPurchaseItems.map((item, index) => {
+          console.log('Processing purchase item:', item)
+          const gross = parseFloat(item.purchase_price) || 0
+          const discount = parseFloat(item.discount) || 0
+          const discountType = item.discount_type || 'percentage'
+          const vat = parseFloat(item.vat) || 0
+          const wht = parseFloat(item.witholding_tax) || 0
+
+          let discAmt = 0
+          if (discountType === 'percentage') {
+            discAmt = gross * (discount / 100)
+          } else {
+            discAmt = discount
+          }
+
+          const discounted = gross - discAmt
+          const vatAmt = discounted * (vat / 100)
+          const whtAmount = discounted * (wht / 100)
+          const amount = discounted + vatAmt - whtAmount
+
+          return {
+            id: `auto-${index}`,
+            purchaseItemId: item.pi_id || item.id,
+            invoiceRef: item.document_reference || item.invoice_ref || '',
+            description: item.product_service_name || item.description || '',
+            responsibilityCenter: item.responsibility_center || '',
+            gross,
+            discAmt,
+            vatAmt,
+            whtAmount,
+            amount,
+            isOther: false,
+          }
+        })
+        console.log('Auto-filled payment items from fetched data:', items)
+        setPaymentItems(items)
+      } else {
+        console.log('No fetched items, using placeholder')
+        // Fallback to placeholder items
+        const items = preSelectedPurchases.map((purchase, index) => ({
+          id: `auto-${index}`,
+          purchaseItemId: purchase.id,
+          invoiceRef: purchase.doc_ref || purchase.document_reference || purchase.purchase_number || '',
+          description: purchase.description || '',
+          responsibilityCenter: '',
+          gross: parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
+          discAmt: 0,
+          vatAmt: 0,
+          whtAmount: 0,
+          amount: parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
+          isOther: false,
+        }))
+        console.log('Auto-filled payment items from placeholder data:', items)
+        setPaymentItems(items)
+      }
+    }
+  }, [preSelectedPurchases, preSelectedPurchaseItems, isViewMode, isEditMode, vendors])
 
   // Populate form with payment data when in view or edit mode
   useEffect(() => {
@@ -1188,6 +1290,10 @@ export default function PaymentsForm({
         setToast({ type: 'warning', message: 'Please select mode of payment' })
         return
       }
+      if (!paymentDate) {
+        setToast({ type: 'warning', message: 'Please select payment date' })
+        return
+      }
       if (
         (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') &&
         !bankName
@@ -1318,7 +1424,7 @@ export default function PaymentsForm({
         mode_of_payment: modeOfPayment,
         bank_name: bankName || '',
         check_number: checkNumber || '',
-        payment_date: new Date().toISOString().split('T')[0],
+        payment_date: paymentDate || new Date().toISOString().split('T')[0],
         remarks,
         total_amount_due: summary.totalCashCollected,
         payment_items: preparedItems,
@@ -1725,6 +1831,22 @@ export default function PaymentsForm({
                   emptyText="No modes found"
                 />
               )}
+            </fieldset>
+            <fieldset>
+              <legend className="text-[11px] font-black uppercase text-gray-100">
+                Payment Date
+              </legend>
+              <input
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                disabled={isViewMode}
+                className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${
+                  isViewMode
+                    ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+                    : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+                }`}
+              />
             </fieldset>
             {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
               <fieldset>

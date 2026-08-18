@@ -24,7 +24,7 @@ function VendorTransactionsContent() {
   if (viewingVendor) {
     return (
       <VendorTransactionDetail
-        vendorId={viewingVendor.id}
+        vendorId={viewingVendor.name}
         vendorName={viewingVendor.name}
         onBack={() => setViewingVendor(null)}
       />

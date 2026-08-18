@@ -541,15 +541,15 @@ const getAllCollections = async (req, res, next) => {
       .from(Accounting.collection_items.tablename)
 
       .innerJoin(
-        Accounting.sales_items.tablename,
-        Accounting.sales_items.selectOptionColumns.id,
+        Accounting.sales.tablename,
+        Accounting.sales.selectOptionColumns.id,
         Accounting.collection_items.selectOptionColumns.sales_id,
       )
 
       .innerJoin(
-        Accounting.sales.tablename,
-        Accounting.sales.selectOptionColumns.id,
+        Accounting.sales_items.tablename,
         Accounting.sales_items.selectOptionColumns.sales_id,
+        Accounting.sales.selectOptionColumns.id,
       )
 
       .leftJoin(
@@ -853,7 +853,7 @@ const createCollection = async (req, res, next) => {
           const itemQuery = `INSERT INTO ${Accounting.collection_items.tablename} (ci_collection_id, ci_sales_id, ci_amount, ci_witholding_tax) VALUES (?, ?, ?, ?)`
 
           const itemValues = [
-            collection_id,
+            collectionId,
 
             item.sales_id,
 
@@ -885,7 +885,7 @@ const createCollection = async (req, res, next) => {
           const entryValues = [
             'collections',
 
-            collection_id,
+            collectionId,
 
             entry.account_id || null,
 

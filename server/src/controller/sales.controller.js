@@ -282,6 +282,9 @@ const getSales = async (req, res, next) => {
     const salesDateFrom = dateFrom || date_from
     const salesDateTo = dateTo || date_to
 
+    const { status } = req.query || {}
+    const excludeCollected = status === 'NOT PAID'
+
     const baseQuery = sql
       .select([
         { col: Accounting.sales.selectOptionColumns.id, as: 'id' },
@@ -322,13 +325,28 @@ const getSales = async (req, res, next) => {
         Master.customers.selectOptionColumns.id,
       )
 
+      .leftJoin(
+        Accounting.collection_items.tablename,
+        Accounting.collection_items.selectOptionColumns.sales_id,
+        Accounting.sales.selectOptionColumns.id,
+      )
+
       .build()
 
     let whereClause = ''
     const queryParams = []
 
+    // Filter out sales that already have collections when status is 'NOT PAID'
+    if (excludeCollected) {
+      whereClause += ` WHERE ${Accounting.collection_items.selectOptionColumns.id} IS NULL`
+    }
+
     if (salesDateFrom) {
-      whereClause += ` WHERE ${Accounting.sales.selectOptionColumns.date_delivered} >= ?`
+      if (whereClause) {
+        whereClause += ` AND ${Accounting.sales.selectOptionColumns.date_delivered} >= ?`
+      } else {
+        whereClause += ` WHERE ${Accounting.sales.selectOptionColumns.date_delivered} >= ?`
+      }
       queryParams.push(salesDateFrom)
     }
 
@@ -354,6 +372,7 @@ const getSales = async (req, res, next) => {
     let sales = await Query(paginatedQuery, queryParams, [
       Accounting.sales.prefix_,
       Master.customers.prefix_,
+      Accounting.collection_items.prefix_,
     ])
 
     res.status(200).json({

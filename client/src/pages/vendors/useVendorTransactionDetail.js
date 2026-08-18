@@ -56,17 +56,28 @@ const useVendorTransactionDetail = (vendorId) => {
           ? purchasesResult.data
           : []
 
-        // Filter by vendor ID and approved state
+        console.log('All disbursements:', allDisbursements)
+        console.log('All purchases:', allPurchases)
+        console.log('Vendor ID:', vendorId)
+
+        // Filter by vendor ID or vendor name and approved state
         const vendorDisbursements = allDisbursements.filter(
           (d) =>
-            String(d.vendor_id) === String(vendorId) &&
+            (String(d.vendor_id) === String(vendorId) ||
+             String(d.vendor) === String(vendorId) ||
+             String(d.vendor_name) === String(vendorId)) &&
             String(d.state || d.status || '').toLowerCase() === 'approved',
         )
         const vendorPurchases = allPurchases.filter(
           (p) =>
-            String(p.vendor_id) === String(vendorId) &&
+            (String(p.vendor_id) === String(vendorId) ||
+             String(p.vendor) === String(vendorId) ||
+             String(p.vendor_name) === String(vendorId)) &&
             String(p.state || p.status || '').toLowerCase() === 'approved',
         )
+
+        console.log('Filtered disbursements:', vendorDisbursements)
+        console.log('Filtered purchases:', vendorPurchases)
 
         setDisbursements(vendorDisbursements)
         setPurchases(vendorPurchases)

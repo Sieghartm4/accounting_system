@@ -58,6 +58,129 @@ function PaymentsContent() {
     title: '',
     message: '',
   })
+  const [activeTab, setActiveTab] = useState('payments') // 'payments' or 'toBePaid'
+  const [selectedPurchases, setSelectedPurchases] = useState([])
+  const [toBePaidData, setToBePaidData] = useState([])
+  const [loadingToBePaid, setLoadingToBePaid] = useState(false)
+  const [expandedVendor, setExpandedVendor] = useState(null) // Track which vendor is expanded
+  const [selectedPurchaseItems, setSelectedPurchaseItems] = useState([]) // Store fetched purchase items
+
+  // Fetch purchase items for selected purchases
+  const fetchPurchaseItems = async (purchaseIds) => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const queryParams = new URLSearchParams()
+      purchaseIds.forEach(id => queryParams.append('purchase_id', id))
+
+      console.log('Fetching purchase items for IDs:', purchaseIds)
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/payments/purchase-items-payment?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.message || 'Failed to fetch purchase items')
+
+      console.log('Purchase items API response:', result)
+      console.log('Purchase items data:', result.data)
+      return result.data || []
+    } catch (error) {
+      console.error('Error fetching purchase items:', error)
+      setToast({
+        type: 'error',
+        message: error.message || 'Failed to fetch purchase items'
+      })
+      return []
+    }
+  }
+
+  // Fetch unpaid purchases for To Be Paid tab
+  const fetchToBePaid = async () => {
+    try {
+      setLoadingToBePaid(true)
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SERVER_LINK}/purchase?status=NOT PAID`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.message || 'Failed to fetch unpaid purchases')
+
+      console.log('Purchases data received:', result.data)
+
+      // Filter out purchases with PAID status (case-insensitive) and only include APPROVED state
+      const unpaidPurchases = result.data?.filter(purchase => {
+        const status = purchase.status?.toLowerCase()
+        const state = purchase.state?.toUpperCase()
+        return status !== 'paid' && state === 'APPROVED'
+      }) || []
+
+      console.log('Filtered unpaid purchases (excluding PAID):', unpaidPurchases)
+
+      // Group by unique vendors
+      const vendorMap = new Map()
+      unpaidPurchases.forEach(purchase => {
+        const vendorId = purchase.vendor_id || purchase.id // Use vendor_id from API
+        const vendorName = purchase.vendor || purchase.vendor_name // Use vendor name from API
+        console.log('Processing purchase:', purchase)
+        console.log('Vendor ID:', vendorId, 'Vendor Name:', vendorName)
+
+        if (!vendorMap.has(vendorId)) {
+          vendorMap.set(vendorId, {
+            vendorId,
+            vendorName,
+            totalUnpaid: 0,
+            purchases: []
+          })
+        }
+        const vendor = vendorMap.get(vendorId)
+        const totalAmount = parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || parseFloat(purchase.amount_due) || 0
+        const paidAmount = parseFloat(purchase.paid_amount) || 0
+        const unpaidAmount = totalAmount - paidAmount
+        vendor.totalUnpaid += unpaidAmount
+        vendor.purchases.push({
+          ...purchase,
+        })
+      })
+
+      const vendors = Array.from(vendorMap.values())
+      console.log('Vendors with unpaid purchases:', vendors)
+
+      setToBePaidData(vendors)
+    } catch (error) {
+      console.error('Error fetching to be paid:', error)
+      setToast({
+        type: 'error',
+        message: error.message || 'Failed to fetch unpaid purchases'
+      })
+    } finally {
+      setLoadingToBePaid(false)
+    }
+  }
+
+  // Fetch to be paid data when tab switches to toBePaid
+  useEffect(() => {
+    if (activeTab === 'toBePaid') {
+      fetchToBePaid()
+    }
+  }, [activeTab])
 
   const applyDateFilters = async () => {
     const from = pendingDateFrom || null
@@ -409,15 +532,22 @@ function PaymentsContent() {
           isEditMode={isEditing}
           isViewMode={isViewing}
           paymentData={viewingPayment}
+          preSelectedPurchases={selectedPurchases}
+          preSelectedPurchaseItems={selectedPurchaseItems}
           onBack={() => {
             setIsAdding(false)
             setIsEditing(false)
             setIsViewing(false)
             setViewingPayment(null)
+            setSelectedPurchases([])
+            setSelectedPurchaseItems([])
           }}
           onSuccess={async (nextToast) => {
             if (nextToast) setToast(nextToast)
             await refetchPayments()
+            if (activeTab === 'toBePaid') {
+              await fetchToBePaid()
+            }
           }}
         />
       </RouteProtection>
@@ -484,237 +614,452 @@ function PaymentsContent() {
 
       {/* --- HEADER SECTION --- */}
       <div className="shrink-0">
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeInUp}
-          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-4"
+        {activeTab === 'payments' && (
+          <>
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-4"
+            >
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
+                    <Layers size={24} />
+                  </div>
+                  <h1 className="text-4xl font-black text-black tracking-tighter">
+                    <span className="text-red-600 italic">Payments</span>
+                  </h1>
+                </div>
+              </div>
+
+              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
+                    <div className="flex flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-gray-500">From</span>
+                        <input
+                          type="date"
+                          value={pendingDateFrom}
+                          onChange={(e) => setPendingDateFrom(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                          aria-label="Filter receipts from date"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-gray-500">To</span>
+                        <input
+                          type="date"
+                          value={pendingDateTo}
+                          onChange={(e) => setPendingDateTo(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                          aria-label="Filter receipts to date"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                      <button
+                        onClick={applyDateFilters}
+                        className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-sm"
+                        type="button"
+                      >
+                        Apply
+                      </button>
+                      <button
+                        onClick={clearDateFilters}
+                        className="px-4 py-2 bg-gray-900 text-gray-100 text-xs font-bold rounded-xl hover:bg-gray-800 transition-all shadow-sm"
+                        type="button"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
+                  <Download size={14} />
+                  EXPORT DATA
+                </button>
+                <ProtectedAction routeName="payments">
+                  <button
+                    onClick={() => setActiveTab('toBePaid')}
+                    className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+                  >
+                    <FilePlus size={14} />
+                    New Payment
+                  </button>
+                </ProtectedAction>
+              </div>
+            </motion.div>
+
+            {/* --- SUMMARY TILES --- */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <SummaryCard
+                icon={<Wallet className="text-red-600" size={20} />}
+                label="Total Paid"
+                value={payments?.length || 0}
+                subText="Entries"
+              />
+              <SummaryCard
+                icon={<CheckCircle className="text-black" size={20} />}
+                label="Verified"
+                value="Active"
+                subText="Compliance"
+              />
+              <SummaryCard
+                icon={<ShieldCheck className="text-gray-400" size={20} />}
+                label="Integrity"
+                value="Valid"
+                subText="Audit Status"
+              />
+            </div>
+          </>
+        )}
+
+        {activeTab === 'toBePaid' && (
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-4"
+          >
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
+                  <Wallet size={24} />
+                </div>
+                <h1 className="text-4xl font-black text-black tracking-tighter">
+                  <span className="text-red-600 italic">To Be Paid</span>
+                </h1>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-2 mb-2 p-1 bg-white rounded-xl w-fit border border-gray-200 shadow-sm">
+        <button
+          onClick={() => setActiveTab('payments')}
+          className={`px-5 py-2 text-xs font-bold tracking-wider rounded-lg transition-all relative ${
+            activeTab === 'payments'
+              ? 'bg-red-600 text-white shadow'
+              : 'text-gray-600 hover:text-black hover:bg-gray-100'
+          }`}
         >
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
-                <Layers size={24} />
-              </div>
-              <h1 className="text-4xl font-black text-black tracking-tighter">
-                <span className="text-red-600 italic">Payments</span>
-              </h1>
-            </div>
-          </div>
+          PAID
+        </button>
 
-          <div className="flex flex-col md:flex-row md:items-center gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
-                <div className="flex flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-gray-500">From</span>
-                    <input
-                      type="date"
-                      value={pendingDateFrom}
-                      onChange={(e) => setPendingDateFrom(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                      aria-label="Filter receipts from date"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-gray-500">To</span>
-                    <input
-                      type="date"
-                      value={pendingDateTo}
-                      onChange={(e) => setPendingDateTo(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                      aria-label="Filter receipts to date"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
-                  <button
-                    onClick={applyDateFilters}
-                    className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-sm"
-                    type="button"
-                  >
-                    Apply
-                  </button>
-                  <button
-                    onClick={clearDateFilters}
-                    className="px-4 py-2 bg-gray-900 text-gray-100 text-xs font-bold rounded-xl hover:bg-gray-800 transition-all shadow-sm"
-                    type="button"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-            </div>
-            <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
-              <Download size={14} />
-              EXPORT DATA
-            </button>
-            <ProtectedAction routeName="payments">
-              <button
-                onClick={() => setIsAdding(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
-              >
-                <FilePlus size={14} />
-                New Payments
-              </button>
-            </ProtectedAction>
-          </div>
-        </motion.div>
-
-        {/* --- SUMMARY TILES --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard
-            icon={<Wallet className="text-red-600" size={20} />}
-            label="Total Paid"
-            value={payments?.length || 0}
-            subText="Entries"
-          />
-          <SummaryCard
-            icon={<CheckCircle className="text-black" size={20} />}
-            label="Verified"
-            value="Active"
-            subText="Compliance"
-          />
-          <SummaryCard
-            icon={<ShieldCheck className="text-gray-400" size={20} />}
-            label="Integrity"
-            value="Valid"
-            subText="Audit Status"
-          />
-        </div>
+        <button
+          onClick={() => setActiveTab('toBePaid')}
+          className={`px-5 py-2 text-xs font-bold tracking-wider rounded-lg transition-all relative ${
+            activeTab === 'toBePaid'
+              ? 'bg-red-600 text-white shadow'
+              : 'text-gray-600 hover:text-black hover:bg-gray-100'
+          }`}
+        >
+          TO BE PAID
+        </button>
       </div>
 
       {/* --- TABLE SECTION --- */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
-      >
-        <DynamicTable
-          data={payments}
-          title="Payments Ledger"
-          enableAddButton={false}
-          enableCheckbox={enableCheckboxes}
-          enableActionColumn={true}
-          checkboxColumn="id"
-          checkboxCondition={checkboxCondition}
-          actionButtons={[
-            {
-              label: 'View',
-              onClick: async (row) => {
-                try {
-                  console.log('Viewing payment:', row)
+      {activeTab === 'payments' && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
+        >
+          <DynamicTable
+            data={payments}
+            title="Payments Ledger"
+            enableAddButton={false}
+            enableCheckbox={enableCheckboxes}
+            enableActionColumn={true}
+            checkboxColumn="id"
+            checkboxCondition={checkboxCondition}
+            actionButtons={[
+              {
+                label: 'View',
+                onClick: async (row) => {
+                  try {
+                    console.log('Viewing payment:', row)
 
-                  const token = localStorage.getItem('token')
-                  if (!token) {
-                    throw new Error('No authentication token found')
+                    const token = localStorage.getItem('token')
+                    if (!token) {
+                      throw new Error('No authentication token found')
+                    }
+
+                    const response = await fetch(
+                      `${import.meta.env.VITE_SERVER_LINK}/payments/${row.id}`,
+                      {
+                        method: 'GET',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${token}`,
+                        },
+                      },
+                    )
+
+                    const result = await response.json()
+
+                    if (!response.ok) {
+                      throw new Error(
+                        result.message || 'Failed to fetch payment details',
+                      )
+                    }
+
+                    console.log('Payment details fetched:', result)
+                    setViewingPayment(result)
+                    setIsViewing(true)
+                  } catch (error) {
+                    console.error('Error fetching payment details:', error)
+                    setToast({
+                      type: 'error',
+                      message: error.message || 'Failed to fetch payment details',
+                    })
                   }
+                },
+              },
+              {
+                label: 'Edit',
+                onClick: async (row) => {
+                  try {
+                    console.log('Editing payment:', row)
 
-                  const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/payments/${row.id}`,
+                    const token = localStorage.getItem('token')
+                    if (!token) {
+                      throw new Error('No authentication token found')
+                    }
+
+                    const response = await fetch(
+                      `${import.meta.env.VITE_SERVER_LINK}/payments/${row.id}`,
+                      {
+                        method: 'GET',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${token}`,
+                        },
+                      },
+                    )
+
+                    const result = await response.json()
+
+                    if (!response.ok) {
+                      throw new Error(
+                        result.message || 'Failed to fetch payment details',
+                      )
+                    }
+
+                    console.log('Payment details fetched for editing:', result)
+                    setViewingPayment(result)
+                    setIsEditing(true)
+                  } catch (error) {
+                    console.error('Error fetching payment details for editing:', error)
+                    setToast({
+                      type: 'error',
+                      message: error.message || 'Failed to fetch payment details',
+                    })
+                  }
+                },
+              },
+            ]}
+            badgeColumns={[
+              {
+                column: 'status',
+                values: {
+                  PAID: 'green',
+                  UNPAID: 'red',
+                  'PARTIALLY PAID': 'yellow',
+                },
+              },
+              {
+                column: 'state',
+                values: {
+                  PREPARED: 'orange',
+                  CHECKED: 'blue',
+                  APPROVED: 'green',
+                  REJECTED: 'red',
+                  CANCELLED: 'orange',
+                },
+              },
+            ]}
+            checkboxActions={getFilteredCheckboxActions([])}
+            checkboxActionsFilter={getFilteredCheckboxActions}
+            enableInfiniteScroll={true}
+            hasMore={hasMore}
+            isLoadingMore={loadingMore}
+            onLoadMore={() =>
+              loadMore({ dateFrom: activeDateFrom, dateTo: activeDateTo })
+            }
+          />
+        </motion.div>
+      )}
+
+      {activeTab === 'toBePaid' && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-8 pb-4"
+        >
+          {loadingToBePaid ? (
+            <div className="col-span-1 md:col-span-12 h-full w-full flex flex-col items-center justify-center space-y-4">
+              <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+                Loading To Be Paid...
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* LEFT COLUMN: Vendor Table */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="col-span-1 md:col-span-4 flex flex-col min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
+              >
+                <DynamicTable
+                  data={toBePaidData}
+                  title="To Be Paid"
+                  enableAddButton={false}
+                  enableCheckbox={false}
+                  enableActionColumn={true}
+                  enableRowClick={true}
+                  returnColumn="vendorId"
+                  onRowClick={(vendorId, row) => setExpandedVendor(expandedVendor === vendorId ? null : vendorId)}
+                  checkboxColumn="vendorId"
+                  checkboxCondition={(row) => {
+                    // Only allow selecting from same vendor
+                    if (selectedPurchases.length === 0) return true
+                    return selectedPurchases[0].vendor_id === row.vendorId
+                  }}
+                  onCheckboxChange={(selectedIds) => {
+                    const selectedVendors = toBePaidData.filter(row => selectedIds.includes(row.vendorId))
+                    const allPurchases = selectedVendors.flatMap(v => v.purchases)
+                    setSelectedPurchases(allPurchases)
+                  }}
+                  checkboxActions={[
                     {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
+                      label: 'Pay Selected',
+                      onClick: async (selectedRows) => {
+                        const allPurchases = selectedRows.flatMap(v => v.purchases)
+                        const purchaseIds = allPurchases.map(p => p.id)
+                        const items = await fetchPurchaseItems(purchaseIds)
+                        setSelectedPurchases(allPurchases)
+                        setSelectedPurchaseItems(items)
+                        setIsAdding(true)
+                      },
+                      style: 'red',
+                    },
+                  ]}
+                  actionButtons={[
+                    {
+                      label: 'Pay',
+                      icon: <Layers size={14} />,
+                      onClick: async (row) => {
+                        const purchaseIds = row.purchases.map(p => p.id)
+                        const items = await fetchPurchaseItems(purchaseIds)
+                        setSelectedPurchases(row.purchases)
+                        setSelectedPurchaseItems(items)
+                        setIsAdding(true)
                       },
                     },
-                  )
-
-                  const result = await response.json()
-
-                  if (!response.ok) {
-                    throw new Error(
-                      result.message || 'Failed to fetch payment details',
-                    )
-                  }
-
-                  console.log('Payment details fetched:', result)
-                  setViewingPayment(result)
-                  setIsViewing(true)
-                } catch (error) {
-                  console.error('Error fetching payment details:', error)
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch payment details',
-                  })
-                }
-              },
-            },
-            {
-              label: 'Edit',
-              onClick: async (row) => {
-                try {
-                  console.log('Editing payment:', row)
-
-                  const token = localStorage.getItem('token')
-                  if (!token) {
-                    throw new Error('No authentication token found')
-                  }
-
-                  const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/payments/${row.id}`,
+                  ]}
+                  columns={[
+                    { key: 'vendorName', label: 'Vendor' },
                     {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
+                      key: 'totalUnpaid',
+                      label: 'Total Unpaid',
+                      render: (value) => `₱${isNaN(value) ? '0.00' : parseFloat(value).toFixed(2)}`
+                    },
+                    {
+                      key: 'purchases',
+                      label: 'Purchases Count',
+                      render: (value) => value.length
+                    },
+                  ]}
+                  hiddenColumns={new Set(['vendorId', 'purchases'])}
+                  highlightRow={{ column: 'vendorId', value: expandedVendor }}
+                />
+              </motion.div>
+
+              {/* RIGHT COLUMN: Purchases Table */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="col-span-1 md:col-span-8 flex flex-col min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
+              >
+                <DynamicTable
+                  data={expandedVendor ? toBePaidData.find(v => v.vendorId === expandedVendor)?.purchases || [] : []}
+                  title=""
+                  enableAddButton={false}
+                  enableCheckbox={true}
+                  enableActionColumn={false}
+                  checkboxColumn="id"
+                  checkboxCondition={(row) => {
+                    if (selectedPurchases.length === 0) return true
+                    return selectedPurchases[0].vendor_id === row.vendor_id
+                  }}
+                  onCheckboxChange={(selectedIds) => {
+                    const vendorData = toBePaidData.find(v => v.vendorId === expandedVendor)
+                    if (vendorData) {
+                      const selectedPurchasesData = vendorData.purchases.filter(p => selectedIds.includes(p.id))
+                      setSelectedPurchases(selectedPurchasesData)
+                    }
+                  }}
+                  checkboxActions={[
+                    {
+                      label: 'Pay Selected',
+                      onClick: async (selectedRows) => {
+                        const purchaseIds = selectedRows.map(p => p.id)
+                        const items = await fetchPurchaseItems(purchaseIds)
+                        setSelectedPurchases(selectedRows)
+                        setSelectedPurchaseItems(items)
+                        setIsAdding(true)
+                      },
+                      style: 'red',
+                    },
+                  ]}
+                  columns={[
+                    { key: 'id', label: 'ID' },
+                    { key: 'vendor', label: 'Vendor' },
+                    { key: 'doc_ref', label: 'Doc Ref' },
+                    { key: 'terms', label: 'Terms' },
+                    { key: 'date_delivered', label: 'Date Delivered' },
+                    { key: 'date_due', label: 'Date Due' },
+                    { key: 'remarks', label: 'Remarks' },
+                    { key: 'amount_due', label: 'Amount Due', render: (value) => `₱${isNaN(value) ? '0.00' : parseFloat(value).toFixed(2)}` },
+                    { key: 'status', label: 'Status' },
+                    { key: 'state', label: 'State' },
+                  ]}
+                  hiddenColumns={new Set(['vendor_id'])}
+                  badgeColumns={[
+                    {
+                      column: 'status',
+                      values: {
+                        PAID: 'green',
+                        UNPAID: 'red',
+                        'PARTIALLY PAID': 'yellow',
                       },
                     },
-                  )
-
-                  const result = await response.json()
-
-                  if (!response.ok) {
-                    throw new Error(
-                      result.message || 'Failed to fetch payment details',
-                    )
-                  }
-
-                  console.log('Payment details fetched for editing:', result)
-                  setViewingPayment(result)
-                  setIsEditing(true)
-                } catch (error) {
-                  console.error('Error fetching payment details for editing:', error)
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch payment details',
-                  })
-                }
-              },
-            },
-          ]}
-          badgeColumns={[
-            {
-              column: 'status',
-              values: {
-                PAID: 'green',
-                UNPAID: 'red',
-                'PARTIALLY PAID': 'yellow',
-              },
-            },
-            {
-              column: 'state',
-              values: {
-                PREPARED: 'orange',
-                CHECKED: 'blue',
-                APPROVED: 'green',
-                REJECTED: 'red',
-                CANCELLED: 'orange',
-              },
-            },
-          ]}
-          checkboxActions={getFilteredCheckboxActions([])}
-          checkboxActionsFilter={getFilteredCheckboxActions}
-          enableInfiniteScroll={true}
-          hasMore={hasMore}
-          isLoadingMore={loadingMore}
-          onLoadMore={() =>
-            loadMore({ dateFrom: activeDateFrom, dateTo: activeDateTo })
-          }
-        />
-      </motion.div>
+                    {
+                      column: 'state',
+                      values: {
+                        PREPARED: 'orange',
+                        CHECKED: 'blue',
+                        APPROVED: 'green',
+                        REJECTED: 'red',
+                        CANCELLED: 'orange',
+                      },
+                    },
+                  ]}
+                />
+              </motion.div>
+            </>
+          )}
+        </motion.div>
+      )}
     </div>
   )
 }
