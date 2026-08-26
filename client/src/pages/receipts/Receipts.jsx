@@ -537,19 +537,37 @@ function ReceiptsContent() {
             icon={<Receipt className="text-red-600" size={20} />}
             label="Total Receipts"
             value={receipts?.length || 0}
-            subText="Processed"
+            subText="Fetched"
+            borderColor="border-gray-200"
+            valueColor="text-black"
+            iconBgColor="bg-red-100"
           />
           <SummaryCard
             icon={<CreditCard className="text-black" size={20} />}
-            label="Transactions"
-            value="Today"
-            subText="Live Feed"
+            label="Pending Approval"
+            value={
+              receipts?.filter(
+                (r) => r.state !== 'APPROVED' && r.state !== 'CANCELLED'
+              ).length || 0
+            }
+            subText="Transactions"
+            borderColor="border-gray-200"
+            valueColor="text-black"
+            iconBgColor="bg-orange-100"
           />
           <SummaryCard
             icon={<ShieldCheck className="text-gray-400" size={20} />}
-            label="Status"
-            value="Verified"
-            subText="Audit Compliant"
+            label="Total Amount Due"
+            value={
+              receipts?.reduce((sum, r) => sum + (parseFloat(r.amount_due) || 0), 0).toLocaleString('en-PH', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }) || '0.00'
+            }
+            subText="PHP"
+            borderColor="border-gray-200"
+            valueColor="text-green-600"
+            iconBgColor="bg-green-100"
           />
         </div>
       </div>
@@ -665,17 +683,17 @@ function ReceiptsContent() {
   )
 }
 
-function SummaryCard({ icon, label, value, subText }) {
+function SummaryCard({ icon, label, value, subText, borderColor, valueColor, iconBgColor }) {
   return (
-    <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
-      <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
+    <div className={`bg-white p-4 rounded-xl border-2 ${borderColor} flex items-center gap-4 shadow-sm`}>
+      <div className={`p-3 ${iconBgColor} rounded-xl`}>{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-700 leading-none mb-1">
           {label}
         </p>
         <div className="flex items-baseline gap-2">
-          <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">
+          <h4 className={`text-xl font-black ${valueColor}`}>{value}</h4>
+          <span className="text-[9px] font-bold text-gray-500 uppercase">
             {subText}
           </span>
         </div>

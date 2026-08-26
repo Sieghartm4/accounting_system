@@ -697,44 +697,162 @@ function PaymentsContent() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <SummaryCard
                 icon={<Wallet className="text-red-600" size={20} />}
-                label="Total Paid"
+                label="Total Payments"
                 value={payments?.length || 0}
-                subText="Entries"
+                subText="Fetched"
+                borderColor="border-gray-200"
+                valueColor="text-black"
+                iconBgColor="bg-red-100"
               />
               <SummaryCard
                 icon={<CheckCircle className="text-black" size={20} />}
-                label="Verified"
-                value="Active"
-                subText="Compliance"
+                label="Pending Approval"
+                value={
+                  payments?.filter(
+                    (p) => p.state !== 'APPROVED' && p.state !== 'CANCELLED'
+                  ).length || 0
+                }
+                subText="Transactions"
+                borderColor="border-gray-200"
+                valueColor="text-black"
+                iconBgColor="bg-orange-100"
               />
               <SummaryCard
                 icon={<ShieldCheck className="text-gray-400" size={20} />}
-                label="Integrity"
-                value="Valid"
-                subText="Audit Status"
+                label="Total Approved"
+                value={
+                  payments?.filter(
+                    (p) => p.state === 'APPROVED'
+                  ).length || 0
+                }
+                subText="Transactions"
+                borderColor="border-gray-200"
+                valueColor="text-black"
+                iconBgColor="bg-blue-100"
               />
             </div>
           </>
         )}
 
         {activeTab === 'toBePaid' && (
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={fadeInUp}
-            className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-4"
-          >
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
-                  <Wallet size={24} />
+          <>
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-4"
+            >
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
+                    <Wallet size={24} />
+                  </div>
+                  <h1 className="text-4xl font-black text-black tracking-tighter">
+                    <span className="text-red-600 italic">To Be Paid</span>
+                  </h1>
                 </div>
-                <h1 className="text-4xl font-black text-black tracking-tighter">
-                  <span className="text-red-600 italic">To Be Paid</span>
-                </h1>
               </div>
+
+              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
+                    <div className="flex flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-gray-500">From</span>
+                        <input
+                          type="date"
+                          value={pendingDateFrom}
+                          onChange={(e) => setPendingDateFrom(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                          aria-label="Filter payments from date"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-gray-500">To</span>
+                        <input
+                          type="date"
+                          value={pendingDateTo}
+                          onChange={(e) => setPendingDateTo(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                          aria-label="Filter payments to date"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                      <button
+                        onClick={applyDateFilters}
+                        className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-sm"
+                        type="button"
+                      >
+                        Apply
+                      </button>
+                      <button
+                        onClick={clearDateFilters}
+                        className="px-4 py-2 bg-gray-900 text-gray-100 text-xs font-bold rounded-xl hover:bg-gray-800 transition-all shadow-sm"
+                        type="button"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
+                  <Download size={14} />
+                  EXPORT DATA
+                </button>
+                <ProtectedAction routeName="payments">
+                  <button
+                    onClick={() => setActiveTab('toBePaid')}
+                    className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+                  >
+                    <FilePlus size={14} />
+                    New Payment
+                  </button>
+                </ProtectedAction>
+              </div>
+            </motion.div>
+
+            {/* --- SUMMARY TILES --- */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <SummaryCard
+                icon={<CheckCircle className="text-black" size={20} />}
+                label="Approved Purchases"
+                value={
+                  toBePaidData?.reduce((count, v) => {
+                    return count + (v.purchases?.filter(p => p.state === 'APPROVED').length || 0)
+                  }, 0) || 0
+                }
+                subText="Transactions"
+                borderColor="border-gray-200"
+                valueColor="text-black"
+                iconBgColor="bg-blue-100"
+              />
+              <SummaryCard
+                icon={<Building className="text-gray-400" size={20} />}
+                label="Total Vendors"
+                value={toBePaidData?.length || 0}
+                subText="Suppliers"
+                borderColor="border-gray-200"
+                valueColor="text-black"
+                iconBgColor="bg-orange-100"
+              />
+              <SummaryCard
+                icon={<Wallet className="text-red-600" size={20} />}
+                label="Total Unpaid Amount"
+                value={
+                  toBePaidData?.reduce((sum, v) => sum + (parseFloat(v.totalUnpaid) || 0), 0).toLocaleString('en-PH', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }) || '0.00'
+                }
+                subText="PHP"
+                borderColor="border-gray-200"
+                valueColor="text-green-600"
+                iconBgColor="bg-red-100"
+              />
             </div>
-          </motion.div>
+          </>
         )}
       </div>
 
@@ -1074,17 +1192,17 @@ function PaymentsContent() {
 }
 
 // Reusable SummaryCard (Same as used in other pages)
-function SummaryCard({ icon, label, value, subText }) {
+function SummaryCard({ icon, label, value, subText, borderColor, valueColor, iconBgColor }) {
   return (
-    <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
-      <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
+    <div className={`bg-white p-4 rounded-xl border-2 ${borderColor} flex items-center gap-4 shadow-sm`}>
+      <div className={`p-3 ${iconBgColor} rounded-xl`}>{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-700 leading-none mb-1">
           {label}
         </p>
         <div className="flex items-baseline gap-2">
-          <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">
+          <h4 className={`text-xl font-black ${valueColor}`}>{value}</h4>
+          <span className="text-[9px] font-bold text-gray-500 uppercase">
             {subText}
           </span>
         </div>

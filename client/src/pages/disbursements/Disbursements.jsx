@@ -578,19 +578,37 @@ function DisbursementsContent() {
             icon={<Wallet className="text-red-600" size={20} />}
             label="Total Vouchers"
             value={disbursements?.length || 0}
-            subText="Processed"
+            subText="Fetched"
+            borderColor="border-gray-200"
+            valueColor="text-black"
+            iconBgColor="bg-red-100"
           />
           <SummaryCard
             icon={<History className="text-black" size={20} />}
-            label="Recent Cycles"
-            value="Current"
-            subText="Live Period"
+            label="Pending Approval"
+            value={
+              disbursements?.filter(
+                (d) => d.state !== 'APPROVED' && d.state !== 'CANCELLED'
+              ).length || 0
+            }
+            subText="Transactions"
+            borderColor="border-gray-200"
+            valueColor="text-black"
+            iconBgColor="bg-orange-100"
           />
           <SummaryCard
             icon={<ShieldCheck className="text-gray-400" size={20} />}
-            label="Compliance"
-            value="SECURE"
-            subText="Verified Ready"
+            label="Total Amount Due"
+            value={
+              disbursements?.reduce((sum, d) => sum + (parseFloat(d.amount_due) || 0), 0).toLocaleString('en-PH', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }) || '0.00'
+            }
+            subText="PHP"
+            borderColor="border-gray-200"
+            valueColor="text-green-600"
+            iconBgColor="bg-green-100"
           />
         </div>
       </div>
@@ -735,17 +753,17 @@ function DisbursementsContent() {
   )
 }
 
-function SummaryCard({ icon, label, value, subText }) {
+function SummaryCard({ icon, label, value, subText, borderColor, valueColor, iconBgColor }) {
   return (
-    <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
-      <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
+    <div className={`bg-white p-4 rounded-xl border-2 ${borderColor} flex items-center gap-4 shadow-sm`}>
+      <div className={`p-3 ${iconBgColor} rounded-xl`}>{icon}</div>
       <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
+        <p className="text-[9px] font-black uppercase tracking-widest text-gray-700 leading-none mb-1">
           {label}
         </p>
         <div className="flex items-baseline gap-2">
-          <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">
+          <h4 className={`text-xl font-black ${valueColor}`}>{value}</h4>
+          <span className="text-[9px] font-bold text-gray-500 uppercase">
             {subText}
           </span>
         </div>

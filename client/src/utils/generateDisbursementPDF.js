@@ -43,10 +43,16 @@ export async function generateDisbursementPDF(
     })
   })
 
-  for (let idx = 0; idx < disbursements.length; idx++) {
-    const disbursement = disbursements[idx]
+  // Create a single PDF document with multiple pages
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' })
 
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' })
+  for (let idx = 0; idx < disbursements.length; idx++) {
+    // Add new page for each disbursement except the first one
+    if (idx > 0) {
+      doc.addPage()
+    }
+
+    const disbursement = disbursements[idx]
     const pageW = doc.internal.pageSize.getWidth()
     const pageH = doc.internal.pageSize.getHeight()
     const margin = 42
@@ -628,19 +634,19 @@ export async function generateDisbursementPDF(
       footerTextY,
       { align: 'right' },
     )
+  }
 
-    // ── PREVIEW (open in new tab instead of auto-download)
-    const pdfBlob = doc.output('blob')
-    const pdfUrl = URL.createObjectURL(pdfBlob)
-    const newWindow = window.open()
-    if (newWindow) {
-      newWindow.document.write(
-        `<iframe src="${pdfUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
-      )
-      newWindow.document.close()
-    } else {
-      // Fallback to download if popup is blocked
-      doc.save('cash_disbursement_' + (disbursement.id ?? idx) + '_' + copyType + '.pdf')
-    }
+  // After all disbursements are processed, open the single multi-page PDF
+  const pdfBlob = doc.output('blob')
+  const pdfUrl = URL.createObjectURL(pdfBlob)
+  const newWindow = window.open()
+  if (newWindow) {
+    newWindow.document.write(
+      `<iframe src="${pdfUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
+    )
+    newWindow.document.close()
+  } else {
+    // Fallback to download if popup is blocked
+    doc.save('disbursements_' + copyType + '.pdf')
   }
 }
