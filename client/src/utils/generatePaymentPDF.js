@@ -131,6 +131,8 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
     const paymentAddress =
       payment.vendor_address || payment.address || payment.vendor?.address || ''
 
+    const maxAddressWidth = 240
+
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(6.5)
     doc.setTextColor(...RED)
@@ -145,10 +147,11 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
     doc.setFontSize(8)
     doc.setTextColor(...MGRAY)
     doc.text(formatTin(paymentTin), margin, y + 25)
-    let custExtra = 0
+
+    let addressLines = []
     if (paymentAddress) {
-      doc.text(paymentAddress, margin, y + 37)
-      custExtra = 12
+      addressLines = doc.splitTextToSize(paymentAddress, maxAddressWidth)
+      doc.text(addressLines, margin, y + 37)
     }
 
     let paymentDate = '—'
@@ -188,7 +191,9 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
       doc.text(String(val), rightMetaX, rowY, { align: 'right' })
     })
 
-    y += Math.max(5 * 12 + 13, 25 + custExtra) + 12
+    const leftBlockHeight = 25 + (addressLines.length * 10)
+    const rightBlockHeight = 13 + metaRows.length * 12
+    y += Math.max(leftBlockHeight, rightBlockHeight) + 12
     doc.setDrawColor(...HAIRLINE)
     doc.setLineWidth(0.5)
     doc.line(margin, y, pageW - margin, y)

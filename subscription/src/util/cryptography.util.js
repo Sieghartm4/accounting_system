@@ -13,9 +13,9 @@ const crypto = require('crypto')
 /**
  * Encryption Algorithm
  */
-const algorithm = process.env._ENCRYPTION_ALGORITHM
-const initVector = Buffer.alloc(16, process.env._ENCRYPTION_IV)
-const Securitykey = Buffer.alloc(32, process.env._ENCRYPTION_KEY)
+const algorithm = process.env._ENCRYPTION_ALGORITHM || 'aes-256-cbc'
+const initVector = process.env._ENCRYPTION_IV ? Buffer.alloc(16, process.env._ENCRYPTION_IV) : Buffer.alloc(16, '5LSOLUTIONS')
+const Securitykey = process.env._ENCRYPTION_KEY ? Buffer.alloc(32, process.env._ENCRYPTION_KEY) : Buffer.alloc(32, 'DEV42FIRSTDEV')
 
 exports.CreateHashPassword = (password, callback) => {
   try {

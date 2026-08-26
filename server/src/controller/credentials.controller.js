@@ -6,7 +6,7 @@ const { formatMemoryUsage, formatTime, DataModeling } = require('../util/helper.
 
 const { Master } = require('../database/model/Master')
 
-const {CheckPassword, Encrypter} = require('../util/cryptography.util')
+const {CheckPassword, Encrypter, Decrypter} = require('../util/cryptography.util')
 
 const jwt = require('jsonwebtoken')
 
@@ -17,6 +17,8 @@ const sql = new SQLQueryBuilder()
 const CONFIG = require('../database/config/config')
 
 const { MongoClient } = require('mongodb')
+
+const mysql = require('mysql2/promise')
 
 require('dotenv').config()
 
@@ -101,35 +103,75 @@ const login = async (req, res, next) => {
 
     console.log('🔍 Login Controller - Starting authentication process...')
 
-    
+    // Step 1: Check if user is an admin in subscription admin database
+    const adminPool = mysql.createPool({
+      host: CONFIG[process.env.NODE_ENV].host,
+      user: CONFIG[process.env.NODE_ENV].username,
+      password: CONFIG[process.env.NODE_ENV].password,
+      database: CONFIG[process.env.NODE_ENV].database,
+      multipleStatements: CONFIG[process.env.NODE_ENV].dialectOptions.multipleStatements,
+    })
 
-    // Step 1: Get tenant pool from config (MongoDB lookup + pool creation)
+    const adminQuery = `SELECT mu_id AS id, mu_username AS username, mu_password AS password, mu_role AS role, mu_status AS status
+                        FROM master_user
+                        WHERE mu_username = ? AND mu_role = 'ADMIN' AND mu_status = 'active'`
 
+    const adminUsers = await Query(adminQuery, [username], ['mu_'], adminPool)
+    await adminPool.end()
+
+    if (adminUsers.length > 0) {
+      console.log('🔍 Admin user found in subscription database')
+      const adminUser = adminUsers[0]
+
+      // Verify admin password
+      Decrypter(adminUser.password, async (error, decryptedPassword) => {
+        if (error) {
+          console.error('Password decryption error:', error)
+          return res.status(500).json({
+            success: false,
+            message: 'Server error during password verification',
+          })
+        }
+
+        if (password !== decryptedPassword) {
+          console.log('Invalid admin password')
+          return res.status(401).json({
+            success: false,
+            message: 'Invalid password',
+          })
+        }
+
+        // Admin authenticated successfully - redirect to subscription admin panel
+        const subscriptionAdminUrl = process.env._SUBSCRIPTION_SERVER_URL || 'http://localhost:3012'
+        return res.json({
+          success: true,
+          message: 'Admin login successful',
+          redirect: `${subscriptionAdminUrl}/admin`,
+          user: {
+            id: adminUser.id,
+            username: adminUser.username,
+            role: adminUser.role,
+          },
+        })
+      })
+      return
+    }
+
+    console.log('🔍 Not an admin user, proceeding with tenant database authentication')
+
+    // Step 2: Get tenant pool from config (MongoDB lookup + pool creation)
     const { pool: tenantPool, tenantDb } = await CONFIG.getTenantPool(username)
-
-    
 
     console.log('🔍 Tenant database from MongoDB:', tenantDb)
 
-    
-
-    // Step 2: Query user from tenant database (manual query to fix WHERE clause issue)
-
-    const query = `SELECT mu_id AS id, mu_username AS username, mu_password AS password, mu_fullname AS fullname, mu_access_id AS access_id, mu_email AS email, ma_access_name AS access 
-
-                   FROM master_user 
-
-                   INNER JOIN master_access ON mu_access_id = ma_access_id 
-
+    // Step 3: Query user from tenant database (manual query to fix WHERE clause issue)
+    const query = `SELECT mu_id AS id, mu_username AS username, mu_password AS password, mu_fullname AS fullname, mu_access_id AS access_id, mu_email AS email, ma_access_name AS access
+                   FROM master_user
+                   INNER JOIN master_access ON mu_access_id = ma_access_id
                    WHERE mu_username = ? AND mu_status = ?`;
 
-    
-
     console.log('🔍 SQL Query:', query)
-
     console.log('🔍 Query params:', [username, 'active'])
-
-    
 
     const users = await Query(query, [username, 'active'], [Master.master_user.prefix_, Master.master_access.prefix_], tenantPool)
 

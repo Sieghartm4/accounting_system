@@ -10,7 +10,7 @@ module.exports = {
         autoIncrement: true,
       },
       ci_collection_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(300),
         allowNull: false,
         references: {
           model: 'collections',
@@ -18,7 +18,7 @@ module.exports = {
         },
       },
       ci_sales_id: {
-        type: Sequelize.STRING(300),
+        type: Sequelize.INTEGER,
         allowNull: false,
         references: {
           model: 'sales_items',

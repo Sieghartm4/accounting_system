@@ -1,4 +1,4 @@
-require('dotenv').config()
+require('dotenv').config({ path: '../.env' })
 const cors = require('cors')
 const express = require('express')
 const { initStaticFiles } = require('./src/startup/staticFiles.startup')
@@ -10,6 +10,7 @@ const { httpLogger } = require('./src/middlewares/logger.middleware')
 const { checkConnection } = require('./src/database/util/queries.util')
 const { corsOptions } = require('./src/middlewares/corsOptions.middleware')
 const { logger } = require('./src/util/logger.util')
+const { scheduleSubscriptionExpiry } = require('./src/util/subscriptionExpiry.util')
 
 const app = express()
 
@@ -52,6 +53,9 @@ const serverStart = async () => {
 
     logger.info('Initializing WebSockets')
     initWebSocket(server)
+
+    logger.info('Scheduling subscription expiry check')
+    scheduleSubscriptionExpiry()
 
     process.on('SIGINT', () => {
       logger.info('SIGINT signal received, Closing the application')

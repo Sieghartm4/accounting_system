@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Login from './pages/login/Login'
 import Register from './pages/register/Register'
+import ClientOnly from './components/ClientOnly'
 import UserDocumentation from './pages/user_documentation/UserDocumentation'
 import DeveloperDocumentation from './pages/developer_documentation/App'
 import Layout from './components/layout/Layout'
@@ -44,7 +45,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/register" element={<ClientOnly><Register /></ClientOnly>} />
         <Route path="/user_documentation" element={<UserDocumentation />} />
         <Route
           path="/developer_documentation"

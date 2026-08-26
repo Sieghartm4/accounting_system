@@ -928,7 +928,7 @@ function CollectionsContent() {
             >
               <DynamicTable
                 data={toBeCollectedData}
-                title="To Be Collected"
+                title=""
                 enableAddButton={false}
                 enableCheckbox={false}
                 enableActionColumn={true}
@@ -978,12 +978,12 @@ function CollectionsContent() {
                   {
                     key: 'totalUnpaid',
                     label: 'Total Unpaid',
-                    render: (value) => `₱${isNaN(value) ? '0.00' : parseFloat(value).toFixed(2)}`
-                  },
-                  {
-                    key: 'sales',
-                    label: 'Sales Count',
-                    render: (value) => value.length
+                    render: (value) => (
+                      <span>
+                        <span className="text-green-600">₱</span>
+                        <span className="ml-1">{isNaN(value) ? '0.00' : parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </span>
+                    )
                   },
                 ]}
                 hiddenColumns={new Set(['customerId', 'sales'])}
@@ -1036,7 +1036,12 @@ function CollectionsContent() {
                   {
                     key: 'amount_due',
                     label: 'Amount Due',
-                    render: (value) => `₱${isNaN(value) ? '0.00' : parseFloat(value).toFixed(2)}`,
+                    render: (value) => (
+                      <span>
+                        <span className="text-green-600">₱</span>
+                        <span className="ml-1">{isNaN(value) ? '0.00' : parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </span>
+                    )
                   },
                   { key: 'status', label: 'Status' },
                   { key: 'state', label: 'State' },

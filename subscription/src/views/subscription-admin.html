@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/logo.png">
+    <title>Subscription Management Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#fdf2f2',
+                            100: '#fde8e8',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                            900: '#7f1d1d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-zinc-50 dark:bg-black text-zinc-900 dark:text-white h-full flex flex-col selection:bg-red-600 selection:text-white transition-colors duration-200">
+
+    <header class="bg-white/80 dark:bg-zinc-950/80 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-30 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 backdrop-blur-md">
+        <div class="flex items-center space-x-3">
+            <div class="h-10 w-10 rounded-xl bg-red-600 flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-red-600/30">S</div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">Subscription Management</h1>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400">Admin Control Center</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <!-- Theme Toggle Button -->
+            <button onclick="toggleTheme()" id="theme-toggle" class="flex items-center space-x-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3.5 py-2 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all shadow-sm">
+                <span id="theme-icon" class="text-base">🌙</span>
+                <span id="theme-text" class="hidden sm:inline">Dark Mode</span>
+            </button>
+
+            <div class="flex items-center space-x-4 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-2 rounded-xl shadow-sm">
+                <div class="flex items-center space-x-2">
+                    <span class="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="username" class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Administrator</span>
+                </div>
+                <div class="h-4 w-px bg-zinc-200 dark:bg-zinc-800"></div>
+                <button onclick="logout()" class="text-xs font-semibold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors uppercase tracking-wider">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            <div class="flex space-x-2 bg-zinc-200/60 dark:bg-zinc-900 p-1.5 rounded-xl border border-zinc-300 dark:border-zinc-800 shadow-sm">
+                <button class="tab-btn active px-6 py-2.5 rounded-lg text-sm font-medium transition-all bg-red-600 text-white shadow-md shadow-red-600/20" data-tab="plans" onclick="switchTab('plans')">Plans</button>
+                <button class="tab-btn px-6 py-2.5 rounded-lg text-sm font-medium transition-all text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-300/50 dark:hover:bg-zinc-800" data-tab="users" onclick="switchTab('users')">Master Users</button>
+            </div>
+            
+            <div id="plans-actions">
+                <button class="btn btn-primary bg-red-600 hover:bg-red-700 text-white font-medium px-5 py-2.5 rounded-xl shadow-lg shadow-red-600/20 transition-all flex items-center space-x-2 text-sm" onclick="openPlanModal()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    <span>New Plan</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="plans-tab" class="tab-content flex-1 flex flex-col">
+            <div class="bg-white/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
+                <div class="overflow-x-auto">
+                    <table id="plans-table" class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950/80 text-zinc-600 dark:text-zinc-400 text-xs uppercase tracking-wider font-semibold">
+                                <th class="py-4 px-6">Code</th>
+                                <th class="py-4 px-6">Name</th>
+                                <th class="py-4 px-6">Price</th>
+                                <th class="py-4 px-6">Billing Cycle</th>
+                                <th class="py-4 px-6">Description</th>
+                                <th class="py-4 px-6">Items</th>
+                                <th class="py-4 px-6">Visibility</th>
+                                <th class="py-4 px-6 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800/50 text-sm">
+                            <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                                <td class="py-4 px-6 font-mono text-xs text-red-600 dark:text-red-400 font-bold">PRO_MONTHLY</td>
+                                <td class="py-4 px-6 font-medium text-zinc-900 dark:text-white">Professional Monthly</td>
+                                <td class="py-4 px-6 text-zinc-900 dark:text-white font-semibold">$29.00</td>
+                                <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 text-xs">Monthly</td>
+                                <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 max-w-xs truncate">Full access to advanced analytics and priority support.</td>
+                                <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 text-xs">3 items</td>
+                                <td class="py-4 px-6"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Active</span></td>
+                                <td class="py-4 px-6 text-right space-x-2">
+                                    <button onclick="editPlan('1')" class="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors text-xs font-medium bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700">Edit</button>
+                                    <button onclick="confirmDelete('1')" class="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors text-xs font-medium bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20">Delete</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="users-tab" class="tab-content hidden flex-1 flex flex-col">
+            <div class="bg-white/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
+                <div class="overflow-x-auto">
+                    <table id="users-table" class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950/80 text-zinc-600 dark:text-zinc-400 text-xs uppercase tracking-wider font-semibold">
+                                <th class="py-4 px-6">Username</th>
+                                <th class="py-4 px-6">Email</th>
+                                <th class="py-4 px-6">Database</th>
+                                <th class="py-4 px-6">Role</th>
+                                <th class="py-4 px-6">Subscription</th>
+                                <th class="py-4 px-6">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800/50 text-sm">
+                            <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                                <td class="py-4 px-6 font-medium text-zinc-900 dark:text-white flex items-center space-x-2">
+                                    <div class="h-7 w-7 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-xs text-red-600 dark:text-red-400 font-bold">JD</div>
+                                    <span>johndoe</span>
+                                </td>
+                                <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400">john@example.com</td>
+                                <td class="py-4 px-6 font-mono text-xs text-zinc-700 dark:text-zinc-300">db_cluster_alpha</td>
+                                <td class="py-4 px-6"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">Master Admin</span></td>
+                                <td class="py-4 px-6"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Online</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="plan-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+        <div class="modal-content bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div class="modal-header px-6 py-5 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-950">
+                <h2 id="modal-title" class="text-lg font-bold text-zinc-900 dark:text-white">New Subscription Plan</h2>
+                <button class="close-btn text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white text-xl w-8 h-8 rounded-full flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors" onclick="closePlanModal()">&times;</button>
+            </div>
+            <form id="plan-form" onsubmit="savePlan(event)" class="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+                <input type="hidden" id="plan-id">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="space-y-1.5">
+                        <label for="plan-code" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Code</label>
+                        <input type="text" id="plan-code" required class="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors" placeholder="e.g. BASIC_MONTHLY">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label for="plan-name" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Name</label>
+                        <input type="text" id="plan-name" required class="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors" placeholder="e.g. Basic Plan">
+                    </div>
+                </div>
+                <div class="space-y-1.5">
+                    <label for="plan-description" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Description</label>
+                    <textarea id="plan-description" rows="3" class="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors" placeholder="Detailed description of features..."></textarea>
+                </div>
+                <div class="space-y-1.5">
+                    <label for="plan-status" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Visibility Status</label>
+                    <select id="plan-status" class="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors">
+                        <option value="PUBLIC">Public - Visible to all users</option>
+                        <option value="PRIVATE">Private - Admin only</option>
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Plan Items</label>
+                        <button type="button" class="text-xs font-semibold text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-400" onclick="addPlanItem()">+ Add Item</button>
+                    </div>
+                    <div id="plan-items-container" class="space-y-2">
+                        <div class="plan-item flex flex-col sm:flex-row gap-2 items-start">
+                            <div class="w-full sm:w-28">
+                                <select class="item-type w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors">
+                                    <option value="BILLING_CYCLE">Billing Cycle</option>
+                                    <option value="PRICE">Price</option>
+                                    <option value="MODULES">Modules</option>
+                                    <option value="FEATURES">Features</option>
+                                    <option value="USERS">Users</option>
+                                </select>
+                            </div>
+                            <div class="flex-1 w-full">
+                                <input type="text" placeholder="Details" class="item-details w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors">
+                            </div>
+                            <div class="sm:w-20">
+                                <button type="button" class="btn btn-danger btn-sm w-full bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500/20 text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 px-3 py-2 rounded-xl text-xs transition-colors" onclick="removePlanItem(this)">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end space-x-3">
+                    <button type="button" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors" onclick="closePlanModal()">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20 transition-all">Save Plan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+        <div class="modal-content bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl p-6 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div class="w-12 h-12 rounded-full bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center mx-auto mb-4 text-xl">⚠️</div>
+            <h2 class="text-lg font-bold text-zinc-900 dark:text-white mb-2">Confirm Action</h2>
+            <p id="confirm-message" class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">Are you sure you want to perform this action?</p>
+            <div class="flex space-x-3">
+                <button class="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors" onclick="closeConfirmModal()">Cancel</button>
+                <button class="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20 transition-all" onclick="confirmAction()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="subscription-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
+        <div class="modal-content bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div class="p-6">
+                <h2 class="text-lg font-bold text-zinc-900 dark:text-white mb-4">Change User Subscription</h2>
+                <div class="space-y-4">
+                    <div class="space-y-1.5">
+                        <label for="subscription-plan-select" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Select Subscription Plan</label>
+                        <select id="subscription-plan-select" class="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors">
+                            <option value="">No Subscription</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pt-4 mt-6 border-t border-zinc-200 dark:border-zinc-800 flex justify-end space-x-3">
+                    <button type="button" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors" onclick="closeSubscriptionModal()">Cancel</button>
+                    <button type="button" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20 transition-all" onclick="saveUserSubscription()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-6 right-6 z-50 translate-y-20 opacity-0 transition-all duration-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 text-sm">
+        <span id="toast-icon">✨</span>
+        <span id="toast-message">Action successful!</span>
+    </div>
+
+    <script>
+        window.CLIENT_URL = window.CLIENT_URL || '';
+        const API_BASE = window.location.origin;
+        let currentUser = null;
+        let pendingAction = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check for token and user in URL parameters (from login redirect)
+            const urlParams = new URLSearchParams(window.location.search);
+            const tokenParam = urlParams.get('token');
+            const userParam = urlParams.get('user');
+            
+            if (tokenParam && userParam) {
+                localStorage.setItem('token', tokenParam);
+                localStorage.setItem('user', decodeURIComponent(userParam));
+                // Clean URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            
+            checkAuth();
+            initializeTheme();
+        });
+
+        // Check authentication
+        function checkAuth() {
+            const token = localStorage.getItem('token');
+            const user = JSON.parse(localStorage.getItem('user'));
+            
+            if (!token || !user) {
+                // Redirect to main client login page
+                const clientUrl = window.CLIENT_URL || window.location.origin.replace(/:\d+/, ':5050');
+                window.location.href = `${clientUrl}/login`;
+                return;
+            }
+            
+            currentUser = user;
+            document.getElementById('username').textContent = user.username || user.fullname || 'Administrator';
+            
+            // Fetch data
+            fetchSubscriptionPlans();
+            fetchMasterUsers();
+        }
+
+        // Fetch subscription plans
+        async function fetchSubscriptionPlans() {
+            try {
+                const response = await fetch(`${API_BASE}/subscription-plans`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderPlansTable(data.data);
+                } else {
+                    showToast('Failed to fetch subscription plans', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching plans:', error);
+                showToast('Error fetching subscription plans', 'error');
+            }
+        }
+
+        // Render plans table
+        function renderPlansTable(plans) {
+            const tbody = document.querySelector('#plans-table tbody');
+            tbody.innerHTML = '';
+
+            if (plans.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-zinc-500 dark:text-zinc-400">No subscription plans found</td></tr>';
+                return;
+            }
+
+            plans.forEach(plan => {
+                // Calculate price from PRICE items
+                const priceItem = plan.items ? plan.items.find(item => item.spi_type === 'PRICE') : null;
+                const price = priceItem ? parseFloat(priceItem.spi_details) : 0;
+
+                // Get billing cycle from BILLING_CYCLE items
+                const billingCycleItem = plan.items ? plan.items.find(item => item.spi_type === 'BILLING_CYCLE') : null;
+                const billingCycle = billingCycleItem ? billingCycleItem.spi_details : '-';
+
+                const itemsCount = plan.items ? plan.items.length : 0;
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors';
+                tr.innerHTML = `
+                    <td class="py-4 px-6 font-mono text-xs text-red-600 dark:text-red-400 font-bold">${plan.sp_code || ''}</td>
+                    <td class="py-4 px-6 font-medium text-zinc-900 dark:text-white">${plan.sp_name || ''}</td>
+                    <td class="py-4 px-6 text-zinc-900 dark:text-white font-semibold">₱${price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
+                    <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 text-xs">${billingCycle}</td>
+                    <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 max-w-xs truncate">${plan.sp_description || '-'}</td>
+                    <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 text-xs">${itemsCount} item${itemsCount !== 1 ? 's' : ''}</td>
+                    <td class="py-4 px-6">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${plan.sp_status === 'PUBLIC' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20' : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'}">
+                            ${plan.sp_status || 'PUBLIC'}
+                        </span>
+                    </td>
+                    <td class="py-4 px-6 text-right space-x-2">
+                        <button onclick="editPlan(${plan.sp_id})" class="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors text-xs font-medium bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700">Edit</button>
+                        <button onclick="confirmDelete(${plan.sp_id})" class="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors text-xs font-medium bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Fetch master users
+        async function fetchMasterUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/users`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderUsersTable(data.data);
+                } else {
+                    showToast('Failed to fetch master users', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching users:', error);
+                showToast('Error fetching master users', 'error');
+            }
+        }
+
+        // Render users table
+        function renderUsersTable(users) {
+            const tbody = document.querySelector('#users-table tbody');
+            tbody.innerHTML = '';
+
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-zinc-500 dark:text-zinc-400">No master users found</td></tr>';
+                return;
+            }
+
+            users.forEach(user => {
+                const initials = (user.username || 'U').substring(0, 2).toUpperCase();
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors';
+                tr.innerHTML = `
+                    <td class="py-4 px-6 font-medium text-zinc-900 dark:text-white flex items-center space-x-2">
+                        <div class="h-7 w-7 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-xs text-red-600 dark:text-red-400 font-bold">${initials}</div>
+                        <span>${user.username || ''}</span>
+                    </td>
+                    <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400">${user.email || '-'}</td>
+                    <td class="py-4 px-6 font-mono text-xs text-zinc-700 dark:text-zinc-300">${user.db_name || '-'}</td>
+                    <td class="py-4 px-6">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${user.role === 'ADMIN' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'}">
+                            ${user.role || 'USER'}
+                        </span>
+                    </td>
+                    <td class="py-4 px-6">
+                        <button onclick="openSubscriptionDropdown(${user.id}, '${user.subscription_plan_name || 'No Subscription'}', ${user.subscription_id || 'null'})" class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium text-sm cursor-pointer hover:underline">
+                            ${user.subscription_plan_name || 'No Subscription'}
+                        </button>
+                    </td>
+                    <td class="py-4 px-6">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${user.status === 'active' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'}">
+                            ${user.status || 'inactive'}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Open subscription change dropdown
+        let currentUserId = null;
+        let currentSubscriptionId = null;
+
+        async function openSubscriptionDropdown(userId, currentPlanName, subscriptionId) {
+            currentUserId = userId;
+            currentSubscriptionId = subscriptionId;
+
+            // Fetch all subscription plans
+            try {
+                const response = await fetch(`${API_BASE}/subscription-plans`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const plans = data.data;
+                    const select = document.getElementById('subscription-plan-select');
+                    select.innerHTML = '<option value="">No Subscription</option>';
+
+                    plans.forEach(plan => {
+                        const option = document.createElement('option');
+                        option.value = plan.sp_id;
+                        option.textContent = `${plan.sp_name} - ${plan.sp_status}`;
+                        if (plan.sp_id === subscriptionId) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+
+                    document.getElementById('subscription-modal').classList.remove('hidden');
+                } else {
+                    showToast('Failed to fetch subscription plans', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching subscription plans:', error);
+                showToast('Error fetching subscription plans', 'error');
+            }
+        }
+
+        function closeSubscriptionModal() {
+            document.getElementById('subscription-modal').classList.add('hidden');
+            currentUserId = null;
+            currentSubscriptionId = null;
+        }
+
+        async function saveUserSubscription() {
+            const newSubscriptionId = document.getElementById('subscription-plan-select').value;
+            const subscriptionId = newSubscriptionId ? parseInt(newSubscriptionId) : null;
+
+            try {
+                const response = await fetch(`${API_BASE}/users/${currentUserId}/subscription`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ subscription_id: subscriptionId }),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('User subscription updated successfully', '✅');
+                    closeSubscriptionModal();
+                    fetchMasterUsers(); // Refresh the table
+                } else {
+                    showToast('Failed to update user subscription', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating user subscription:', error);
+                showToast('Error updating user subscription', 'error');
+            }
+        }
+
+        // Theme Toggle Functionality
+        function toggleTheme() {
+            const html = document.documentElement;
+            const themeIcon = document.getElementById('theme-icon');
+            const themeText = document.getElementById('theme-text');
+            
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                themeIcon.innerText = '☀️';
+                themeText.innerText = 'Light Mode';
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                themeIcon.innerText = '🌙';
+                themeText.innerText = 'Dark Mode';
+            }
+        }
+
+        // Initialize Theme on load based on localStorage
+        function initializeTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const html = document.documentElement;
+            const themeIcon = document.getElementById('theme-icon');
+            const themeText = document.getElementById('theme-text');
+            
+            if (savedTheme === 'light') {
+                html.classList.remove('dark');
+                if (themeIcon) themeIcon.innerText = '☀️';
+                if (themeText) themeText.innerText = 'Light Mode';
+            } else {
+                html.classList.add('dark');
+                if (themeIcon) themeIcon.innerText = '🌙';
+                if (themeText) themeText.innerText = 'Dark Mode';
+            }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-red-600', 'text-white', 'shadow-md', 'shadow-red-600/20');
+                btn.classList.add('text-zinc-600', 'dark:text-zinc-400', 'hover:text-zinc-900', 'dark:hover:text-white', 'hover:bg-zinc-300/50', 'dark:hover:bg-zinc-800');
+            });
+
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+            const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
+            activeBtn.classList.add('bg-red-600', 'text-white', 'shadow-md', 'shadow-red-600/20');
+            activeBtn.classList.remove('text-zinc-600', 'dark:text-zinc-400', 'hover:text-zinc-900', 'dark:hover:text-white', 'hover:bg-zinc-300/50', 'dark:hover:bg-zinc-800');
+
+            const plansActions = document.getElementById('plans-actions');
+            if (tabName === 'plans') {
+                plansActions.classList.remove('hidden');
+            } else {
+                plansActions.classList.add('hidden');
+            }
+        }
+
+        function openPlanModal(plan = null) {
+            document.getElementById('modal-title').innerText = plan ? 'Edit Subscription Plan' : 'New Subscription Plan';
+            document.getElementById('plan-modal').classList.remove('hidden');
+
+            if (plan) {
+                document.getElementById('plan-id').value = plan.sp_id || '';
+                document.getElementById('plan-code').value = plan.sp_code || '';
+                document.getElementById('plan-name').value = plan.sp_name || '';
+                document.getElementById('plan-description').value = plan.sp_description || '';
+                document.getElementById('plan-status').value = plan.sp_status || 'PUBLIC';
+
+                // Load plan items if available
+                if (plan.items && plan.items.length > 0) {
+                    document.getElementById('plan-items-container').innerHTML = '';
+                    plan.items.forEach(item => {
+                        addPlanItem(item.spi_type || 'BILLING_CYCLE', item.spi_details || '');
+                    });
+                } else {
+                    // Add empty item if no items
+                    document.getElementById('plan-items-container').innerHTML = '';
+                    addPlanItem();
+                }
+            } else {
+                document.getElementById('plan-form').reset();
+                document.getElementById('plan-id').value = '';
+                document.getElementById('plan-status').value = 'PUBLIC';
+                document.getElementById('plan-items-container').innerHTML = '';
+                addPlanItem();
+            }
+        }
+
+        function closePlanModal() {
+            document.getElementById('plan-modal').classList.add('hidden');
+        }
+
+        async function editPlan(planId) {
+            try {
+                const response = await fetch(`${API_BASE}/subscription-plans/${planId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    openPlanModal(data.data);
+                } else {
+                    showToast('Failed to fetch plan details', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching plan:', error);
+                showToast('Error fetching plan details', 'error');
+            }
+        }
+
+        function addPlanItem(type = 'BILLING_CYCLE', details = '') {
+            const container = document.getElementById('plan-items-container');
+            const div = document.createElement('div');
+            div.className = 'plan-item flex flex-col sm:flex-row gap-2 items-start';
+            div.innerHTML = `
+                <div class="w-full sm:w-28">
+                    <select class="item-type w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors">
+                        <option value="BILLING_CYCLE" ${type === 'BILLING_CYCLE' ? 'selected' : ''}>Billing Cycle</option>
+                        <option value="PRICE" ${type === 'PRICE' ? 'selected' : ''}>Price</option>
+                        <option value="MODULES" ${type === 'MODULES' ? 'selected' : ''}>Modules</option>
+                        <option value="FEATURES" ${type === 'FEATURES' ? 'selected' : ''}>Features</option>
+                        <option value="USERS" ${type === 'USERS' ? 'selected' : ''}>Users</option>
+                    </select>
+                </div>
+                <div class="flex-1 w-full">
+                    <input type="text" placeholder="Details" class="item-details w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors" value="${details}">
+                </div>
+                <div class="sm:w-20">
+                    <button type="button" class="btn btn-danger btn-sm w-full bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500/20 text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 px-3 py-2 rounded-xl text-xs transition-colors" onclick="removePlanItem(this)">Remove</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function removePlanItem(btn) {
+            const container = document.getElementById('plan-items-container');
+            if (container.children.length > 1) {
+                btn.parentElement.remove();
+            } else {
+                showToast('Plan must have at least one item', '⚠️');
+            }
+        }
+
+        function confirmDelete(id) {
+            pendingAction = async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`${API_BASE}/subscription-plans/${id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showToast('Plan deleted successfully', '🗑️');
+                        fetchSubscriptionPlans();
+                    } else {
+                        showToast(data.message || 'Failed to delete plan', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error deleting plan:', error);
+                    showToast('Error deleting plan', 'error');
+                }
+                closeConfirmModal();
+            };
+            document.getElementById('confirm-message').innerText = 'Are you sure you want to delete this subscription plan? This action cannot be undone.';
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').classList.add('hidden');
+            pendingAction = null;
+        }
+
+        function confirmAction() {
+            if (pendingAction) {
+                pendingAction();
+            }
+        }
+
+        async function savePlan(event) {
+            event.preventDefault();
+
+            const planId = document.getElementById('plan-id').value;
+            const sp_code = document.getElementById('plan-code').value.trim();
+            const sp_name = document.getElementById('plan-name').value.trim();
+            const sp_description = document.getElementById('plan-description').value.trim();
+            const sp_status = document.getElementById('plan-status').value;
+
+            // Validation
+            if (!sp_code || !sp_name) {
+                showToast('Please fill in all required fields (Code, Name)', '⚠️');
+                return;
+            }
+
+            const planData = {
+                sp_code,
+                sp_name,
+                sp_description: sp_description || null,
+                sp_status,
+                items: []
+            };
+            
+            // Collect plan items
+            const itemContainers = document.querySelectorAll('.plan-item');
+            itemContainers.forEach((container, index) => {
+                const typeSelect = container.querySelector('.item-type');
+                const detailsInput = container.querySelector('.item-details');
+                
+                if (typeSelect && detailsInput && detailsInput.value.trim()) {
+                    planData.items.push({
+                        spi_type: typeSelect.value,
+                        spi_details: detailsInput.value.trim(),
+                        spi_display_order: index + 1
+                    });
+                }
+            });
+            
+            // Validate at least one PRICE item for pricing
+            const hasPrice = planData.items.some(item => item.spi_type === 'PRICE');
+            if (!hasPrice) {
+                showToast('Plan must have at least one PRICE item (for pricing)', '⚠️');
+                return;
+            }
+            
+            // Validate at least one BILLING_CYCLE item for duration
+            const hasBillingCycle = planData.items.some(item => item.spi_type === 'BILLING_CYCLE');
+            if (!hasBillingCycle) {
+                showToast('Plan must have at least one BILLING_CYCLE item (for duration)', '⚠️');
+                return;
+            }
+            
+            console.log('Sending plan data:', planData);
+            
+            try {
+                const token = localStorage.getItem('token');
+                const url = planId ? `${API_BASE}/subscription-plans/${planId}` : `${API_BASE}/subscription-plans`;
+                const method = planId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(planData)
+                });
+                
+                const data = await response.json();
+                console.log('Response:', data);
+                
+                if (data.success) {
+                    showToast(planId ? 'Plan updated successfully' : 'Plan created successfully', '✅');
+                    closePlanModal();
+                    fetchSubscriptionPlans();
+                } else {
+                    showToast(data.message || 'Failed to save plan', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving plan:', error);
+                showToast('Error saving plan', 'error');
+            }
+        }
+
+        async function logout() {
+            pendingAction = async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                        await fetch(`${API_BASE}/credentials/logout`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error calling logout endpoint:', error);
+                }
+                
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = `${window.CLIENT_URL}/login`;
+                closeConfirmModal();
+            };
+            document.getElementById('confirm-message').innerText = 'Are you sure you want to logout from the admin center?';
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
+        function showToast(message, icon = '✨') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+            
+            if (toastMessage) toastMessage.innerText = message;
+            if (toastIcon) toastIcon.innerText = icon;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

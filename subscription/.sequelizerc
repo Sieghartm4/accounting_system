@@ -1,5 +1,8 @@
 const path = require('path')
 
+// Load .env from parent directory before loading config
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') })
+
 module.exports = {
   config: path.resolve('src', 'database', 'config', 'config.js'),
   modelsPath: path.resolve('src', 'database', 'models'),

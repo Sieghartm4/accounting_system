@@ -207,6 +207,7 @@ export async function generateDisbursementPDF(
       ''
 
     const vendRightX = pageW - margin
+    const maxAddressWidth = 240
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(6.5)
@@ -222,13 +223,16 @@ export async function generateDisbursementPDF(
     doc.setFontSize(8)
     doc.setTextColor(...MGRAY)
     doc.text(formatTin(disbursementTin), vendRightX, y + 25, { align: 'right' })
-    let vendExtra = 0
+
+    let addressLines = []
     if (disbursementAddress) {
-      doc.text(disbursementAddress, vendRightX, y + 37, { align: 'right' })
-      vendExtra = 12
+      addressLines = doc.splitTextToSize(disbursementAddress, maxAddressWidth)
+      doc.text(addressLines, vendRightX, y + 37, { align: 'right' })
     }
 
-    y += Math.max(3 * 12 + 13, 25 + vendExtra) + 12
+    const leftBlockHeight = 13 + metaRows.length * 12
+    const rightBlockHeight = 25 + (addressLines.length * 10)
+    y += Math.max(leftBlockHeight, rightBlockHeight) + 12
     doc.setDrawColor(...HAIRLINE)
     doc.setLineWidth(0.5)
     doc.line(margin, y, pageW - margin, y)

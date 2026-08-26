@@ -30,6 +30,16 @@ module.exports = {
         values: ['active', 'inactive'],
         allowNull: false,
         defaultValue: 'active'
+      },
+      mu_role: {
+        type: Sequelize.ENUM,
+        values: ['ADMIN', 'USER'],
+        allowNull: false,
+        defaultValue: 'USER'
+      },
+      subscription_id: {
+        type: Sequelize.INTEGER,
+        allowNull: true
       }
     });
   },

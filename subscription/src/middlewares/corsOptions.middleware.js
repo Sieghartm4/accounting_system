@@ -9,7 +9,6 @@ const getOrigins = () => {
   const defaultOrigins = [
     `http://${process.env._CLIENT_URL}:${process.env._CLIENT_PORT}`,
     `http://${process.env._SERVER_URL}:${process.env._SUBSCRIPTION_SERVER_PORT}`,
-    `http://localhost:${process.env._SUBSCRIPTION_SERVER_PORT}`,
   ].filter(Boolean)
 
   if (envOrigins.includes('*')) {

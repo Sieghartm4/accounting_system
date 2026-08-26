@@ -14,6 +14,7 @@ const DynamicTable = ({
   optionColumns = new Set(),
   onOptionChange = null,
   hiddenColumns = new Set(),
+  columns = [], // array of { key, label, render } for custom column rendering
   // --- OPTION SELECT PROPS ---
   selectOptions = [], // array of { value, label } for select dropdowns
   // --- CHECKBOX PROPS ---
@@ -335,11 +336,17 @@ const DynamicTable = ({
   }, [enableInfiniteScroll, hasMore, onLoadMore])
 
   const headers = useMemo(
-    () =>
-      Array.isArray(data) && data.length > 0
+    () => {
+      // If custom columns are provided, use those
+      if (columns && columns.length > 0) {
+        return columns.map(col => col.key)
+      }
+      // Otherwise, derive from data
+      return Array.isArray(data) && data.length > 0
         ? Object.keys(data[0]).filter((header) => !hiddenColumns.has(header))
-        : [],
-    [data, hiddenColumns],
+        : []
+    },
+    [data, hiddenColumns, columns],
   )
 
   useEffect(() => {
@@ -721,7 +728,7 @@ const DynamicTable = ({
                     >
                       <div className="flex items-center justify-center gap-2">
                         <span className="text-[12px] font-black text-black uppercase tracking-[2px] transition-colors">
-                          {formatHeader(header)}
+                          {columns.find(col => col.key === header)?.label || formatHeader(header)}
                         </span>
                         {sortColumn === header && (
                           <div
@@ -776,7 +783,13 @@ const DynamicTable = ({
                           key={header}
                           className="px-3 py-4 text-center text-xs font-bold text-gray-700 tracking-tight"
                         >
-                          {renderCellValue(row[header], header, row)}
+                          {(() => {
+                            const columnDef = columns.find(col => col.key === header)
+                            if (columnDef && columnDef.render) {
+                              return columnDef.render(row[header], row)
+                            }
+                            return renderCellValue(row[header], header, row)
+                          })()}
                         </td>
                       ),
                   )}

@@ -186,6 +186,7 @@ export async function generateSalesPDF(salesData, copyType = 'internal') {
       sale.customer_address || sale.address || sale.customer?.address || ''
 
     const custRightX = pageW - margin
+    const maxAddressWidth = 240
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(6.5)
@@ -201,13 +202,16 @@ export async function generateSalesPDF(salesData, copyType = 'internal') {
     doc.setFontSize(8)
     doc.setTextColor(...MGRAY)
     doc.text(formatTin(saleTin), custRightX, y + 25, { align: 'right' })
-    let custExtra = 0
+
+    let addressLines = []
     if (saleAddress) {
-      doc.text(saleAddress, custRightX, y + 37, { align: 'right' })
-      custExtra = 12
+      addressLines = doc.splitTextToSize(saleAddress, maxAddressWidth)
+      doc.text(addressLines, custRightX, y + 37, { align: 'right' })
     }
 
-    y += Math.max(5 * 12 + 13, 25 + custExtra) + 12
+    const leftBlockHeight = 13 + metaRows.length * 12
+    const rightBlockHeight = 25 + (addressLines.length * 10)
+    y += Math.max(leftBlockHeight, rightBlockHeight) + 12
     doc.setDrawColor(...HAIRLINE)
     doc.setLineWidth(0.5)
     doc.line(margin, y, pageW - margin, y)

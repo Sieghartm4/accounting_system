@@ -172,6 +172,7 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
       receipt.customer_address || receipt.address || receipt.customer?.address || ''
 
     const custRightX = pageW - margin
+    const maxAddressWidth = 240
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(6.5)
@@ -187,13 +188,16 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     doc.setFontSize(8)
     doc.setTextColor(...MGRAY)
     doc.text(formatTin(receiptTin), custRightX, y + 25, { align: 'right' })
-    let custExtra = 0
+
+    let addressLines = []
     if (receiptAddress) {
-      doc.text(receiptAddress, custRightX, y + 37, { align: 'right' })
-      custExtra = 12
+      addressLines = doc.splitTextToSize(receiptAddress, maxAddressWidth)
+      doc.text(addressLines, custRightX, y + 37, { align: 'right' })
     }
 
-    y += Math.max(3 * 12 + 13, 25 + custExtra) + 12
+    const leftBlockHeight = 13 + metaRows.length * 12
+    const rightBlockHeight = 25 + (addressLines.length * 10)
+    y += Math.max(leftBlockHeight, rightBlockHeight) + 12
     doc.setDrawColor(...HAIRLINE)
     doc.setLineWidth(0.5)
     doc.line(margin, y, pageW - margin, y)

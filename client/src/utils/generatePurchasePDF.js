@@ -186,6 +186,7 @@ export async function generatePurchasePDF(purchaseData, copyType = 'internal') {
       ''
 
     const custRightX = pageW - margin
+    const maxAddressWidth = 240
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(6.5)
@@ -201,13 +202,16 @@ export async function generatePurchasePDF(purchaseData, copyType = 'internal') {
     doc.setFontSize(8)
     doc.setTextColor(...MGRAY)
     doc.text(formatTin(purchaseTin), custRightX, y + 25, { align: 'right' })
-    let custExtra = 0
+
+    let addressLines = []
     if (purchaseAddress) {
-      doc.text(purchaseAddress, custRightX, y + 37, { align: 'right' })
-      custExtra = 12
+      addressLines = doc.splitTextToSize(purchaseAddress, maxAddressWidth)
+      doc.text(addressLines, custRightX, y + 37, { align: 'right' })
     }
 
-    y += Math.max(4 * 12 + 13, 25 + custExtra) + 12
+    const leftBlockHeight = 13 + metaRows.length * 12
+    const rightBlockHeight = 25 + (addressLines.length * 10)
+    y += Math.max(leftBlockHeight, rightBlockHeight) + 12
     doc.setDrawColor(...HAIRLINE)
     doc.setLineWidth(0.5)
     doc.line(margin, y, pageW - margin, y)

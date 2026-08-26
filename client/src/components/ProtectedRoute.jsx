@@ -10,6 +10,15 @@ const ProtectedRoute = ({ children, routeName }) => {
     return <Navigate to="/" replace />;
   }
   
+  // Allow ADMIN users from subscription database to access subscription page
+  if (routeName === 'subscription') {
+    console.log('Checking subscription access, user:', user);
+    console.log('User role:', user.role);
+    if (user.role === 'ADMIN') {
+      console.log('Access granted: ADMIN role');
+      return children;
+    }
+  }
   
   if (!hasRouteAccess(routeName, user)) {
     // Get all accessible routes for this user

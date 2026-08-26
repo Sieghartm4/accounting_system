@@ -7,7 +7,7 @@ module.exports = {
       c_id: {
         type: Sequelize.STRING(300),
         primaryKey: true,
-        autoIncrement: true
+        allowNull: false
       },
       c_customer_id: {
         type: Sequelize.INTEGER,

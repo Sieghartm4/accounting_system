@@ -1,10 +1,9 @@
-require('dotenv').config({ path: '../.env' })
 const { DecryptString } = require('../../util/cryptography.util')
 
 module.exports = {
   development: {
     username: process.env._USER_ADMIN,
-    password: DecryptString(process.env._PASSWORD_ADMIN),
+    password: process.env._PASSWORD_ADMIN ? DecryptString(process.env._PASSWORD_ADMIN) : '',
     database: process.env._DATABASE_ADMIN,
     host: process.env._HOST_ADMIN,
     mongoUrl: process.env._SUBSCRIPTION_MONGODB_URL,
@@ -15,7 +14,7 @@ module.exports = {
   },
   test: {
     username: process.env._USER_ADMIN,
-    password: DecryptString(process.env._PASSWORD_ADMIN),
+    password: process.env._PASSWORD_ADMIN ? DecryptString(process.env._PASSWORD_ADMIN) : '',
     database: process.env._DATABASE_ADMIN,
     host: process.env._HOST_ADMIN,
     mongoUrl: process.env._SUBSCRIPTION_MONGODB_URL,
@@ -26,7 +25,7 @@ module.exports = {
   },
   production: {
     username: process.env._USER_ADMIN,
-    password: DecryptString(process.env._PASSWORD_ADMIN),
+    password: process.env._PASSWORD_ADMIN ? DecryptString(process.env._PASSWORD_ADMIN) : '',
     database: process.env._DATABASE_ADMIN,
     host: process.env._HOST_ADMIN,
     mongoUrl: process.env._SUBSCRIPTION_MONGODB_URL,

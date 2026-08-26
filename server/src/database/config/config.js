@@ -15,7 +15,7 @@ const getTenantDbOverride = () => {
   return _currentTenantDb
 }
 
-console.log("ENCRYPTER:", EncryptString("password1"))
+console.log("ENCRYPTER:", EncryptString("@admin123"))
 console.log("DECRYPTER:", DecryptString("7b40760b8ebbfb7da8ebe42af07de0e5"))
 console.log("PASSWORD_ADMIN:", process.env._PASSWORD_ADMIN)
 const getTenantDatabase = async (username) => {
