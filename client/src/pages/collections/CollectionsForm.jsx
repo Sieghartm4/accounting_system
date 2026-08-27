@@ -12,6 +12,11 @@ import {
   Layers,
   Landmark,
   Receipt,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Wallet,
+  Divide,
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
@@ -327,6 +332,12 @@ export default function CollectionsForm({
     sublabel: center.department || '',
     value: center.name || '',
   }))
+
+  const [bulkResponsibilityCenter, setBulkResponsibilityCenter] = useState('')
+
+  const [isCollectionItemsCollapsed, setIsCollectionItemsCollapsed] = useState(false)
+  const [isJournalEntriesCollapsed, setIsJournalEntriesCollapsed] = useState(false)
+  const [isBasicDetailsCollapsed, setIsBasicDetailsCollapsed] = useState(false)
 
   // ── Payment / header fields ───────────────────────────────────────────────
   const [modeOfPayment, setModeOfPayment] = useState('')
@@ -1419,13 +1430,13 @@ export default function CollectionsForm({
       </RightSideModal>
 
       {/* TOP NAV */}
-      <div className="flex items-center justify-between flex-shrink-0">
+      <div className="flex items-center justify-between flex-shrink-0 mb-2">
         <nav
-          className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[2px] text-gray-400 cursor-pointer hover:text-black transition-colors"
+          className="cursor-pointer px-4 py-2 bg-gray-600 text-white text-[12px] font-black rounded-lg hover:bg-gray-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-gray-200"
           onClick={onBack}
         >
           <ArrowLeft size={17} />
-          <span className="text-black">Back to Collections</span>
+          <span className="text-white">Go Back</span>
         </nav>
         {!isViewMode && (
           <div className="flex gap-2">
@@ -1434,9 +1445,9 @@ export default function CollectionsForm({
             </button>
             <button
               onClick={handlePostTransaction}
-              className="px-6 py-2 bg-red-600 text-white text-[12px] font-black rounded-lg hover:bg-red-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-red-200"
+              className="px-6 py-2 bg-green-600 text-white text-[12px] font-black rounded-lg hover:bg-green-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-green-200"
             >
-              <Save size={14} /> Post Collection
+              <Save size={14} /> {isEditMode ? 'Update Receipt' : 'Post Transaction'}
             </button>
           </div>
         )}
@@ -1444,214 +1455,85 @@ export default function CollectionsForm({
 
       {/* BODY */}
       <div className="flex-1 flex flex-col gap-2 min-h-0">
-        {/* BASIC DETAILS - FULL WIDTH TOP */}
-        <fieldset className="bg-black rounded-2xl p-3 pl-6 pr-6 text-white shadow-xl">
-          <legend className="bg-red-600 text-[13px] font-black uppercase tracking-[3px] text-white flex items-center justify-center gap-2 px-4 py-1 rounded-lg mx-auto w-fit">
-            <Landmark size={18} /> Basic Details
-          </legend>
-          <div
-            className={`grid gap-3 ${modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER' ? 'grid-cols-6' : 'grid-cols-4'}`}
-          >
-            <div className="col-span-1">
-              <fieldset>
-                <legend className="text-[11px] font-black uppercase text-gray-100">
-                  Customer <span className="text-red-600">*</span>
-                </legend>
-                {isViewMode ? (
-                  <div className={inputBase + ' text-black py-1.5'}>
-                    {customerSearch || 'No customer selected'}
-                  </div>
-                ) : customerLoading ? (
-                  <div className={inputBase + ' text-black py-1.5'}>
-                    Loading customers…
-                  </div>
-                ) : (
-                  <SearchableDropdown
-                    placeholder="Search customer..."
-                    value={customerSearch}
-                    onChange={(v) => {
-                      setCustomerSearch(v)
-                      setSelectedCustomer('')
-                    }}
-                    onSelect={(opt) => {
-                      setSelectedCustomer(opt.value)
-                      setCustomerSearch(opt.label)
-                    }}
-                    options={customerOptions}
-                    inputClassName={inputBase}
-                    emptyText={customerError || 'No customers found'}
-                    dropdownFooter={
-                      <button
-                        type="button"
-                        onPointerDown={(e) => {
-                          e.preventDefault()
-                        }}
-                        onMouseDown={(e) => {
-                          e.preventDefault()
-                        }}
-                        onClick={openCustomerModal}
-                        className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-black text-white text-[11px] font-black rounded-xl hover:bg-red-600 transition-all"
-                      >
-                        <Plus size={12} /> Add Customer
-                      </button>
-                    }
-                  />
-                )}
-              </fieldset>
-            </div>
-            <div className="col-span-1">
-              <fieldset>
-                <legend className="text-[11px] font-black uppercase text-gray-100">
-                  OR / Reference
-                </legend>
-                <input
-                  type="text"
-                  placeholder="OR-000"
-                  value={documentReference}
-                  onChange={(e) => setDocumentReference(e.target.value)}
-                  disabled={isViewMode}
-                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${
-                    isViewMode
-                      ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
-                      : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
-                  }`}
-                />
-              </fieldset>
-            </div>
-            <fieldset>
-              <legend className="text-[11px] font-black uppercase text-gray-100">
-                Mode of Payment
-              </legend>
-              {isViewMode ? (
-                <div className={inputBase + ' text-black py-1.5'}>
-                  {modeSearch || 'No mode selected'}
-                </div>
-              ) : (
-                <SearchableDropdown
-                  placeholder="Select mode..."
-                  value={modeSearch}
-                  onChange={(v) => {
-                    setModeSearch(v)
-                    setModeOfPayment('')
-                  }}
-                  onSelect={(opt) => {
-                    setModeOfPayment(opt.value)
-                    setModeSearch(opt.label)
-                  }}
-                  options={modeOfPaymentOptions.map((m) => ({ label: m, value: m }))}
-                  inputClassName={inputBase}
-                  emptyText="No modes found"
-                />
-              )}
-            </fieldset>
-            <fieldset>
-              <legend className="text-[11px] font-black uppercase text-gray-100">
-                Collection Date
-              </legend>
-              <input
-                type="date"
-                value={collectionDate}
-                onChange={(e) => setCollectionDate(e.target.value)}
-                disabled={isViewMode}
-                className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${
-                  isViewMode
-                    ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
-                    : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
-                }`}
-              />
-            </fieldset>
-            {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
-              <fieldset>
-                <legend className="text-[11px] font-black uppercase text-gray-100">
-                  Bank Name
-                </legend>
-                <input
-                  type="text"
-                  placeholder="Enter bank name"
-                  value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
-                  disabled={isViewMode}
-                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${
-                    isViewMode
-                      ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
-                      : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
-                  }`}
-                />
-              </fieldset>
-            )}
-            {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
-              <fieldset>
-                <legend className="text-[11px] font-black uppercase text-gray-100">
-                  Check #
-                </legend>
-                <input
-                  type="text"
-                  placeholder="Check number"
-                  value={checkNumber}
-                  onChange={(e) => setCheckNumber(e.target.value)}
-                  disabled={isViewMode}
-                  className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${
-                    isViewMode
-                      ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
-                      : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
-                  }`}
-                />
-              </fieldset>
-            )}
-          </div>
-        </fieldset>
-
-        {/* MAIN CONTENT AREA */}
         <div className="flex-1 flex gap-2 min-h-0">
-          {/* LEFT SIDEBAR - SUMMARY ONLY */}
-          <aside className="w-full flex-shrink-0 flex flex-col gap-2 h-full overflow-y-auto sidebar-scroll max-w-[20%]">
-            {/* ── SUMMARY ── */}
-            <section className=" bg-white rounded-2xl border-2 border-red-100 shadow-xl shadow-red-500/5 flex-1 flex flex-col min-h-0 overflow-hidden">
-              {/* Header: Solid Red with White Text */}
-              <header className="bg-red-600 p-4 flex-shrink-0">
-                <h3 className="text-[clamp(14px,1.4vw,16px)] font-black uppercase tracking-[3px] text-white flex items-center gap-2">
-                  <Calculator size={16} className="shrink-0 text-white" />
-                  Summary
-                </h3>
-              </header>
-
-              {/* Scrollable rows */}
-              <div className="custom-table-scroller overflow-y-auto min-h-0 flex-1 custom-scrollbar p-4 py-2">
-                <div className="space-y-0">
-                  <SummaryRow
-                    label="Total Invoice Amount"
-                    value={fmt(summary.totalGross)}
-                  />
-                  <SDivider />
-                  <SummaryRow
-                    label="Total Discount"
-                    value={fmt(summary.totalDiscount)}
-                  />
-                  <SDivider />
-                  <SummaryRow label="Total VAT" value={fmt(summary.totalVAT)} />
-                  <SDivider />
-                  <SummaryRow label="Total WHT" value={fmt(summary.totalWHT)} />
+          {/* LEFT SIDEBAR - SUMMARY */}
+          <aside className="w-full flex-shrink-0 flex flex-col gap-2 h-full max-w-[18%]">
+            <section className="bg-white rounded-xl border border-red-200 shadow-md overflow-hidden flex-1 flex flex-col min-h-0">
+              {/* Prominent Header */}
+              <div className="px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white flex items-center justify-between border-b border-red-800 shadow-sm flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <Calculator size={18} className="text-red-100" />
+                  <h3 className="text-sm font-bold tracking-tight">Financial Summary</h3>
                 </div>
+                <span className="text-xs bg-zinc-900 text-zinc-100 px-2.5 py-0.5 rounded-full border border-zinc-800 font-mono font-semibold">
+                  PHP (₱)
+                </span>
               </div>
 
-              {/* Total Amount Due footer */}
-              <div className="p-4 pt-0 flex-shrink-0">
-                <div className="flex flex-col gap-[2px] mb-3">
-                  <div className="h-[3px] w-full bg-red-600 rounded-full" />
-                  <div className="h-[1px] w-full bg-gray-200" />
-                </div>
+              {/* Financial Summary Items */}
+              <div className="custom-table-scroller overflow-y-auto min-h-0 flex-1 custom-scrollbar p-3.5 py-2 space-y-1.5">
+                {/* 1. Total Sales Price */}
+                <SummaryRow
+                  label="Total Sales Price:"
+                  value={fmt(summary.totalGross)}
+                />
 
-                <div className="text-center bg-red-500 rounded-xl py-3 border border-gray-100">
-                  <p className="text-[clamp(11px,1.1vw,12px)] font-black text-gray-200 uppercase tracking-[4px] mb-1">
-                    Total Amount Due
-                  </p>
+                {/* 2. Total Discount (-) */}
+                <SummaryRow
+                  label="Total Discount:"
+                  value={fmt(summary.totalDiscount)}
+                  badge="(-)"
+                  badgeColor="text-red-500"
+                  valuePrefix="-"
+                  textColor="text-red-600"
+                />
 
-                  <p className="text-[clamp(22px,2.5vw,28px)] font-black text-white tracking-tighter leading-none flex items-baseline justify-center gap-2">
-                    <span className="text-[clamp(12px,1.3vw,15px)] text-green-300 font-black">
-                      PHP
+                {/* 3. Total Discounted Amount - Red Left Border + Bottom Zinc Line */}
+                <SummaryRow
+                  label="Total Discounted Amount:"
+                  value={fmt(summary.totalGross - summary.totalDiscount)}
+                  containerClassName="p-2 rounded-md bg-red-50/70 border-l-3 border-red-500 my-1"
+                />
+
+                {/* 4. Total Output VAT (+) - Border explicitly removed (border-b-0) */}
+                <SummaryRow
+                  label="Total VAT (%):"
+                  value={fmt(summary.totalVAT)}
+                  badge="(+)"
+                  badgeColor="text-zinc-400"
+                  containerClassName="py-1 border-b-0"
+                />
+
+                {/* 5. Total Withholding Tax (-) */}
+                <SummaryRow
+                  label="Total Withholding Tax (WHT):"
+                  value={fmt(summary.totalWHT)}
+                  badge="(-)"
+                  badgeColor="text-red-500"
+                  valuePrefix="-"
+                  textColor="text-red-600"
+                />
+              </div>
+
+              {/* TOTAL AMOUNT HERO BOX */}
+              <div className="p-3.5 pt-1 flex-shrink-0">
+                <div className="h-[2px] w-full bg-red-600 rounded-full mb-2" />
+
+                <div className="p-3 bg-gradient-to-br from-red-600 via-red-600 to-red-700 rounded-lg text-white shadow-md border-l-4 border-zinc-900 relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="bg-zinc-900 text-zinc-100 px-2.5 py-0.5 rounded text-xs font-black tracking-wider uppercase border border-zinc-800 shadow-sm flex items-center gap-1">
+                      <Wallet size={11} className="text-red-500" />
+                      TOTAL AMOUNT
                     </span>
-                    {fmt(summary.totalCashCollected)}
-                  </p>
+                  </div>
+
+                  <div className="text-right w-full min-w-0">
+                    <TotalHeroAmount value={summary.totalCashCollected} fmt={fmt} />
+
+                    <p className="text-xs text-red-100/90 mt-0.5 font-medium">
+                      Amount to be collected
+                    </p>
+                  </div>
                 </div>
               </div>
             </section>
@@ -1665,71 +1547,241 @@ export default function CollectionsForm({
               variants={fadeInUp}
               className="space-y-4"
             >
+              {/* BASIC DETAILS */}
+              <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+                <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-semibold text-sm">
+                      <Landmark size={14} />
+                    </div>
+                    <h2 className="text-base font-bold tracking-tight">Basic Details</h2>
+                  </div>
+                  <button
+                    onClick={() => setIsBasicDetailsCollapsed(!isBasicDetailsCollapsed)}
+                    className="text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
+                    title={isBasicDetailsCollapsed ? 'Expand' : 'Collapse'}
+                  >
+                    {isBasicDetailsCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                  </button>
+                </div>
+                {!isBasicDetailsCollapsed && (
+                  <div className="p-4">
+                    <div className={`grid gap-4 ${modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-4'}`}>
+                      {/* Customer Selection */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Customer Name <span className="text-red-500">*</span>
+                        </label>
+                        {isViewMode ? (
+                          <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
+                            {customerSearch || 'No customer selected'}
+                          </div>
+                        ) : customerLoading ? (
+                          <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
+                            Loading customers...
+                          </div>
+                        ) : (
+                          <SearchableDropdown
+                            placeholder="Select Customer..."
+                            value={customerSearch}
+                            onChange={(v) => {
+                              setCustomerSearch(v)
+                              setSelectedCustomer('')
+                            }}
+                            onSelect={(opt) => {
+                              setSelectedCustomer(opt.value)
+                              setCustomerSearch(opt.label)
+                            }}
+                            options={customerOptions}
+                            inputClassName={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${!customerSearch ? 'border-red-500' : 'border-zinc-300'}`}
+                            emptyText={customerError || 'No customers found'}
+                            dropdownFooter={
+                              <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={openCustomerModal}
+                                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-black text-white text-[11px] font-black rounded-xl hover:bg-red-600 transition-all"
+                              >
+                                <Plus size={12} /> Add Customer
+                              </button>
+                            }
+                          />
+                        )}
+                      </div>
+
+                      {/* Reference Number */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Reference / Official Receipt No.
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. OR-100234"
+                          value={documentReference}
+                          onChange={(e) => setDocumentReference(e.target.value)}
+                          disabled={isViewMode}
+                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!documentReference ? 'border-red-500' : 'border-zinc-300'}`}
+                        />
+                      </div>
+
+                      {/* Mode of Payment */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Mode of Payment <span className="text-red-500">*</span>
+                        </label>
+                        {isViewMode ? (
+                          <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
+                            {modeSearch || 'No mode selected'}
+                          </div>
+                        ) : (
+                          <SearchableDropdown
+                            placeholder="Select Mode..."
+                            value={modeSearch}
+                            onChange={(v) => {
+                              setModeSearch(v)
+                              setModeOfPayment('')
+                            }}
+                            onSelect={(opt) => {
+                              setModeOfPayment(opt.value)
+                              setModeSearch(opt.label)
+                            }}
+                            options={modeOfPaymentOptions.map((m) => ({ label: m, value: m }))}
+                            inputClassName={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${!modeOfPayment ? 'border-red-500' : 'border-zinc-300'}`}
+                            emptyText="No modes found"
+                          />
+                        )}
+                      </div>
+
+                      {/* Collection Date */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Collection Date <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={collectionDate}
+                          onChange={(e) => setCollectionDate(e.target.value)}
+                          disabled={isViewMode}
+                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!collectionDate ? 'border-red-500' : 'border-zinc-300'}`}
+                        />
+                      </div>
+
+                      {/* Bank Name (conditional) */}
+                      {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Bank Name
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Bank Name"
+                            value={bankName}
+                            onChange={(e) => setBankName(e.target.value)}
+                            disabled={isViewMode}
+                            className={`w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                          />
+                        </div>
+                      )}
+
+                      {/* Check Number (conditional) */}
+                      {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Check #
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Check #"
+                            value={checkNumber}
+                            onChange={(e) => setCheckNumber(e.target.value)}
+                            disabled={isViewMode}
+                            className={`w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </section>
               {/* 1. COLLECTION ITEMS */}
-              <TableSection title="Collection Items" icon={<Receipt size={14} />}>
-                <div className="w-full flex flex-col gap-[2px] mb-3">
-                  <div className="h-[2px] w-full bg-red-600 rounded-full" />
-                  <div className="h-[1px] w-full bg-black/10" />
+              <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+                <div className="px-4 py-2.5 bg-zinc-900 text-white flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-semibold text-sm">
+                      <Receipt size={14} />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold tracking-tight">Collection Items</h2>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-white pointer-events-none" />
+                      <div className="pl-7">
+                        <SearchableDropdown
+                          placeholder="Resp. Center to All"
+                          value={bulkResponsibilityCenter}
+                          onChange={setBulkResponsibilityCenter}
+                          onSelect={(opt) => {
+                            setBulkResponsibilityCenter(opt.value)
+                            journalEntries.forEach((entry) =>
+                              updateJournalEntry(entry.id, 'center', opt.value),
+                            )
+                          }}
+                          options={responsibilityCenterOptions}
+                          inputClassName="w-full px-2 py-1.5 rounded-lg text-[11px] font-medium outline-none transition-all bg-zinc-800 border border-white text-white focus:ring-2 focus:ring-red-500"
+                          emptyText={
+                            responsibilityCentersError ||
+                            'No responsibility centers found'
+                          }
+                          disabled={isViewMode}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsCollectionItemsCollapsed(!isCollectionItemsCollapsed)}
+                      className="text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
+                      title={isCollectionItemsCollapsed ? 'Expand' : 'Collapse'}
+                    >
+                      {isCollectionItemsCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                    </button>
+                  </div>
                 </div>
 
-                {/* <div className="mb-3 px-3 py-2 bg-blue-50 rounded-xl border border-blue-100">
-                <span className="text-blue-600 text-[11px] font-black uppercase tracking-wide">
-                  ℹ️ Collected against Sales Invoice — amounts are auto-computed from original invoice items (Discounted + VAT − WHT). Only Sales ID, Amount, and WHT are stored.
-                </span>
-              </div> */}
-
-                {collectionItems.length === 0 ? (
-                  <div className="py-10 text-center text-gray-400 text-[13px] font-bold border-2 border-dashed border-gray-100 rounded-xl">
-                    No items yet. Click "Add Sales Items" to select outstanding
-                    invoices.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto custom-table-scroller">
-                    {/*
-                    READ-ONLY display table.
-                    All columns are for accountant review.
-                    Only whtAmount (→ ci_witholding_tax) and amount (→ ci_amount) go to the DB.
-                  */}
-                    <table
-                      className="w-full text-center min-w-[860px]"
-                      style={{ tableLayout: 'fixed' }}
-                    >
-                      <colgroup>
-                        <col style={{ width: '16%' }} /> {/* Invoice Ref */}
-                        <col style={{ width: '20%' }} /> {/* Product/Service */}
-                        <col style={{ width: '12%' }} /> {/* Gross Amt */}
-                        <col style={{ width: '10%' }} /> {/* Discount */}
-                        <col style={{ width: '10%' }} /> {/* VAT */}
-                        <col style={{ width: '12%' }} />{' '}
-                        {/* WHT → ci_witholding_tax */}
-                        <col style={{ width: '14%' }} />{' '}
-                        {/* Amount Due → ci_amount */}
-                        <col style={{ width: '10%' }} />{' '}
-                        {/* Responsibility Center */}
-                        <col style={{ width: '6%' }} /> {/* Delete */}
-                      </colgroup>
-                      <thead>
-                        <tr className="border-b border-gray-100">
-                          {[
-                            'Invoice Ref',
-                            'Product/Service',
-                            'Gross Amt',
-                            'Discount',
-                            'VAT',
-                            'WHT',
-                            'Amount Due',
-                            'Responsibility Center',
-                            '',
-                          ].map((h, i) => (
-                            <th
-                              key={i}
-                              className="pb-2 text-[11px] font-black uppercase text-gray-900 text-center px-1"
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
+                {!isCollectionItemsCollapsed && (
+                  <>
+                    <div className="overflow-x-auto custom-scrollbar">
+                      <table
+                        className="w-full text-left text-xs text-slate-600"
+                        style={{ tableLayout: 'fixed', minWidth: 860 }}
+                      >
+                        <colgroup>
+                          <col style={{ width: '16%' }} /> {/* Invoice Ref */}
+                          <col style={{ width: '20%' }} /> {/* Product/Service */}
+                          <col style={{ width: '12%' }} /> {/* Gross Amt */}
+                          <col style={{ width: '10%' }} /> {/* Discount */}
+                          <col style={{ width: '10%' }} /> {/* VAT */}
+                          <col style={{ width: '12%' }} />{' '}
+                          {/* WHT → ci_witholding_tax */}
+                          <col style={{ width: '14%' }} />{' '}
+                          {/* Amount Due → ci_amount */}
+                          <col style={{ width: '10%' }} />{' '}
+                          {/* Responsibility Center */}
+                          <col style={{ width: '6%' }} /> {/* Delete */}
+                        </colgroup>
+                        <thead className="bg-zinc-100 border-b border-zinc-200 uppercase font-bold text-zinc-700 tracking-wider">
+                          <tr>
+                            <th className="py-3 px-3 min-w-[180px] text-center">Invoice Ref</th>
+                            <th className="py-3 px-2 min-w-[120px] text-center">Product/Service</th>
+                            <th className="py-3 px-2 min-w-[150px] text-center">Gross Amt</th>
+                            <th className="py-3 px-2 w-16 text-center">Discount</th>
+                            <th className="py-3 px-2 w-28 text-center">VAT</th>
+                            <th className="py-3 px-2 w-24 text-center">WHT</th>
+                            <th className="py-3 px-2 w-20 text-center">Amount Due</th>
+                            <th className="py-3 px-2 w-20 text-center">Resp. Center</th>
+                            <th className="py-3 px-2 w-10 text-center"></th>
+                          </tr>
+                        </thead>
                       <tbody className="divide-y divide-gray-50">
                         {collectionItems.map((item) => (
                           <tr
@@ -1806,57 +1858,67 @@ export default function CollectionsForm({
                       </tfoot>
                     </table>
                   </div>
+                  {!isViewMode && !isEditMode && (
+                    <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
+                      <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                      >
+                        <Plus size={12} /> Add Sales Items
+                      </button>
+                      <span className="text-xs text-zinc-500 font-medium">{collectionItems.length} {collectionItems.length === 1 ? 'item' : 'items'}</span>
+                    </div>
+                  )}
+                  </>
                 )}
-
-                {!isViewMode && !isEditMode && (
-                  <div className="mt-3">
-                    <button
-                      onClick={() => setIsModalOpen(true)}
-                      className="w-full py-2 border-2 border-dashed rounded-xl text-[11px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-2"
-                    >
-                      <Plus size={14} /> Add Sales Items
-                    </button>
-                  </div>
-                )}
-              </TableSection>
+              </section>
 
               {/* 2. JOURNAL ENTRIES */}
-              <TableSection title="Journal Entries" icon={<Layers size={14} />}>
-                <div className="w-full flex flex-col gap-[2px] mb-4">
-                  <div className="h-[2px] w-full bg-red-600 rounded-full" />
-                  <div className="h-[1px] w-full bg-black/10" />
+              <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+                <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-semibold text-sm">
+                      <Layers size={14} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-bold tracking-tight">Journal Entries</h2>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-800 text-zinc-100 border border-zinc-700`}>
+                        {isBalanced ? 'Balanced' : 'Unbalanced'}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsJournalEntriesCollapsed(!isJournalEntriesCollapsed)}
+                    className="text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
+                    title={isJournalEntriesCollapsed ? 'Expand' : 'Collapse'}
+                  >
+                    {isJournalEntriesCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                  </button>
                 </div>
 
-                <div className="overflow-x-auto custom-table-scroller">
-                  <table
-                    className="w-full text-center"
-                    style={{ tableLayout: 'fixed', minWidth: 600 }}
-                  >
-                    <colgroup>
-                      <col style={{ width: '40%' }} />
-                      <col style={{ width: '16%' }} />
-                      <col style={{ width: '16%' }} />
-                      <col style={{ width: '22%' }} />
-                      <col style={{ width: '6%' }} />
-                    </colgroup>
-                    <thead>
-                      <tr className="border-b border-gray-100">
-                        {[
-                          'Charts of Account',
-                          'Debit',
-                          'Credit',
-                          'Responsibility Center',
-                          '',
-                        ].map((h, i) => (
-                          <th
-                            key={i}
-                            className="pb-3 text-[12px] font-black uppercase text-gray-900 text-center px-1"
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
+                {!isJournalEntriesCollapsed && (
+                  <div className="">
+                    <div className="overflow-x-auto">
+                      <table
+                        className="w-full text-left text-xs"
+                        style={{ tableLayout: 'fixed', minWidth: 600 }}
+                      >
+                        <colgroup>
+                          <col style={{ width: '35%' }} />
+                          <col style={{ width: '18%' }} />
+                          <col style={{ width: '18%' }} />
+                          <col style={{ width: '22%' }} />
+                          <col style={{ width: '6%' }} />
+                        </colgroup>
+                        <thead className="bg-zinc-100 border-b border-zinc-200 uppercase font-bold text-zinc-600 tracking-wider">
+                          <tr>
+                            <th className="py-2.5 px-3 text-center">Chart of Account</th>
+                            <th className="py-2.5 px-3 text-center w-32">Debit (₱)</th>
+                            <th className="py-2.5 px-3 text-center w-32">Credit (₱)</th>
+                            <th className="py-2.5 px-3 text-center">Responsibility Center</th>
+                            <th className="py-2.5 px-3 w-10 text-center"></th>
+                          </tr>
+                        </thead>
                     <tbody className="divide-y divide-gray-50">
                       {journalEntries.length === 0 ? (
                         <tr>
@@ -1971,85 +2033,73 @@ export default function CollectionsForm({
                         ))
                       )}
                     </tbody>
-                    <tfoot>
-                      <tr className="bg-gray-50/50 border">
-                        <td
-                          colSpan={1}
-                          className="py-2 px-3 text-[12px] font-black uppercase text-black text-left"
-                        >
-                          Balance Check
-                        </td>
-                        <td className="py-2 px-1 text-center text-[13px] font-black">
-                          {fmt(totalDebit)}
-                        </td>
-                        <td
-                          className={`py-2 px-1 text-center text-[13px] font-black ${isBalanced ? 'text-green-600' : 'text-red-600'}`}
-                        >
-                          {fmt(totalCredit)}{' '}
-                          <span className="text-[11px]">
-                            {isBalanced ? '✅' : '❌'}
-                          </span>
-                        </td>
-                        <td />
+                    <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
+                      <tr>
+                        <td colSpan={2} className="py-2.5 px-3 text-right text-xs">Total Ledger Balance:</td>
+                        <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(totalDebit)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(totalCredit)}</td>
                         <td />
                       </tr>
                     </tfoot>
                   </table>
                 </div>
-
                 {!isViewMode && (
-                  <button
-                    onClick={addJournalEntry}
-                    className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1"
-                  >
-                    <Plus size={15} /> Add Ledger Row
-                  </button>
+                  <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
+                    <button
+                      onClick={addJournalEntry}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                    >
+                      <Plus size={12} /> Add Ledger Row
+                    </button>
+                    <span className="text-xs text-zinc-500 font-medium">{journalEntries.length} {journalEntries.length === 1 ? 'entry' : 'entries'}</span>
+                  </div>
                 )}
-              </TableSection>
+                  </div>
+                )}
+              </section>
 
               {/* 3. ATTACHMENTS & REMARKS */}
-              <div className="grid grid-cols-1 gap-4">
-                <TableSection
-                  title="Attachments"
-                  icon={<Paperclip size={14} />}
-                  defaultCollapsed
-                >
-                  <div className="w-full flex flex-col gap-[2px] mb-4">
-                    <div className="h-[2px] w-full bg-red-600 rounded-full" />
-                    <div className="h-[1px] w-full bg-black/10" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Attachments Card */}
+                <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+                  <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Paperclip className="text-red-500" size={16} />
+                      <h2 className="text-sm font-bold tracking-tight">Attachments</h2>
+                    </div>
+                    <span className="text-xs text-zinc-400 font-medium">{attachments.length} {attachments.length === 1 ? 'File' : 'Files'}</span>
                   </div>
-                  <div className="overflow-x-auto custom-table-scroller">
-                    <table
-                      className="w-full text-center"
-                      style={{ tableLayout: 'fixed', minWidth: 800 }}
-                    >
-                      <colgroup>
-                        <col style={{ width: '20%' }} />
-                        <col style={{ width: '20%' }} />
-                        <col style={{ width: '25%' }} />
-                        <col style={{ width: '15%' }} />
-                        <col style={{ width: '15%' }} />
-                        <col style={{ width: '5%' }} />
-                      </colgroup>
-                      <thead>
-                        <tr className="border-b border-gray-100">
-                          {[
-                            'File Name',
-                            'File',
-                            'Remarks',
-                            'Uploaded By',
-                            'Date',
-                            '',
-                          ].map((h, i) => (
-                            <th
-                              key={i}
-                              className="pb-3 text-[12px] font-black uppercase text-gray-900 tracking-tighter text-center px-1"
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
+                  <div className="p-4">
+                    <div className="overflow-x-auto custom-table-scroller">
+                      <table
+                        className="w-full text-center"
+                        style={{ tableLayout: 'fixed', minWidth: 600 }}
+                      >
+                        <colgroup>
+                          <col style={{ width: '25%' }} />
+                          <col style={{ width: '25%' }} />
+                          <col style={{ width: '25%' }} />
+                          <col style={{ width: '15%' }} />
+                          <col style={{ width: '10%' }} />
+                        </colgroup>
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            {[
+                              'File Name',
+                              'File',
+                              'Remarks',
+                              'Uploaded By',
+                              '',
+                            ].map((h, i) => (
+                              <th
+                                key={i}
+                                className="pb-3 text-[12px] font-black uppercase text-gray-900 tracking-tighter text-center px-1"
+                              >
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
                       <tbody className="divide-y divide-gray-50">
                         {attachments.map((file) => (
                           <tr key={file.id}>
@@ -2153,9 +2203,6 @@ export default function CollectionsForm({
                             <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">
                               {file.uploadedBy}
                             </td>
-                            <td className="py-2 px-1 text-[12px] font-bold text-gray-600 tabular-nums">
-                              {file.date}
-                            </td>
                             <td className="py-2 text-center">
                               {!isViewMode && (
                                 <button
@@ -2174,30 +2221,33 @@ export default function CollectionsForm({
                   {!isViewMode && (
                     <button
                       onClick={addAttachment}
-                      className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-red-300 text-red-600 transition-all duration-300 hover:bg-red-50 hover:border-red-500 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/10 flex items-center justify-center gap-1"
+                      className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
                     >
                       <Plus size={15} /> Add File
                     </button>
                   )}
-                </TableSection>
+                  </div>
+                </section>
 
-                <TableSection
-                  title="Remarks"
-                  icon={<FileText size={14} />}
-                  defaultCollapsed
-                >
-                  <textarea
-                    disabled={isViewMode}
-                    className={`w-full min-h-[100px] mt-4 p-4 rounded-xl text-[14px] font-bold outline-none ${
-                      isViewMode
-                        ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed resize-none'
-                        : 'bg-gray-50 border-none focus:ring-1 focus:ring-red-500'
-                    }`}
-                    placeholder="Enter collection notes or justification here..."
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                  />
-                </TableSection>
+                {/* Remarks Card */}
+                <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+                  <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="text-red-500" size={16} />
+                      <h2 className="text-sm font-bold tracking-tight">Remarks & Internal Notes</h2>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <textarea
+                      disabled={isViewMode}
+                      rows={4}
+                      placeholder="Enter justification, payment reference notes, or internal instructions here..."
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      className={`w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                    />
+                  </div>
+                </section>
               </div>
             </motion.div>
           </main>
@@ -2437,30 +2487,79 @@ function SDivider() {
   return <div className="h-[1px] w-full bg-gray-400" />
 }
 
-function SummaryRow({ label, value, color = 'text-gray-800', formula }) {
+const SummaryRow = ({
+  label,
+  value,
+  badge,
+  badgeColor = "text-zinc-400",
+  valuePrefix = "",
+  textColor = "text-zinc-900",
+  containerClassName = "py-1 border-b border-zinc-500",
+  isNested = false,
+}) => {
+  const strVal = String(value || "");
+
+  const getValueFontSize = (len) => {
+    if (len > 24) return "text-xs";
+    if (len > 18) return "text-sm";
+    return "text-sm sm:text-base";
+  };
+
   return (
-    <div className="summary-row relative flex justify-between items-center hover:bg-gray-50 rounded-md transition-colors py-1.5 px-1 cursor-default">
-      {/* Label: 10.5px -> ~12.5px */}
-      <span className="text-[clamp(11px,1.1vw,12.5px)] font-black uppercase text-gray-500 leading-tight pr-1 flex-1">
-        {label}
-      </span>
+    <div
+      className={`flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 w-full min-w-0 ${containerClassName}`}
+    >
+      {/* Label & Badge */}
+      <div className="flex items-center gap-1 min-w-max">
+        <span
+          className={`font-bold text-zinc-800 ${isNested ? "text-xs" : "text-sm"
+            }`}
+        >
+          {label}
+        </span>
+        {badge && (
+          <span className={`text-xs font-bold ${badgeColor}`}>{badge}</span>
+        )}
+      </div>
 
-      {/* Value: 12px -> ~14px */}
-      <span
-        className={`${color} text-[clamp(12px,1.25vw,14px)] font-black tabular-nums tracking-tight whitespace-nowrap text-right flex-shrink-0`}
-      >
-        {value}
-      </span>
-
-      {formula && (
-        <div className="summary-tooltip absolute left-0 bottom-full mb-1 z-50 bg-gray-900 text-white text-[11px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-xl pointer-events-none">
-          <span className="text-gray-300 font-medium">{formula}</span>
-          <div className="absolute left-3 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-900" />
-        </div>
-      )}
+      {/* Value */}
+      <div className="flex-1 flex justify-end min-w-max text-right">
+        <span
+          className={`font-extrabold font-mono tracking-tight whitespace-nowrap ml-auto ${textColor} ${getValueFontSize(
+            strVal.length
+          )}`}
+        >
+          {valuePrefix && <span className="mr-0.5">{valuePrefix}</span>}
+          <span className="text-emerald-600 font-extrabold mr-1">₱</span>
+          <span>{strVal}</span>
+        </span>
+      </div>
     </div>
-  )
-}
+  );
+};
+
+const TotalHeroAmount = ({ value, fmt }) => {
+  const formattedVal = fmt(value);
+  const len = String(formattedVal || "").length;
+
+  const getHeroFontSize = (charCount) => {
+    if (charCount > 25) return "text-sm";
+    if (charCount > 18) return "text-base";
+    if (charCount > 12) return "text-xl";
+    return "text-2xl";
+  };
+
+  return (
+    <div
+      className={`font-black font-mono text-white tracking-tight drop-shadow-sm text-right whitespace-nowrap overflow-hidden transition-all duration-150 ${getHeroFontSize(
+        len
+      )}`}
+    >
+      <span className="text-emerald-300 mr-1">₱</span>
+      <span>{formattedVal}</span>
+    </div>
+  );
+};
 
 function SidebarInput({
   label,

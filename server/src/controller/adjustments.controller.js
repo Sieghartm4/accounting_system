@@ -388,7 +388,7 @@ const createAdjustment = async (req, res, next) => {
             .build()
 
           const attachmentValues = [
-            adjustment_id,
+            adjustmentId,
             attachment.file || null,
             attachment.name || null,
             attachment.remarks || null,
@@ -434,7 +434,7 @@ const createAdjustment = async (req, res, next) => {
 
           const entryValues = [
             'adjustments',
-            adjustment_id,
+            adjustmentId,
             accountId,
             entry.responsibility_center || '',
             type,
