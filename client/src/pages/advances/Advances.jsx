@@ -34,6 +34,9 @@ function AdvancesContent() {
   const [filterEndDate, setFilterEndDate] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [expandedGroup, setExpandedGroup] = useState(null) // Track which date/type group is expanded
+  const [selectedAdvances, setSelectedAdvances] = useState([]) // Store selected advances for adjustment
+  const [selectedGroups, setSelectedGroups] = useState([]) // Store selected groups for bulk adjustment
   const navigate = useNavigate()
   const {
     advances,
@@ -92,6 +95,41 @@ function AdvancesContent() {
     0,
   )
 
+  // Group advances by date and type
+  const groupedAdvances = useMemo(() => {
+    const groups = new Map()
+
+    advances.forEach((advance) => {
+      const dateKey = formatDate(advance.date)
+      const typeKey = advance.type
+      const groupKey = `${dateKey}-${typeKey}`
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          groupKey,
+          date: dateKey,
+          type: typeKey,
+          totalAmount: 0,
+          advances: []
+        })
+      }
+
+      const group = groups.get(groupKey)
+      group.totalAmount += Number(advance.amount || 0)
+      group.advances.push(advance)
+    })
+
+    return Array.from(groups.values()).sort((a, b) => {
+      // Sort by date descending, then by type
+      const dateA = new Date(a.date)
+      const dateB = new Date(b.date)
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateB.getTime() - dateA.getTime()
+      }
+      return a.type.localeCompare(b.type)
+    })
+  }, [advances])
+
   const tableData = advances.map((entry) => ({
     ...entry,
     amount_raw: entry.amount,
@@ -104,6 +142,34 @@ function AdvancesContent() {
       ...row,
       amount: row.amount_raw ?? row.amount,
     }))
+
+    navigate('/adjustments', {
+      state: {
+        selectedAdvanceJournalEntries,
+      },
+    })
+  }
+
+  const handleBulkCreateAdjustment = (group) => {
+    const selectedAdvanceJournalEntries = group.advances.map((advance) => ({
+      ...advance,
+      amount: Number(advance.amount),
+    }))
+
+    navigate('/adjustments', {
+      state: {
+        selectedAdvanceJournalEntries,
+      },
+    })
+  }
+
+  const handleBulkCreateAdjustmentFromGroups = (selectedGroups) => {
+    const selectedAdvanceJournalEntries = selectedGroups.flatMap((group) =>
+      group.advances.map((advance) => ({
+        ...advance,
+        amount: Number(advance.amount),
+      }))
+    )
 
     navigate('/adjustments', {
       state: {
@@ -279,27 +345,109 @@ function AdvancesContent() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
+        className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-6 pb-4"
       >
-        <DynamicTable
-          data={tableData}
-          title="Advances"
-          actionButtons={[]}
-          routeName="advances"
-          enableAddButton={false}
-          enableCheckbox={true}
-          checkboxColumn="id"
-          checkboxActions={[
-            {
-              label: 'Create Adjustment',
-              onClick: handleCreateAdjustment,
-            },
-          ]}
-          enableInfiniteScroll={true}
-          hasMore={hasMore}
-          isLoadingMore={loadingMore}
-          onLoadMore={loadMore}
-        />
+        {/* LEFT COLUMN: Grouped Date/Type Table */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="col-span-1 md:col-span-4 flex flex-col min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
+        >
+          <DynamicTable
+            data={groupedAdvances}
+            title=""
+            enableAddButton={false}
+            enableCheckbox={true}
+            enableActionColumn={true}
+            enableRowClick={true}
+            returnColumn="groupKey"
+            onRowClick={(groupKey, row) => {
+              const key = `${row.date}-${row.type}`
+              setExpandedGroup(expandedGroup === key ? null : key)
+            }}
+            checkboxColumn="groupKey"
+            onCheckboxChange={(selectedIds) => {
+              const selectedRows = groupedAdvances.filter(row => selectedIds.includes(row.groupKey))
+              setSelectedGroups(selectedRows)
+            }}
+            checkboxActions={[
+              {
+                label: 'Create Adjustment',
+                onClick: (selectedRows) => handleBulkCreateAdjustmentFromGroups(selectedRows),
+                style: 'red',
+              },
+            ]}
+            actionButtons={[
+              {
+                label: 'Create Adjustment',
+                icon: <ArrowRight size={14} />,
+                onClick: (row) => handleBulkCreateAdjustment(row),
+                style: 'red',
+              },
+            ]}
+            columns={[
+              { key: 'date', label: 'Date' },
+              { key: 'type', label: 'Type' },
+              {
+                key: 'totalAmount',
+                label: 'Total Amount',
+                render: (value) => (
+                  <span>
+                    <span className="text-green-600">₱</span>
+                    <span className="ml-1">{isNaN(value) ? '0.00' : parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </span>
+                )
+              },
+            ]}
+            hiddenColumns={new Set(['advances', 'groupKey'])}
+            highlightRow={{ column: 'groupKey', value: expandedGroup }}
+          />
+        </motion.div>
+
+        {/* RIGHT COLUMN: Detailed Advances Table */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="col-span-1 md:col-span-8 flex flex-col min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
+        >
+          <DynamicTable
+            data={expandedGroup ? groupedAdvances.find(g => `${g.date}-${g.type}` === expandedGroup)?.advances || [] : []}
+            title=""
+            enableAddButton={false}
+            enableCheckbox={true}
+            enableActionColumn={false}
+            checkboxColumn="id"
+            onCheckboxChange={(selectedIds) => {
+              const group = groupedAdvances.find(g => `${g.date}-${g.type}` === expandedGroup)
+              if (!group) return
+              const selectedRows = group.advances.filter(row => selectedIds.includes(row.id))
+              setSelectedAdvances(selectedRows)
+            }}
+            checkboxActions={[
+              {
+                label: 'Create Adjustment',
+                onClick: (selectedRows) => handleCreateAdjustment(selectedRows),
+                style: 'red',
+              },
+            ]}
+            columns={[
+              { key: 'name', label: 'Account Name' },
+              { key: 'responsibility_center', label: 'Responsibility Center' },
+              { key: 'type', label: 'Type' },
+              {
+                key: 'amount',
+                label: 'Amount',
+                render: (value) => (
+                  <span>
+                    <span className="text-green-600">₱</span>
+                    <span className="ml-1">{isNaN(value) ? '0.00' : parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </span>
+                )
+              },
+            ]}
+            hiddenColumns={new Set(['id', 'db_name', 'db_id', 'coa_id', 'date'])}
+          />
+        </motion.div>
       </motion.div>
     </div>
   )
