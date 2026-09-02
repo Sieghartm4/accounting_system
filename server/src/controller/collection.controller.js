@@ -339,7 +339,7 @@ const getSalesItemsCollection = async (req, res, next) => {
         Master.products_service.selectOptionColumns.id,
       )
 
-      .innerJoin(
+      .leftJoin(
         Master.charts_of_accounts.tablename,
 
         Accounting.sales_items.selectOptionColumns.charts_of_accounts,
@@ -402,7 +402,12 @@ const getSalesItemsCollection = async (req, res, next) => {
 const getAllCollections = async (req, res, next) => {
   const { collection_id } = req.params
 
-  console.log('Received collection_id:', collection_id, 'type:', typeof collection_id)
+  console.log(
+    'Received collection_id:',
+    collection_id,
+    'type:',
+    typeof collection_id,
+  )
 
   if (!collection_id) {
     return res.status(400).json({
@@ -850,6 +855,19 @@ const createCollection = async (req, res, next) => {
             })
           }
 
+          const [salesItemRows] = await connection.execute(
+            `SELECT ${Accounting.sales_items.selectOptionColumns.id} FROM ${Accounting.sales_items.tablename} WHERE ${Accounting.sales_items.selectOptionColumns.id} = ? LIMIT 1`,
+            [item.sales_id],
+          )
+
+          if (salesItemRows.length === 0) {
+            await connection.rollback()
+            return res.status(400).json({
+              success: false,
+              message: `Collection item references a sales item that does not exist: ${item.sales_id}`,
+            })
+          }
+
           const itemQuery = `INSERT INTO ${Accounting.collection_items.tablename} (ci_collection_id, ci_sales_id, ci_amount, ci_witholding_tax) VALUES (?, ?, ?, ?)`
 
           const itemValues = [
@@ -1094,7 +1112,11 @@ const updateCollectionState = async (req, res, next) => {
       await connection.beginTransaction()
 
       // Get user full name from database
-      const userFullName = await getUserFullName(req.context.username, connection, Master)
+      const userFullName = await getUserFullName(
+        req.context.username,
+        connection,
+        Master,
+      )
 
       const updatePromises = updates.map(async (update) => {
         const { id, currentState } = update
@@ -1180,14 +1202,15 @@ const updateCollectionState = async (req, res, next) => {
                 },
               ])
               .from(Accounting.sales_items.tablename)
-              .whereIn(Accounting.sales_items.selectOptionColumns.id, uniqueSalesItemIds)
+              .whereIn(
+                Accounting.sales_items.selectOptionColumns.id,
+                uniqueSalesItemIds,
+              )
               .build()
 
-            const salesItems = await Query(
-              salesItemsQuery,
-              uniqueSalesItemIds,
-              [Accounting.sales_items.prefix_],
-            )
+            const salesItems = await Query(salesItemsQuery, uniqueSalesItemIds, [
+              Accounting.sales_items.prefix_,
+            ])
 
             console.log('salesItems', salesItems)
 
@@ -1209,8 +1232,13 @@ const updateCollectionState = async (req, res, next) => {
 
               const updateSalesValues = ['PAID', salesId, 'UNPAID']
 
-              const [result] = await connection.execute(updateSalesQuery, updateSalesValues)
-              console.log(`Updated sales ID ${salesId} status to PAID, affected rows: ${result.affectedRows}`)
+              const [result] = await connection.execute(
+                updateSalesQuery,
+                updateSalesValues,
+              )
+              console.log(
+                `Updated sales ID ${salesId} status to PAID, affected rows: ${result.affectedRows}`,
+              )
             }
           }
 
@@ -1336,7 +1364,8 @@ const cancelCollectionState = async (req, res, next) => {
         (update) =>
           !update ||
           !update.id ||
-          (update.currentState === 'CANCELLED' || update.currentState === 'REJECTED'),
+          update.currentState === 'CANCELLED' ||
+          update.currentState === 'REJECTED',
       )
 
       if (validUpdates.length === 0) {
@@ -1984,7 +2013,12 @@ const getPrintCollections = async (req, res, next) => {
 const updateCollection = async (req, res, next) => {
   const { collection_id } = req.params
 
-  console.log('Updating collection_id:', collection_id, 'type:', typeof collection_id)
+  console.log(
+    'Updating collection_id:',
+    collection_id,
+    'type:',
+    typeof collection_id,
+  )
 
   try {
     const {

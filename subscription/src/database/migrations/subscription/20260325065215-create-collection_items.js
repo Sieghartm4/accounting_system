@@ -18,7 +18,7 @@ module.exports = {
         },
       },
       ci_sales_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(300),
         allowNull: false,
         references: {
           model: 'sales_items',

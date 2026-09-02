@@ -29,7 +29,13 @@ const getAccess = async (req, res, next) => {
       .build()
 
     const tenantDb = req.context?.dbName || req.context?.tenantDb || null
-    const accesses = await Query(query, [], [Master.master_access.prefix_], null, tenantDb)
+    const accesses = await Query(
+      query,
+      [],
+      [Master.master_access.prefix_],
+      null,
+      tenantDb,
+    )
     res.status(200).json({
       success: true,
       message: 'Accesses retrieved successfully',
@@ -117,6 +123,8 @@ const createAccess = async (req, res, next) => {
       'advances',
       'purchase_order',
       'responsibility_center',
+      'aging_payables',
+      'tax_compliance',
     ]
 
     let routeQueries = []

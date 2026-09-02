@@ -56,7 +56,7 @@ function FlipUnitGroup({ value, label }) {
   )
 }
 
-function AgingTimerCell({ dueDate, now }) {
+export function AgingTimerCell({ dueDate, now }) {
   const dueTime = new Date(dueDate).getTime()
   const timeDiff = Number.isFinite(dueTime) ? now - dueTime : 0
   const isFuture = timeDiff < 0
@@ -219,7 +219,6 @@ function AgeingReceivablesContent() {
 
           <div className="flex gap-3">
             <div className="flex items-center gap-3">
-
               {/* Inline Date Filter */}
               <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-1 border border-gray-200">
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider mr-1">
@@ -238,7 +237,7 @@ function AgeingReceivablesContent() {
                   onChange={(e) => setDateTo(e.target.value)}
                   className="px-2 py-1 bg-gray-50 border border-gray-100 rounded text-sm text-gray-800"
                 />
-                
+
                 <button
                   onClick={() =>
                     refetchSales({ date_from: dateFrom, date_to: dateTo })
@@ -247,7 +246,7 @@ function AgeingReceivablesContent() {
                 >
                   Apply
                 </button>
-                
+
                 <button
                   onClick={() => {
                     setDateFrom('')

@@ -1679,14 +1679,30 @@ export default function PurchaseForm({
       }
     }
 
-    // 4. Creditable Withholding Tax (CREDIT)
+    // 4. Withholding Tax (CREDIT) - Liability account
+    // Determine if this is payroll-related or supplier-related based on COA
     if (totalWhtAmount > 0) {
+      // Payroll-related COA keywords - use Withholding Tax - Compensation
+      const payrollKeywords = [
+        'salary', 'wage', 'commission', 'bonus', 'compensation',
+        'sss', 'philhealth', 'pag-ibig', 'pagibig', 'payroll'
+      ]
+      
+      // Check if any item has a payroll-related COA
+      const hasPayrollItem = purchaseItems.some((item) => {
+        const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
+        const coaName = (selectedCoa?.name || '').toLowerCase()
+        return payrollKeywords.some(keyword => coaName.includes(keyword))
+      })
+      
+      // Select appropriate WHT liability account
       const whtAccount = chartsOfAccounts.find((a) => {
         const name = (a.name || '').toLowerCase()
-        return (
-          name.includes('creditable withholding tax') ||
-          name.includes('creditable witholding tax')
-        )
+        if (hasPayrollItem) {
+          return name.includes('withholding tax - compensation')
+        } else {
+          return name.includes('withholding tax - expanded')
+        }
       })
 
       if (whtAccount) {

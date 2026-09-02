@@ -439,7 +439,8 @@ export function useBankReconciliation(selectedReconciliation) {
 
   const [bankBalanceInput, setBankBalanceInput] = useState('')
 
-  const [reconciliationMethod, setReconciliationMethod] = useState('adjusted_balance')
+  const [reconciliationMethod, setReconciliationMethod] =
+    useState('adjusted_balance')
 
   const [editingBookBalance, setEditingBookBalance] = useState(false)
 
@@ -489,15 +490,16 @@ export function useBankReconciliation(selectedReconciliation) {
     const suggestions = []
 
     // Check GL entries for partial matches
-    journalEntries.forEach(entry => {
+    journalEntries.forEach((entry) => {
       const entryAmount = parseFloat(entry.amount) || 0
       const type = (entry.db_name || entry.category || '').toLowerCase()
 
       // Calculate matched amount for this entry
       const matchedAmount = items
-        .filter(item => item.ledger_id === entry.id)
+        .filter((item) => item.ledger_id === entry.id)
         .reduce((sum, item) => {
-          const matchedAmt = parseFloat(item.matched_amount || getItemAmount(item)) || 0
+          const matchedAmt =
+            parseFloat(item.matched_amount || getItemAmount(item)) || 0
           return sum + matchedAmt
         }, 0)
 
@@ -589,7 +591,7 @@ export function useBankReconciliation(selectedReconciliation) {
         console.log('First journal entry sample:', result.data?.[0])
         // Deduplicate journal entries by id to prevent duplicates in the UI
         const uniqueEntries = Array.from(
-          new Map((result.data || []).map(entry => [entry.id, entry])).values()
+          new Map((result.data || []).map((entry) => [entry.id, entry])).values(),
         )
         setJournalEntries(uniqueEntries)
       } else {
@@ -646,7 +648,7 @@ export function useBankReconciliation(selectedReconciliation) {
         }
         // Deduplicate journal entries by id to prevent duplicates in the UI
         const uniqueEntries = Array.from(
-          new Map(entries.map(entry => [entry.id, entry])).values()
+          new Map(entries.map((entry) => [entry.id, entry])).values(),
         )
         setJournalEntries(uniqueEntries)
       } else {
@@ -846,7 +848,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
       if (result.success) {
         await fetchReconciliationItems()
-        
+
         // Also refresh journal entries to ensure UI is updated
         const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
         if (coaId && detailStartDate && detailEndDate) {
@@ -884,23 +886,31 @@ export function useBankReconciliation(selectedReconciliation) {
       const result = await response.json()
       if (result.success) {
         await fetchReconciliationItems()
-        
+
         // Also refresh journal entries to ensure UI is updated
         const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
         if (coaId && detailStartDate && detailEndDate) {
           await fetchJournalEntriesByCoa(coaId, detailStartDate, detailEndDate)
         }
-        
+
         showToastMsg('Bank statement item deleted successfully')
       } else {
-        showToastMsg(result.message || 'Failed to delete bank statement item', 'error')
+        showToastMsg(
+          result.message || 'Failed to delete bank statement item',
+          'error',
+        )
       }
     } catch {
       showToastMsg('Server error while deleting bank statement item', 'error')
     }
   }
 
-  const handleMatchBankToLedger = async (bankItemId, ledgerId, matchedAmount = null, skipRefresh = false) => {
+  const handleMatchBankToLedger = async (
+    bankItemId,
+    ledgerId,
+    matchedAmount = null,
+    skipRefresh = false,
+  ) => {
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(
@@ -924,14 +934,12 @@ export function useBankReconciliation(selectedReconciliation) {
         if (!skipRefresh) {
           // Fetch both data sources in parallel to ensure sync
           const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
-          const journalEntriesPromise = (coaId && detailStartDate && detailEndDate)
-            ? fetchJournalEntriesByCoa(coaId, detailStartDate, detailEndDate)
-            : fetchJournalEntries()
+          const journalEntriesPromise =
+            coaId && detailStartDate && detailEndDate
+              ? fetchJournalEntriesByCoa(coaId, detailStartDate, detailEndDate)
+              : fetchJournalEntries()
 
-          await Promise.all([
-            fetchReconciliationItems(),
-            journalEntriesPromise
-          ])
+          await Promise.all([fetchReconciliationItems(), journalEntriesPromise])
           showToastMsg('Bank item matched to ledger successfully')
         }
       } else {
@@ -963,14 +971,12 @@ export function useBankReconciliation(selectedReconciliation) {
       if (result.success) {
         // Fetch both data sources in parallel to ensure sync
         const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
-        const journalEntriesPromise = (coaId && detailStartDate && detailEndDate)
-          ? fetchJournalEntriesByCoa(coaId, detailStartDate, detailEndDate)
-          : fetchJournalEntries()
+        const journalEntriesPromise =
+          coaId && detailStartDate && detailEndDate
+            ? fetchJournalEntriesByCoa(coaId, detailStartDate, detailEndDate)
+            : fetchJournalEntries()
 
-        await Promise.all([
-          fetchReconciliationItems(),
-          journalEntriesPromise
-        ])
+        await Promise.all([fetchReconciliationItems(), journalEntriesPromise])
         showToastMsg('Bank item unmatched successfully')
       } else {
         showToastMsg(result.message || 'Failed to unmatch bank from ledger', 'error')
@@ -1014,7 +1020,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
       if (result.success) {
         await fetchReconciliationItems()
-        
+
         // Also refresh journal entries to ensure UI is updated
         const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
         if (coaId && detailStartDate && detailEndDate) {
@@ -1175,7 +1181,7 @@ export function useBankReconciliation(selectedReconciliation) {
       )
 
       await fetchReconciliationItems()
-      
+
       // Also refresh journal entries to ensure UI is updated
       const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
       if (coaId && detailStartDate && detailEndDate) {
@@ -1246,7 +1252,7 @@ export function useBankReconciliation(selectedReconciliation) {
         showToastMsg('Item deleted successfully')
 
         await fetchReconciliationItems()
-        
+
         // Also refresh journal entries to ensure UI is updated
         const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
         if (coaId && detailStartDate && detailEndDate) {
@@ -1354,7 +1360,7 @@ export function useBankReconciliation(selectedReconciliation) {
       if (result.success) {
         await fetchAdjustments()
         await fetchReconciliationItems()
-        
+
         // Also refresh journal entries to ensure UI is updated
         const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
         if (coaId && detailStartDate && detailEndDate) {
@@ -1426,7 +1432,7 @@ export function useBankReconciliation(selectedReconciliation) {
       if (result.success) {
         await fetchAdjustments()
         await fetchReconciliationItems()
-        
+
         // Also refresh journal entries to ensure UI is updated
         const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
         if (coaId && detailStartDate && detailEndDate) {
@@ -1467,7 +1473,7 @@ export function useBankReconciliation(selectedReconciliation) {
       if (result.success) {
         await fetchAdjustments()
         await fetchReconciliationItems()
-        
+
         // Also refresh journal entries to ensure UI is updated
         const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
         if (coaId && detailStartDate && detailEndDate) {
@@ -1504,7 +1510,7 @@ export function useBankReconciliation(selectedReconciliation) {
       if (result.success) {
         await fetchAdjustments()
         await fetchReconciliationItems()
-        
+
         // Also refresh journal entries to ensure UI is updated
         const coaId = reconData?.coa_id || selectedReconciliation?.coa_id
         if (coaId && detailStartDate && detailEndDate) {
@@ -1784,7 +1790,8 @@ export function useBankReconciliation(selectedReconciliation) {
       setSummaryDetails(null)
 
       // Reset date range to next month for new period
-      const [newDefaultStartDate, newDefaultEndDate] = getNextMonthRange(detailEndDate)
+      const [newDefaultStartDate, newDefaultEndDate] =
+        getNextMonthRange(detailEndDate)
       setDetailStartDate(newDefaultStartDate)
       setDetailEndDate(newDefaultEndDate)
 
@@ -1922,7 +1929,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
   // Calculate matched and unmatched bank statement amounts
   const matchedBankAmount = items
-    .filter(item => item.ledger_id !== null && item.ledger_id !== undefined)
+    .filter((item) => item.ledger_id !== null && item.ledger_id !== undefined)
     .reduce((sum, item) => {
       const debit = parseFloat(item.debit || item.bri_debit || 0) || 0
       const credit = parseFloat(item.credit || item.bri_credit || 0) || 0
@@ -1930,7 +1937,7 @@ export function useBankReconciliation(selectedReconciliation) {
     }, 0)
 
   const unmatchedBankAmount = items
-    .filter(item => item.ledger_id === null || item.ledger_id === undefined)
+    .filter((item) => item.ledger_id === null || item.ledger_id === undefined)
     .reduce((sum, item) => {
       const debit = parseFloat(item.debit || item.bri_debit || 0) || 0
       const credit = parseFloat(item.credit || item.bri_credit || 0) || 0
@@ -1939,14 +1946,19 @@ export function useBankReconciliation(selectedReconciliation) {
 
   // Calculate matched and unmatched GL amounts
   const matchedGLAmount = journalEntries
-    .filter(entry => items.some(item => item.ledger_id === entry.id))
+    .filter((entry) => items.some((item) => item.ledger_id === entry.id))
     .reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0)
 
   const unmatchedGLAmount = journalEntries
-    .filter(entry => !items.some(item => item.ledger_id === entry.id))
-    .filter(entry => {
+    .filter((entry) => !items.some((item) => item.ledger_id === entry.id))
+    .filter((entry) => {
       const type = (entry.db_name || entry.category || '').toLowerCase()
-      return type.includes('receipt') || type.includes('collection') || type.includes('payment') || type.includes('disbursement')
+      return (
+        type.includes('receipt') ||
+        type.includes('collection') ||
+        type.includes('payment') ||
+        type.includes('disbursement')
+      )
     })
     .reduce((sum, entry) => {
       const type = (entry.db_name || entry.category || '').toLowerCase()
@@ -1956,69 +1968,55 @@ export function useBankReconciliation(selectedReconciliation) {
     }, 0)
 
   // Calculate deposits in transit (unmatched GL receipts/collections with DEBIT type)
-  // For partial matching: calculate the unmatched remainder of each GL entry
-  // Also consider unmatched bank items with matching reference numbers as partial clears
+  // KEY: Only include GL entries that are COMPLETELY UNMATCHED (no matched items at all)
+  // Once a GL entry is matched to ANY bank item, it's no longer "in transit"
   const depositsInTransit = journalEntries
-    .filter(entry => {
+    .filter((entry) => {
       const dbType = (entry.db_name || entry.category || '').toLowerCase()
       const entryType = (entry.type || '').toUpperCase()
       // Only include DEBIT entries from receipts/collections (actual inflows)
-      return (dbType.includes('receipt') || dbType.includes('collection')) && entryType === 'DEBIT'
+      if (
+        !(
+          (dbType.includes('receipt') || dbType.includes('collection')) &&
+          entryType === 'DEBIT'
+        )
+      ) {
+        return false
+      }
+      // CRITICAL: Exclude any GL entry that has matched items
+      const hasMatches = items.some((item) => item.ledger_id === entry.id)
+      return !hasMatches // Only unmatched entries contribute
     })
     .reduce((sum, entry) => {
-      const entryAmount = parseFloat(entry.amount) || 0
-      // Calculate total matched amount for this entry (formally matched items)
-      const matchedAmount = items
-        .filter(item => item.ledger_id === entry.id)
-        .reduce((matchedSum, item) => {
-          const matchedAmt = parseFloat(item.matched_amount || getItemAmount(item)) || 0
-          return matchedSum + matchedAmt
-        }, 0)
-      
-      // Also add unmatched bank items with matching reference numbers (partial clears)
-      const glRef = (entry.check_number || entry.document_reference || '').toLowerCase()
-      const partialClearAmount = items
-        .filter(item => (item.ledger_id === null || item.ledger_id === undefined))
-        .filter(item => {
-          const bankRef = (item.reference_number || item.bri_reference_number || '').toLowerCase()
-          return bankRef && glRef && bankRef === glRef
-        })
-        .reduce((partialSum, item) => {
-          const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
-          const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
-          const amount = parseFloat(item.amount || 0) || 0
-          const netAmount = amount !== 0 ? Math.abs(amount) : Math.abs(debit - credit)
-          return partialSum + netAmount
-        }, 0)
-      
-      // Add the unmatched remainder (entry amount minus both formal matches and partial clears)
-      const totalCleared = matchedAmount + partialClearAmount
-      const unmatchedRemainder = Math.max(0, entryAmount - totalCleared)
-      return sum + unmatchedRemainder
+      // For completely unmatched GL entries, add the full amount
+      return sum + (parseFloat(entry.amount) || 0)
     }, 0)
 
   // Calculate outstanding checks (unmatched GL payments/disbursements, or CREDIT entries in receipts)
-  // For partial matching: calculate the unmatched remainder of each GL entry
+  // KEY: Only include GL entries that are COMPLETELY UNMATCHED (no matched items at all)
+  // Once a GL entry is matched to ANY bank item, it's no longer "outstanding"
   const outstandingChecks = journalEntries
-    .filter(entry => {
+    .filter((entry) => {
       const dbType = (entry.db_name || entry.category || '').toLowerCase()
       const entryType = (entry.type || '').toUpperCase()
       // Include: 1) payments/disbursements with DEBIT type, 2) CREDIT entries in receipts (contra-entries)
-      return (dbType.includes('payment') || dbType.includes('disbursement') && entryType === 'DEBIT') ||
-             ((dbType.includes('receipt') || dbType.includes('collection')) && entryType === 'CREDIT')
+      if (
+        !(
+          dbType.includes('payment') ||
+          (dbType.includes('disbursement') && entryType === 'DEBIT') ||
+          ((dbType.includes('receipt') || dbType.includes('collection')) &&
+            entryType === 'CREDIT')
+        )
+      ) {
+        return false
+      }
+      // CRITICAL: Exclude any GL entry that has matched items
+      const hasMatches = items.some((item) => item.ledger_id === entry.id)
+      return !hasMatches // Only unmatched entries contribute
     })
     .reduce((sum, entry) => {
-      const entryAmount = Math.abs(parseFloat(entry.amount) || 0)
-      // Calculate total matched amount for this entry
-      const matchedAmount = items
-        .filter(item => item.ledger_id === entry.id)
-        .reduce((matchedSum, item) => {
-          const matchedAmt = parseFloat(item.matched_amount || getItemAmount(item)) || 0
-          return matchedSum + matchedAmt
-        }, 0)
-      // Add the unmatched remainder
-      const unmatchedRemainder = Math.max(0, entryAmount - matchedAmount)
-      return sum + unmatchedRemainder
+      // For completely unmatched GL entries, add the full amount
+      return sum + Math.abs(parseFloat(entry.amount) || 0)
     }, 0)
 
   const bankErrors = bankSectionItems
@@ -2036,85 +2034,16 @@ export function useBankReconciliation(selectedReconciliation) {
       return sum + (c - d)
     }, 0)
 
-  // Bank statement ending balance: always compute from bank feed records (sum of all bank statement transactions)
-  const bankStatementEndingBalance = items.reduce((sum, item) => {
-    // Try amount field first
-    const amount = parseFloat(item.amount || 0) || 0
-    if (amount !== 0) return sum + amount
-
-    // Try bri_debit/bri_credit fields
-    const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
-    const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
-    if (debit !== 0 || credit !== 0) return sum + (debit - credit)
-
-    return sum
-  }, 0)
-
-  const bankAdditions = bankSectionItems.reduce((sum, item) => {
-    // Bank additions: items that increase the bank balance (deposits/credits)
-    // Check if this is a credit (deposit) or debit based on actual fields
-    const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
-    const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
-    // Credit entries (deposits) are additions, debit entries (withdrawals) are not
-    if (credit > 0 && debit === 0) {
-      return sum + credit
-    }
-    return sum
-  }, 0)
-
-  const bankDeductions = bankSectionItems.reduce((sum, item) => {
-    // Bank deductions: items that decrease the bank balance (withdrawals/debits)
-    // Check if this is a debit (withdrawal) or credit based on actual fields
-    const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
-    const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
-    // Debit entries (withdrawals) are deductions, credit entries (deposits) are not
-    if (debit > 0 && credit === 0) {
-      return sum + debit
-    }
-    return sum
-  }, 0)
-
-  // Calculate bank adjustments from the card adjustments
-
-  const bankCardAdditions = bankAdjustments
-
-    .filter((adj) => adj.type === 'deposits_in_transit')
-
-    .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
-
-  const bankCardDeductions = bankAdjustments
-
-    .filter((adj) => adj.type === 'outstanding_checks')
-
-    .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
-
-  const bankCardErrors = bankAdjustments
-
-    .filter((adj) => adj.type === 'error_bank')
-
-    .reduce((sum, adj) => {
-      // adjustments for errors are stored with sign according to user selection
-      return sum + (parseFloat(adj.amount) || 0)
-    }, 0)
-
-  // Calculate bank adjustments total
-  const bankCardAdjustmentsTotal = bankAdjustments.reduce((sum, adj) => {
-    const amount = parseFloat(adj.amount) || 0
-    // deposits_in_transit and error_bank (positive) are additions
-    // outstanding_checks and error_bank (negative) are deductions
-    if (adj.type === 'deposits_in_transit' || (adj.type === 'error_bank' && amount >= 0)) {
-      return sum + amount
-    } else if (adj.type === 'outstanding_checks' || (adj.type === 'error_bank' && amount < 0)) {
-      return sum + amount
-    }
-    return sum
-  }, 0)
-
   // Calculate ending book GL balance from cash transactions only (receipts, collections, payments, cash_disbursements)
   // This should include ALL GL entries regardless of match status - it's the total book balance
-  const cashJournalEntries = journalEntries.filter(entry => {
+  const cashJournalEntries = journalEntries.filter((entry) => {
     const type = (entry.db_name || entry.category || '').toLowerCase()
-    return type.includes('receipt') || type.includes('collection') || type.includes('payment') || type.includes('disbursement')
+    return (
+      type.includes('receipt') ||
+      type.includes('collection') ||
+      type.includes('payment') ||
+      type.includes('disbursement')
+    )
   })
 
   const endingBookBalance = cashJournalEntries.reduce((sum, entry) => {
@@ -2125,28 +2054,101 @@ export function useBankReconciliation(selectedReconciliation) {
     return sum + (entryType === 'DEBIT' ? amount : -amount)
   }, 0)
 
+  // Bank statement ending balance: CALCULATED from bank items (the imported bank feed)
+  // CRITICAL: This is the ACTUAL ending balance shown on the bank statement
+  // It includes ALL bank items (both matched and unmatched) because they all cleared the bank
+  // Items on the bank statement are NOT "in transit" - they've already been processed by the bank
+  const bankStatementEndingBalance = items
+    .filter(
+      (item) =>
+        (item.bri_details || item.details || item.item_type) !== 'error_bank',
+    )
+    .reduce((sum, item) => {
+      const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+      const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+      // Bank items: credits add, debits subtract
+      return sum + credit - debit
+    }, 0)
+
+  // Calculate bank adjustments from the card adjustments
+  const bankCardAdditions = bankAdjustments
+    .filter((adj) => adj.type === 'deposits_in_transit')
+    .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
+
+  const bankCardDeductions = bankAdjustments
+    .filter((adj) => adj.type === 'outstanding_checks')
+    .reduce((sum, adj) => sum + (parseFloat(adj.amount) || 0), 0)
+
+  const bankCardErrors = bankAdjustments
+    .filter((adj) => adj.type === 'error_bank')
+    .reduce((sum, adj) => {
+      return sum + (parseFloat(adj.amount) || 0)
+    }, 0)
+
+  // Calculate bank adjustments total
+  const bankCardAdjustmentsTotal = bankAdjustments.reduce((sum, adj) => {
+    const amount = parseFloat(adj.amount) || 0
+    if (
+      adj.type === 'deposits_in_transit' ||
+      (adj.type === 'error_bank' && amount >= 0)
+    ) {
+      return sum + amount
+    } else if (
+      adj.type === 'outstanding_checks' ||
+      (adj.type === 'error_bank' && amount < 0)
+    ) {
+      return sum + amount
+    }
+    return sum
+  }, 0)
+
   // Calculate unrecorded bank credits (unmatched bank items that are credits/deposits)
   // For bank items: credit > 0 and debit === 0 means deposit (credit)
-  // EXCEPT: exclude bank items whose reference # matches a GL entry's reference/check #
+  // EXCEPT: exclude bank items whose reference # OR amount matches a GL entry's reference/amount
   const bookAdditions = items
-    .filter(item => (item.ledger_id === null || item.ledger_id === undefined))
-    .filter(item => {
-      // Check if this bank item's reference matches any GL entry's reference/check number
-      const bankRef = (item.reference_number || item.bri_reference_number || '').toLowerCase()
-      const hasMatchingGL = journalEntries.some(entry => {
-        const glRef = (entry.check_number || entry.document_reference || '').toLowerCase()
-        return glRef && bankRef && glRef === bankRef
-      })
-      // Exclude if there's a matching GL reference (should be partial match, not new credit)
-      return !hasMatchingGL
-    })
-    .filter(item => {
+    .filter((item) => item.ledger_id === null || item.ledger_id === undefined)
+    .filter((item) => {
       // Only include items that are credits (credit > 0 and debit === 0)
       const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
       const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
       const isCredit = credit > 0 && debit === 0
-      console.log('BookAdditions filter:', { id: item.id, debit, credit, isCredit })
-      return isCredit
+      if (!isCredit) return false
+
+      // Check if this bank item matches any GL entry (by reference OR by amount)
+      const bankRef = (
+        item.reference_number ||
+        item.bri_reference_number ||
+        ''
+      ).toLowerCase()
+      const bankAmount = credit
+
+      const hasMatchingGL = journalEntries.some((entry) => {
+        // Match by reference number (if both have refs)
+        const glRef = (
+          entry.check_number ||
+          entry.document_reference ||
+          ''
+        ).toLowerCase()
+        if (glRef && bankRef && glRef === bankRef) return true
+
+        // Match by amount and type (GL DEBIT receipts/collections = bank credits/deposits)
+        const entryType = (entry.type || '').toUpperCase()
+        const entryAmount = parseFloat(entry.amount) || 0
+        const dbType = (entry.db_name || entry.category || '').toLowerCase()
+        const isReceiptOrCollection =
+          dbType.includes('receipt') || dbType.includes('collection')
+        if (
+          isReceiptOrCollection &&
+          entryType === 'DEBIT' &&
+          Math.abs(entryAmount - bankAmount) < 0.01
+        ) {
+          return true
+        }
+        return false
+      })
+
+      // Exclude if there's a matching GL entry (it's not unrecorded)
+      return !hasMatchingGL
     })
     .reduce((sum, item) => {
       const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
@@ -2155,30 +2157,81 @@ export function useBankReconciliation(selectedReconciliation) {
 
   // Calculate unrecorded bank charges (unmatched bank items that are debits/withdrawals)
   // For bank items: debit > 0 and credit === 0 means withdrawal/charge (debit)
-  // EXCEPT: exclude bank items whose reference # matches a GL entry's reference/check #
+  // EXCEPT: exclude bank items whose reference # OR amount matches a GL entry's reference/amount
   const bookDeductions = items
-    .filter(item => (item.ledger_id === null || item.ledger_id === undefined))
-    .filter(item => {
-      // Check if this bank item's reference matches any GL entry's reference/check number
-      const bankRef = (item.reference_number || item.bri_reference_number || '').toLowerCase()
-      const hasMatchingGL = journalEntries.some(entry => {
-        const glRef = (entry.check_number || entry.document_reference || '').toLowerCase()
-        return glRef && bankRef && glRef === bankRef
-      })
-      // Exclude if there's a matching GL reference (should be partial match, not new charge)
-      return !hasMatchingGL
-    })
-    .filter(item => {
+    .filter((item) => item.ledger_id === null || item.ledger_id === undefined)
+    .filter((item) => {
       // Only include items that are debits (debit > 0 and credit === 0)
       const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
       const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
       const isDebit = debit > 0 && credit === 0
-      console.log('BookDeductions filter:', { id: item.id, debit, credit, isDebit })
-      return isDebit
+      if (!isDebit) return false
+
+      // Check if this bank item matches any GL entry (by reference OR by amount)
+      const bankRef = (
+        item.reference_number ||
+        item.bri_reference_number ||
+        ''
+      ).toLowerCase()
+      const bankAmount = debit
+
+      const hasMatchingGL = journalEntries.some((entry) => {
+        // Match by reference number (if both have refs)
+        const glRef = (
+          entry.check_number ||
+          entry.document_reference ||
+          ''
+        ).toLowerCase()
+        if (glRef && bankRef && glRef === bankRef) return true
+
+        // Match by amount and type (GL CREDIT payments/disbursements = bank debits/withdrawals)
+        const entryType = (entry.type || '').toUpperCase()
+        const entryAmount = parseFloat(entry.amount) || 0
+        const dbType = (entry.db_name || entry.category || '').toLowerCase()
+        const isPaymentOrDisbursement =
+          dbType.includes('payment') || dbType.includes('disbursement')
+        if (
+          isPaymentOrDisbursement &&
+          entryType === 'CREDIT' &&
+          Math.abs(entryAmount - bankAmount) < 0.01
+        ) {
+          return true
+        }
+        return false
+      })
+
+      // Exclude if there's a matching GL entry (it's not unrecorded)
+      return !hasMatchingGL
     })
     .reduce((sum, item) => {
       const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
       return sum + debit
+    }, 0)
+
+  // Calculate bank additions (unmatched bank credits/deposits that will need to be deposited)
+  const bankAdditions = bankSectionItems
+    .filter((item) => item.ledger_id === null || item.ledger_id === undefined)
+    .reduce((sum, item) => {
+      const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+      const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+      // Credit entries (deposits) are additions
+      if (credit > 0 && debit === 0) {
+        return sum + credit
+      }
+      return sum
+    }, 0)
+
+  // Calculate bank deductions (unmatched bank debits/withdrawals)
+  const bankDeductions = bankSectionItems
+    .filter((item) => item.ledger_id === null || item.ledger_id === undefined)
+    .reduce((sum, item) => {
+      const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+      const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+      // Debit entries (withdrawals) are deductions
+      if (debit > 0 && credit === 0) {
+        return sum + debit
+      }
+      return sum
     }, 0)
 
   const bookErrorAdjustments = bookSectionItems
@@ -2202,27 +2255,48 @@ export function useBankReconciliation(selectedReconciliation) {
     const amount = parseFloat(adj.amount) || 0
     console.log('Book adjustment:', adj)
     // If direction is "less" or type indicates subtraction, subtract the amount
-    if (adj.direction === 'less' || adj.type === 'outstanding_checks' || adj.type === 'service_fees' || (adj.type === 'error_bank' && amount < 0)) {
+    if (
+      adj.direction === 'less' ||
+      adj.type === 'outstanding_checks' ||
+      adj.type === 'service_fees' ||
+      (adj.type === 'error_bank' && amount < 0)
+    ) {
       return sum - Math.abs(amount)
     }
     // Otherwise add the amount
     return sum + Math.abs(amount)
   }, 0)
 
+  // If no bank statement has been uploaded (balance is 0), deposits/outstanding adjustments don't apply
+  const effectiveDepositsInTransit =
+    bankStatementEndingBalance === 0 ? 0 : depositsInTransit
+  const effectiveOutstandingChecks =
+    bankStatementEndingBalance === 0 ? 0 : outstandingChecks
+
   // Calculate adjusted balances based on selected reconciliation method
   let adjustedBankBalance, adjustedBookBalance
 
   if (reconciliationMethod === 'adjusted_balance') {
     // Adjusted Balance Method: Adjusts both bank statement balance and book balance to find a corrected, matching common total
-    adjustedBankBalance = bankStatementEndingBalance + depositsInTransit - outstandingChecks + bankCardAdjustmentsTotal
-    adjustedBookBalance = endingBookBalance + bookAdditions - bookDeductions + bookCardAdjustmentsTotal
+    adjustedBankBalance =
+      bankStatementEndingBalance +
+      effectiveDepositsInTransit -
+      effectiveOutstandingChecks +
+      bankCardAdjustmentsTotal
+    adjustedBookBalance =
+      endingBookBalance + bookAdditions - bookDeductions + bookCardAdjustmentsTotal
   } else if (reconciliationMethod === 'bank_to_book') {
     // Bank-to-Book Method: Starts with bank statement balance and adds/subtracts outstanding items to reach book balance
-    adjustedBankBalance = bankStatementEndingBalance + depositsInTransit - outstandingChecks + bankCardAdjustmentsTotal
+    adjustedBankBalance =
+      bankStatementEndingBalance +
+      effectiveDepositsInTransit -
+      effectiveOutstandingChecks +
+      bankCardAdjustmentsTotal
     adjustedBookBalance = endingBookBalance + bookCardAdjustmentsTotal // Target is the ending book GL balance plus book adjustments
   } else if (reconciliationMethod === 'book_to_bank') {
     // Book-to-Bank Method: Starts with internal ledger balance and reconciles it up to the active bank statement balance
-    adjustedBookBalance = endingBookBalance + bookAdditions - bookDeductions + bookCardAdjustmentsTotal
+    adjustedBookBalance =
+      endingBookBalance + bookAdditions - bookDeductions + bookCardAdjustmentsTotal
     adjustedBankBalance = bankStatementEndingBalance + bankCardAdjustmentsTotal // Target is the ending statement balance plus bank adjustments
   }
 
@@ -2237,7 +2311,7 @@ export function useBankReconciliation(selectedReconciliation) {
     bookCardAdjustmentsTotal,
     bookAdjustments,
     adjustedBankBalance,
-    adjustedBookBalance
+    adjustedBookBalance,
   })
 
   // Net variance: Always show absolute difference between adjusted bank and book balances
@@ -2410,9 +2484,9 @@ export function useBankReconciliation(selectedReconciliation) {
 
     removeItemFormRow,
 
-    depositsInTransit,
+    depositsInTransit: effectiveDepositsInTransit,
 
-    outstandingChecks,
+    outstandingChecks: effectiveOutstandingChecks,
 
     matchedBankAmount,
 

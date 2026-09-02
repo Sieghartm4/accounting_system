@@ -86,8 +86,8 @@ const getBankReconciliations = async (req, res, next) => {
     const hasBankStatementBalance = await hasBankStatementBalanceColumn()
 
     const bankStatementBalanceSelect = hasBankStatementBalance
-      ? 'COALESCE(br.br_bank_statement_balance, item_summary.bank_statement_balance, 0)'
-      : 'COALESCE(item_summary.bank_statement_balance, 0)'
+      ? 'COALESCE(br.br_bank_statement_balance, 0)'
+      : '0'
 
     const query = sql
 
@@ -396,46 +396,6 @@ const getBankReconciliationDetail = async (req, res, next) => {
 
     console.log(`Fetched ${items.length} bank reconciliation items`)
 
-    let computedBankStatementBalance = 0
-
-    if (!hasBankStatementBalance) {
-      const statementBalanceQuery = `
-        SELECT
-          COALESCE(
-            SUM(
-              CASE
-                WHEN bri_details IN ('deposits_in_transit', 'interest_income', 'credit_memo')
-                  THEN GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
-                WHEN bri_details IN ('outstanding_checks', 'bank_charges', 'nsf_checks', 'debit_memo')
-                  THEN -GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
-                WHEN bri_details IN ('error_bank', 'error_book')
-                  THEN COALESCE(bri_credit, 0) - COALESCE(bri_debit, 0)
-                ELSE GREATEST(ABS(COALESCE(bri_debit, 0)), ABS(COALESCE(bri_credit, 0)))
-              END
-            ),
-            0
-          ) AS bank_statement_balance
-        FROM ${Accounting.bank_reconciliation_items.tablename}
-        WHERE ${Accounting.bank_reconciliation_items.selectOptionColumns.br_id} = ?
-          ${start_date ? `AND ${Accounting.bank_reconciliation_items.selectOptionColumns.date} >= ?` : ''}
-          ${end_date ? `AND ${Accounting.bank_reconciliation_items.selectOptionColumns.date} <= ?` : ''}
-      `
-
-      const statementBalanceValues = [
-        reconciliationId,
-
-        ...(start_date ? [start_date] : []),
-
-        ...(end_date ? [end_date] : []),
-      ]
-
-      const balanceRows = await Query(statementBalanceQuery, statementBalanceValues)
-
-      computedBankStatementBalance = parseFloat(
-        balanceRows?.[0]?.bank_statement_balance || 0,
-      )
-    }
-
     res.status(200).json({
       success: true,
 
@@ -446,7 +406,7 @@ const getBankReconciliationDetail = async (req, res, next) => {
 
         bank_statement_balance: hasBankStatementBalance
           ? parseFloat(reconciliation.bank_statement_balance || 0)
-          : computedBankStatementBalance,
+          : 0,
 
         account_name: accountName,
 
@@ -730,7 +690,9 @@ const updateBankReconciliationItem = async (req, res, next) => {
         updateColumns.push('bri_date')
 
         // Convert ISO date to YYYY-MM-DD format for MySQL
-        const formattedDate = date ? new Date(date).toISOString().split('T')[0] : null
+        const formattedDate = date
+          ? new Date(date).toISOString().split('T')[0]
+          : null
         updateValues.push(formattedDate)
       }
 
@@ -1811,7 +1773,9 @@ const matchBankToLedger = async (req, res, next) => {
     }
 
     // Update bank item with ledger_id
-    const updateColumns = [Accounting.bank_reconciliation_items.selectOptionColumns.ledger_id]
+    const updateColumns = [
+      Accounting.bank_reconciliation_items.selectOptionColumns.ledger_id,
+    ]
     const updateValues = [ledgerNum]
 
     const updateQuery = sql
@@ -1822,9 +1786,7 @@ const matchBankToLedger = async (req, res, next) => {
 
     updateValues.push(bankItemNum)
 
-    await Transaction([
-      { sql: updateQuery, values: updateValues },
-    ])
+    await Transaction([{ sql: updateQuery, values: updateValues }])
 
     res.status(200).json({
       success: true,
@@ -1840,7 +1802,10 @@ const matchBankToLedger = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while matching bank to ledger',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
     })
   }
 }
@@ -1883,7 +1848,9 @@ const unmatchBankFromLedger = async (req, res, next) => {
     }
 
     // Update bank item to set ledger_id to null
-    const updateColumns = [Accounting.bank_reconciliation_items.selectOptionColumns.ledger_id]
+    const updateColumns = [
+      Accounting.bank_reconciliation_items.selectOptionColumns.ledger_id,
+    ]
     const updateValues = [null]
 
     const updateQuery = sql
@@ -1894,9 +1861,7 @@ const unmatchBankFromLedger = async (req, res, next) => {
 
     updateValues.push(itemId)
 
-    await Transaction([
-      { sql: updateQuery, values: updateValues },
-    ])
+    await Transaction([{ sql: updateQuery, values: updateValues }])
 
     res.status(200).json({
       success: true,
@@ -1909,7 +1874,10 @@ const unmatchBankFromLedger = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while unmatching bank from ledger',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
     })
   }
 }

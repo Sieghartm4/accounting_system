@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus,
@@ -26,6 +27,7 @@ const fmt = (n) =>
   })
 
 export default function BankReconciliation() {
+  const location = useLocation()
   const [view, setView] = useState('list')
   const [reconciliations, setReconciliations] = useState([])
   const [loading, setLoading] = useState(false)
@@ -41,7 +43,21 @@ export default function BankReconciliation() {
     coa_id: '',
     bank_statement_balance: '',
   })
+  const [coaSearch, setCoaSearch] = useState('')
+  const [isCoaDropdownOpen, setIsCoaDropdownOpen] = useState(false)
+  const coaDropdownRef = useRef(null)
   const [reconciliationSummaries, setReconciliationSummaries] = useState({})
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (coaDropdownRef.current && !coaDropdownRef.current.contains(event.target)) {
+        setIsCoaDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
 
   const formatLocalDate = (d) => {
     const year = d.getFullYear()
@@ -86,25 +102,29 @@ export default function BankReconciliation() {
 
           // Calculate the new/open period date range
           let startDate, endDate
-          if (monthsResult.success && monthsResult.data && monthsResult.data.length > 0) {
+          if (
+            monthsResult.success &&
+            monthsResult.data &&
+            monthsResult.data.length > 0
+          ) {
             const savedMonths = [...monthsResult.data].sort(
               (a, b) => new Date(b.end_date) - new Date(a.end_date),
             )
             const latestSaved = savedMonths[0]
-            
+
             const latestEndLocal = new Date(latestSaved.end_date)
             const latestEndLocalStr = formatLocalDate(latestEndLocal)
             const periodStart = new Date(latestEndLocalStr)
-            
+
             const periodEnd = new Date(periodStart)
             periodEnd.setDate(periodStart.getDate() + 29)
-            
+
             startDate = formatLocalDate(periodStart)
             endDate = formatLocalDate(periodEnd)
           } else {
-            [startDate, endDate] = getCurrentMonthRange()
+            ;[startDate, endDate] = getCurrentMonthRange()
           }
-          
+
           const queryString = buildDateQuery(startDate, endDate)
 
           const detailResponse = await fetch(
@@ -161,125 +181,162 @@ export default function BankReconciliation() {
             (item) => getItemSection(item) === 'BOOK',
           )
 
-          // Calculate deposits in transit from journal entries (same as detail page)
+          // Calculate deposits in transit from UNMATCHED GL entries only
+          // CRITICAL: Only include GL entries that have NO matches at all (ledger_id === null for ALL items)
           const depositsInTransit = journalEntries
-            .filter(entry => {
+            .filter((entry) => {
               const dbType = (entry.db_name || entry.category || '').toLowerCase()
               const entryType = (entry.type || '').toUpperCase()
-              return (dbType.includes('receipt') || dbType.includes('collection')) && entryType === 'DEBIT'
+              // Only DEBIT receipts/collections
+              if (
+                !(
+                  (dbType.includes('receipt') || dbType.includes('collection')) &&
+                  entryType === 'DEBIT'
+                )
+              ) {
+                return false
+              }
+              // CRITICAL: Exclude any GL entry that has matched items
+              const hasMatches = items.some((item) => item.ledger_id === entry.id)
+              return !hasMatches // Only unmatched entries contribute
             })
             .reduce((sum, entry) => {
-              const entryAmount = parseFloat(entry.amount) || 0
-              const matchedAmount = items
-                .filter(item => item.ledger_id === entry.id)
-                .reduce((matchedSum, item) => {
-                  const matchedAmt = parseFloat(item.matched_amount || item.amount || 0) || 0
-                  if (matchedAmt !== 0) return matchedSum + matchedAmt
-                  // Fallback to debit/credit fields
-                  const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
-                  const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
-                  return matchedSum + Math.abs(debit - credit)
-                }, 0)
-              
-              // Also add unmatched bank items with matching reference numbers (partial clears)
-              const glRef = (entry.check_number || entry.document_reference || '').toLowerCase()
-              const partialClearAmount = items
-                .filter(item => (item.ledger_id === null || item.ledger_id === undefined))
-                .filter(item => {
-                  const bankRef = (item.reference_number || item.bri_reference_number || '').toLowerCase()
-                  return bankRef && glRef && bankRef === glRef
-                })
-                .reduce((partialSum, item) => {
-                  const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
-                  const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
-                  const amount = parseFloat(item.amount || 0) || 0
-                  const netAmount = amount !== 0 ? Math.abs(amount) : Math.abs(debit - credit)
-                  return partialSum + netAmount
-                }, 0)
-              
-              const totalCleared = matchedAmount + partialClearAmount
-              const unmatchedRemainder = Math.max(0, entryAmount - totalCleared)
-              return sum + unmatchedRemainder
+              // For completely unmatched GL entries, add the full amount
+              return sum + (parseFloat(entry.amount) || 0)
             }, 0)
 
-          // Calculate outstanding checks from journal entries (same as detail page)
+          // Calculate outstanding checks from UNMATCHED GL entries only
+          // CRITICAL: Only include GL entries that have NO matches at all (ledger_id === null for ALL items)
           const outstandingChecks = journalEntries
-            .filter(entry => {
+            .filter((entry) => {
               const dbType = (entry.db_name || entry.category || '').toLowerCase()
               const entryType = (entry.type || '').toUpperCase()
-              return (dbType.includes('payment') || dbType.includes('disbursement') && entryType === 'DEBIT') ||
-                     ((dbType.includes('receipt') || dbType.includes('collection')) && entryType === 'CREDIT')
+              // Include payments/disbursements with CREDIT type OR DEBIT type
+              if (
+                !(
+                  dbType.includes('payment') ||
+                  (dbType.includes('disbursement') && entryType === 'DEBIT') ||
+                  ((dbType.includes('receipt') || dbType.includes('collection')) &&
+                    entryType === 'CREDIT')
+                )
+              ) {
+                return false
+              }
+              // CRITICAL: Exclude any GL entry that has matched items
+              const hasMatches = items.some((item) => item.ledger_id === entry.id)
+              return !hasMatches // Only unmatched entries contribute
             })
             .reduce((sum, entry) => {
-              const entryAmount = Math.abs(parseFloat(entry.amount) || 0)
-              const matchedItems = items.filter(item => item.ledger_id === entry.id)
-              const matchedAmount = matchedItems.reduce((matchedSum, item) => {
-                const matchedAmt = parseFloat(item.matched_amount || item.amount || 0) || 0
-                if (matchedAmt !== 0) return matchedSum + matchedAmt
-                // Fallback to debit/credit fields
-                const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
-                const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
-                return matchedSum + Math.abs(debit - credit)
-              }, 0)
-              
-              // Also add unmatched bank items with matching reference numbers (partial clears)
-              const glRef = (entry.check_number || entry.document_reference || '').toLowerCase()
-              const partialClearAmount = items
-                .filter(item => (item.ledger_id === null || item.ledger_id === undefined))
-                .filter(item => {
-                  const bankRef = (item.reference_number || item.bri_reference_number || '').toLowerCase()
-                  return bankRef && glRef && bankRef === glRef
-                })
-                .reduce((partialSum, item) => {
-                  const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
-                  const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
-                  const amount = parseFloat(item.amount || 0) || 0
-                  const netAmount = amount !== 0 ? Math.abs(amount) : Math.abs(debit - credit)
-                  return partialSum + netAmount
-                }, 0)
-              
-              const totalCleared = matchedAmount + partialClearAmount
-              const unmatchedRemainder = Math.max(0, entryAmount - totalCleared)
-              console.log('Outstanding check entry:', {
-                entryId: entry.id,
-                dbType: entry.db_name || entry.category,
-                entryType: entry.type,
-                entryAmount,
-                matchedItems: matchedItems.map(i => ({ id: i.id, ledger_id: i.ledger_id, amount: i.amount })),
-                matchedAmount,
-                partialClearAmount,
-                totalCleared,
-                unmatchedRemainder
+              // For completely unmatched GL entries, add the full amount
+              return sum + Math.abs(parseFloat(entry.amount) || 0)
+            }, 0)
+
+          // Calculate unrecorded bank credits (unmatched bank items that match GL entries)
+          // EXCEPT: exclude items that match GL by reference OR by amount
+          const bookAdditions = items
+            .filter(
+              (item) => item.ledger_id === null || item.ledger_id === undefined,
+            )
+            .filter((item) => {
+              // Only include items that are credits (credit > 0 and debit === 0)
+              const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+              const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+              const isCredit = credit > 0 && debit === 0
+              if (!isCredit) return false
+
+              // Check if this bank item matches any GL entry (by reference OR by amount)
+              const bankRef = (
+                item.reference_number ||
+                item.bri_reference_number ||
+                ''
+              ).toLowerCase()
+              const bankAmount = credit
+
+              const hasMatchingGL = journalEntries.some((entry) => {
+                // Match by reference number (if both have refs)
+                const glRef = (
+                  entry.check_number ||
+                  entry.document_reference ||
+                  ''
+                ).toLowerCase()
+                if (glRef && bankRef && glRef === bankRef) return true
+
+                // Match by amount and type (GL DEBIT receipts/collections = bank credits/deposits)
+                const entryType = (entry.type || '').toUpperCase()
+                const entryAmount = parseFloat(entry.amount) || 0
+                const dbType = (entry.db_name || entry.category || '').toLowerCase()
+                const isReceiptOrCollection =
+                  dbType.includes('receipt') || dbType.includes('collection')
+                if (
+                  isReceiptOrCollection &&
+                  entryType === 'DEBIT' &&
+                  Math.abs(entryAmount - bankAmount) < 0.01
+                ) {
+                  return true
+                }
+                return false
               })
-              return sum + unmatchedRemainder
+
+              // Exclude if there's a matching GL entry (it's not unrecorded)
+              return !hasMatchingGL
+            })
+            .reduce((sum, item) => {
+              const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+              return sum + credit
             }, 0)
 
-          const bookAdditions = bookSectionItems
+          // Calculate unrecorded bank charges (unmatched bank items that match GL entries)
+          // EXCEPT: exclude items that match GL by reference OR by amount
+          const bookDeductions = items
             .filter(
-              (item) =>
-                getItemMeta(item.bri_details || item.details || item.item_type)
-                  .effect === 'add',
+              (item) => item.ledger_id === null || item.ledger_id === undefined,
             )
-            .reduce((sum, item) => {
-              const debit = Math.abs(parseFloat(item.bri_debit || item.debit || 0))
-              const credit = Math.abs(
-                parseFloat(item.bri_credit || item.credit || 0),
-              )
-              return sum + Math.max(debit, credit)
-            }, 0)
+            .filter((item) => {
+              // Only include items that are debits (debit > 0 and credit === 0)
+              const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+              const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+              const isDebit = debit > 0 && credit === 0
+              if (!isDebit) return false
 
-          const bookDeductions = bookSectionItems
-            .filter(
-              (item) =>
-                getItemMeta(item.bri_details || item.details || item.item_type)
-                  .effect === 'deduct',
-            )
+              // Check if this bank item matches any GL entry (by reference OR by amount)
+              const bankRef = (
+                item.reference_number ||
+                item.bri_reference_number ||
+                ''
+              ).toLowerCase()
+              const bankAmount = debit
+
+              const hasMatchingGL = journalEntries.some((entry) => {
+                // Match by reference number (if both have refs)
+                const glRef = (
+                  entry.check_number ||
+                  entry.document_reference ||
+                  ''
+                ).toLowerCase()
+                if (glRef && bankRef && glRef === bankRef) return true
+
+                // Match by amount and type (GL CREDIT payments/disbursements = bank debits/withdrawals)
+                const entryType = (entry.type || '').toUpperCase()
+                const entryAmount = parseFloat(entry.amount) || 0
+                const dbType = (entry.db_name || entry.category || '').toLowerCase()
+                const isPaymentOrDisbursement =
+                  dbType.includes('payment') || dbType.includes('disbursement')
+                if (
+                  isPaymentOrDisbursement &&
+                  entryType === 'CREDIT' &&
+                  Math.abs(entryAmount - bankAmount) < 0.01
+                ) {
+                  return true
+                }
+                return false
+              })
+
+              // Exclude if there's a matching GL entry (it's not unrecorded)
+              return !hasMatchingGL
+            })
             .reduce((sum, item) => {
-              const debit = Math.abs(parseFloat(item.bri_debit || item.debit || 0))
-              const credit = Math.abs(
-                parseFloat(item.bri_credit || item.credit || 0),
-              )
-              return sum + Math.max(debit, credit)
+              const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+              return sum + debit
             }, 0)
 
           const bookErrorAdjustments = bookSectionItems
@@ -341,7 +398,12 @@ export default function BankReconciliation() {
             .filter((adj) => adj.side === 'BANK')
             .reduce((sum, adj) => {
               const amount = parseFloat(adj.amount) || 0
-              if (adj.direction === 'less' || adj.type === 'outstanding_checks' || adj.type === 'service_fees' || (adj.type === 'error_bank' && amount < 0)) {
+              if (
+                adj.direction === 'less' ||
+                adj.type === 'outstanding_checks' ||
+                adj.type === 'service_fees' ||
+                (adj.type === 'error_bank' && amount < 0)
+              ) {
                 return sum - Math.abs(amount)
               }
               return sum + Math.abs(amount)
@@ -352,29 +414,41 @@ export default function BankReconciliation() {
             .filter((adj) => adj.side === 'BOOK')
             .reduce((sum, adj) => {
               const amount = parseFloat(adj.amount) || 0
-              if (adj.direction === 'less' || adj.type === 'outstanding_checks' || adj.type === 'service_fees' || (adj.type === 'error_book' && amount < 0)) {
+              if (
+                adj.direction === 'less' ||
+                adj.type === 'outstanding_checks' ||
+                adj.type === 'service_fees' ||
+                (adj.type === 'error_book' && amount < 0)
+              ) {
                 return sum - Math.abs(amount)
               }
               return sum + Math.abs(amount)
             }, 0)
 
-          // Calculate bank statement ending balance from all bank items (same as detail page)
-          const bankStatementEndingBalance = bankSectionItems.reduce((sum, item) => {
-            const amount = parseFloat(item.amount || 0) || 0
-            if (amount !== 0) return sum + amount
-            const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
-            const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
-            return sum + (debit - credit)
-          }, 0)
+          // Calculate bank statement ending balance from all bank items (the imported bank feed)
+          // CRITICAL: This is the ACTUAL ending balance shown on the bank statement
+          // It includes ALL bank items (both matched and unmatched) because they all cleared the bank
+          const bankStatementEndingBalance = items
+            .filter(
+              (item) =>
+                (item.bri_details || item.details || item.item_type) !==
+                'error_bank',
+            )
+            .reduce((sum, item) => {
+              const credit = parseFloat(item.bri_credit || item.credit || 0) || 0
+              const debit = parseFloat(item.bri_debit || item.debit || 0) || 0
+              // Bank items: credits add, debits subtract
+              return sum + credit - debit
+            }, 0)
 
           console.log('Bank statement ending balance calculation:', {
             bankStatementEndingBalance,
-            bankSectionItems: bankSectionItems.map(i => ({
+            bankSectionItems: bankSectionItems.map((i) => ({
               id: i.id,
               debit: i.bri_debit || i.debit,
               credit: i.bri_credit || i.credit,
-              amount: i.amount
-            }))
+              amount: i.amount,
+            })),
           })
 
           console.log('Adjusted balance calculation:', {
@@ -385,19 +459,32 @@ export default function BankReconciliation() {
             endingBookBalance,
             bookAdditions,
             bookDeductions,
-            bookCardAdjustmentsTotal
+            bookCardAdjustmentsTotal,
           })
 
+          // Apply the same zero-bank guard as the detail worksheet.
+          // If the bank statement has no balance yet, timing items should not inflate the bank side.
+          const effectiveDepositsInTransit =
+            bankStatementEndingBalance === 0 ? 0 : depositsInTransit
+          const effectiveOutstandingChecks =
+            bankStatementEndingBalance === 0 ? 0 : outstandingChecks
+
           // Use the same calculation as detail page (adjusted_balance method)
-          const adjustedBankBalance = bankStatementEndingBalance + depositsInTransit - outstandingChecks + bankCardAdjustmentsTotal
-          const adjustedBookBalance = endingBookBalance + bookAdditions - bookDeductions + bookCardAdjustmentsTotal
+          const adjustedBankBalance =
+            bankStatementEndingBalance +
+            effectiveDepositsInTransit -
+            effectiveOutstandingChecks +
+            bankCardAdjustmentsTotal
+          const adjustedBookBalance =
+            endingBookBalance +
+            bookAdditions -
+            bookDeductions +
+            bookCardAdjustmentsTotal
 
           const reconDifference = adjustedBookBalance - adjustedBankBalance
 
           summaries[reconciliation.id] = {
-            bankStatementBalance: parseFloat(
-              detailResult.data.bank_statement_balance || 0,
-            ),
+            bankStatementBalance: bankStatementEndingBalance,
             glBalance: endingBookBalance,
             adjustedBankBalance,
             adjustedBookBalance,
@@ -477,6 +564,19 @@ export default function BankReconciliation() {
     fetchChartOfAccounts()
   }, [])
 
+  useEffect(() => {
+    const requestedId = location.state?.reconciliationId
+    if (!requestedId || reconciliations.length === 0) return
+
+    const requestedReconciliation = reconciliations.find(
+      (reconciliation) => String(reconciliation.id) === String(requestedId),
+    )
+    if (!requestedReconciliation) return
+
+    setSelectedReconciliation(requestedReconciliation)
+    setView('detail')
+  }, [location.state, reconciliations])
+
   const handleCreateReconciliation = async () => {
     if (!createFormData.bank_account || !createFormData.coa_id) {
       setShowToast(true)
@@ -508,6 +608,8 @@ export default function BankReconciliation() {
           coa_id: '',
           bank_statement_balance: '',
         })
+        setCoaSearch('')
+        setIsCoaDropdownOpen(false)
         fetchReconciliations()
       } else {
         setShowToast(true)
@@ -580,7 +682,6 @@ export default function BankReconciliation() {
     >
       {/* Main Workspace Container */}
       <main className="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        
         {/* Method explanation banner */}
         <div className="bg-white border border-gray-100 rounded-2xl p-4 mb-5 shadow-sm">
           <div className="flex items-start gap-4 flex-wrap">
@@ -742,6 +843,8 @@ export default function BankReconciliation() {
                   coa_id: '',
                   bank_statement_balance: '',
                 })
+                setCoaSearch('')
+                setIsCoaDropdownOpen(false)
                 setShowCreateModal(true)
               }}
               className="text-sm font-bold text-gray-900 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition"
@@ -762,18 +865,34 @@ export default function BankReconciliation() {
                   {reconciliations.length === 1 ? '' : 's'}
                 </span>
               </div>
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[2px]">
-                Select an account to open the reconciliation worksheet
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="hidden md:inline text-[10px] font-black text-zinc-500 uppercase tracking-[2px]">
+                  Select an account to open the reconciliation worksheet
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateFormData({
+                      bank_account: '',
+                      coa_id: '',
+                      bank_statement_balance: '',
+                    })
+                    setShowCreateModal(true)
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-red-700"
+                >
+                  <Plus size={13} />
+                  Add Reconciliation
+                </button>
+              </div>
             </div>
             <div className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 <AnimatePresence>
                   {reconciliations.map((r, i) => {
                     const summary = reconciliationSummaries[r.id] || {}
-                    // Always use adjusted balances for display
-                    const bankStatement = summary.adjustedBankBalance ?? 0
-                    const glBalance = summary.adjustedBookBalance ?? 0
+                    const bankStatement = summary.bankStatementBalance ?? 0
+                    const glBalance = summary.glBalance ?? 0
                     const effectiveDiff =
                       typeof summary.reconDifference === 'number'
                         ? summary.reconDifference
@@ -782,8 +901,10 @@ export default function BankReconciliation() {
                       typeof summary.isReconciled === 'boolean'
                         ? summary.isReconciled
                         : Math.abs(effectiveDiff) < 0.01
-                    const adjustedBankBalance = summary.adjustedBankBalance
-                    const adjustedBookBalance = summary.adjustedBookBalance
+                    const adjustedBankBalance =
+                      summary.adjustedBankBalance ?? bankStatement
+                    const adjustedBookBalance =
+                      summary.adjustedBookBalance ?? glBalance
 
                     return (
                       <motion.button
@@ -826,38 +947,25 @@ export default function BankReconciliation() {
                             </div>
                           </div>
 
-                          {/* Two-column balance display matching the two-section method */}
+                          {/* Bank and book side values shown directly to avoid duplication */}
                           <div className="grid grid-cols-2 gap-2 mt-4">
                             <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
                               <p className="text-[9px] font-black text-blue-400 uppercase tracking-[2px]">
-                                Bank Statement
+                                Bank Side
                               </p>
                               <p className="text-sm font-black font-mono text-blue-700 mt-1 truncate">
-                                ₱{fmt(bankStatement)}
+                                ₱{fmt(adjustedBankBalance)}
                               </p>
                             </div>
                             <div className="rounded-lg bg-violet-50 border border-violet-100 p-3">
                               <p className="text-[9px] font-black text-violet-400 uppercase tracking-[2px]">
-                                GL Book Balance
+                                Book Side
                               </p>
                               <p className="text-sm font-black font-mono text-violet-700 mt-1 truncate">
-                                ₱{fmt(glBalance)}
+                                ₱{fmt(adjustedBookBalance)}
                               </p>
                             </div>
                           </div>
-
-                          {adjustedBankBalance != null &&
-                            adjustedBookBalance != null && (
-                              <div className="mt-3 rounded-xl bg-slate-50 border border-slate-100 p-3 text-[11px] text-slate-700">
-                                <p className="font-black uppercase tracking-[2px] text-slate-400 mb-1">
-                                  Current month adjusted balances
-                                </p>
-                                <div className="flex flex-wrap gap-2 text-slate-800">
-                                  <span>Bank ₱{fmt(adjustedBankBalance)}</span>
-                                  <span>Book ₱{fmt(adjustedBookBalance)}</span>
-                                </div>
-                              </div>
-                            )}
 
                           <div className="mt-3 flex items-center justify-between border-t border-zinc-100 pt-3">
                             <span
@@ -931,23 +1039,77 @@ export default function BankReconciliation() {
                   <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
                     Chart of Accounts (Cash Account) *
                   </label>
-                  <select
-                    value={createFormData.coa_id}
-                    onChange={(e) =>
-                      setCreateFormData({
-                        ...createFormData,
-                        coa_id: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none text-sm"
-                  >
-                    <option value="">-- Select Cash Account --</option>
-                    {chartOfAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.code} – {a.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div ref={coaDropdownRef} className="relative">
+                    <input
+                      type="text"
+                      value={coaSearch}
+                      onFocus={() => setIsCoaDropdownOpen(true)}
+                      onChange={(e) => {
+                        setCoaSearch(e.target.value)
+                        setCreateFormData({ ...createFormData, coa_id: '' })
+                        setIsCoaDropdownOpen(true)
+                      }}
+                      placeholder="Search cash account..."
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none text-sm"
+                    />
+                    {isCoaDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-lg">
+                        {chartOfAccounts.filter((account) => {
+                          const search = coaSearch.toLowerCase()
+                          return (
+                            !search ||
+                            String(account.code || '')
+                              .toLowerCase()
+                              .includes(search) ||
+                            String(account.name || '')
+                              .toLowerCase()
+                              .includes(search)
+                          )
+                        }).length > 0 ? (
+                          chartOfAccounts
+                            .filter((account) => {
+                              const search = coaSearch.toLowerCase()
+                              return (
+                                !search ||
+                                String(account.code || '')
+                                  .toLowerCase()
+                                  .includes(search) ||
+                                String(account.name || '')
+                                  .toLowerCase()
+                                  .includes(search)
+                              )
+                            })
+                            .map((account) => (
+                              <button
+                                type="button"
+                                key={account.id}
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setCoaSearch(`${account.code} - ${account.name}`)
+                                  setCreateFormData({
+                                    ...createFormData,
+                                    coa_id: account.id,
+                                  })
+                                  setIsCoaDropdownOpen(false)
+                                }}
+                                className="block w-full border-b border-gray-100 px-3 py-2 text-left text-sm text-gray-800 transition hover:bg-red-50 last:border-b-0"
+                              >
+                                <span className="font-semibold">{account.name}</span>
+                                {account.code && (
+                                  <span className="ml-2 text-xs text-gray-400">
+                                    {account.code}
+                                  </span>
+                                )}
+                              </button>
+                            ))
+                        ) : (
+                          <div className="px-3 py-3 text-center text-sm text-gray-400">
+                            No cash accounts found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">

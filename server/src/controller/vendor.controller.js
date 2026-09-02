@@ -663,10 +663,15 @@ const importVendors = async (req, res, next) => {
       try {
         const { id, code, name, category, type, address, tin, details, contact, status } = vendor
         const normalizedCode = normalizeCodeValue(code)
-        const finalStatus = typeof status !== 'undefined' ? String(status).toUpperCase() : 'ACTIVE'
+        const statusUpper = typeof status !== 'undefined' ? String(status).toUpperCase().trim() : ''
+        const finalStatus = (statusUpper === 'ACTIVE' || statusUpper === 'INACTIVE') ? statusUpper : 'ACTIVE'
+
+        // Fix field mapping: TIN is in details field, address is in tin field
+        const actualTin = details || tin || ''
+        const actualAddress = tin || address || ''
 
         // Validate required fields
-        if (!normalizedCode || !name || !address || !tin) {
+        if (!normalizedCode || !name || !actualAddress || !actualTin) {
           results.errors.push({
             vendor,
             message: 'Missing required fields (code, name, address, tin)',
@@ -768,8 +773,8 @@ const importVendors = async (req, res, next) => {
                 existingVendor.name,
                 code,
                 name,
-                address,
-                tin,
+                actualAddress,
+                actualTin,
                 details,
                 contact,
               )
@@ -781,8 +786,8 @@ const importVendors = async (req, res, next) => {
                 vendorInfoColumns,
                 code,
                 name,
-                address,
-                tin,
+                actualAddress,
+                actualTin,
                 details,
                 contact,
                 keyColumn === 'vi_vendor_id' ? existingVendor.id : undefined,
@@ -871,8 +876,8 @@ const importVendors = async (req, res, next) => {
               vendorInfoColumns,
               code,
               name,
-              address,
-              tin,
+              actualAddress,
+              actualTin,
               details,
               contact,
               newVendorId,

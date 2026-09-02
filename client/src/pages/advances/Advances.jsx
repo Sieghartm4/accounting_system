@@ -360,6 +360,7 @@ function AdvancesContent() {
             enableCheckbox={true}
             enableActionColumn={true}
             enableRowClick={true}
+            isLoading={loading && advances.length === 0}
             returnColumn="groupKey"
             onRowClick={(groupKey, row) => {
               const key = `${row.date}-${row.type}`
@@ -416,6 +417,7 @@ function AdvancesContent() {
             enableAddButton={false}
             enableCheckbox={true}
             enableActionColumn={false}
+            isLoading={loading && advances.length === 0}
             checkboxColumn="id"
             onCheckboxChange={(selectedIds) => {
               const group = groupedAdvances.find(g => `${g.date}-${g.type}` === expandedGroup)

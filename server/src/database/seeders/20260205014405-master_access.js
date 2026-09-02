@@ -12,16 +12,16 @@ module.exports = {
      *   isBetaMember: false
      * }], {});
     */
-    await queryInterface.bulkInsert('master_access', [
-      {
-        ma_access_name: 'Admin',
-        ma_status: 'active'
-      },
-      {
-        ma_access_name: 'User',
-        ma_status: 'active'
-      }
-    ]);
+    // await queryInterface.bulkInsert('master_access', [
+    //   {
+    //     ma_access_name: 'Admin',
+    //     ma_status: 'active'
+    //   },
+    //   {
+    //     ma_access_name: 'User',
+    //     ma_status: 'active'
+    //   }
+    // ]);
   },
 
   async down (queryInterface, Sequelize) {

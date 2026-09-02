@@ -662,10 +662,15 @@ const importCustomers = async (req, res, next) => {
       try {
         const { id, code, name, category, type, address, tin, details, contact, status } = customer
         const normalizedCode = normalizeCodeValue(code)
-        const finalStatus = typeof status !== 'undefined' ? String(status).toUpperCase() : 'ACTIVE'
+        const statusUpper = typeof status !== 'undefined' ? String(status).toUpperCase().trim() : ''
+        const finalStatus = (statusUpper === 'ACTIVE' || statusUpper === 'INACTIVE') ? statusUpper : 'ACTIVE'
+
+        // Fix field mapping: TIN is in details field, address is in tin field
+        const actualTin = details || tin || ''
+        const actualAddress = tin || address || ''
 
         // Validate required fields
-        if (!normalizedCode || !name || !address || !tin) {
+        if (!normalizedCode || !name || !actualAddress || !actualTin) {
           results.errors.push({
             customer,
             message: 'Missing required fields (code, name, address, tin)',
@@ -767,8 +772,8 @@ const importCustomers = async (req, res, next) => {
                 existingCustomer.name,
                 code,
                 name,
-                address,
-                tin,
+                actualAddress,
+                actualTin,
                 details,
                 contact,
               )
@@ -780,8 +785,8 @@ const importCustomers = async (req, res, next) => {
                 customerInfoColumns,
                 code,
                 name,
-                address,
-                tin,
+                actualAddress,
+                actualTin,
                 details,
                 contact,
                 keyColumn === 'ci_customer_id' ? existingCustomer.id : undefined,
@@ -870,8 +875,8 @@ const importCustomers = async (req, res, next) => {
               customerInfoColumns,
               code,
               name,
-              address,
-              tin,
+              actualAddress,
+              actualTin,
               details,
               contact,
               newCustomerId,

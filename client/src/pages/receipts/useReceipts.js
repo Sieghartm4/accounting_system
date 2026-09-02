@@ -962,10 +962,8 @@ export function useReceiptsForm({
   )
 
   useEffect(() => {
-    if (!isDisabled && (!isEditMode || !isViewMode)) {
-      if (!isEditMode || hasNewReceiptItems()) {
-        generateJournalEntries()
-      }
+    if (!isDisabled && !isViewMode) {
+      generateJournalEntries()
     }
   }, [
     receiptItems,
@@ -973,7 +971,6 @@ export function useReceiptsForm({
     bankName,
     chartsOfAccounts,
     isDisabled,
-    isEditMode,
     isViewMode,
   ])
 

@@ -58,6 +58,8 @@ const { bankReconciliationRouter } = require('../routes/bank_reconciliation.rout
 
 const { auditTrailRouter } = require('../routes/audit_trail.routes')
 
+const { taxComplianceRouter } = require('../routes/tax_compliance.routes')
+
 const initRoutes = (app) => {
   app.use('/credentials', credentialsRouter)
 
@@ -116,6 +118,8 @@ const initRoutes = (app) => {
   app.use('/bank_reconciliation', bankReconciliationRouter)
 
   app.use('/audit-trail', auditTrailRouter)
+
+  app.use('/tax-compliance', taxComplianceRouter)
 }
 
 module.exports = { initRoutes }

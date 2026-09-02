@@ -388,6 +388,11 @@ export const ROUTE_CONFIG = {
     label: 'Withholding Tax',
     icon: 'Receipt',
   },
+  tax_compliance: {
+    name: 'tax_compliance',
+    label: 'Tax & Compliance Status',
+    icon: 'ShieldCheck',
+  },
   customer_transactions: {
     name: 'customer_transactions',
     label: 'Customer Transactions',
@@ -408,6 +413,11 @@ export const ROUTE_CONFIG = {
     icon: 'Clock3',
   },
   purchase: { name: 'purchase', label: 'Purchase', icon: 'ShoppingCart' },
+  aging_payables: {
+    name: 'aging_payables',
+    label: 'Aging Payables',
+    icon: 'Clock3',
+  },
   payments: { name: 'payments', label: 'Payments', icon: 'PaymentCard' },
   adjustments: {
     name: 'adjustments',
@@ -520,7 +530,7 @@ export const getSidebarItems = (user) => {
   })
 
   // Purchase & Payments section
-  const purchaseRoutes = ['purchase', 'payments']
+  const purchaseRoutes = ['purchase', 'payments', 'aging_payables']
   purchaseRoutes.forEach((route) => {
     if (hasRouteAccess(route, user)) {
       items.purchase.push(ROUTE_CONFIG[route])
@@ -562,6 +572,7 @@ export const getSidebarItems = (user) => {
     'balance_sheet',
     'statement_of_comprehensive_income',
     'journal_entries',
+    'tax_compliance',
   ]
   reportRoutes.forEach((route) => {
     if (hasRouteAccess(route, user)) {

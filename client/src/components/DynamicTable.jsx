@@ -38,6 +38,8 @@ const DynamicTable = ({
   hasMore = false, // if true, more rows can be loaded
   isLoadingMore = false, // if true, currently loading more rows
   onLoadMore = null, // callback function to load more rows
+  // --- LOADING STATE ---
+  isLoading = false, // if true, table is in initial loading state
 }) => {
   const [searchParams] = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
@@ -677,9 +679,18 @@ const DynamicTable = ({
 
       {/* --- DATA TABLE --- */}
       <div
-        className="flex-1 overflow-auto bg-white custom-scrollbar"
+        className="flex-1 overflow-auto bg-white custom-scrollbar relative"
         ref={tableScrollRef}
       >
+        {/* --- INITIAL LOADING OVERLAY --- */}
+        {isLoading && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
+            <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-[10px] font-black uppercase tracking-[3px] text-gray-400 mt-4">
+              Loading Data...
+            </p>
+          </div>
+        )}
         <style
           dangerouslySetInnerHTML={{
             __html: `

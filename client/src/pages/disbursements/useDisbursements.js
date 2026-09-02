@@ -972,9 +972,28 @@ export function useDisbursementForm({
         }
 
         if (whtAmount > 0) {
-          const whtAccount = chartsOfAccounts.find((a) =>
-            (a.name || '').toLowerCase().includes('withholding tax - expanded'),
-          )
+          // Determine WHT account based on COA type (payroll vs supplier)
+          const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
+          const coaName = (selectedCoa?.name || '').toLowerCase()
+          
+          // Payroll-related COA keywords - use Withholding Tax - Compensation
+          const payrollKeywords = [
+            'salary', 'wage', 'commission', 'bonus', 'compensation',
+            'sss', 'philhealth', 'pag-ibig', 'pagibig', 'payroll'
+          ]
+          
+          const isPayroll = payrollKeywords.some(keyword => coaName.includes(keyword))
+          
+          // Select appropriate WHT liability account
+          const whtAccount = chartsOfAccounts.find((a) => {
+            const name = (a.name || '').toLowerCase()
+            if (isPayroll) {
+              return name.includes('withholding tax - compensation')
+            } else {
+              return name.includes('withholding tax - expanded')
+            }
+          })
+          
           if (whtAccount) {
             entries.push({
               id: Date.now() + Math.random(),
@@ -1062,9 +1081,7 @@ export function useDisbursementForm({
 
   useEffect(() => {
     if (!isViewMode) {
-      if (!isEditMode || hasNewDisbursementItems()) {
-        generateJournalEntries()
-      }
+      generateJournalEntries()
     }
   }, [
     disbursementItems,
@@ -1072,7 +1089,6 @@ export function useDisbursementForm({
     bankName,
     chartsOfAccounts,
     isViewMode,
-    isEditMode,
   ])
 
   // ── Post / Submit ──

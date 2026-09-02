@@ -412,6 +412,8 @@ export default function Sidebar({ isCollapsed }) {
                       vat: Percent,
 
                       withholding_tax: Receipt,
+
+                      tax_compliance: ShieldCheck,
                     }
 
                     const Icon = iconMap[item.name] || Settings
@@ -664,6 +666,7 @@ export default function Sidebar({ isCollapsed }) {
                     purchase: ShoppingCart,
                     purchase_order: Package,
                     payments: PaymentCard,
+                    aging_payables: Clock3,
                   }
 
                   const Icon = iconMap[item.name] || Settings
@@ -684,6 +687,16 @@ export default function Sidebar({ isCollapsed }) {
                 >
                   <Package size={14} /> Purchase Orders
                 </Link>
+                {!sidebarItems.purchase?.some(
+                  (item) => item?.name === 'aging_payables',
+                ) && (
+                  <Link
+                    to="/aging_payables"
+                    className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === '/aging_payables' ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
+                  >
+                    <Clock3 size={14} /> Aging Payables
+                  </Link>
+                )}
               </div>
             )}
           </div>
@@ -806,6 +819,8 @@ export default function Sidebar({ isCollapsed }) {
                     journal_entries: FileText,
 
                     bank_reconciliation: Landmark,
+
+                    tax_compliance: ShieldCheck,
                   }
 
                   const Icon = iconMap[item.name] || Settings

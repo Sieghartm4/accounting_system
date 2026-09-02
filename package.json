@@ -16,6 +16,7 @@
     "migrate:prod": "dotenv -e .env -- npm run db:migrate:prod -w server",
     "migrate:tenant": "dotenv -e .env -- npm run db:migrate:tenant -w server --",
     "seed": "dotenv -e .env -- npm run db:seed -w server",
+    "seed:all": "dotenv -e .env -- npm run db:seed:all -w server",
     "db:status": "dotenv -e .env -- npm run db:status -w server",
     "db:reset": "dotenv -e .env -- npm run db:reset -w server",
     "db:create": "dotenv -e .env -- npm run db:create -w server",

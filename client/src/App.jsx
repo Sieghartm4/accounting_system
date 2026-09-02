@@ -6,7 +6,7 @@ import UserDocumentation from './pages/user_documentation/UserDocumentation'
 import DeveloperDocumentation from './pages/developer_documentation/App'
 import Layout from './components/layout/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
-import Dashboard from './pages/dashboard/Dashboard'
+import DashboardNew from './pages/dashboard/DashboardNew'
 import Users from './pages/users/Users'
 import Vendors from './pages/vendors/Vendors'
 import VendorTransactions from './pages/vendors/VendorTransactions'
@@ -20,6 +20,7 @@ import Disbursements from './pages/disbursements/Disbursements'
 import Sales from './pages/sales/Sales'
 import Collections from './pages/collections/Collections'
 import AgeingReceivables from './pages/aging_receivables/AgeingReceivables'
+import AgeingPayables from './pages/aging_payables/AgeingPayables'
 import Purchase from './pages/purchase/Purchase'
 import PurchaseOrder from './pages/purchase_order/PurchaseOrder'
 import Payments from './pages/payments/Payments'
@@ -28,6 +29,7 @@ import CustomerTransactions from './pages/customers/CustomerTransactions'
 import Vat from './pages/vat/Vat'
 import ResponsibilityCenter from './pages/responsibility_center/ResponsibilityCenter'
 import WithholdingTax from './pages/withholding_tax/WithholdingTax'
+import TaxCompliance from './pages/tax_compliance/TaxCompliance'
 import Adjustments from './pages/adjustments/Adjustments'
 import TrialBalance from './pages/reports/TrialBalance'
 import IncomeStatement from './pages/reports/IncomeStatement'
@@ -45,7 +47,14 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<ClientOnly><Register /></ClientOnly>} />
+        <Route
+          path="/register"
+          element={
+            <ClientOnly>
+              <Register />
+            </ClientOnly>
+          }
+        />
         <Route path="/user_documentation" element={<UserDocumentation />} />
         <Route
           path="/developer_documentation"
@@ -56,7 +65,7 @@ function App() {
             path="dashboard"
             element={
               <ProtectedRoute routeName="dashboard">
-                <Dashboard />
+                <DashboardNew />
               </ProtectedRoute>
             }
           />
@@ -137,6 +146,14 @@ function App() {
             element={
               <ProtectedRoute routeName="aging_receivables">
                 <AgeingReceivables />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="aging_payables"
+            element={
+              <ProtectedRoute routeName={['aging_payables', 'purchase']}>
+                <AgeingPayables />
               </ProtectedRoute>
             }
           />
@@ -225,6 +242,26 @@ function App() {
             element={
               <ProtectedRoute routeName="witholding_tax">
                 <WithholdingTax />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="tax-compliance"
+            element={
+              <ProtectedRoute
+                routeName={['tax_compliance', 'vat', 'witholding_tax']}
+              >
+                <TaxCompliance />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="tax_compliance"
+            element={
+              <ProtectedRoute
+                routeName={['tax_compliance', 'vat', 'witholding_tax']}
+              >
+                <TaxCompliance />
               </ProtectedRoute>
             }
           />

@@ -563,9 +563,18 @@ export default function CollectionsForm({
 
   // Auto-fill form from preSelectedSales (To Be Collected feature)
   useEffect(() => {
-    if (preSelectedSales && preSelectedSales.length > 0 && !isViewMode && !isEditMode && customers.length > 0) {
+    if (
+      preSelectedSales &&
+      preSelectedSales.length > 0 &&
+      !isViewMode &&
+      !isEditMode &&
+      customers.length > 0
+    ) {
       console.log('Auto-filling form from preSelectedSales:', preSelectedSales)
-      console.log('Auto-filling form from preSelectedSalesItems:', preSelectedSalesItems)
+      console.log(
+        'Auto-filling form from preSelectedSalesItems:',
+        preSelectedSalesItems,
+      )
       console.log('Available customers:', customers)
 
       // Set customer from first sale - find matching customer by name to get ID
@@ -574,7 +583,10 @@ export default function CollectionsForm({
       console.log('Looking for customer with name:', customerName)
 
       const matchingCustomer = customers.find(
-        (c) => c.name === customerName || c.customer_name === customerName || c.code === customerName
+        (c) =>
+          c.name === customerName ||
+          c.customer_name === customerName ||
+          c.code === customerName,
       )
 
       if (matchingCustomer) {
@@ -597,10 +609,12 @@ export default function CollectionsForm({
           const vat = parseFloat(item.vat) || 0
           const wht = parseFloat(item.witholding_tax) || 0
           const amount = gross - discount + vat - wht
-          console.log(`Calculated: gross=${gross}, discount=${discount}, vat=${vat}, wht=${wht}, amount=${amount}`)
+          console.log(
+            `Calculated: gross=${gross}, discount=${discount}, vat=${vat}, wht=${wht}, amount=${amount}`,
+          )
           return {
             id: `auto-${index}`,
-            salesItemId: item.sales_id || item.id,
+            salesItemId: item.id,
             invoiceRef: item.document_reference || '',
             description: item.product_service_name || item.name || '',
             responsibilityCenter: item.responsibility_center || '',
@@ -615,23 +629,8 @@ export default function CollectionsForm({
         setCollectionItems(items)
         console.log('Auto-filled collection items from fetched data:', items)
       } else {
-        console.log('No fetched items, using placeholder')
-        // Fallback to placeholder items
-        const items = preSelectedSales.map((sale, index) => ({
-          id: `auto-${index}`,
-          salesItemId: sale.id,
-          invoiceRef: sale.doc_ref || sale.document_reference || '',
-          description: `Sales Payment - ${sale.id}`,
-          responsibilityCenter: '',
-          gross: parseFloat(sale.amount_due) || 0,
-          discAmt: 0,
-          vatAmt: 0,
-          whtAmount: 0,
-          amount: parseFloat(sale.amount_due) || 0,
-          isOther: false,
-        }))
-        setCollectionItems(items)
-        console.log('Auto-filled collection items from placeholder data:', items)
+        console.warn('No sales items were returned for the selected sales')
+        setCollectionItems([])
       }
     }
   }, [preSelectedSales, preSelectedSalesItems, isViewMode, isEditMode, customers])
@@ -1463,7 +1462,9 @@ export default function CollectionsForm({
               <div className="px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white flex items-center justify-between border-b border-red-800 shadow-sm flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Calculator size={18} className="text-red-100" />
-                  <h3 className="text-sm font-bold tracking-tight">Financial Summary</h3>
+                  <h3 className="text-sm font-bold tracking-tight">
+                    Financial Summary
+                  </h3>
                 </div>
                 <span className="text-xs bg-zinc-900 text-zinc-100 px-2.5 py-0.5 rounded-full border border-zinc-800 font-mono font-semibold">
                   PHP (₱)
@@ -1554,19 +1555,29 @@ export default function CollectionsForm({
                     <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-semibold text-sm">
                       <Landmark size={14} />
                     </div>
-                    <h2 className="text-base font-bold tracking-tight">Basic Details</h2>
+                    <h2 className="text-base font-bold tracking-tight">
+                      Basic Details
+                    </h2>
                   </div>
                   <button
-                    onClick={() => setIsBasicDetailsCollapsed(!isBasicDetailsCollapsed)}
+                    onClick={() =>
+                      setIsBasicDetailsCollapsed(!isBasicDetailsCollapsed)
+                    }
                     className="text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
                     title={isBasicDetailsCollapsed ? 'Expand' : 'Collapse'}
                   >
-                    {isBasicDetailsCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                    {isBasicDetailsCollapsed ? (
+                      <ChevronDown size={16} />
+                    ) : (
+                      <ChevronUp size={16} />
+                    )}
                   </button>
                 </div>
                 {!isBasicDetailsCollapsed && (
                   <div className="p-4">
-                    <div className={`grid gap-4 ${modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-4'}`}>
+                    <div
+                      className={`grid gap-4 ${modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-4'}`}
+                    >
                       {/* Customer Selection */}
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -1645,7 +1656,10 @@ export default function CollectionsForm({
                               setModeOfPayment(opt.value)
                               setModeSearch(opt.label)
                             }}
-                            options={modeOfPaymentOptions.map((m) => ({ label: m, value: m }))}
+                            options={modeOfPaymentOptions.map((m) => ({
+                              label: m,
+                              value: m,
+                            }))}
                             inputClassName={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${!modeOfPayment ? 'border-red-500' : 'border-zinc-300'}`}
                             emptyText="No modes found"
                           />
@@ -1667,7 +1681,8 @@ export default function CollectionsForm({
                       </div>
 
                       {/* Bank Name (conditional) */}
-                      {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+                      {(modeOfPayment === 'CHECK' ||
+                        modeOfPayment === 'BANK_TRANSFER') && (
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                             Bank Name
@@ -1684,7 +1699,8 @@ export default function CollectionsForm({
                       )}
 
                       {/* Check Number (conditional) */}
-                      {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+                      {(modeOfPayment === 'CHECK' ||
+                        modeOfPayment === 'BANK_TRANSFER') && (
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                             Check #
@@ -1711,7 +1727,9 @@ export default function CollectionsForm({
                       <Receipt size={14} />
                     </div>
                     <div>
-                      <h2 className="text-base font-bold tracking-tight">Collection Items</h2>
+                      <h2 className="text-base font-bold tracking-tight">
+                        Collection Items
+                      </h2>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1739,11 +1757,17 @@ export default function CollectionsForm({
                       </div>
                     </div>
                     <button
-                      onClick={() => setIsCollectionItemsCollapsed(!isCollectionItemsCollapsed)}
+                      onClick={() =>
+                        setIsCollectionItemsCollapsed(!isCollectionItemsCollapsed)
+                      }
                       className="text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
                       title={isCollectionItemsCollapsed ? 'Expand' : 'Collapse'}
                     >
-                      {isCollectionItemsCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                      {isCollectionItemsCollapsed ? (
+                        <ChevronDown size={16} />
+                      ) : (
+                        <ChevronUp size={16} />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1771,104 +1795,119 @@ export default function CollectionsForm({
                         </colgroup>
                         <thead className="bg-zinc-100 border-b border-zinc-200 uppercase font-bold text-zinc-700 tracking-wider">
                           <tr>
-                            <th className="py-3 px-3 min-w-[180px] text-center">Invoice Ref</th>
-                            <th className="py-3 px-2 min-w-[120px] text-center">Product/Service</th>
-                            <th className="py-3 px-2 min-w-[150px] text-center">Gross Amt</th>
+                            <th className="py-3 px-3 min-w-[180px] text-center">
+                              Invoice Ref
+                            </th>
+                            <th className="py-3 px-2 min-w-[120px] text-center">
+                              Product/Service
+                            </th>
+                            <th className="py-3 px-2 min-w-[150px] text-center">
+                              Gross Amt
+                            </th>
                             <th className="py-3 px-2 w-16 text-center">Discount</th>
                             <th className="py-3 px-2 w-28 text-center">VAT</th>
                             <th className="py-3 px-2 w-24 text-center">WHT</th>
-                            <th className="py-3 px-2 w-20 text-center">Amount Due</th>
-                            <th className="py-3 px-2 w-20 text-center">Resp. Center</th>
+                            <th className="py-3 px-2 w-20 text-center">
+                              Amount Due
+                            </th>
+                            <th className="py-3 px-2 w-20 text-center">
+                              Resp. Center
+                            </th>
                             <th className="py-3 px-2 w-10 text-center"></th>
                           </tr>
                         </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {collectionItems.map((item) => (
-                          <tr
-                            key={item.id}
-                            className="hover:bg-gray-50/50 transition-colors"
-                          >
-                            <td className="py-2 px-2 text-center">
-                              <span className="font-mono text-[11px] bg-gray-100 px-2 py-0.5 rounded text-gray-700">
-                                {item.invoiceRef || '—'}
-                              </span>
-                            </td>
-                            <td
-                              className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 truncate"
-                              title={item.product_service_name || item.description}
+                        <tbody className="divide-y divide-gray-50">
+                          {collectionItems.map((item) => (
+                            <tr
+                              key={item.id}
+                              className="hover:bg-gray-50/50 transition-colors"
                             >
-                              {item.product_service_name || item.description || '—'}
+                              <td className="py-2 px-2 text-center">
+                                <span className="font-mono text-[11px] bg-gray-100 px-2 py-0.5 rounded text-gray-700">
+                                  {item.invoiceRef || '—'}
+                                </span>
+                              </td>
+                              <td
+                                className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 truncate"
+                                title={item.product_service_name || item.description}
+                              >
+                                {item.product_service_name ||
+                                  item.description ||
+                                  '—'}
+                              </td>
+                              <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-800 tabular-nums">
+                                {fmt(item.gross || 0)}
+                              </td>
+                              <td className="py-2 px-2 text-[12px] font-bold text-center text-orange-500 tabular-nums">
+                                ({fmt(item.discAmt || 0)})
+                              </td>
+                              <td className="py-2 px-2 text-[12px] font-bold text-center text-red-500 tabular-nums">
+                                +{fmt(item.vatAmt || 0)}
+                              </td>
+                              <td className="py-2 px-2 text-[12px] font-bold text-center text-blue-600 tabular-nums">
+                                ({fmt(item.whtAmount || 0)})
+                              </td>
+                              <td className="py-2 px-2 text-[13px] font-black text-center text-green-700 tabular-nums">
+                                {fmt(item.amount || 0)}
+                              </td>
+                              <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 tabular-nums">
+                                {item.responsibilityCenter || '---'}
+                              </td>
+                              <td className="py-2 px-1 text-center">
+                                {!isViewMode && !isEditMode && (
+                                  <button
+                                    onClick={() => removeCollectionItem(item.id)}
+                                    className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-gray-200 bg-gray-50/80">
+                            <td
+                              colSpan={2}
+                              className="py-2 px-2 text-[13px] font-black uppercase text-gray-900 text-left"
+                            >
+                              Totals
                             </td>
-                            <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-800 tabular-nums">
-                              {fmt(item.gross || 0)}
+                            <td className="py-2 px-2 text-[12px] font-black tabular-nums">
+                              {fmt(summary.totalGross)}
                             </td>
-                            <td className="py-2 px-2 text-[12px] font-bold text-center text-orange-500 tabular-nums">
-                              ({fmt(item.discAmt || 0)})
+                            <td className="py-2 px-2 text-[12px] font-black text-orange-500 tabular-nums">
+                              ({fmt(summary.totalDiscount)})
                             </td>
-                            <td className="py-2 px-2 text-[12px] font-bold text-center text-red-500 tabular-nums">
-                              +{fmt(item.vatAmt || 0)}
+                            <td className="py-2 px-2 text-[12px] font-black text-red-500 tabular-nums">
+                              +{fmt(summary.totalVAT)}
                             </td>
-                            <td className="py-2 px-2 text-[12px] font-bold text-center text-blue-600 tabular-nums">
-                              ({fmt(item.whtAmount || 0)})
+                            <td className="py-2 px-2 text-[12px] font-black text-blue-600 tabular-nums">
+                              ({fmt(summary.totalWHT)})
                             </td>
-                            <td className="py-2 px-2 text-[13px] font-black text-center text-green-700 tabular-nums">
-                              {fmt(item.amount || 0)}
+                            <td className="py-2 px-2 text-[13px] font-black text-green-700 tabular-nums">
+                              {fmt(summary.totalCashCollected)}
                             </td>
-                            <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 tabular-nums">
-                              {item.responsibilityCenter || '---'}
-                            </td>
-                            <td className="py-2 px-1 text-center">
-                              {!isViewMode && !isEditMode && (
-                                <button
-                                  onClick={() => removeCollectionItem(item.id)}
-                                  className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </td>
+                            <td />
                           </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t-2 border-gray-200 bg-gray-50/80">
-                          <td
-                            colSpan={2}
-                            className="py-2 px-2 text-[13px] font-black uppercase text-gray-900 text-left"
-                          >
-                            Totals
-                          </td>
-                          <td className="py-2 px-2 text-[12px] font-black tabular-nums">
-                            {fmt(summary.totalGross)}
-                          </td>
-                          <td className="py-2 px-2 text-[12px] font-black text-orange-500 tabular-nums">
-                            ({fmt(summary.totalDiscount)})
-                          </td>
-                          <td className="py-2 px-2 text-[12px] font-black text-red-500 tabular-nums">
-                            +{fmt(summary.totalVAT)}
-                          </td>
-                          <td className="py-2 px-2 text-[12px] font-black text-blue-600 tabular-nums">
-                            ({fmt(summary.totalWHT)})
-                          </td>
-                          <td className="py-2 px-2 text-[13px] font-black text-green-700 tabular-nums">
-                            {fmt(summary.totalCashCollected)}
-                          </td>
-                          <td />
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                  {!isViewMode && !isEditMode && (
-                    <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
-                      <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
-                      >
-                        <Plus size={12} /> Add Sales Items
-                      </button>
-                      <span className="text-xs text-zinc-500 font-medium">{collectionItems.length} {collectionItems.length === 1 ? 'item' : 'items'}</span>
+                        </tfoot>
+                      </table>
                     </div>
-                  )}
+                    {!isViewMode && !isEditMode && (
+                      <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
+                        <button
+                          onClick={() => setIsModalOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                        >
+                          <Plus size={12} /> Add Sales Items
+                        </button>
+                        <span className="text-xs text-zinc-500 font-medium">
+                          {collectionItems.length}{' '}
+                          {collectionItems.length === 1 ? 'item' : 'items'}
+                        </span>
+                      </div>
+                    )}
                   </>
                 )}
               </section>
@@ -1881,18 +1920,28 @@ export default function CollectionsForm({
                       <Layers size={14} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-base font-bold tracking-tight">Journal Entries</h2>
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-800 text-zinc-100 border border-zinc-700`}>
+                      <h2 className="text-base font-bold tracking-tight">
+                        Journal Entries
+                      </h2>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-800 text-zinc-100 border border-zinc-700`}
+                      >
                         {isBalanced ? 'Balanced' : 'Unbalanced'}
                       </span>
                     </div>
                   </div>
                   <button
-                    onClick={() => setIsJournalEntriesCollapsed(!isJournalEntriesCollapsed)}
+                    onClick={() =>
+                      setIsJournalEntriesCollapsed(!isJournalEntriesCollapsed)
+                    }
                     className="text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
                     title={isJournalEntriesCollapsed ? 'Expand' : 'Collapse'}
                   >
-                    {isJournalEntriesCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                    {isJournalEntriesCollapsed ? (
+                      <ChevronDown size={16} />
+                    ) : (
+                      <ChevronUp size={16} />
+                    )}
                   </button>
                 </div>
 
@@ -1912,148 +1961,176 @@ export default function CollectionsForm({
                         </colgroup>
                         <thead className="bg-zinc-100 border-b border-zinc-200 uppercase font-bold text-zinc-600 tracking-wider">
                           <tr>
-                            <th className="py-2.5 px-3 text-center">Chart of Account</th>
-                            <th className="py-2.5 px-3 text-center w-32">Debit (₱)</th>
-                            <th className="py-2.5 px-3 text-center w-32">Credit (₱)</th>
-                            <th className="py-2.5 px-3 text-center">Responsibility Center</th>
+                            <th className="py-2.5 px-3 text-center">
+                              Chart of Account
+                            </th>
+                            <th className="py-2.5 px-3 text-center w-32">
+                              Debit (₱)
+                            </th>
+                            <th className="py-2.5 px-3 text-center w-32">
+                              Credit (₱)
+                            </th>
+                            <th className="py-2.5 px-3 text-center">
+                              Responsibility Center
+                            </th>
                             <th className="py-2.5 px-3 w-10 text-center"></th>
                           </tr>
                         </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {journalEntries.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={5}
-                            className="py-6 text-[12px] text-gray-400 text-center"
-                          >
-                            Journal entries auto-generate once items are added and
-                            mode of payment is selected.
-                          </td>
-                        </tr>
-                      ) : (
-                        journalEntries.map((entry) => (
-                          <tr key={entry.id}>
-                            <td className="py-1.5 px-1">
-                              <SearchableDropdown
-                                disabled={isViewMode}
-                                placeholder="Search account..."
-                                value={entry.accountSearch}
-                                onChange={(v) =>
-                                  updateJournalEntry(entry.id, 'accountSearch', v)
-                                }
-                                onSelect={(opt) => {
-                                  updateJournalEntry(entry.id, 'account', opt.value)
-                                  updateJournalEntry(
-                                    entry.id,
-                                    'accountSearch',
-                                    opt.label,
-                                  )
-                                }}
-                                options={coaOptions}
-                                inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                emptyText="No accounts found"
-                              />
+                        <tbody className="divide-y divide-gray-50">
+                          {journalEntries.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={5}
+                                className="py-6 text-[12px] text-gray-400 text-center"
+                              >
+                                Journal entries auto-generate once items are added
+                                and mode of payment is selected.
+                              </td>
+                            </tr>
+                          ) : (
+                            journalEntries.map((entry) => (
+                              <tr key={entry.id}>
+                                <td className="py-1.5 px-1">
+                                  <SearchableDropdown
+                                    disabled={isViewMode}
+                                    placeholder="Search account..."
+                                    value={entry.accountSearch}
+                                    onChange={(v) =>
+                                      updateJournalEntry(
+                                        entry.id,
+                                        'accountSearch',
+                                        v,
+                                      )
+                                    }
+                                    onSelect={(opt) => {
+                                      updateJournalEntry(
+                                        entry.id,
+                                        'account',
+                                        opt.value,
+                                      )
+                                      updateJournalEntry(
+                                        entry.id,
+                                        'accountSearch',
+                                        opt.label,
+                                      )
+                                    }}
+                                    options={coaOptions}
+                                    inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    emptyText="No accounts found"
+                                  />
+                                </td>
+                                <td className="py-1.5 px-1">
+                                  <input
+                                    disabled={isViewMode || !entry.isManual}
+                                    className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    placeholder="0.00"
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={formatPriceDisplay(entry.debit ?? '')}
+                                    onChange={(e) => {
+                                      const parsed = parsePriceInput(e.target.value)
+                                      updateJournalEntry(
+                                        entry.id,
+                                        'debit',
+                                        parsed === '' ? '' : parseFloat(parsed) || 0,
+                                      )
+                                    }}
+                                    readOnly={!entry.isManual}
+                                  />
+                                </td>
+                                <td className="py-1.5 px-1">
+                                  <input
+                                    disabled={isViewMode || !entry.isManual}
+                                    className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    placeholder="0.00"
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={formatPriceDisplay(entry.credit ?? '')}
+                                    onChange={(e) => {
+                                      const parsed = parsePriceInput(e.target.value)
+                                      updateJournalEntry(
+                                        entry.id,
+                                        'credit',
+                                        parsed === '' ? '' : parseFloat(parsed) || 0,
+                                      )
+                                    }}
+                                    readOnly={!entry.isManual}
+                                  />
+                                </td>
+                                <td className="py-1.5 px-1">
+                                  <SearchableDropdown
+                                    disabled={isViewMode}
+                                    placeholder="Select"
+                                    value={entry.center}
+                                    onChange={(v) =>
+                                      updateJournalEntry(entry.id, 'center', v)
+                                    }
+                                    onSelect={(opt) =>
+                                      updateJournalEntry(
+                                        entry.id,
+                                        'center',
+                                        opt.value,
+                                      )
+                                    }
+                                    options={responsibilityCenterOptions}
+                                    inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    emptyText={
+                                      responsibilityCentersError ||
+                                      'No responsibility centers found'
+                                    }
+                                  />
+                                </td>
+                                <td className="py-1.5 text-center">
+                                  {!isViewMode && entry.isManual ? (
+                                    <button
+                                      className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                      onClick={() => removeJournalEntry(entry.id)}
+                                    >
+                                      <Trash2 size={14} className="mx-auto" />
+                                    </button>
+                                  ) : (
+                                    <span className="text-gray-300 text-[10px] italic">
+                                      {isViewMode ? '' : 'Auto'}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                        <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
+                          <tr>
+                            <td
+                              colSpan={2}
+                              className="py-2.5 px-3 text-right text-xs"
+                            >
+                              Total Ledger Balance:
                             </td>
-                            <td className="py-1.5 px-1">
-                              <input
-                                disabled={isViewMode || !entry.isManual}
-                                className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                placeholder="0.00"
-                                type="text"
-                                inputMode="decimal"
-                                value={formatPriceDisplay(entry.debit ?? '')}
-                                onChange={(e) => {
-                                  const parsed = parsePriceInput(e.target.value)
-                                  updateJournalEntry(
-                                    entry.id,
-                                    'debit',
-                                    parsed === '' ? '' : parseFloat(parsed) || 0,
-                                  )
-                                }}
-                                readOnly={!entry.isManual}
-                              />
+                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">
+                              {fmt(totalDebit)}
                             </td>
-                            <td className="py-1.5 px-1">
-                              <input
-                                disabled={isViewMode || !entry.isManual}
-                                className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                placeholder="0.00"
-                                type="text"
-                                inputMode="decimal"
-                                value={formatPriceDisplay(entry.credit ?? '')}
-                                onChange={(e) => {
-                                  const parsed = parsePriceInput(e.target.value)
-                                  updateJournalEntry(
-                                    entry.id,
-                                    'credit',
-                                    parsed === '' ? '' : parseFloat(parsed) || 0,
-                                  )
-                                }}
-                                readOnly={!entry.isManual}
-                              />
+                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">
+                              {fmt(totalCredit)}
                             </td>
-                            <td className="py-1.5 px-1">
-                              <SearchableDropdown
-                                disabled={isViewMode}
-                                placeholder="Select"
-                                value={entry.center}
-                                onChange={(v) =>
-                                  updateJournalEntry(entry.id, 'center', v)
-                                }
-                                onSelect={(opt) =>
-                                  updateJournalEntry(
-                                    entry.id,
-                                    'center',
-                                    opt.value,
-                                  )
-                                }
-                                options={responsibilityCenterOptions}
-                                inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                emptyText={
-                                  responsibilityCentersError ||
-                                  'No responsibility centers found'
-                                }
-                              />
-                            </td>
-                            <td className="py-1.5 text-center">
-                              {!isViewMode && entry.isManual ? (
-                                <button
-                                  className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                  onClick={() => removeJournalEntry(entry.id)}
-                                >
-                                  <Trash2 size={14} className="mx-auto" />
-                                </button>
-                              ) : (
-                                <span className="text-gray-300 text-[10px] italic">
-                                  {isViewMode ? '' : 'Auto'}
-                                </span>
-                              )}
-                            </td>
+                            <td />
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                    <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
-                      <tr>
-                        <td colSpan={2} className="py-2.5 px-3 text-right text-xs">Total Ledger Balance:</td>
-                        <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(totalDebit)}</td>
-                        <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(totalCredit)}</td>
-                        <td />
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-                {!isViewMode && (
-                  <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
-                    <button
-                      onClick={addJournalEntry}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
-                    >
-                      <Plus size={12} /> Add Ledger Row
-                    </button>
-                    <span className="text-xs text-zinc-500 font-medium">{journalEntries.length} {journalEntries.length === 1 ? 'entry' : 'entries'}</span>
-                  </div>
-                )}
+                        </tfoot>
+                      </table>
+                    </div>
+                    {!isViewMode && (
+                      <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
+                        <button
+                          onClick={addJournalEntry}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                        >
+                          <Plus size={12} /> Add Ledger Row
+                        </button>
+                        <span className="text-xs text-zinc-500 font-medium">
+                          {journalEntries.length}{' '}
+                          {journalEntries.length === 1 ? 'entry' : 'entries'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </section>
@@ -2065,9 +2142,14 @@ export default function CollectionsForm({
                   <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Paperclip className="text-red-500" size={16} />
-                      <h2 className="text-sm font-bold tracking-tight">Attachments</h2>
+                      <h2 className="text-sm font-bold tracking-tight">
+                        Attachments
+                      </h2>
                     </div>
-                    <span className="text-xs text-zinc-400 font-medium">{attachments.length} {attachments.length === 1 ? 'File' : 'Files'}</span>
+                    <span className="text-xs text-zinc-400 font-medium">
+                      {attachments.length}{' '}
+                      {attachments.length === 1 ? 'File' : 'Files'}
+                    </span>
                   </div>
                   <div className="p-4">
                     <div className="overflow-x-auto custom-table-scroller">
@@ -2084,148 +2166,145 @@ export default function CollectionsForm({
                         </colgroup>
                         <thead>
                           <tr className="border-b border-gray-100">
-                            {[
-                              'File Name',
-                              'File',
-                              'Remarks',
-                              'Uploaded By',
-                              '',
-                            ].map((h, i) => (
-                              <th
-                                key={i}
-                                className="pb-3 text-[12px] font-black uppercase text-gray-900 tracking-tighter text-center px-1"
-                              >
-                                {h}
-                              </th>
-                            ))}
+                            {['File Name', 'File', 'Remarks', 'Uploaded By', ''].map(
+                              (h, i) => (
+                                <th
+                                  key={i}
+                                  className="pb-3 text-[12px] font-black uppercase text-gray-900 tracking-tighter text-center px-1"
+                                >
+                                  {h}
+                                </th>
+                              ),
+                            )}
                           </tr>
                         </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {attachments.map((file) => (
-                          <tr key={file.id}>
-                            <td className="py-2 px-1">
-                              <input
-                                disabled={isViewMode}
-                                className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                placeholder="e.g. OR_Scan"
-                                value={file.fileName}
-                                onChange={(e) =>
-                                  updateAttachment(
-                                    file.id,
-                                    'fileName',
-                                    e.target.value,
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="py-2 px-1">
-                              {isViewMode ? (
-                                <div
-                                  className={`${tableInput} text-black cursor-not-allowed flex items-center justify-center`}
-                                >
-                                  {file.file &&
-                                  typeof file.file === 'string' &&
-                                  file.file.startsWith('data:image/') ? (
-                                    <img
-                                      src={file.file}
-                                      alt={file.fileName || 'Attachment'}
-                                      className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
-                                      onClick={() =>
-                                        setImageModal({
-                                          isOpen: true,
-                                          imageSrc: file.file,
-                                        })
-                                      }
-                                      title="Click to view full size"
-                                      onLoad={() =>
-                                        console.log(
-                                          'Image loaded successfully:',
-                                          file.fileName,
-                                        )
-                                      }
-                                      onError={(e) => {
-                                        console.error(
-                                          'Image failed to load:',
-                                          file.fileName,
-                                          e,
-                                        )
-                                        e.target.style.display = 'none'
-                                        const fallback =
-                                          document.createElement('span')
-                                        fallback.className =
-                                          'text-red-600 text-[10px] font-bold'
-                                        fallback.textContent = 'Image error'
-                                        e.target.parentNode.appendChild(fallback)
-                                      }}
-                                    />
-                                  ) : file.file && typeof file.file === 'string' ? (
-                                    <span
-                                      className="text-blue-600 text-[11px] font-bold"
-                                      title={file.file.substring(0, 50) + '...'}
-                                    >
-                                      Non-image file
-                                    </span>
-                                  ) : file.file ? (
-                                    <span className="text-orange-600 text-[11px] font-bold">
-                                      Invalid file data
-                                    </span>
-                                  ) : (
-                                    <span className="text-gray-400 text-[11px] italic">
-                                      No file
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
+                        <tbody className="divide-y divide-gray-50">
+                          {attachments.map((file) => (
+                            <tr key={file.id}>
+                              <td className="py-2 px-1">
                                 <input
-                                  type="file"
-                                  className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full"
+                                  disabled={isViewMode}
+                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder="e.g. OR_Scan"
+                                  value={file.fileName}
                                   onChange={(e) =>
-                                    handleFileChange(file.id, e.target.files[0])
+                                    updateAttachment(
+                                      file.id,
+                                      'fileName',
+                                      e.target.value,
+                                    )
                                   }
                                 />
-                              )}
-                            </td>
-                            <td className="py-2 px-1">
-                              <input
-                                disabled={isViewMode}
-                                className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                placeholder="Add note..."
-                                value={file.remarks}
-                                onChange={(e) =>
-                                  updateAttachment(
-                                    file.id,
-                                    'remarks',
-                                    e.target.value,
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">
-                              {file.uploadedBy}
-                            </td>
-                            <td className="py-2 text-center">
-                              {!isViewMode && (
-                                <button
-                                  onClick={() => removeAttachment(file.id)}
-                                  className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {!isViewMode && (
-                    <button
-                      onClick={addAttachment}
-                      className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
-                    >
-                      <Plus size={15} /> Add File
-                    </button>
-                  )}
+                              </td>
+                              <td className="py-2 px-1">
+                                {isViewMode ? (
+                                  <div
+                                    className={`${tableInput} text-black cursor-not-allowed flex items-center justify-center`}
+                                  >
+                                    {file.file &&
+                                    typeof file.file === 'string' &&
+                                    file.file.startsWith('data:image/') ? (
+                                      <img
+                                        src={file.file}
+                                        alt={file.fileName || 'Attachment'}
+                                        className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={() =>
+                                          setImageModal({
+                                            isOpen: true,
+                                            imageSrc: file.file,
+                                          })
+                                        }
+                                        title="Click to view full size"
+                                        onLoad={() =>
+                                          console.log(
+                                            'Image loaded successfully:',
+                                            file.fileName,
+                                          )
+                                        }
+                                        onError={(e) => {
+                                          console.error(
+                                            'Image failed to load:',
+                                            file.fileName,
+                                            e,
+                                          )
+                                          e.target.style.display = 'none'
+                                          const fallback =
+                                            document.createElement('span')
+                                          fallback.className =
+                                            'text-red-600 text-[10px] font-bold'
+                                          fallback.textContent = 'Image error'
+                                          e.target.parentNode.appendChild(fallback)
+                                        }}
+                                      />
+                                    ) : file.file &&
+                                      typeof file.file === 'string' ? (
+                                      <span
+                                        className="text-blue-600 text-[11px] font-bold"
+                                        title={file.file.substring(0, 50) + '...'}
+                                      >
+                                        Non-image file
+                                      </span>
+                                    ) : file.file ? (
+                                      <span className="text-orange-600 text-[11px] font-bold">
+                                        Invalid file data
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400 text-[11px] italic">
+                                        No file
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <input
+                                    type="file"
+                                    className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full"
+                                    onChange={(e) =>
+                                      handleFileChange(file.id, e.target.files[0])
+                                    }
+                                  />
+                                )}
+                              </td>
+                              <td className="py-2 px-1">
+                                <input
+                                  disabled={isViewMode}
+                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder="Add note..."
+                                  value={file.remarks}
+                                  onChange={(e) =>
+                                    updateAttachment(
+                                      file.id,
+                                      'remarks',
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">
+                                {file.uploadedBy}
+                              </td>
+                              <td className="py-2 text-center">
+                                {!isViewMode && (
+                                  <button
+                                    onClick={() => removeAttachment(file.id)}
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {!isViewMode && (
+                      <button
+                        onClick={addAttachment}
+                        className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
+                      >
+                        <Plus size={15} /> Add File
+                      </button>
+                    )}
                   </div>
                 </section>
 
@@ -2234,7 +2313,9 @@ export default function CollectionsForm({
                   <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileText className="text-red-500" size={16} />
-                      <h2 className="text-sm font-bold tracking-tight">Remarks & Internal Notes</h2>
+                      <h2 className="text-sm font-bold tracking-tight">
+                        Remarks & Internal Notes
+                      </h2>
                     </div>
                   </div>
                   <div className="p-4">
@@ -2491,19 +2572,19 @@ const SummaryRow = ({
   label,
   value,
   badge,
-  badgeColor = "text-zinc-400",
-  valuePrefix = "",
-  textColor = "text-zinc-900",
-  containerClassName = "py-1 border-b border-zinc-500",
+  badgeColor = 'text-zinc-400',
+  valuePrefix = '',
+  textColor = 'text-zinc-900',
+  containerClassName = 'py-1 border-b border-zinc-500',
   isNested = false,
 }) => {
-  const strVal = String(value || "");
+  const strVal = String(value || '')
 
   const getValueFontSize = (len) => {
-    if (len > 24) return "text-xs";
-    if (len > 18) return "text-sm";
-    return "text-sm sm:text-base";
-  };
+    if (len > 24) return 'text-xs'
+    if (len > 18) return 'text-sm'
+    return 'text-sm sm:text-base'
+  }
 
   return (
     <div
@@ -2512,21 +2593,18 @@ const SummaryRow = ({
       {/* Label & Badge */}
       <div className="flex items-center gap-1 min-w-max">
         <span
-          className={`font-bold text-zinc-800 ${isNested ? "text-xs" : "text-sm"
-            }`}
+          className={`font-bold text-zinc-800 ${isNested ? 'text-xs' : 'text-sm'}`}
         >
           {label}
         </span>
-        {badge && (
-          <span className={`text-xs font-bold ${badgeColor}`}>{badge}</span>
-        )}
+        {badge && <span className={`text-xs font-bold ${badgeColor}`}>{badge}</span>}
       </div>
 
       {/* Value */}
       <div className="flex-1 flex justify-end min-w-max text-right">
         <span
           className={`font-extrabold font-mono tracking-tight whitespace-nowrap ml-auto ${textColor} ${getValueFontSize(
-            strVal.length
+            strVal.length,
           )}`}
         >
           {valuePrefix && <span className="mr-0.5">{valuePrefix}</span>}
@@ -2535,31 +2613,31 @@ const SummaryRow = ({
         </span>
       </div>
     </div>
-  );
-};
+  )
+}
 
 const TotalHeroAmount = ({ value, fmt }) => {
-  const formattedVal = fmt(value);
-  const len = String(formattedVal || "").length;
+  const formattedVal = fmt(value)
+  const len = String(formattedVal || '').length
 
   const getHeroFontSize = (charCount) => {
-    if (charCount > 25) return "text-sm";
-    if (charCount > 18) return "text-base";
-    if (charCount > 12) return "text-xl";
-    return "text-2xl";
-  };
+    if (charCount > 25) return 'text-sm'
+    if (charCount > 18) return 'text-base'
+    if (charCount > 12) return 'text-xl'
+    return 'text-2xl'
+  }
 
   return (
     <div
       className={`font-black font-mono text-white tracking-tight drop-shadow-sm text-right whitespace-nowrap overflow-hidden transition-all duration-150 ${getHeroFontSize(
-        len
+        len,
       )}`}
     >
       <span className="text-emerald-300 mr-1">₱</span>
       <span>{formattedVal}</span>
     </div>
-  );
-};
+  )
+}
 
 function SidebarInput({
   label,

@@ -48,30 +48,19 @@ export function useDashboard() {
     }
   };
 
-  const fh  = data?.financialHealth    || {};
-  const cf  = data?.cashFlowActivity   || {};
-  const tv  = data?.transactionVolume  || {};
-  const al  = data?.alerts             || {};
-  const tr  = data?.trends             || {};
+  // New dashboard structure
+  const fh  = data?.fh || {};
+  const cf  = data?.cf || {};
+  const tax = data?.tax || {};
+  const arAging = data?.arAging || {};
+  const topVendors = data?.topVendors || [];
+  const bankAccounts = data?.bankAccounts || [];
+  const recentTransactions = data?.recentTransactions || [];
+  const revenueExpenses = data?.revenueExpenses || [];
 
   const maxCF  = Math.max(cf.totalCollections || 1, cf.totalDisbursements || 1);
   const colPct = ((cf.totalCollections   || 0) / maxCF) * 100;
   const disPct = ((cf.totalDisbursements || 0) / maxCF) * 100;
-
-  const totalTxn = (tv.salesCount || 0) + (tv.purchaseCount || 0) +
-                   (tv.disbursementCount || 0) + (tv.adjustmentCount || 0) || 1;
-
-  const donutData = [
-    { label: 'Sales & Collections',   count: tv.salesCount        || 0, color: '#22c55e' },
-    { label: 'Purchases & Payments',  count: tv.purchaseCount     || 0, color: '#3b82f6' },
-    { label: 'Disbursements',         count: tv.disbursementCount || 0, color: '#ef4444' },
-    { label: 'Adjustments',           count: tv.adjustmentCount   || 0, color: '#f59e0b' },
-  ];
-
-  const revenueExpenses = (tr.revenueVsExpenses || []).slice(-6);
-  const cashTrend       = tr.cashFlowTrend || [];
-  const collections     = cashTrend.filter(t => t.type === 'collection').slice(-6);
-  const disbursements   = cashTrend.filter(t => t.type === 'disbursement').slice(-6);
 
   const isHealthy = (fh.netIncome || 0) >= 0;
 
@@ -89,16 +78,14 @@ export function useDashboard() {
     fetchDashboardData,
     fh,
     cf,
-    tv,
-    al,
-    tr,
+    tax,
+    arAging,
+    topVendors,
+    bankAccounts,
+    recentTransactions,
+    revenueExpenses,
     colPct,
     disPct,
-    totalTxn,
-    donutData,
-    revenueExpenses,
-    collections,
-    disbursements,
     isHealthy,
   };
 }

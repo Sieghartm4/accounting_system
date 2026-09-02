@@ -1,4 +1,5 @@
 const os = require('os')
+const crypto = require('crypto')
 
 const {
   checkConnection,
@@ -50,6 +51,8 @@ const generateSalesId = async (connection) => {
 
   return `${idPrefix}${String(seq).padStart(4, '0')}`
 }
+
+const generateSalesItemId = (salesId) => `${salesId}-ITEM-${crypto.randomUUID()}`
 
 const resolveCollectionPaymentAccountId = async (
   connection,
@@ -325,20 +328,22 @@ const getSales = async (req, res, next) => {
         Master.customers.selectOptionColumns.id,
       )
 
-      .leftJoin(
-        Accounting.collection_items.tablename,
-        Accounting.collection_items.selectOptionColumns.sales_id,
-        Accounting.sales.selectOptionColumns.id,
-      )
-
       .build()
 
     let whereClause = ''
     const queryParams = []
 
-    // Filter out sales that already have collections when status is 'NOT PAID'
+    // Filter out sales that already have collection items through their sales lines.
     if (excludeCollected) {
-      whereClause += ` WHERE ${Accounting.collection_items.selectOptionColumns.id} IS NULL`
+      const collectedSalesSubquery =
+        `SELECT 1 FROM ${Accounting.collection_items.tablename} ci_coll ` +
+        `INNER JOIN ${Accounting.sales_items.tablename} si_inv ` +
+        `ON si_inv.${Accounting.sales_items.selectOptionColumns.id} = ` +
+        `ci_coll.${Accounting.collection_items.selectOptionColumns.sales_id} ` +
+        `WHERE si_inv.${Accounting.sales_items.selectOptionColumns.sales_id} = ` +
+        `${Accounting.sales.selectOptionColumns.id}`
+
+      whereClause += ` WHERE NOT EXISTS (${collectedSalesSubquery})`
     }
 
     if (salesDateFrom) {
@@ -808,6 +813,7 @@ const createSales = async (req, res, next) => {
 
       if (sales_items && sales_items.length > 0) {
         for (const item of sales_items) {
+          const itemId = generateSalesItemId(salesId)
           const itemQuery = sql
             .insert(Accounting.sales_items.tablename, {
               columns: Accounting.sales_items.insertColumns,
@@ -819,6 +825,8 @@ const createSales = async (req, res, next) => {
             .build()
 
           const itemValues = [
+            itemId,
+
             salesId,
 
             item.product_id || null,
@@ -1061,7 +1069,11 @@ const updateSalesState = async (req, res, next) => {
       await connection.beginTransaction()
 
       // Get user full name from database
-      const userFullName = await getUserFullName(req.context.username, connection, Master)
+      const userFullName = await getUserFullName(
+        req.context.username,
+        connection,
+        Master,
+      )
 
       const validUpdates = updates.filter(
         (update) =>
@@ -1231,7 +1243,8 @@ const cancelSalesState = async (req, res, next) => {
         (update) =>
           !update ||
           !update.id ||
-          (update.currentState === 'CANCELLED' || update.currentState === 'REJECTED'),
+          update.currentState === 'CANCELLED' ||
+          update.currentState === 'REJECTED',
       )
 
       if (validUpdates.length === 0) {
@@ -1736,6 +1749,7 @@ const updateSale = async (req, res, next) => {
 
             await connection.execute(updateItemQuery, updateItemValues)
           } else {
+            const itemId = generateSalesItemId(salesId)
             const itemQuery = sql
               .insert(Accounting.sales_items.tablename, {
                 columns: Accounting.sales_items.insertColumns,
@@ -1747,6 +1761,8 @@ const updateSale = async (req, res, next) => {
               .build()
 
             const itemValues = [
+              itemId,
+
               salesId,
 
               item.product_id || null,

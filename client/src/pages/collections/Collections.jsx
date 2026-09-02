@@ -73,7 +73,7 @@ function CollectionsContent() {
       if (!token) throw new Error('No authentication token found')
 
       const queryParams = new URLSearchParams()
-      salesIds.forEach(id => queryParams.append('sales_id', id))
+      salesIds.forEach((id) => queryParams.append('sales_id', id))
 
       console.log('Fetching sales items for IDs:', salesIds)
       const response = await fetch(
@@ -88,17 +88,21 @@ function CollectionsContent() {
       )
 
       const result = await response.json()
-      if (!response.ok) throw new Error(result.message || 'Failed to fetch sales items')
+      if (!response.ok)
+        throw new Error(result.message || 'Failed to fetch sales items')
 
       console.log('Sales items API response:', result)
       console.log('Sales items data:', result.data)
-      console.log('Sales items data structure:', result.data ? result.data.map(item => Object.keys(item)) : 'No data')
+      console.log(
+        'Sales items data structure:',
+        result.data ? result.data.map((item) => Object.keys(item)) : 'No data',
+      )
       return result.data || []
     } catch (error) {
       console.error('Error fetching sales items:', error)
       setToast({
         type: 'error',
-        message: error.message || 'Failed to fetch sales items'
+        message: error.message || 'Failed to fetch sales items',
       })
       return []
     }
@@ -123,22 +127,24 @@ function CollectionsContent() {
       )
 
       const result = await response.json()
-      if (!response.ok) throw new Error(result.message || 'Failed to fetch unpaid sales')
+      if (!response.ok)
+        throw new Error(result.message || 'Failed to fetch unpaid sales')
 
       console.log('Sales data received:', result.data)
 
       // Filter out sales with PAID status (case-insensitive) and only include APPROVED state
-      const unpaidSales = result.data?.filter(sale => {
-        const status = sale.status?.toLowerCase()
-        const state = sale.state?.toUpperCase()
-        return status !== 'paid' && state === 'APPROVED'
-      }) || []
+      const unpaidSales =
+        result.data?.filter((sale) => {
+          const status = sale.status?.toLowerCase()
+          const state = sale.state?.toUpperCase()
+          return status !== 'paid' && state === 'APPROVED'
+        }) || []
 
       console.log('Filtered unpaid sales (excluding PAID):', unpaidSales)
 
       // Group by unique customers
       const customerMap = new Map()
-      unpaidSales.forEach(sale => {
+      unpaidSales.forEach((sale) => {
         const customerId = sale.customer_id || sale.customer
         const customerName = sale.customer_name || sale.customer
         if (!customerMap.has(customerId)) {
@@ -146,7 +152,7 @@ function CollectionsContent() {
             customerId,
             customerName,
             totalUnpaid: 0,
-            sales: []
+            sales: [],
           })
         }
         const customer = customerMap.get(customerId)
@@ -156,22 +162,25 @@ function CollectionsContent() {
         customer.sales.push({
           ...sale,
           unpaidAmount,
-          sales_number: sale.sales_number || sale.document_reference || sale.id
+          sales_number: sale.sales_number || sale.document_reference || sale.id,
         })
       })
 
-      console.log('Customer totals:', Array.from(customerMap.values()).map(c => ({
-        customer: c.customerName,
-        totalUnpaid: c.totalUnpaid,
-        salesCount: c.sales.length
-      })))
+      console.log(
+        'Customer totals:',
+        Array.from(customerMap.values()).map((c) => ({
+          customer: c.customerName,
+          totalUnpaid: c.totalUnpaid,
+          salesCount: c.sales.length,
+        })),
+      )
 
       setToBeCollectedData(Array.from(customerMap.values()))
     } catch (error) {
       console.error('Error fetching to be collected:', error)
       setToast({
         type: 'error',
-        message: error.message || 'Failed to fetch unpaid sales'
+        message: error.message || 'Failed to fetch unpaid sales',
       })
     } finally {
       setLoadingToBeCollected(false)
@@ -407,7 +416,10 @@ function CollectionsContent() {
         style: 'orange',
         onClick: async (selectedRows) => {
           const cancellableRows = selectedRows.filter(
-            (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
+            (row) =>
+              row.state !== 'CANCELLED' &&
+              row.state !== 'REJECTED' &&
+              row.state !== 'APPROVED',
           )
 
           if (cancellableRows.length === 0) {
@@ -499,7 +511,10 @@ function CollectionsContent() {
       }
       if (action.label === 'Cancel Selected') {
         return selectedRows.some(
-          (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
+          (row) =>
+            row.state !== 'CANCELLED' &&
+            row.state !== 'REJECTED' &&
+            row.state !== 'APPROVED',
         )
       }
       return true
@@ -610,136 +625,137 @@ function CollectionsContent() {
         type="warning"
       />
 
-    {/* --- HEADER SECTION --- */}
-    <div className="shrink-0">
-      {/* Tab Navigation */}
+      {/* --- HEADER SECTION --- */}
+      <div className="shrink-0">
+        {/* Tab Navigation */}
 
-
-      {activeTab === 'collections' && (
-        <>
-          {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+        {activeTab === 'collections' && (
+          <>
+            {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
             <span>Treasury</span>
             <ArrowRight size={10} />
             <span className="text-black">Account Collections</span>
           </nav> */}
 
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={fadeInUp}
-            className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-4"
-          >
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
-                  <Layers size={24} />
-                </div>
-                <h1 className="text-4xl font-black text-black tracking-tighter">
-                  <span className="text-red-600 italic">Collections</span>
-                </h1>
-              </div>
-            </div>
-
-            <div className="flex flex-col md:flex-row md:items-center gap-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
-                  <div className="flex flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-gray-500">From</span>
-                      <input
-                        type="date"
-                        value={pendingDateFrom}
-                        onChange={(e) => setPendingDateFrom(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                        aria-label="Filter receipts from date"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-gray-500">To</span>
-                      <input
-                        type="date"
-                        value={pendingDateTo}
-                        onChange={(e) => setPendingDateTo(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                        aria-label="Filter receipts to date"
-                      />
-                    </div>
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-4"
+            >
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
+                    <Layers size={24} />
                   </div>
-
-                  <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
-                    <button
-                      onClick={applyDateFilters}
-                      className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-sm"
-                      type="button"
-                    >
-                      Apply
-                    </button>
-                    <button
-                      onClick={clearDateFilters}
-                      className="px-4 py-2 bg-gray-900 text-gray-100 text-xs font-bold rounded-xl hover:bg-gray-800 transition-all shadow-sm"
-                      type="button"
-                    >
-                      Clear
-                    </button>
-                  </div>
+                  <h1 className="text-4xl font-black text-black tracking-tighter">
+                    <span className="text-red-600 italic">Collections</span>
+                  </h1>
                 </div>
               </div>
-              <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
-                <Download size={14} />
-                EXPORT DATA
-              </button>
-              <ProtectedAction routeName="collections">
-                <button
-                  onClick={() => setActiveTab('toBeCollected')}
-                  className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
-                >
-                  <FilePlus size={14} />
-                  New Collection
+
+              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
+                    <div className="flex flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-gray-500">
+                          From
+                        </span>
+                        <input
+                          type="date"
+                          value={pendingDateFrom}
+                          onChange={(e) => setPendingDateFrom(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                          aria-label="Filter receipts from date"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-gray-500">
+                          To
+                        </span>
+                        <input
+                          type="date"
+                          value={pendingDateTo}
+                          onChange={(e) => setPendingDateTo(e.target.value)}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                          aria-label="Filter receipts to date"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+                      <button
+                        onClick={applyDateFilters}
+                        className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-sm"
+                        type="button"
+                      >
+                        Apply
+                      </button>
+                      <button
+                        onClick={clearDateFilters}
+                        className="px-4 py-2 bg-gray-900 text-gray-100 text-xs font-bold rounded-xl hover:bg-gray-800 transition-all shadow-sm"
+                        type="button"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
+                  <Download size={14} />
+                  EXPORT DATA
                 </button>
-              </ProtectedAction>
-            </div>
-          </motion.div>
+                <ProtectedAction routeName="collections">
+                  <button
+                    onClick={() => setActiveTab('toBeCollected')}
+                    className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
+                  >
+                    <FilePlus size={14} />
+                    New Collection
+                  </button>
+                </ProtectedAction>
+              </div>
+            </motion.div>
 
-          {/* --- SUMMARY TILES --- */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <SummaryCard
-              icon={<Wallet className="text-red-600" size={20} />}
-              label="Total Collections"
-              value={collections?.length || 0}
-              subText="Fetched"
-              borderColor="border-gray-200"
-              valueColor="text-black"
-              iconBgColor="bg-red-100"
-            />
-            <SummaryCard
-              icon={<CheckCircle className="text-black" size={20} />}
-              label="Pending Approval"
-              value={
-                collections?.filter(
-                  (c) => c.state !== 'APPROVED' && c.state !== 'CANCELLED'
-                ).length || 0
-              }
-              subText="Transactions"
-              borderColor="border-gray-200"
-              valueColor="text-black"
-              iconBgColor="bg-orange-100"
-            />
-            <SummaryCard
-              icon={<ShieldCheck className="text-gray-400" size={20} />}
-              label="Total Approved"
-              value={
-                collections?.filter(
-                  (c) => c.state === 'APPROVED'
-                ).length || 0
-              }
-              subText="Transactions"
-              borderColor="border-gray-200"
-              valueColor="text-black"
-              iconBgColor="bg-blue-100"
-            />
-          </div>
-        </>
-      )}
+            {/* --- SUMMARY TILES --- */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <SummaryCard
+                icon={<Wallet className="text-red-600" size={20} />}
+                label="Total Collections"
+                value={collections?.length || 0}
+                subText="Fetched"
+                borderColor="border-gray-200"
+                valueColor="text-black"
+                iconBgColor="bg-red-100"
+              />
+              <SummaryCard
+                icon={<CheckCircle className="text-black" size={20} />}
+                label="Pending Approval"
+                value={
+                  collections?.filter(
+                    (c) => c.state !== 'APPROVED' && c.state !== 'CANCELLED',
+                  ).length || 0
+                }
+                subText="Transactions"
+                borderColor="border-gray-200"
+                valueColor="text-black"
+                iconBgColor="bg-orange-100"
+              />
+              <SummaryCard
+                icon={<ShieldCheck className="text-gray-400" size={20} />}
+                label="Total Approved"
+                value={
+                  collections?.filter((c) => c.state === 'APPROVED').length || 0
+                }
+                subText="Transactions"
+                borderColor="border-gray-200"
+                valueColor="text-black"
+                iconBgColor="bg-blue-100"
+              />
+            </div>
+          </>
+        )}
 
         {activeTab === 'toBeCollected' && (
           <>
@@ -765,7 +781,9 @@ function CollectionsContent() {
                   <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
                     <div className="flex flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-500">From</span>
+                        <span className="text-[10px] font-bold text-gray-500">
+                          From
+                        </span>
                         <input
                           type="date"
                           value={pendingDateFrom}
@@ -775,7 +793,9 @@ function CollectionsContent() {
                         />
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-500">To</span>
+                        <span className="text-[10px] font-bold text-gray-500">
+                          To
+                        </span>
                         <input
                           type="date"
                           value={pendingDateTo}
@@ -820,387 +840,464 @@ function CollectionsContent() {
               </div>
             </motion.div>
 
-          {/* --- SUMMARY TILES --- */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <SummaryCard
-              icon={<CheckCircle className="text-black" size={20} />}
-              label="Approved Sales"
-              value={
-                toBeCollectedData?.reduce((count, c) => {
-                  return count + (c.sales?.filter(s => s.state === 'APPROVED').length || 0)
-                }, 0) || 0
-              }
-              subText="Transactions"
-              borderColor="border-gray-200"
-              valueColor="text-black"
-              iconBgColor="bg-blue-100"
-            />
-            <SummaryCard
-              icon={<Building className="text-gray-400" size={20} />}
-              label="Total Customers"
-              value={toBeCollectedData?.length || 0}
-              subText="Clients"
-              borderColor="border-gray-200"
-              valueColor="text-black"
-              iconBgColor="bg-orange-100"
-            />
-            <SummaryCard
-              icon={<Wallet className="text-red-600" size={20} />}
-              label="Total Unpaid Amount"
-              value={
-                toBeCollectedData?.reduce((sum, c) => sum + (parseFloat(c.totalUnpaid) || 0), 0).toLocaleString('en-PH', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                }) || '0.00'
-              }
-              subText="PHP"
-              borderColor="border-gray-200"
-              valueColor="text-green-600"
-              iconBgColor="bg-red-100"
-            />
-          </div>
-        </>
-      )}
-    </div>
-<div className="flex items-center gap-2 mb-2 p-1 bg-white rounded-xl w-fit border border-gray-200 shadow-sm">
-  <button
-    onClick={() => setActiveTab('collections')}
-    className={`px-5 py-2 text-xs font-bold tracking-wider rounded-lg transition-all relative ${
-      activeTab === 'collections'
-        ? 'bg-red-600 text-white shadow'
-        : 'text-gray-600 hover:text-black hover:bg-gray-100'
-    }`}
-  >
-    COLLECTED
-  </button>
-
-  <button
-    onClick={() => setActiveTab('toBeCollected')}
-    className={`px-5 py-2 text-xs font-bold tracking-wider rounded-lg transition-all relative ${
-      activeTab === 'toBeCollected'
-        ? 'bg-red-600 text-white shadow'
-        : 'text-gray-600 hover:text-black hover:bg-gray-100'
-    }`}
-  >
-    TO BE COLLECTED
-  </button>
-</div>
-    {/* --- TABLE SECTION --- */}
-    {activeTab === 'collections' && (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
-      >
-        <DynamicTable
-          data={collections}
-          title="Collections Ledger"
-          enableAddButton={false}
-          enableCheckbox={enableCheckboxes}
-          enableActionColumn={true}
-          checkboxColumn="id"
-          checkboxCondition={checkboxCondition}
-          actionButtons={[
-            {
-              label: 'View',
-              onClick: async (row) => {
-                try {
-                  console.log('Viewing collection:', row)
-
-                  const token = localStorage.getItem('token')
-                  if (!token) {
-                    throw new Error('No authentication token found')
-                  }
-
-                  const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/collections/${row.id}`,
-                    {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                    },
-                  )
-
-                  const result = await response.json()
-
-                  if (!response.ok) {
-                    throw new Error(
-                      result.message || 'Failed to fetch collection details',
+            {/* --- SUMMARY TILES --- */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <SummaryCard
+                icon={<CheckCircle className="text-black" size={20} />}
+                label="Approved Sales"
+                value={
+                  toBeCollectedData?.reduce((count, c) => {
+                    return (
+                      count +
+                      (c.sales?.filter((s) => s.state === 'APPROVED').length || 0)
                     )
-                  }
-
-                  console.log('Collection details fetched:', result)
-                  setViewingCollection(result)
-                  setIsViewing(true)
-                } catch (error) {
-                  console.error('Error fetching collection details:', error)
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch collection details',
-                  })
+                  }, 0) || 0
                 }
-              },
-            },
-            {
-              label: 'Edit',
-              onClick: async (row) => {
-                try {
-                  console.log('Editing collection:', row)
-
-                  const token = localStorage.getItem('token')
-                  if (!token) {
-                    throw new Error('No authentication token found')
-                  }
-
-                  const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/collections/${row.id}`,
-                    {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                    },
-                  )
-
-                  const result = await response.json()
-
-                  if (!response.ok) {
-                    throw new Error(
-                      result.message || 'Failed to fetch collection details',
-                    )
-                  }
-
-                  console.log('Collection details fetched for editing:', result)
-                  setEditingCollection(result)
-                  setIsEditing(true)
-                } catch (error) {
-                  console.error(
-                    'Error fetching collection details for editing:',
-                    error,
-                  )
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch collection details',
-                  })
+                subText="Transactions"
+                borderColor="border-gray-200"
+                valueColor="text-black"
+                iconBgColor="bg-blue-100"
+              />
+              <SummaryCard
+                icon={<Building className="text-gray-400" size={20} />}
+                label="Total Customers"
+                value={toBeCollectedData?.length || 0}
+                subText="Clients"
+                borderColor="border-gray-200"
+                valueColor="text-black"
+                iconBgColor="bg-orange-100"
+              />
+              <SummaryCard
+                icon={<Wallet className="text-red-600" size={20} />}
+                label="Total Unpaid Amount"
+                value={
+                  toBeCollectedData
+                    ?.reduce((sum, c) => sum + (parseFloat(c.totalUnpaid) || 0), 0)
+                    .toLocaleString('en-PH', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }) || '0.00'
                 }
-              },
-            },
-          ]}
-          badgeColumns={[
-            {
-              column: 'status',
-              values: {
-                COLLECTED: 'green',
-                'NOT COLLECTED': 'red',
-                'PARTIALLY COLLECTED': 'yellow',
-              },
-            },
-            {
-              column: 'state',
-              values: {
-                PREPARED: 'orange',
-                CHECKED: 'blue',
-                APPROVED: 'green',
-                REJECTED: 'red',
-                CANCELLED: 'orange',
-              },
-            },
-          ]}
-          checkboxActions={getFilteredCheckboxActions([])}
-          checkboxActionsFilter={getFilteredCheckboxActions}
-          enableInfiniteScroll={true}
-          hasMore={hasMore}
-          isLoadingMore={loadingMore}
-          onLoadMore={() =>
-            loadMore({ dateFrom: activeDateFrom, dateTo: activeDateTo })
-          }
-        />
-      </motion.div>
-    )}
-
-    {activeTab === 'toBeCollected' && (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-8 pb-4"
-      >
-        {loadingToBeCollected ? (
-          <div className="col-span-1 md:col-span-12 h-full w-full flex flex-col items-center justify-center space-y-4">
-            <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-              Loading To Be Collected...
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* LEFT COLUMN: Customer Table */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="col-span-1 md:col-span-4 flex flex-col min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
-            >
-              <DynamicTable
-                data={toBeCollectedData}
-                title=""
-                enableAddButton={false}
-                enableCheckbox={false}
-                enableActionColumn={true}
-                enableRowClick={true}
-                returnColumn="customerId"
-                onRowClick={(customerId, row) => setExpandedCustomer(expandedCustomer === customerId ? null : customerId)}
-                checkboxColumn="customerId"
-                checkboxCondition={(row) => {
-                  // Only allow selecting from same customer
-                  if (selectedSales.length === 0) return true
-                  return selectedSales[0].customer_id === row.customer_id
-                }}
-                onCheckboxChange={(selectedIds) => {
-                  const selectedCustomers = toBeCollectedData.filter(row => selectedIds.includes(row.customerId))
-                  const allSales = selectedCustomers.flatMap(c => c.sales)
-                  setSelectedSales(allSales)
-                }}
-                checkboxActions={[
-                  {
-                    label: 'Collect Selected',
-                    onClick: async (selectedRows) => {
-                      const allSales = selectedRows.flatMap(c => c.sales)
-                      const salesIds = allSales.map(s => s.id)
-                      const items = await fetchSalesItems(salesIds)
-                      setSelectedSales(allSales)
-                      setSelectedSalesItems(items)
-                      setIsAdding(true)
-                    },
-                    style: 'red',
-                  },
-                ]}
-                actionButtons={[
-                  {
-                    label: 'Collect',
-                    icon: <Layers size={14} />,
-                    onClick: async (row) => {
-                      const salesIds = row.sales.map(s => s.id)
-                      const items = await fetchSalesItems(salesIds)
-                      setSelectedSales(row.sales)
-                      setSelectedSalesItems(items)
-                      setIsAdding(true)
-                    },
-                  },
-                ]}
-                columns={[
-                  { key: 'customerName', label: 'Customer' },
-                  {
-                    key: 'totalUnpaid',
-                    label: 'Total Unpaid',
-                    render: (value) => (
-                      <span>
-                        <span className="text-green-600">₱</span>
-                        <span className="ml-1">{isNaN(value) ? '0.00' : parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </span>
-                    )
-                  },
-                ]}
-                hiddenColumns={new Set(['customerId', 'sales'])}
-                highlightRow={{ column: 'customerId', value: expandedCustomer }}
+                subText="PHP"
+                borderColor="border-gray-200"
+                valueColor="text-green-600"
+                iconBgColor="bg-red-100"
               />
-            </motion.div>
-
-            {/* RIGHT COLUMN: Sales Table */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="col-span-1 md:col-span-8 flex flex-col min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
-            >
-              <DynamicTable
-                data={expandedCustomer ? toBeCollectedData.find(c => c.customerId === expandedCustomer)?.sales || [] : []}
-                title=""
-                enableAddButton={false}
-                enableCheckbox={true}
-                enableActionColumn={false}
-                checkboxColumn="id"
-                checkboxCondition={(row) => {
-                  if (selectedSales.length === 0) return true
-                  return selectedSales[0].customer_id === row.customer_id
-                }}
-                onCheckboxChange={(selectedIds) => {
-                  const customer = toBeCollectedData.find(c => c.customerId === expandedCustomer)
-                  if (!customer) return
-                  const selectedRows = customer.sales.filter(row => selectedIds.includes(row.id))
-                  setSelectedSales(selectedRows)
-                }}
-                checkboxActions={[
-                  {
-                    label: 'Collect Selected',
-                    onClick: async (selectedRows) => {
-                      const salesIds = selectedRows.map(s => s.id)
-                      const items = await fetchSalesItems(salesIds)
-                      setSelectedSales(selectedRows)
-                      setSelectedSalesItems(items)
-                      setIsAdding(true)
-                    },
-                    style: 'red',
-                  },
-                ]}
-                columns={[
-                  { key: 'doc_ref', label: 'Doc Ref' },
-                  { key: 'terms', label: 'Terms' },
-                  { key: 'date_delivered', label: 'Date Delivered' },
-                  { key: 'date_due', label: 'Date Due' },
-                  { key: 'remarks', label: 'Remarks' },
-                  {
-                    key: 'amount_due',
-                    label: 'Amount Due',
-                    render: (value) => (
-                      <span>
-                        <span className="text-green-600">₱</span>
-                        <span className="ml-1">{isNaN(value) ? '0.00' : parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </span>
-                    )
-                  },
-                  { key: 'status', label: 'Status' },
-                  { key: 'state', label: 'State' },
-                ]}
-                hiddenColumns={new Set(['customer_id', 'customer_name', 'totalUnpaid', 'unpaidAmount', 'sales_number'])}
-                badgeColumns={[
-                  {
-                    column: 'status',
-                    values: {
-                      COLLECTED: 'green',
-                      'NOT COLLECTED': 'red',
-                      'PARTIALLY COLLECTED': 'yellow',
-                      PAID: 'green',
-                      UNPAID: 'red',
-                    },
-                  },
-                  {
-                    column: 'state',
-                    values: {
-                      PREPARED: 'orange',
-                      CHECKED: 'blue',
-                      APPROVED: 'green',
-                      REJECTED: 'red',
-                      CANCELLED: 'orange',
-                    },
-                  },
-                ]}
-              />
-            </motion.div>
+            </div>
           </>
         )}
-      </motion.div>
-    )}
+      </div>
+      <div className="flex items-center gap-2 mb-2 p-1 bg-white rounded-xl w-fit border border-gray-200 shadow-sm">
+        <button
+          onClick={() => setActiveTab('collections')}
+          className={`px-5 py-2 text-xs font-bold tracking-wider rounded-lg transition-all relative ${
+            activeTab === 'collections'
+              ? 'bg-red-600 text-white shadow'
+              : 'text-gray-600 hover:text-black hover:bg-gray-100'
+          }`}
+        >
+          COLLECTED
+        </button>
+
+        <button
+          onClick={() => setActiveTab('toBeCollected')}
+          className={`px-5 py-2 text-xs font-bold tracking-wider rounded-lg transition-all relative ${
+            activeTab === 'toBeCollected'
+              ? 'bg-red-600 text-white shadow'
+              : 'text-gray-600 hover:text-black hover:bg-gray-100'
+          }`}
+        >
+          TO BE COLLECTED
+        </button>
+      </div>
+      {/* --- TABLE SECTION --- */}
+      {activeTab === 'collections' && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
+        >
+          <DynamicTable
+            data={collections}
+            title="Collections Ledger"
+            enableAddButton={false}
+            enableCheckbox={enableCheckboxes}
+            enableActionColumn={true}
+            checkboxColumn="id"
+            checkboxCondition={checkboxCondition}
+            actionButtons={[
+              {
+                label: 'View',
+                onClick: async (row) => {
+                  try {
+                    console.log('Viewing collection:', row)
+
+                    const token = localStorage.getItem('token')
+                    if (!token) {
+                      throw new Error('No authentication token found')
+                    }
+
+                    const response = await fetch(
+                      `${import.meta.env.VITE_SERVER_LINK}/collections/${row.id}`,
+                      {
+                        method: 'GET',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${token}`,
+                        },
+                      },
+                    )
+
+                    const result = await response.json()
+
+                    if (!response.ok) {
+                      throw new Error(
+                        result.message || 'Failed to fetch collection details',
+                      )
+                    }
+
+                    console.log('Collection details fetched:', result)
+                    setViewingCollection(result)
+                    setIsViewing(true)
+                  } catch (error) {
+                    console.error('Error fetching collection details:', error)
+                    setToast({
+                      type: 'error',
+                      message: error.message || 'Failed to fetch collection details',
+                    })
+                  }
+                },
+              },
+              {
+                label: 'Edit',
+                onClick: async (row) => {
+                  try {
+                    console.log('Editing collection:', row)
+
+                    const token = localStorage.getItem('token')
+                    if (!token) {
+                      throw new Error('No authentication token found')
+                    }
+
+                    const response = await fetch(
+                      `${import.meta.env.VITE_SERVER_LINK}/collections/${row.id}`,
+                      {
+                        method: 'GET',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${token}`,
+                        },
+                      },
+                    )
+
+                    const result = await response.json()
+
+                    if (!response.ok) {
+                      throw new Error(
+                        result.message || 'Failed to fetch collection details',
+                      )
+                    }
+
+                    console.log('Collection details fetched for editing:', result)
+                    setEditingCollection(result)
+                    setIsEditing(true)
+                  } catch (error) {
+                    console.error(
+                      'Error fetching collection details for editing:',
+                      error,
+                    )
+                    setToast({
+                      type: 'error',
+                      message: error.message || 'Failed to fetch collection details',
+                    })
+                  }
+                },
+              },
+            ]}
+            badgeColumns={[
+              {
+                column: 'status',
+                values: {
+                  COLLECTED: 'green',
+                  'NOT COLLECTED': 'red',
+                  'PARTIALLY COLLECTED': 'yellow',
+                },
+              },
+              {
+                column: 'state',
+                values: {
+                  PREPARED: 'orange',
+                  CHECKED: 'blue',
+                  APPROVED: 'green',
+                  REJECTED: 'red',
+                  CANCELLED: 'orange',
+                },
+              },
+            ]}
+            checkboxActions={getFilteredCheckboxActions([])}
+            checkboxActionsFilter={getFilteredCheckboxActions}
+            enableInfiniteScroll={true}
+            hasMore={hasMore}
+            isLoadingMore={loadingMore}
+            onLoadMore={() =>
+              loadMore({ dateFrom: activeDateFrom, dateTo: activeDateTo })
+            }
+          />
+        </motion.div>
+      )}
+
+      {activeTab === 'toBeCollected' && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12 gap-8 pb-4"
+        >
+          {loadingToBeCollected ? (
+            <div className="col-span-1 md:col-span-12 h-full w-full flex flex-col items-center justify-center space-y-4">
+              <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
+                Loading To Be Collected...
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* LEFT COLUMN: Customer Table */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="col-span-1 md:col-span-4 flex flex-col min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
+              >
+                <DynamicTable
+                  data={toBeCollectedData}
+                  title=""
+                  enableAddButton={false}
+                  enableCheckbox={false}
+                  enableActionColumn={true}
+                  enableRowClick={true}
+                  returnColumn="customerId"
+                  onRowClick={(customerId, row) =>
+                    setExpandedCustomer(
+                      expandedCustomer === customerId ? null : customerId,
+                    )
+                  }
+                  checkboxColumn="customerId"
+                  checkboxCondition={(row) => {
+                    // Only allow selecting from same customer
+                    if (selectedSales.length === 0) return true
+                    return selectedSales[0].customer_id === row.customer_id
+                  }}
+                  onCheckboxChange={(selectedIds) => {
+                    const selectedCustomers = toBeCollectedData.filter((row) =>
+                      selectedIds.includes(row.customerId),
+                    )
+                    const allSales = selectedCustomers.flatMap((c) => c.sales)
+                    setSelectedSales(allSales)
+                  }}
+                  checkboxActions={[
+                    {
+                      label: 'Collect Selected',
+                      onClick: async (selectedRows) => {
+                        const allSales = selectedRows.flatMap((c) => c.sales)
+                        const salesIds = allSales.map((s) => s.id)
+                        const items = await fetchSalesItems(salesIds)
+                        if (items.length === 0) {
+                          setToast({
+                            type: 'error',
+                            message:
+                              'This sales order has no sales items and cannot be collected.',
+                          })
+                          return
+                        }
+                        setSelectedSales(allSales)
+                        setSelectedSalesItems(items)
+                        setIsAdding(true)
+                      },
+                      style: 'red',
+                    },
+                  ]}
+                  actionButtons={[
+                    {
+                      label: 'Collect',
+                      icon: <Layers size={14} />,
+                      onClick: async (row) => {
+                        const salesIds = row.sales.map((s) => s.id)
+                        const items = await fetchSalesItems(salesIds)
+                        if (items.length === 0) {
+                          setToast({
+                            type: 'error',
+                            message:
+                              'This sales order has no sales items and cannot be collected.',
+                          })
+                          return
+                        }
+                        setSelectedSales(row.sales)
+                        setSelectedSalesItems(items)
+                        setIsAdding(true)
+                      },
+                    },
+                  ]}
+                  columns={[
+                    { key: 'customerName', label: 'Customer' },
+                    {
+                      key: 'totalUnpaid',
+                      label: 'Total Unpaid',
+                      render: (value) => (
+                        <span>
+                          <span className="text-green-600">₱</span>
+                          <span className="ml-1">
+                            {isNaN(value)
+                              ? '0.00'
+                              : parseFloat(value).toLocaleString('en-US', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                          </span>
+                        </span>
+                      ),
+                    },
+                  ]}
+                  hiddenColumns={new Set(['customerId', 'sales'])}
+                  highlightRow={{ column: 'customerId', value: expandedCustomer }}
+                />
+              </motion.div>
+
+              {/* RIGHT COLUMN: Sales Table */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="col-span-1 md:col-span-8 flex flex-col min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
+              >
+                <DynamicTable
+                  data={
+                    expandedCustomer
+                      ? toBeCollectedData.find(
+                          (c) => c.customerId === expandedCustomer,
+                        )?.sales || []
+                      : []
+                  }
+                  title=""
+                  enableAddButton={false}
+                  enableCheckbox={true}
+                  enableActionColumn={false}
+                  checkboxColumn="id"
+                  checkboxCondition={(row) => {
+                    if (selectedSales.length === 0) return true
+                    return selectedSales[0].customer_id === row.customer_id
+                  }}
+                  onCheckboxChange={(selectedIds) => {
+                    const customer = toBeCollectedData.find(
+                      (c) => c.customerId === expandedCustomer,
+                    )
+                    if (!customer) return
+                    const selectedRows = customer.sales.filter((row) =>
+                      selectedIds.includes(row.id),
+                    )
+                    setSelectedSales(selectedRows)
+                  }}
+                  checkboxActions={[
+                    {
+                      label: 'Collect Selected',
+                      onClick: async (selectedRows) => {
+                        const salesIds = selectedRows.map((s) => s.id)
+                        const items = await fetchSalesItems(salesIds)
+                        if (items.length === 0) {
+                          setToast({
+                            type: 'error',
+                            message:
+                              'This sales order has no sales items and cannot be collected.',
+                          })
+                          return
+                        }
+                        setSelectedSales(selectedRows)
+                        setSelectedSalesItems(items)
+                        setIsAdding(true)
+                      },
+                      style: 'red',
+                    },
+                  ]}
+                  columns={[
+                    { key: 'doc_ref', label: 'Doc Ref' },
+                    { key: 'terms', label: 'Terms' },
+                    { key: 'date_delivered', label: 'Date Delivered' },
+                    { key: 'date_due', label: 'Date Due' },
+                    { key: 'remarks', label: 'Remarks' },
+                    {
+                      key: 'amount_due',
+                      label: 'Amount Due',
+                      render: (value) => (
+                        <span>
+                          <span className="text-green-600">₱</span>
+                          <span className="ml-1">
+                            {isNaN(value)
+                              ? '0.00'
+                              : parseFloat(value).toLocaleString('en-US', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                          </span>
+                        </span>
+                      ),
+                    },
+                    { key: 'status', label: 'Status' },
+                    { key: 'state', label: 'State' },
+                  ]}
+                  hiddenColumns={
+                    new Set([
+                      'customer_id',
+                      'customer_name',
+                      'totalUnpaid',
+                      'unpaidAmount',
+                      'sales_number',
+                    ])
+                  }
+                  badgeColumns={[
+                    {
+                      column: 'status',
+                      values: {
+                        COLLECTED: 'green',
+                        'NOT COLLECTED': 'red',
+                        'PARTIALLY COLLECTED': 'yellow',
+                        PAID: 'green',
+                        UNPAID: 'red',
+                      },
+                    },
+                    {
+                      column: 'state',
+                      values: {
+                        PREPARED: 'orange',
+                        CHECKED: 'blue',
+                        APPROVED: 'green',
+                        REJECTED: 'red',
+                        CANCELLED: 'orange',
+                      },
+                    },
+                  ]}
+                />
+              </motion.div>
+            </>
+          )}
+        </motion.div>
+      )}
     </div>
   )
 }
 
 // Reusable SummaryCard (Same as used in other pages)
-function SummaryCard({ icon, label, value, subText, borderColor, valueColor, iconBgColor }) {
+function SummaryCard({
+  icon,
+  label,
+  value,
+  subText,
+  borderColor,
+  valueColor,
+  iconBgColor,
+}) {
   return (
-    <div className={`bg-white p-4 rounded-xl border-2 ${borderColor} flex items-center gap-4 shadow-sm`}>
+    <div
+      className={`bg-white p-4 rounded-xl border-2 ${borderColor} flex items-center gap-4 shadow-sm`}
+    >
       <div className={`p-3 ${iconBgColor} rounded-xl`}>{icon}</div>
       <div>
         <p className="text-[9px] font-black uppercase tracking-widest text-gray-700 leading-none mb-1">

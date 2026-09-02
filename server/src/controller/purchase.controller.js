@@ -1,4 +1,5 @@
 const os = require('os')
+const crypto = require('crypto')
 
 const {
   checkConnection,
@@ -51,6 +52,9 @@ const generatePurchaseId = async (connection) => {
 
   return `${idPrefix}${String(seq).padStart(4, '0')}`
 }
+
+const generatePurchaseItemId = (purchaseId) =>
+  `${purchaseId}-ITEM-${crypto.randomUUID()}`
 
 const resolvePaymentAccountId = async (connection, modeOfPayment, bankName) => {
   const coaQuery = sql
@@ -795,6 +799,7 @@ const createPurchase = async (req, res, next) => {
 
       if (purchase_items && purchase_items.length > 0) {
         for (const item of purchase_items) {
+          const itemId = generatePurchaseItemId(purchaseId)
           const itemQuery = sql
             .insert(Accounting.purchase_items.tablename, {
               columns: Accounting.purchase_items.insertColumns,
@@ -806,6 +811,8 @@ const createPurchase = async (req, res, next) => {
             .build()
 
           const itemValues = [
+            itemId,
+
             purchaseId,
 
             item.product_service || null,
@@ -1056,7 +1063,11 @@ const updatePurchaseState = async (req, res, next) => {
       await connection.beginTransaction()
 
       // Get user full name from database
-      const userFullName = await getUserFullName(req.context.username, connection, Master)
+      const userFullName = await getUserFullName(
+        req.context.username,
+        connection,
+        Master,
+      )
 
       const updatePromises = updates.map(async (update) => {
         const { id, currentState } = update
@@ -1218,7 +1229,8 @@ const cancelPurchaseState = async (req, res, next) => {
         (update) =>
           !update ||
           !update.id ||
-          (update.currentState === 'CANCELLED' || update.currentState === 'REJECTED'),
+          update.currentState === 'CANCELLED' ||
+          update.currentState === 'REJECTED',
       )
 
       if (validUpdates.length === 0) {
@@ -1691,6 +1703,7 @@ const updatePurchase = async (req, res, next) => {
 
             await connection.execute(updateItemQuery, updateItemValues)
           } else {
+            const itemId = generatePurchaseItemId(purchaseId)
             const itemQuery = sql
               .insert(Accounting.purchase_items.tablename, {
                 columns: Accounting.purchase_items.insertColumns,
@@ -1702,6 +1715,8 @@ const updatePurchase = async (req, res, next) => {
               .build()
 
             const itemValues = [
+              itemId,
+
               purchaseId,
 
               item.product_service || null,

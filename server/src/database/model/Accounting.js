@@ -432,6 +432,7 @@ const Accounting = {
     prefix: 'pi',
     prefix_: 'pi_',
     insertColumns: [
+      'id',
       'purchase_id',
       'product_service',
       'charts_of_accounts',
@@ -489,7 +490,7 @@ const Accounting = {
     selectDateFormatColumns: {},
     selectMiscColumns: {},
     columnDataTypes: {
-      id: 'INTEGER',
+      id: 'STRING',
       purchase_id: 'STRING',
       product_service: 'STRING',
       charts_of_accounts: 'INTEGER',
@@ -792,6 +793,7 @@ const Accounting = {
     prefix: 'si',
     prefix_: 'si_',
     insertColumns: [
+      'id',
       'sales_id',
       'product_service',
       'charts_of_accounts',
@@ -849,7 +851,7 @@ const Accounting = {
     selectDateFormatColumns: {},
     selectMiscColumns: {},
     columnDataTypes: {
-      id: 'INTEGER',
+      id: 'STRING',
       sales_id: 'STRING',
       product_service: 'STRING',
       charts_of_accounts: 'INTEGER',
