@@ -1,5 +1,7 @@
 const { Query, Insert, Update } = require('../database/util/queries.util')
 const { TaxCompliance } = require('../schemas/tax-compliance.schema')
+const { Accounting } = require('../database/model/Accounting')
+const { Master } = require('../database/model/Master')
 const { SQLQueryBuilder } = require('../util/helper.util')
 const PDFDocument = require('pdfkit')
 const { Readable } = require('stream')
@@ -101,7 +103,7 @@ const saveTaxFormDraft = async (req, res, next) => {
 // Export to PDF
 const exportTaxFormPDF = async (req, res, next) => {
   try {
-    const { formType, dateRange, formRows } = req.body
+    const { formType, dateRange, formRows, company } = req.body
 
     if (!formType || !dateRange || !formRows) {
       return res.status(400).json({
@@ -154,8 +156,10 @@ const exportTaxFormPDF = async (req, res, next) => {
     // Taxpayer Info
     doc.fontSize(9).font('Helvetica-Bold').text('Taxpayer Information:', 'left')
     doc.fontSize(8).font('Helvetica')
-    doc.text('TIN: 008-123-456-00000')
-    doc.text('Company: ACME FINANCIAL TECHNOLOGIES INC.')
+    doc.text(`TIN: ${company?.tin || 'Not on file'}`)
+    doc.text(`Company: ${company?.name || 'Not on file'}`)
+    doc.text(`Address: ${company?.address || 'Not on file'}`)
+    doc.text(`Contact: ${company?.contactNumber || 'Not on file'}`)
     doc.text(`Period: ${dateRange.start} to ${dateRange.end}`)
     doc.moveDown()
 
@@ -448,8 +452,6 @@ const getTaxFormDraft = async (req, res, next) => {
 const calculateTaxFromJournalEntries = async (req, res, next) => {
   try {
     const { start_date, end_date } = req.query
-    const companyId = req.company?.id || 1
-
     if (!start_date || !end_date) {
       return res.status(400).json({
         success: false,
@@ -460,17 +462,17 @@ const calculateTaxFromJournalEntries = async (req, res, next) => {
     // Query Output VAT (CREDIT balance from Output VAT account)
     const outputVATQuery = `
       SELECT 
-        SUM(CASE WHEN je.type = 'CREDIT'
-                 THEN je.amount 
-                 ELSE -je.amount END) AS outputVAT
+        SUM(CASE WHEN je.je_type = 'CREDIT'
+                 THEN je.je_amount
+                 ELSE -je.je_amount END) AS outputVAT
       FROM journal_entries je
       INNER JOIN charts_of_accounts coa
-        ON je.coa_id = coa.id
-      WHERE coa.name = 'Output VAT'
-        AND je.db_id IS NOT NULL
-        AND je.coa_id IS NOT NULL
-        AND DATE(je.date) >= ? 
-        AND DATE(je.date) <= ?
+        ON je.je_coa_id = coa.coa_id
+      WHERE coa.coa_name = 'Output VAT'
+        AND je.je_db_id IS NOT NULL
+        AND je.je_coa_id IS NOT NULL
+        AND DATE(je.je_date) >= ?
+        AND DATE(je.je_date) <= ?
     `
 
     const outputVATResult = await Query(outputVATQuery, [start_date, end_date])
@@ -479,17 +481,17 @@ const calculateTaxFromJournalEntries = async (req, res, next) => {
     // Query Input VAT (DEBIT balance from Input VAT account)
     const inputVATQuery = `
       SELECT 
-        SUM(CASE WHEN je.type = 'DEBIT'
-                 THEN je.amount 
-                 ELSE -je.amount END) AS inputVAT
+        SUM(CASE WHEN je.je_type = 'DEBIT'
+                 THEN je.je_amount
+                 ELSE -je.je_amount END) AS inputVAT
       FROM journal_entries je
       INNER JOIN charts_of_accounts coa
-        ON je.coa_id = coa.id
-      WHERE coa.name = 'Input VAT'
-        AND je.db_id IS NOT NULL
-        AND je.coa_id IS NOT NULL
-        AND DATE(je.date) >= ? 
-        AND DATE(je.date) <= ?
+        ON je.je_coa_id = coa.coa_id
+      WHERE coa.coa_name = 'Input VAT'
+        AND je.je_db_id IS NOT NULL
+        AND je.je_coa_id IS NOT NULL
+        AND DATE(je.je_date) >= ?
+        AND DATE(je.je_date) <= ?
     `
 
     const inputVATResult = await Query(inputVATQuery, [start_date, end_date])
@@ -498,43 +500,157 @@ const calculateTaxFromJournalEntries = async (req, res, next) => {
     // Query Withholding Tax - Expanded (liability - CREDIT balance)
     const wtExpandedQuery = `
       SELECT 
-        SUM(CASE WHEN je.type = 'CREDIT'
-                 THEN je.amount 
-                 ELSE -je.amount END) AS wtExpanded
+        SUM(CASE WHEN je.je_type = 'CREDIT'
+                 THEN je.je_amount
+                 ELSE -je.je_amount END) AS wtExpanded
       FROM journal_entries je
       INNER JOIN charts_of_accounts coa
-        ON je.coa_id = coa.id
-      WHERE coa.name = 'Withholding Tax - Expanded'
-        AND je.db_id IS NOT NULL
-        AND je.coa_id IS NOT NULL
-        AND DATE(je.date) >= ? 
-        AND DATE(je.date) <= ?
+        ON je.je_coa_id = coa.coa_id
+      WHERE coa.coa_name = 'Withholding Tax - Expanded'
+        AND je.je_db_id IS NOT NULL
+        AND je.je_coa_id IS NOT NULL
+        AND DATE(je.je_date) >= ?
+        AND DATE(je.je_date) <= ?
     `
 
     const wtExpandedResult = await Query(wtExpandedQuery, [start_date, end_date])
-    // For liability accounts, invert sign so credit balance shows as positive amount owed
-    const wtExpanded = -parseFloat(wtExpandedResult[0]?.wtExpanded || 0)
+    const wtExpanded = parseFloat(wtExpandedResult[0]?.wtExpanded || 0)
 
     // Query Creditable Withholding Tax (asset - DEBIT balance)
     const wtCreditableQuery = `
       SELECT 
-        SUM(CASE WHEN je.type = 'DEBIT'
-                 THEN je.amount 
-                 ELSE -je.amount END) AS wtCreditable
+        SUM(CASE WHEN je.je_type = 'DEBIT'
+                 THEN je.je_amount
+                 ELSE -je.je_amount END) AS wtCreditable
       FROM journal_entries je
       INNER JOIN charts_of_accounts coa
-        ON je.coa_id = coa.id
-      WHERE coa.name = 'Creditable Withholding Tax'
-        AND je.db_id IS NOT NULL
-        AND je.coa_id IS NOT NULL
-        AND DATE(je.date) >= ? 
-        AND DATE(je.date) <= ?
+        ON je.je_coa_id = coa.coa_id
+      WHERE coa.coa_name = 'Creditable Withholding Tax'
+        AND je.je_db_id IS NOT NULL
+        AND je.je_coa_id IS NOT NULL
+        AND DATE(je.je_date) >= ?
+        AND DATE(je.je_date) <= ?
     `
 
     const wtCreditableResult = await Query(wtCreditableQuery, [start_date, end_date])
     const wtCreditable = parseFloat(wtCreditableResult[0]?.wtCreditable || 0)
 
-    // Calculate Net VAT Payable
+    const journalEntriesQuery = `
+      SELECT
+        je.je_id AS id,
+        je.je_db_name AS dbName,
+        je.je_db_id AS dbId,
+        je.je_type AS type,
+        je.je_amount AS amount,
+        je.je_date AS date,
+        coa.coa_id AS coaId,
+        coa.coa_code AS coaCode,
+        coa.coa_name AS coaName,
+        coa.coa_type AS coaType,
+        CONCAT(je.je_db_name, ':', je.je_db_id) AS voucherId,
+        COALESCE(
+          (SELECT wt.wt_code FROM purchase_items pi
+           INNER JOIN withholding_tax wt ON wt.wt_id = pi.pi_witholding_tax
+           WHERE je.je_db_name = 'purchase' AND pi.pi_purchase_id = je.je_db_id
+           LIMIT 1),
+          (SELECT wt.wt_code FROM cash_disbursement_items cdi
+           INNER JOIN withholding_tax wt ON wt.wt_id = cdi.cdi_witholding_tax
+           WHERE je.je_db_name = 'cash_disbursements' AND cdi.cdi_cash_disbursement_id = je.je_db_id
+           LIMIT 1),
+          (SELECT wt.wt_code FROM sales_items si
+           INNER JOIN withholding_tax wt ON wt.wt_id = si.si_witholding_tax
+           WHERE je.je_db_name = 'sales' AND si.si_sales_id = je.je_db_id
+           LIMIT 1),
+          (SELECT wt.wt_code FROM receipt_items ri
+           INNER JOIN withholding_tax wt ON wt.wt_id = ri.ri_witholding_tax
+           WHERE je.je_db_name = 'receipts' AND ri.ri_receipts_id = je.je_db_id
+           LIMIT 1),
+          (SELECT wt.wt_code
+           FROM payment_items payi
+           INNER JOIN purchase_items pi ON pi.pi_purchase_id = payi.ci_purchase_id
+           INNER JOIN withholding_tax wt ON wt.wt_id = pi.pi_witholding_tax
+           WHERE je.je_db_name = 'payments' AND payi.ci_payment_id = je.je_db_id
+           LIMIT 1)
+        ) AS atc,
+        COALESCE(
+          (SELECT wt.wt_rate FROM purchase_items pi
+           INNER JOIN withholding_tax wt ON wt.wt_id = pi.pi_witholding_tax
+           WHERE je.je_db_name = 'purchase' AND pi.pi_purchase_id = je.je_db_id
+           LIMIT 1),
+          (SELECT wt.wt_rate FROM cash_disbursement_items cdi
+           INNER JOIN withholding_tax wt ON wt.wt_id = cdi.cdi_witholding_tax
+           WHERE je.je_db_name = 'cash_disbursements' AND cdi.cdi_cash_disbursement_id = je.je_db_id
+           LIMIT 1),
+          (SELECT wt.wt_rate FROM sales_items si
+           INNER JOIN withholding_tax wt ON wt.wt_id = si.si_witholding_tax
+           WHERE je.je_db_name = 'sales' AND si.si_sales_id = je.je_db_id
+           LIMIT 1),
+          (SELECT wt.wt_rate FROM receipt_items ri
+           INNER JOIN withholding_tax wt ON wt.wt_id = ri.ri_witholding_tax
+           WHERE je.je_db_name = 'receipts' AND ri.ri_receipts_id = je.je_db_id
+           LIMIT 1),
+          (SELECT wt.wt_rate
+           FROM payment_items payi
+           INNER JOIN purchase_items pi ON pi.pi_purchase_id = payi.ci_purchase_id
+           INNER JOIN withholding_tax wt ON wt.wt_id = pi.pi_witholding_tax
+           WHERE je.je_db_name = 'payments' AND payi.ci_payment_id = je.je_db_id
+           LIMIT 1)
+        ) AS withholdingRate,
+        CASE
+          WHEN je.je_db_name = 'receipts' THEN r.r_document_reference
+          WHEN je.je_db_name = 'cash_disbursements' THEN cd.cd_document_reference
+          WHEN je.je_db_name = 'sales' THEN s.s_document_reference
+          WHEN je.je_db_name = 'collections' THEN c.c_document_reference
+          WHEN je.je_db_name = 'purchase' THEN p.p_document_reference
+          WHEN je.je_db_name = 'payments' THEN pay.c_document_reference
+          WHEN je.je_db_name = 'adjustments' THEN a.a_document_reference
+          ELSE NULL
+        END AS referenceNo,
+        CASE
+          WHEN je.je_db_name IN ('receipts', 'sales', 'collections') THEN cust.c_name
+          WHEN je.je_db_name IN ('cash_disbursements', 'purchase', 'payments') THEN vend.v_name
+          ELSE NULL
+        END AS payeeName,
+        CASE
+          WHEN je.je_db_name IN ('receipts', 'sales', 'collections') THEN ci.ci_tin
+          WHEN je.je_db_name IN ('cash_disbursements', 'purchase', 'payments') THEN vi.vi_tin
+          ELSE NULL
+        END AS payeeTin
+      FROM journal_entries je
+      INNER JOIN charts_of_accounts coa ON je.je_coa_id = coa.coa_id
+      LEFT JOIN receipts r
+        ON je.je_db_name = 'receipts' AND r.r_id = je.je_db_id
+      LEFT JOIN cash_disbursements cd
+        ON je.je_db_name = 'cash_disbursements' AND cd.cd_id = je.je_db_id
+      LEFT JOIN sales s
+        ON je.je_db_name = 'sales' AND s.s_id = je.je_db_id
+      LEFT JOIN collections c
+        ON je.je_db_name = 'collections' AND c.c_id = je.je_db_id
+      LEFT JOIN purchase p
+        ON je.je_db_name = 'purchase' AND p.p_id = je.je_db_id
+      LEFT JOIN payments pay
+        ON je.je_db_name = 'payments' AND pay.c_id = je.je_db_id
+      LEFT JOIN adjustments a
+        ON je.je_db_name = 'adjustments' AND a.a_id = je.je_db_id
+      LEFT JOIN customers cust
+        ON (je.je_db_name = 'receipts' AND cust.c_id = r.r_customer_id)
+        OR (je.je_db_name = 'sales' AND cust.c_id = s.s_customer_id)
+        OR (je.je_db_name = 'collections' AND cust.c_id = c.c_customer_id)
+      LEFT JOIN vendors vend
+        ON (je.je_db_name = 'cash_disbursements' AND vend.v_id = cd.cd_vendor_id)
+        OR (je.je_db_name = 'purchase' AND vend.v_id = p.p_vendor_id)
+        OR (je.je_db_name = 'payments' AND vend.v_id = pay.c_vendor_id)
+      LEFT JOIN customers_information ci ON ci.ci_customer_id = cust.c_id
+      LEFT JOIN vendors_information vi ON vi.vi_vendor_id = vend.v_id
+      WHERE je.je_db_id IS NOT NULL
+        AND je.je_coa_id IS NOT NULL
+        AND DATE(je.je_date) >= ?
+        AND DATE(je.je_date) <= ?
+      ORDER BY je.je_date ASC, je.je_id ASC
+    `
+    const journalEntries = await Query(journalEntriesQuery, [start_date, end_date])
+
+    // Credit balances on liability accounts are positive amounts payable.
     const netVATPayable = outputVAT - inputVAT
 
     return res.status(200).json({
@@ -547,6 +663,7 @@ const calculateTaxFromJournalEntries = async (req, res, next) => {
           wtExpanded: Math.max(0, wtExpanded),
           wtCreditable: Math.max(0, wtCreditable),
         },
+        journalEntries,
       },
     })
   } catch (error) {

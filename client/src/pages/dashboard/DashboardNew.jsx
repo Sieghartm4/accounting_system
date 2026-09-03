@@ -37,6 +37,15 @@ const getCurrentMonthRange = () => {
   }
 }
 
+const getNextEwtDeadline = (now = new Date()) => {
+  const deadline = new Date(now.getFullYear(), now.getMonth() + 1, 10)
+  const days = Math.max(
+    0,
+    Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+  )
+  return { deadline, days }
+}
+
 function DashboardNewContent() {
   const navigate = useNavigate()
   const { responsibilityCenters, loading: responsibilityCentersLoading } =
@@ -57,6 +66,13 @@ function DashboardNewContent() {
   const [chartLoaded, setChartLoaded] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [ewtDeadline, setEwtDeadline] = useState(() => getNextEwtDeadline())
+
+  useEffect(() => {
+    const updateEwtDeadline = () => setEwtDeadline(getNextEwtDeadline())
+    const timer = window.setInterval(updateEwtDeadline, 60 * 1000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   // Dynamic Metrics based on Date selection
   const [metrics, setMetrics] = useState({
@@ -907,9 +923,13 @@ function DashboardNewContent() {
 
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
               <span className="text-xs text-slate-500 flex items-center">
-                <Clock className="w-3.5 h-3.5 mr-1" /> Due in 12 days
+                <Clock className="w-3.5 h-3.5 mr-1" /> Due in {ewtDeadline.days} days
               </span>
-              <button className="text-xs text-sky-600 hover:text-sky-700 font-semibold flex items-center">
+              <button
+                type="button"
+                onClick={() => navigate('/tax-compliance')}
+                className="text-xs text-sky-600 hover:text-sky-700 font-semibold flex items-center"
+              >
                 Generate Tax Return <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
               </button>
             </div>

@@ -49,6 +49,11 @@ window.fetch = async function (...args) {
 export async function fetchWithAuth(url, options = {}) {
   const token = localStorage.getItem('token')
 
+  if (typeof url === 'string' && url.startsWith('/')) {
+    const serverLink = import.meta.env.VITE_SERVER_LINK || ''
+    url = `${serverLink.replace(/\/$/, '')}${url}`
+  }
+
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
