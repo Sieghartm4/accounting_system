@@ -5,6 +5,7 @@ module.exports = {
     await queryInterface.createTable('payment_items', {
       ci_id: {
         type: Sequelize.INTEGER,
+        allowNull: false,
         autoIncrement: true,
         primaryKey: true,
       },

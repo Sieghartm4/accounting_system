@@ -1,9 +1,18 @@
-const { DecryptString } = require('../../util/cryptography.util')
+const path = require('path')
+const dotenv = require('dotenv')
+
+dotenv.config({ path: path.resolve(__dirname, '../../../../.env') })
+dotenv.config()
+process.env.NODE_ENV = process.env.NODE_ENV || 'development'
+
+const { DecryptString, EncryptString } = require('../../util/cryptography.util')
 
 module.exports = {
   development: {
     username: process.env._USER_ADMIN,
-    password: process.env._PASSWORD_ADMIN ? DecryptString(process.env._PASSWORD_ADMIN) : '',
+    password: process.env._PASSWORD_ADMIN
+      ? DecryptString(process.env._PASSWORD_ADMIN)
+      : '',
     database: process.env._DATABASE_ADMIN,
     host: process.env._HOST_ADMIN,
     mongoUrl: process.env._SUBSCRIPTION_MONGODB_URL,
@@ -14,7 +23,9 @@ module.exports = {
   },
   test: {
     username: process.env._USER_ADMIN,
-    password: process.env._PASSWORD_ADMIN ? DecryptString(process.env._PASSWORD_ADMIN) : '',
+    password: process.env._PASSWORD_ADMIN
+      ? DecryptString(process.env._PASSWORD_ADMIN)
+      : '',
     database: process.env._DATABASE_ADMIN,
     host: process.env._HOST_ADMIN,
     mongoUrl: process.env._SUBSCRIPTION_MONGODB_URL,
@@ -25,7 +36,9 @@ module.exports = {
   },
   production: {
     username: process.env._USER_ADMIN,
-    password: process.env._PASSWORD_ADMIN ? DecryptString(process.env._PASSWORD_ADMIN) : '',
+    password: process.env._PASSWORD_ADMIN
+      ? DecryptString(process.env._PASSWORD_ADMIN)
+      : '',
     database: process.env._DATABASE_ADMIN,
     host: process.env._HOST_ADMIN,
     mongoUrl: process.env._SUBSCRIPTION_MONGODB_URL,

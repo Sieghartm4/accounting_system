@@ -10,7 +10,7 @@ module.exports = {
         autoIncrement: true,
       },
       ci_collection_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(300),
         allowNull: false,
         references: {
           model: 'collections',

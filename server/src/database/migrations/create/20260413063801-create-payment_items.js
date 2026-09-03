@@ -9,11 +9,11 @@ module.exports = {
         primaryKey: true,
       },
       ci_payment_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(300),
         allowNull: false,
         references: {
           model: 'payments',
-          key: 'c_id',
+          key: 'p_id',
         },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE',

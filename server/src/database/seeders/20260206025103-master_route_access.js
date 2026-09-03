@@ -1,8 +1,8 @@
-'use strict';
+'use strict'
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     /**
      * Add seed commands here.
      *
@@ -11,13 +11,12 @@ module.exports = {
      *   name: 'John Doe',
      *   isBetaMember: false
      * }], {});
-    */
+     */
     //    const routes = [
     //   'dashboard', 'access', 'users', 'customers', 'vendors', 'charts',
     //   'proforma_entries', 'product_service', 'company', 'receipts',
-    //   'disbursement', 'sales', 'collections', 'purchase', 'payments', 'adjustments', 'vat', 'witholding_tax', 'trial_balance', 'income_statement', 'general_ledger', 'balance_sheet', 'journal_entries', 'statement_of_comprehensive_income', 'bank_reconciliation', 'audit_trail', 'aging_receivables', 'customer_transactions', 'vendor_transactions', 'advances', 'purchase_order', 'responsibility_center', 'aging_payables',
+    //   'disbursement', 'sales', 'collections', 'purchase', 'payments', 'adjustments', 'vat', 'witholding_tax', 'trial_balance', 'income_statement', 'general_ledger', 'balance_sheet', 'journal_entries', 'statement_of_comprehensive_income', 'bank_reconciliation', 'audit_trail', 'aging_receivables', 'customer_transactions', 'vendor_transactions', 'advances', 'purchase_order', 'responsibility_center', 'aging_payables', 'tax_compliance',
     // ];
-
     // const seedData = [];
     // routes.forEach(route => {
     //   seedData.push({
@@ -31,16 +30,15 @@ module.exports = {
     //     mra_status: 'Full Access'
     //   });
     // });
-
     // await queryInterface.bulkInsert('master_route_access', seedData);
   },
 
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface, Sequelize) {
     /**
      * Add commands to revert seed here.
      *
      * Example:
      * await queryInterface.bulkDelete('People', null, {});
      */
-  }
-};
+  },
+}

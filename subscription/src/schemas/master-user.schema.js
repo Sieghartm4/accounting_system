@@ -21,9 +21,21 @@ const MasterUserSchema = Joi.object({
         'any.required': 'dbName is required.',
         'string.empty': 'dbName must be a valid string.',
       }),
+ 	email: Joi.string().trim().required().messages({
+        'any.required': 'email is required.',
+        'string.empty': 'email must be a valid string.',
+      }),
  	status: Joi.string().trim().required().messages({
         'any.required': 'status is required.',
         'string.empty': 'status must be a valid enum.',
+      }),
+ 	role: Joi.string().trim().required().messages({
+        'any.required': 'role is required.',
+        'string.empty': 'role must be a valid enum.',
+      }),
+ 	subscriptionId: Joi.number().integer().required().messages({
+        'any.required': 'subscriptionId is required.',
+        'number.base': 'subscriptionId must be a valid integer.',
       })
 });
 
@@ -34,8 +46,11 @@ const MasterUserField = {
     Username: 'username',
     Password: 'password',
     DbName: 'db_name',
+    Email: 'email',
     Status: 'status',
-    All: ['id', 'username', 'password', 'db_name', 'status'],
+    Role: 'role',
+    SubscriptionId: 'subscription_id',
+    All: ['id', 'username', 'password', 'db_name', 'email', 'status', 'role', 'subscription_id'],
 };
 
 

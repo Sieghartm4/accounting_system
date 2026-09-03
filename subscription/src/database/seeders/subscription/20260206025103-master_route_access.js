@@ -45,6 +45,8 @@ module.exports = {
       'advances',
       'purchase_order',
       'responsibility_center',
+      'aging_payables',
+      'tax_compliance',
     ]
 
     const seedData = []

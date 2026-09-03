@@ -7,6 +7,7 @@ module.exports = {
       ci_id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
+        allowNull: false,
         autoIncrement: true,
       },
       ci_collection_id: {

@@ -4,7 +4,7 @@ module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('purchase_items', {
       pi_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(300),
         autoIncrement: true,
         primaryKey: true,
       },
