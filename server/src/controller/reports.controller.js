@@ -681,13 +681,13 @@ const getGeneralLedger = async (req, res, next) => {
 
       // Convert db_name to readable transaction type
       const transactionTypeMap = {
-        'receipts': 'Receipt',
-        'cash_disbursements': 'Cash Disbursement',
-        'sales': 'Sales',
-        'collections': 'Collection',
-        'purchase': 'Purchase',
-        'payments': 'Payment',
-        'adjustments': 'Adjustment',
+        receipts: 'Receipt',
+        cash_disbursements: 'Cash Disbursement',
+        sales: 'Sales',
+        collections: 'Collection',
+        purchase: 'Purchase',
+        payments: 'Payment',
+        adjustments: 'Adjustment',
       }
       const transactionType = transactionTypeMap[row.db_name] || row.db_name
 
@@ -878,7 +878,7 @@ const getBalanceSheet = async (req, res, next) => {
       )
     `
 
-    const balance_sheet_query = `SELECT ${Master.charts_of_accounts.selectOptionColumns.code} as 'Account Code', ${Master.charts_of_accounts.selectOptionColumns.name} as 'Account Name', SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) as Current FROM ${Master.charts_of_accounts.tablename} LEFT JOIN ${Accounting.journal_entries.tablename} ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id} WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE' AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('ASSETS', 'LIABILITIES', 'EQUITY')${dateFilter}${approvalFilter} GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.code}, ${Master.charts_of_accounts.selectOptionColumns.name}, ${Master.charts_of_accounts.selectOptionColumns.type} ORDER BY ${Master.charts_of_accounts.selectOptionColumns.type}, ${Master.charts_of_accounts.selectOptionColumns.code}`
+    const balance_sheet_query = `SELECT ${Master.charts_of_accounts.selectOptionColumns.code} as 'Account Code', ${Master.charts_of_accounts.selectOptionColumns.name} as 'Account Name', CASE WHEN ${Master.charts_of_accounts.selectOptionColumns.type} = 'ASSETS' THEN SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) ELSE SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) END as Current FROM ${Master.charts_of_accounts.tablename} LEFT JOIN ${Accounting.journal_entries.tablename} ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id} WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE' AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('ASSETS', 'LIABILITIES', 'EQUITY')${dateFilter}${approvalFilter} GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.code}, ${Master.charts_of_accounts.selectOptionColumns.name}, ${Master.charts_of_accounts.selectOptionColumns.type} ORDER BY ${Master.charts_of_accounts.selectOptionColumns.type}, ${Master.charts_of_accounts.selectOptionColumns.code}`
 
     const balanceSheet = await Query(balance_sheet_query)
 
@@ -950,7 +950,7 @@ const getBalanceSheet = async (req, res, next) => {
       updatedEquity.push({
         'Account Code': '300999',
         'Account Name': 'Current Period Net Income',
-        Current: -netIncome,
+        Current: netIncome,
       })
     }
 
@@ -1021,8 +1021,8 @@ const getSearch = async (req, res, next) => {
   )
 
   // Treat empty strings as undefined for date filtering
-  const effectiveStartDate = (startDate && startDate.trim() !== '') ? startDate : null
-  const effectiveEndDate = (endDate && endDate.trim() !== '') ? endDate : null
+  const effectiveStartDate = startDate && startDate.trim() !== '' ? startDate : null
+  const effectiveEndDate = endDate && endDate.trim() !== '' ? endDate : null
 
   try {
     if (!search || search.trim() === '') {
@@ -1277,7 +1277,10 @@ const getSearch = async (req, res, next) => {
       if (effectiveStartDate && effectiveEndDate) {
         cashDisbursementsParams.push(effectiveStartDate, effectiveEndDate)
       }
-      const cashDisbursementsResults = await Query(cashDisbursementsQuery, cashDisbursementsParams)
+      const cashDisbursementsResults = await Query(
+        cashDisbursementsQuery,
+        cashDisbursementsParams,
+      )
       results.push(...cashDisbursementsResults)
     }
 

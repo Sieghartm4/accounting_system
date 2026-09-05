@@ -1221,21 +1221,28 @@ const updateCollectionState = async (req, res, next) => {
 
             console.log('uniqueSalesIds', uniqueSalesIds)
 
-            // Update sales status to PAID only if current status is UNPAID
+            // Recalculate each sale status from all approved collection items.
             for (const salesId of uniqueSalesIds) {
-              const updateSalesQuery = sql
-                .update(Accounting.sales.tablename)
-                .set([Accounting.sales.selectOptionColumns.status])
-                .where(Accounting.sales.selectOptionColumns.id)
-                .andWhere(Accounting.sales.selectOptionColumns.status)
-                .build()
+              const updateSalesQuery = `
+                UPDATE ${Accounting.sales.tablename} s
+                SET ${Accounting.sales.selectOptionColumns.status} = CASE
+                  WHEN s.${Accounting.sales.selectOptionColumns.total_amount_due} <= COALESCE((
+                    SELECT SUM(ci.${Accounting.collection_items.selectOptionColumns.amount})
+                    FROM ${Accounting.collection_items.tablename} ci
+                    INNER JOIN ${Accounting.sales_items.tablename} si
+                      ON si.${Accounting.sales_items.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.sales_id}
+                    INNER JOIN ${Accounting.collections.tablename} c
+                      ON c.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
+                    WHERE si.${Accounting.sales_items.selectOptionColumns.sales_id} = s.${Accounting.sales.selectOptionColumns.id}
+                      AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+                  ), 0) THEN 'PAID'
+                  ELSE 'PARTIAL'
+                END
+                WHERE s.${Accounting.sales.selectOptionColumns.id} = ?
+                  AND s.${Accounting.sales.selectOptionColumns.status} IN ('UNPAID', 'PARTIAL')
+              `
 
-              const updateSalesValues = ['PAID', salesId, 'UNPAID']
-
-              const [result] = await connection.execute(
-                updateSalesQuery,
-                updateSalesValues,
-              )
+              const [result] = await connection.execute(updateSalesQuery, [salesId])
               console.log(
                 `Updated sales ID ${salesId} status to PAID, affected rows: ${result.affectedRows}`,
               )

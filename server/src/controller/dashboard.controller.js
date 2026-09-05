@@ -272,26 +272,26 @@ const getDashboardData = async (req, res, next) => {
     const checks = parseFloat(cashBreakdownResult[0]?.checks || 0)
     const totalCashPosition = cashOnHand + pettyCash + bankAccountsBalance + checks
 
-    // Total Receivables (AR) - Sales not yet collected within date range
-    const receivables_query = sql
-      .select([
-        {
-          col: `SUM(${Accounting.sales.selectOptionColumns.total_amount_due})`,
-          as: 'totalReceivables',
-        },
-      ])
-      .from(Accounting.sales.tablename)
-      .where(
-        `${Accounting.sales.selectOptionColumns.status} = 'UNPAID' OR ${Accounting.sales.selectOptionColumns.status} = 'PARTIAL'`,
-      )
-      .andWhere(`${Accounting.sales.selectOptionColumns.state} = 'APPROVED'`)
-      .andWhere(
-        `${Accounting.sales.selectOptionColumns.date_delivered} >= '${startDate}'`,
-      )
-      .andWhere(
-        `${Accounting.sales.selectOptionColumns.date_delivered} <= '${endDate}'`,
-      )
-      .build()
+    // Open AR as of the selected period end, including residual balances from prior periods.
+    const receivables_query = `
+      SELECT COALESCE(SUM(s.${Accounting.sales.selectOptionColumns.total_amount_due} - COALESCE(collected.amount, 0)), 0) AS totalReceivables
+      FROM ${Accounting.sales.tablename} s
+      LEFT JOIN (
+        SELECT si.${Accounting.sales_items.selectOptionColumns.sales_id} AS sales_id,
+               SUM(ci.${Accounting.collection_items.selectOptionColumns.amount}) AS amount
+        FROM ${Accounting.collection_items.tablename} ci
+        INNER JOIN ${Accounting.sales_items.tablename} si
+          ON si.${Accounting.sales_items.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.sales_id}
+        INNER JOIN ${Accounting.collections.tablename} c
+          ON c.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
+        WHERE c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+          AND c.${Accounting.collections.selectOptionColumns.collection_date} <= '${endDate}'
+        GROUP BY si.${Accounting.sales_items.selectOptionColumns.sales_id}
+      ) collected ON collected.sales_id = s.${Accounting.sales.selectOptionColumns.id}
+      WHERE s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        AND s.${Accounting.sales.selectOptionColumns.date_delivered} <= '${endDate}'
+        AND s.${Accounting.sales.selectOptionColumns.total_amount_due} - COALESCE(collected.amount, 0) > 0
+    `
     const receivablesResult = await Query(receivables_query)
     const totalReceivables = parseFloat(receivablesResult[0]?.totalReceivables || 0)
 
@@ -320,22 +320,29 @@ const getDashboardData = async (req, res, next) => {
 
     // ==================== CASH FLOW ACTIVITY ====================
 
-    // Total Collections this period - count approved collections within date range
+    // Total Collections this period is an amount, not a transaction count.
     const collections_count_query = `
-      SELECT COUNT(*) AS totalCollections
-      FROM ${Accounting.collections.tablename}
-      WHERE ${Accounting.collections.selectOptionColumns.collection_date} >= '${startDate}'
-        AND ${Accounting.collections.selectOptionColumns.collection_date} <= '${endDate}'
-        AND ${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+      SELECT COALESCE(SUM(ci.${Accounting.collection_items.selectOptionColumns.amount}), 0) AS totalCollections
+      FROM ${Accounting.collections.tablename} c
+      INNER JOIN ${Accounting.collection_items.tablename} ci
+        ON ci.${Accounting.collection_items.selectOptionColumns.collection_id} = c.${Accounting.collections.selectOptionColumns.id}
+      WHERE c.${Accounting.collections.selectOptionColumns.collection_date} >= '${startDate}'
+        AND c.${Accounting.collections.selectOptionColumns.collection_date} <= '${endDate}'
+        AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
     `
     const collectionsCountResult = await Query(collections_count_query)
     const totalCollections = parseFloat(
       collectionsCountResult[0]?.totalCollections || 0,
     )
 
-    // Total Sales for collections rate calculation - count approved sales within date range
+    // Total billed sales for collections rate calculation.
     const total_sales_count_query = sql
-      .select([{ col: `COUNT(*)`, as: 'totalSales' }])
+      .select([
+        {
+          col: `COALESCE(SUM(${Accounting.sales.selectOptionColumns.total_amount_due}), 0)`,
+          as: 'totalSales',
+        },
+      ])
       .from(Accounting.sales.tablename)
       .where(`${Accounting.sales.selectOptionColumns.state} = 'APPROVED'`)
       .andWhere(
@@ -348,7 +355,7 @@ const getDashboardData = async (req, res, next) => {
     const totalSalesResult = await Query(total_sales_count_query)
     const totalSales = parseFloat(totalSalesResult[0]?.totalSales || 0)
 
-    // Collections Rate - (Total Collections Count / Total Sales Count) * 100
+    // Collections Rate - collected amount divided by billed amount.
     let collectionsRate = 0
     if (totalSales > 0) {
       collectionsRate = ((totalCollections / totalSales) * 100).toFixed(1)
@@ -363,7 +370,7 @@ const getDashboardData = async (req, res, next) => {
       endDate,
     })
 
-    // Total Disbursements this period
+    // Total Disbursements this period.
     const disbursements_query = sql
       .select([
         {
@@ -387,8 +394,31 @@ const getDashboardData = async (req, res, next) => {
       disbursementsResult[0]?.totalDisbursements || 0,
     )
 
-    // Net Cash Movement
-    const netCashMovement = totalCollections - totalDisbursements
+    const receipts_query = `
+      SELECT COALESCE(SUM(${Accounting.receipts.selectOptionColumns.total_amount_due}), 0) AS totalReceipts
+      FROM ${Accounting.receipts.tablename}
+      WHERE ${Accounting.receipts.selectOptionColumns.collection_date} >= '${startDate}'
+        AND ${Accounting.receipts.selectOptionColumns.collection_date} <= '${endDate}'
+        AND ${Accounting.receipts.selectOptionColumns.state} = 'APPROVED'
+    `
+    const receiptsResult = await Query(receipts_query)
+    const totalReceipts = parseFloat(receiptsResult[0]?.totalReceipts || 0)
+
+    const payments_query = `
+      SELECT COALESCE(SUM(pi.${Accounting.payment_items.selectOptionColumns.amount}), 0) AS totalPayments
+      FROM ${Accounting.payments.tablename} pay
+      INNER JOIN ${Accounting.payment_items.tablename} pi
+        ON pi.${Accounting.payment_items.selectOptionColumns.payment_id} = pay.${Accounting.payments.selectOptionColumns.id}
+      WHERE pay.${Accounting.payments.selectOptionColumns.payment_date} >= '${startDate}'
+        AND pay.${Accounting.payments.selectOptionColumns.payment_date} <= '${endDate}'
+        AND pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+    `
+    const paymentsResult = await Query(payments_query)
+    const totalPayments = parseFloat(paymentsResult[0]?.totalPayments || 0)
+
+    // Net cash movement includes receipts, collections, disbursements, and payments.
+    const netCashMovement =
+      totalReceipts + totalCollections - totalDisbursements - totalPayments
 
     // ==================== TRANSACTION VOLUME ====================
 
@@ -478,53 +508,86 @@ const getDashboardData = async (req, res, next) => {
     // Balance Sheet check (Assets = Liabilities + Equity)
     const balance_sheet_check_query = `
       SELECT 
-        SUM(CASE WHEN account_type = 'ASSET' THEN account_balance ELSE 0 END) AS totalAssets,
-        SUM(CASE WHEN account_type IN ('LIABILITY', 'EQUITY') THEN account_balance ELSE 0 END) AS totalLiabilitiesEquity
+        SUM(CASE WHEN account_type IN ('ASSET', 'ASSETS') THEN account_balance ELSE 0 END) AS totalAssets,
+        SUM(CASE
+          WHEN account_type IN ('LIABILITY', 'LIABILITIES', 'EQUITY')
+            THEN account_balance
+          ELSE 0
+        END) AS totalLiabilitiesEquity
       FROM (
         SELECT 
           ${Master.charts_of_accounts.selectOptionColumns.type} AS account_type,
-          SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT' 
-                   THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) -
-          SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' 
-                   THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS account_balance
+          CASE WHEN ${Master.charts_of_accounts.selectOptionColumns.type} IN ('ASSET', 'ASSETS') THEN
+            SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                     THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) -
+            SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                     THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+          WHEN ${Master.charts_of_accounts.selectOptionColumns.type} IN ('LIABILITY', 'LIABILITIES', 'EQUITY') THEN
+            SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                     THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) -
+            SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                     THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+          ELSE
+            SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                     THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) -
+            SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                     THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+          END AS account_balance
         FROM ${Master.charts_of_accounts.tablename}
         LEFT JOIN ${Accounting.journal_entries.tablename}
           ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
           ${validJeCondition} /* Enforced Null Checks */
         WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
+          ${dateFilter}
           ${approvalFilter}
         GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.type}
       ) AS account_balances
     `
     const balanceSheetResult = await Query(balance_sheet_check_query)
     const totalAssets = parseFloat(balanceSheetResult[0]?.totalAssets || 0)
-    const totalLiabilitiesEquity = parseFloat(
-      balanceSheetResult[0]?.totalLiabilitiesEquity || 0,
-    )
+    const totalLiabilitiesEquity =
+      parseFloat(balanceSheetResult[0]?.totalLiabilitiesEquity || 0) + netIncome
     const balanceSheetDifference = Math.abs(totalAssets - totalLiabilitiesEquity)
     const balanceSheetBalanced = balanceSheetDifference < 0.01
 
+    // Aging is evaluated as of today; endDate only limits the transaction population.
+    const agingAsOfDate = new Date().toISOString().split('T')[0]
+
     // Overdue AR count and amount
-    const today = new Date().toISOString().split('T')[0]
-    const overdue_ar_query = sql
-      .select([
-        { col: `COUNT(*)`, as: 'overdueCount' },
-        {
-          col: `SUM(${Accounting.sales.selectOptionColumns.total_amount_due})`,
-          as: 'overdueAmount',
-        },
-      ])
-      .from(Accounting.sales.tablename)
-      .where(`${Accounting.sales.selectOptionColumns.date_due} < '${today}'`)
-      .andWhere(
-        `(${Accounting.sales.selectOptionColumns.status} = 'UNPAID' OR ${Accounting.sales.selectOptionColumns.status} = 'PARTIAL')`,
-      )
-      .build()
+    const overdue_ar_query = `
+      SELECT COUNT(*) AS overdueCount, COALESCE(SUM(open_sales.open_amount), 0) AS overdueAmount
+      FROM (
+        SELECT COALESCE(
+                 STR_TO_DATE(s.${Accounting.sales.selectOptionColumns.date_due}, '%Y-%m-%d'),
+                 STR_TO_DATE(s.${Accounting.sales.selectOptionColumns.date_due}, '%m/%d/%Y'),
+                 STR_TO_DATE(s.${Accounting.sales.selectOptionColumns.date_due}, '%m-%d-%Y')
+               ) AS due_date,
+               s.${Accounting.sales.selectOptionColumns.total_amount_due} - COALESCE(collected.amount, 0) AS open_amount
+        FROM ${Accounting.sales.tablename} s
+        LEFT JOIN (
+          SELECT si.${Accounting.sales_items.selectOptionColumns.sales_id} AS sales_id,
+                 SUM(ci.${Accounting.collection_items.selectOptionColumns.amount}) AS amount
+          FROM ${Accounting.collection_items.tablename} ci
+          INNER JOIN ${Accounting.sales_items.tablename} si
+            ON si.${Accounting.sales_items.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.sales_id}
+          INNER JOIN ${Accounting.collections.tablename} c
+            ON c.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
+          WHERE c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+            AND c.${Accounting.collections.selectOptionColumns.collection_date} <= '${endDate}'
+          GROUP BY si.${Accounting.sales_items.selectOptionColumns.sales_id}
+        ) collected ON collected.sales_id = s.${Accounting.sales.selectOptionColumns.id}
+        WHERE s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+          AND s.${Accounting.sales.selectOptionColumns.date_delivered} <= '${endDate}'
+      ) open_sales
+      WHERE open_sales.due_date < '${agingAsOfDate}'
+        AND open_sales.open_amount > 0
+    `
     const overdueARResult = await Query(overdue_ar_query)
     const overdueARCount = overdueARResult[0]?.overdueCount || 0
     const overdueARAmount = overdueARResult[0]?.overdueAmount || 0
 
     // Overdue AP count and amount
+    const today = new Date().toISOString().split('T')[0]
     const overdue_ap_query = sql
       .select([
         { col: `COUNT(*)`, as: 'overdueCount' },
@@ -860,8 +923,8 @@ const getDashboardData = async (req, res, next) => {
         ${approvalFilter}
     `
     const wtExpandedResult = await Query(wt_expanded_query)
-    // For liability accounts, invert the sign so credit balance shows as positive amount owed
-    const wtExpanded = -parseFloat(wtExpandedResult[0]?.wtExpanded || 0)
+    // Liability credit balances are presented as positive amounts owed.
+    const wtExpanded = parseFloat(wtExpandedResult[0]?.wtExpanded || 0)
 
     // Creditable Withholding Tax - from journal entries with COA name 'Creditable Withholding Tax'
     // For asset accounts, debit balance means asset held (positive)
@@ -883,39 +946,36 @@ const getDashboardData = async (req, res, next) => {
 
     // ==================== AR AGING DATA ====================
     const ar_aging_query = `
-      SELECT 
-        SUM(CASE 
-          WHEN ${Accounting.sales.selectOptionColumns.date_due} >= CURDATE() 
-          THEN ${Accounting.sales.selectOptionColumns.total_amount_due} 
-          ELSE 0 
-        END) AS current,
-        SUM(CASE 
-          WHEN ${Accounting.sales.selectOptionColumns.date_due} < CURDATE() 
-          THEN ${Accounting.sales.selectOptionColumns.total_amount_due} 
-          ELSE 0 
-        END) AS overdue_total,
-        SUM(CASE 
-          WHEN ${Accounting.sales.selectOptionColumns.date_due} < CURDATE() 
-           AND ${Accounting.sales.selectOptionColumns.date_due} >= CURDATE() - INTERVAL 30 DAY 
-          THEN ${Accounting.sales.selectOptionColumns.total_amount_due} 
-          ELSE 0 
-        END) AS overdue_1_30,
-        SUM(CASE 
-          WHEN ${Accounting.sales.selectOptionColumns.date_due} < CURDATE() - INTERVAL 30 DAY 
-           AND ${Accounting.sales.selectOptionColumns.date_due} >= CURDATE() - INTERVAL 60 DAY 
-          THEN ${Accounting.sales.selectOptionColumns.total_amount_due} 
-          ELSE 0 
-        END) AS overdue_31_60,
-        SUM(CASE 
-          WHEN ${Accounting.sales.selectOptionColumns.date_due} < CURDATE() - INTERVAL 60 DAY 
-          THEN ${Accounting.sales.selectOptionColumns.total_amount_due} 
-          ELSE 0 
-        END) AS overdue_61_plus
-      FROM ${Accounting.sales.tablename}
-      WHERE (${Accounting.sales.selectOptionColumns.status} = 'UNPAID' OR ${Accounting.sales.selectOptionColumns.status} = 'PARTIAL')
-        AND ${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
-        AND ${Accounting.sales.selectOptionColumns.date_delivered} >= '${startDate}'
-        AND ${Accounting.sales.selectOptionColumns.date_delivered} <= '${endDate}'
+      SELECT
+        COALESCE(SUM(CASE WHEN open_sales.due_date >= '${agingAsOfDate}' THEN open_sales.open_amount ELSE 0 END), 0) AS current,
+        COALESCE(SUM(CASE WHEN open_sales.due_date < '${agingAsOfDate}' THEN open_sales.open_amount ELSE 0 END), 0) AS overdue_total,
+        COALESCE(SUM(CASE WHEN open_sales.due_date < '${agingAsOfDate}' AND open_sales.due_date >= DATE_SUB('${agingAsOfDate}', INTERVAL 30 DAY) THEN open_sales.open_amount ELSE 0 END), 0) AS overdue_1_30,
+        COALESCE(SUM(CASE WHEN open_sales.due_date < DATE_SUB('${agingAsOfDate}', INTERVAL 30 DAY) AND open_sales.due_date >= DATE_SUB('${agingAsOfDate}', INTERVAL 60 DAY) THEN open_sales.open_amount ELSE 0 END), 0) AS overdue_31_60,
+        COALESCE(SUM(CASE WHEN open_sales.due_date < DATE_SUB('${agingAsOfDate}', INTERVAL 60 DAY) THEN open_sales.open_amount ELSE 0 END), 0) AS overdue_61_plus
+      FROM (
+        SELECT COALESCE(
+                 STR_TO_DATE(s.${Accounting.sales.selectOptionColumns.date_due}, '%Y-%m-%d'),
+                 STR_TO_DATE(s.${Accounting.sales.selectOptionColumns.date_due}, '%m/%d/%Y'),
+                 STR_TO_DATE(s.${Accounting.sales.selectOptionColumns.date_due}, '%m-%d-%Y')
+               ) AS due_date,
+               s.${Accounting.sales.selectOptionColumns.total_amount_due} - COALESCE(collected.amount, 0) AS open_amount
+        FROM ${Accounting.sales.tablename} s
+        LEFT JOIN (
+          SELECT si.${Accounting.sales_items.selectOptionColumns.sales_id} AS sales_id,
+                 SUM(ci.${Accounting.collection_items.selectOptionColumns.amount}) AS amount
+          FROM ${Accounting.collection_items.tablename} ci
+          INNER JOIN ${Accounting.sales_items.tablename} si
+            ON si.${Accounting.sales_items.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.sales_id}
+          INNER JOIN ${Accounting.collections.tablename} c
+            ON c.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
+          WHERE c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+            AND c.${Accounting.collections.selectOptionColumns.collection_date} <= '${endDate}'
+          GROUP BY si.${Accounting.sales_items.selectOptionColumns.sales_id}
+        ) collected ON collected.sales_id = s.${Accounting.sales.selectOptionColumns.id}
+        WHERE s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+          AND s.${Accounting.sales.selectOptionColumns.date_delivered} <= '${endDate}'
+      ) open_sales
+      WHERE open_sales.open_amount > 0
     `
     const arAgingResult = await Query(ar_aging_query)
     const arAging = arAgingResult[0] || {
@@ -1021,8 +1081,10 @@ const getDashboardData = async (req, res, next) => {
         },
       },
       cf: {
+        totalReceipts,
         totalCollections,
         totalDisbursements,
+        totalPayments,
         netCashMovement,
       },
       tax: {
@@ -1053,8 +1115,10 @@ const getDashboardData = async (req, res, next) => {
         paymentsRate,
       },
       cashFlowActivity: {
+        totalReceipts,
         totalCollections,
         totalDisbursements,
+        totalPayments,
         netCashMovement,
       },
       transactionVolume: {
