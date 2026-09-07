@@ -8,7 +8,7 @@ const useResponsibilityCenter = () => {
   const fetchResponsibilityCenters = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -43,7 +43,7 @@ const useResponsibilityCenter = () => {
 
   const createResponsibilityCenter = async (centerData) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         throw new Error('No authorization token found')
       }
@@ -78,7 +78,7 @@ const useResponsibilityCenter = () => {
 
   const updateResponsibilityCenter = async (id, centerData) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         throw new Error('No authorization token found')
       }
@@ -113,7 +113,7 @@ const useResponsibilityCenter = () => {
 
   const importResponsibilityCenters = async (centers) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         throw new Error('No authorization token found')
       }

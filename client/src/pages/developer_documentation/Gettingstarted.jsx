@@ -86,7 +86,7 @@ The application implements strict session-less token authentication.
 
 1. User submits credentials to \`POST /credentials\`
 2. Server validates and returns a compact Signed JWT containing client metadata and authorization profile.
-3. Client stores token in \`localStorage.getItem('token')\`
+3. Client stores token in \`sessionStorage.getItem('authenticated')\`
 4. Subsequent requests include header: \`Authorization: Bearer <token>\`
 5. Token expires → 401 response → Client redirects to login page.
 

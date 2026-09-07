@@ -8,6 +8,7 @@ import {
   Calendar,
   Hash,
 } from 'lucide-react'
+import LoadingScreen from '../../components/LoadingScreen'
 
 export default function JournalEntries() {
   const [journalEntries, setJournalEntries] = useState([])
@@ -18,10 +19,6 @@ export default function JournalEntries() {
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    fetchJournalEntries()
-  }, [])
-
-  useEffect(() => {
     const t = setTimeout(() => fetchJournalEntries(), 500)
     return () => clearTimeout(t)
   }, [startDate, endDate])
@@ -30,7 +27,7 @@ export default function JournalEntries() {
     try {
       setLoading(true)
       setError('')
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const params = new URLSearchParams()
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
@@ -90,15 +87,8 @@ export default function JournalEntries() {
     )
   }, [journalEntries, searchTerm])
 
-  if (loading && journalEntries.length === 0)
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center gap-4">
-        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[3px] text-gray-400">
-          Loading Journal Entries...
-        </p>
-      </div>
-    )
+  if (loading)
+    return <LoadingScreen label="Loading Journal Entries..." />
 
   if (error)
     return (

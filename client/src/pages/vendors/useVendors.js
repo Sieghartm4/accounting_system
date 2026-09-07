@@ -8,7 +8,7 @@ const useVendors = () => {
   const fetchVendors = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -53,7 +53,7 @@ const useVendors = () => {
     contact,
   ) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -112,7 +112,7 @@ const useVendors = () => {
     status,
   ) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -161,7 +161,7 @@ const useVendors = () => {
 
   const importVendors = async (vendors) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')

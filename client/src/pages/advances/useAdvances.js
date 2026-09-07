@@ -18,7 +18,7 @@ const useAdvances = (startDate, endDate) => {
         }
         setError(null)
 
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
         const params = new URLSearchParams()
         const isDateFiltered = Boolean(startDate || endDate)
         const currentOffset = isLoadMore ? advances.length : 0

@@ -16,6 +16,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import RightSideModal from '../RightSideModal'
 import { hasRouteAccess, getAccessibleRoutes } from '../../utils/routeProtection'
+import LoadingScreen from '../LoadingScreen'
 
 const SEARCH_ROUTE_DOCUMENT_TYPE_MAP = {
   sales: 'Sales',
@@ -45,6 +46,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
   })
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileSaving, setProfileSaving] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
   const [profileError, setProfileError] = useState('')
   const [profileSuccess, setProfileSuccess] = useState('')
   const [showChangePasswordFields, setShowChangePasswordFields] = useState(false)
@@ -63,7 +65,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
   const searchRef = useRef(null)
 
   useEffect(() => {
-    const userData = localStorage.getItem('user')
+    const userData = sessionStorage.getItem('auth_user')
     if (userData) {
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
@@ -92,13 +94,15 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
 
   const fetchCompanies = async () => {
     try {
-      const token = localStorage.getItem('token')
+      // ✅ Read token from sessionStorage (set during login)
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/company`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
         const result = await response.json()
-        if (result.success) {''
+        if (result.success) {
+          ;('')
           setCompanies(result.data)
           if (result.data.length > 0 && !selectedCompany)
             setSelectedCompany(result.data[0])
@@ -134,7 +138,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
 
     setIsSearching(true)
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const params = new URLSearchParams({
         search: searchQuery.trim(),
         allowedRoutes: allowedRoutes.join(','),
@@ -221,7 +225,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     setProfileLoading(true)
     setProfileError('')
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/users/profile`,
         {
@@ -235,7 +239,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
         // If server lookup fails, fall back to local cached user so modal still shows
         const errorData = await response.json().catch(() => ({}))
         try {
-          const fallback = JSON.parse(localStorage.getItem('user') || '{}')
+          const fallback = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
           if (fallback && Object.keys(fallback).length > 0) {
             setProfile((prev) => ({ ...prev, ...fallback }))
           }
@@ -264,7 +268,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     setShowDropdown(false)
     setShowProfileModal(true)
 
-    const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
+    const storedUser = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
     if (storedUser && Object.keys(storedUser).length > 0) {
       setProfile(storedUser)
     }
@@ -295,7 +299,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
         }
       }
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const requestBody = {
         fullname: profile.fullname,
         username: profile.username,
@@ -326,7 +330,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
 
       const result = await response.json()
       if (result.success) {
-        const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
+        const currentUser = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
         const updatedUser = {
           ...currentUser,
           fullname: result.data.fullname ?? profile.fullname ?? currentUser.fullname,
@@ -363,11 +367,12 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
   }
 
   const handleLogout = async () => {
+    setLoggingOut(true)
     try {
-      const token = localStorage.getItem('token')
-      const userData = localStorage.getItem('user')
+      const token = sessionStorage.getItem('authenticated')
+      const userData = sessionStorage.getItem('auth_user')
       const userId = userData ? JSON.parse(userData).id : null
-      
+
       const subscriptionUrl =
         import.meta.env.VITE_SUBSCRIPTION_LINK ||
         `http://${import.meta.env.VITE_SUBSCRIPTION_URL || 'localhost'}:${import.meta.env.VITE_SUBSCRIPTION_PORT || '5051'}`
@@ -415,6 +420,11 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
 
   return (
     <>
+      {loggingOut && (
+        <div className="fixed inset-0 z-[200] bg-white flex items-center justify-center">
+          <LoadingScreen label="Logging Out..." />
+        </div>
+      )}
       <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-4 shrink-0 shadow-sm z-30">
         <button
           className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
@@ -662,9 +672,11 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
                 <User size={18} className="text-red-600" />
-                <h3 className="text-sm font-bold text-gray-800">Account Information</h3>
+                <h3 className="text-sm font-bold text-gray-800">
+                  Account Information
+                </h3>
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-gray-600">
                   Username
@@ -678,7 +690,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                   required
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-gray-600">
                   Full Name
@@ -714,7 +726,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                 <Shield size={18} className="text-red-600" />
                 <h3 className="text-sm font-bold text-gray-800">Security</h3>
               </div>
-              
+
               {!showChangePasswordFields ? (
                 <button
                   type="button"
@@ -770,9 +782,11 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
                 <Shield size={18} className="text-red-600" />
-                <h3 className="text-sm font-bold text-gray-800">System Information</h3>
+                <h3 className="text-sm font-bold text-gray-800">
+                  System Information
+                </h3>
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-gray-600">
                   Role
@@ -784,7 +798,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                   className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 outline-none cursor-not-allowed"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-gray-600">
                   Status

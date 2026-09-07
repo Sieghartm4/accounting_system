@@ -45,94 +45,99 @@ const getDashboardData = async (req, res, next) => {
       ${responsibilityCenterFilter}
     `
 
-    // Date filter using EXISTS subqueries to check parent table date columns
-    let dateFilter = ''
-    if (startDate || endDate) {
-      const conditions = []
-      if (startDate) {
-        conditions.push(`
-          (
-            (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
-              SELECT 1 FROM ${Accounting.receipts.tablename} r
-              WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND r.${Accounting.receipts.selectOptionColumns.collection_date} >= '${startDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
-              SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
-              WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} >= '${startDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
-              SELECT 1 FROM ${Accounting.sales.tablename} s
-              WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND s.${Accounting.sales.selectOptionColumns.date_delivered} >= '${startDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
-              SELECT 1 FROM ${Accounting.collections.tablename} c
-              WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND c.${Accounting.collections.selectOptionColumns.collection_date} >= '${startDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
-              SELECT 1 FROM ${Accounting.purchase.tablename} p
-              WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND p.${Accounting.purchase.selectOptionColumns.date_delivered} >= '${startDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
-              SELECT 1 FROM ${Accounting.payments.tablename} pay
-              WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND pay.${Accounting.payments.selectOptionColumns.payment_date} >= '${startDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
-              SELECT 1 FROM ${Accounting.adjustments.tablename} a
-              WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND a.${Accounting.adjustments.selectOptionColumns.posting_date} >= '${startDate}'
-            ))
-          )
-        `)
+    // Build a date range filter with optional start/end bounds.
+    const buildDateFilter = (dateFrom, dateTo) => {
+      let filter = ''
+      if (dateFrom || dateTo) {
+        const conditions = []
+        if (dateFrom) {
+          conditions.push(`
+            (
+              (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+                SELECT 1 FROM ${Accounting.receipts.tablename} r
+                WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND r.${Accounting.receipts.selectOptionColumns.collection_date} >= '${dateFrom}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+                SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+                WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} >= '${dateFrom}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+                SELECT 1 FROM ${Accounting.sales.tablename} s
+                WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND s.${Accounting.sales.selectOptionColumns.date_delivered} >= '${dateFrom}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+                SELECT 1 FROM ${Accounting.collections.tablename} c
+                WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND c.${Accounting.collections.selectOptionColumns.collection_date} >= '${dateFrom}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+                SELECT 1 FROM ${Accounting.purchase.tablename} p
+                WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND p.${Accounting.purchase.selectOptionColumns.date_delivered} >= '${dateFrom}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+                SELECT 1 FROM ${Accounting.payments.tablename} pay
+                WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND pay.${Accounting.payments.selectOptionColumns.payment_date} >= '${dateFrom}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+                SELECT 1 FROM ${Accounting.adjustments.tablename} a
+                WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND a.${Accounting.adjustments.selectOptionColumns.posting_date} >= '${dateFrom}'
+              ))
+            )
+          `)
+        }
+        if (dateTo) {
+          conditions.push(`
+            (
+              (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+                SELECT 1 FROM ${Accounting.receipts.tablename} r
+                WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND r.${Accounting.receipts.selectOptionColumns.collection_date} <= '${dateTo}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+                SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+                WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} <= '${dateTo}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+                SELECT 1 FROM ${Accounting.sales.tablename} s
+                WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND s.${Accounting.sales.selectOptionColumns.date_delivered} <= '${dateTo}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+                SELECT 1 FROM ${Accounting.collections.tablename} c
+                WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND c.${Accounting.collections.selectOptionColumns.collection_date} <= '${dateTo}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+                SELECT 1 FROM ${Accounting.purchase.tablename} p
+                WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND p.${Accounting.purchase.selectOptionColumns.date_delivered} <= '${dateTo}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+                SELECT 1 FROM ${Accounting.payments.tablename} pay
+                WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND pay.${Accounting.payments.selectOptionColumns.payment_date} <= '${dateTo}'
+              ))
+              OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+                SELECT 1 FROM ${Accounting.adjustments.tablename} a
+                WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+                AND a.${Accounting.adjustments.selectOptionColumns.posting_date} <= '${dateTo}'
+              ))
+            )
+          `)
+        }
+        filter = ` AND ${conditions.join(' AND ')}`
       }
-      if (endDate) {
-        conditions.push(`
-          (
-            (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
-              SELECT 1 FROM ${Accounting.receipts.tablename} r
-              WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND r.${Accounting.receipts.selectOptionColumns.collection_date} <= '${endDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
-              SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
-              WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} <= '${endDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
-              SELECT 1 FROM ${Accounting.sales.tablename} s
-              WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND s.${Accounting.sales.selectOptionColumns.date_delivered} <= '${endDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
-              SELECT 1 FROM ${Accounting.collections.tablename} c
-              WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND c.${Accounting.collections.selectOptionColumns.collection_date} <= '${endDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
-              SELECT 1 FROM ${Accounting.purchase.tablename} p
-              WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND p.${Accounting.purchase.selectOptionColumns.date_delivered} <= '${endDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
-              SELECT 1 FROM ${Accounting.payments.tablename} pay
-              WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND pay.${Accounting.payments.selectOptionColumns.payment_date} <= '${endDate}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
-              SELECT 1 FROM ${Accounting.adjustments.tablename} a
-              WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND a.${Accounting.adjustments.selectOptionColumns.posting_date} <= '${endDate}'
-            ))
-          )
-        `)
-      }
-      dateFilter = ` AND ${conditions.join(' AND ')}`
+      return filter
     }
+
+    const dateFilter = buildDateFilter(startDate, endDate)
 
     // Approval filter - only include journal entries from approved documents
     const approvalFilter = `
@@ -178,7 +183,7 @@ const getDashboardData = async (req, res, next) => {
     // ==================== FINANCIAL HEALTH (Quick KPIs) ====================
 
     // Net Income / Gross Revenue - from journal entries by COA
-    const net_income_query = `
+    const buildNetIncomeQuery = (dateRangeFilter) => `
       SELECT 
         SUM(CASE WHEN account_type = 'REVENUE' THEN account_balance ELSE 0 END) AS grossRevenue,
         SUM(CASE WHEN account_type = 'REVENUE' THEN account_balance ELSE 0 END) -
@@ -205,16 +210,42 @@ const getDashboardData = async (req, res, next) => {
           ${validJeCondition} /* Enforced Null Checks */
         WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
           AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
-          ${dateFilter}
+          ${dateRangeFilter}
           ${approvalFilter}
         GROUP BY ${Master.charts_of_accounts.selectOptionColumns.id}, ${Master.charts_of_accounts.selectOptionColumns.type}
       ) AS account_balances
     `
-    const netIncomeResult = await Query(net_income_query)
+    const netIncomeResult = await Query(buildNetIncomeQuery(dateFilter))
     const netIncome = parseFloat(netIncomeResult[0]?.netIncome || 0)
     const grossRevenue = parseFloat(netIncomeResult[0]?.grossRevenue || 0)
     const marginPercent =
       grossRevenue > 0 ? ((netIncome / grossRevenue) * 100).toFixed(1) : 0
+
+    // Prior-period net income for increase/decrease comparison (same period length)
+    let netIncomeChangePercent = 0
+    let prevNetIncome = 0
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      const periodDays = Math.max(
+        1,
+        Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
+      )
+      const prevEnd = new Date(start.getTime() - 1000 * 60 * 60 * 24)
+      const prevStart = new Date(prevEnd.getTime() - periodDays * 1000 * 60 * 60 * 24)
+      const prevStartDate = prevStart.toISOString().split('T')[0]
+      const prevEndDate = prevEnd.toISOString().split('T')[0]
+      const prevDateFilter = buildDateFilter(prevStartDate, prevEndDate)
+      const prevNetIncomeResult = await Query(buildNetIncomeQuery(prevDateFilter))
+      prevNetIncome = parseFloat(prevNetIncomeResult[0]?.netIncome || 0)
+      if (prevNetIncome !== 0) {
+        netIncomeChangePercent = ((netIncome - prevNetIncome) / Math.abs(prevNetIncome)) * 100
+      } else if (netIncome !== 0) {
+        netIncomeChangePercent = 100
+      } else {
+        netIncomeChangePercent = 0
+      }
+    }
 
     // Cash Position Breakdown - detailed calculation from journal entries by COA
     const cash_breakdown_query = `
@@ -1066,6 +1097,7 @@ const getDashboardData = async (req, res, next) => {
         netIncome,
         grossRevenue,
         marginPercent,
+        netIncomeChangePercent,
         totalCashPosition,
         totalReceivables,
         totalPayables,

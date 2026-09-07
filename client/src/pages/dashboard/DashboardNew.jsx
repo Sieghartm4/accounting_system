@@ -23,6 +23,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import RouteProtection from '../../components/RouteProtection'
+import LoadingScreen from '../../components/LoadingScreen'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 
 const getCurrentMonthRange = () => {
@@ -79,6 +80,7 @@ function DashboardNewContent() {
     netIncome: 0,
     grossRevenue: 0,
     margin: 0,
+    netIncomeChangePercent: 0,
     cash: 0,
     ar: 0,
     ap: 0,
@@ -104,52 +106,15 @@ function DashboardNewContent() {
   const agingChartInstance = useRef(null)
   const centerDropdownRef = useRef(null)
 
-  // Transactions Data
-  const [transactions, setTransactions] = useState([
-    {
-      ref: 'OR-2026-0891',
-      date: 'Aug 29, 2026',
-      type: 'Receipt',
-      party: 'Acme Enterprise Corp',
-      center: 'Retail & Sales',
-      amount: 28500,
-      status: 'Posted',
-    },
-    {
-      ref: 'DV-2026-0412',
-      date: 'Aug 28, 2026',
-      type: 'Disbursement',
-      party: 'Apex Global Logistics',
-      center: 'Operations',
-      amount: -14250,
-      status: 'For Approval',
-    },
-    {
-      ref: 'JV-2026-0105',
-      date: 'Aug 28, 2026',
-      type: 'Adjustment',
-      party: 'Depreciation Expense & Accum. Dep.',
-      center: 'Head Office',
-      amount: 5400,
-      status: 'Posted',
-    },
-    {
-      ref: 'INV-2026-1102',
-      date: 'Aug 27, 2026',
-      type: 'Sales Invoice',
-      party: 'Starlight Retail Group',
-      center: 'Retail & Sales',
-      amount: 42100,
-      status: 'Posted',
-    },
-  ])
+  // Transactions come from the ledger; a new tenant starts empty.
+  const [transactions, setTransactions] = useState([])
 
   // Fetch dashboard data from API
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true)
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
         const dashboardParams = new URLSearchParams({
           start_date: submittedStartDate,
           end_date: submittedEndDate,
@@ -179,6 +144,7 @@ function DashboardNewContent() {
               netIncome: result.data.fh?.netIncome || 0,
               grossRevenue: result.data.fh?.grossRevenue || 0,
               margin: result.data.fh?.marginPercent || 0,
+              netIncomeChangePercent: result.data.fh?.netIncomeChangePercent || 0,
               cash: result.data.fh?.totalCashPosition || 0,
               ar: result.data.fh?.totalReceivables || 0,
               ap: result.data.fh?.totalPayables || 0,
@@ -195,22 +161,20 @@ function DashboardNewContent() {
             })
 
             // Update transactions
-            if (result.data.recentTransactions) {
-              setTransactions(
-                result.data.recentTransactions.map((txn) => ({
-                  ref: txn.refNo,
-                  date: txn.date,
-                  type: txn.module,
-                  party: txn.party,
-                  center: txn.responsibilityCenter || 'Head Office',
-                  amount: txn.amount,
-                  status: txn.status,
-                  sourceModule: txn.sourceModule,
-                  sourceRoute: txn.sourceRoute,
-                  entryType: txn.entryType,
-                })),
-              )
-            }
+            setTransactions(
+              (result.data.recentTransactions || []).map((txn) => ({
+                ref: txn.refNo,
+                date: txn.date,
+                type: txn.module,
+                party: txn.party,
+                center: txn.responsibilityCenter || 'Head Office',
+                amount: txn.amount,
+                status: txn.status,
+                sourceModule: txn.sourceModule,
+                sourceRoute: txn.sourceRoute,
+                entryType: txn.entryType,
+              })),
+            )
           }
         }
       } catch (err) {
@@ -250,24 +214,6 @@ function DashboardNewContent() {
     script.onload = () => setChartLoaded(true)
     document.body.appendChild(script)
   }, [])
-
-  // Update Data based on Date Range change
-  useEffect(() => {
-    if (startDate && endDate && !apiData) {
-      const start = new Date(startDate)
-      const end = new Date(endDate)
-      const diffDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)))
-
-      const estimatedRev = diffDays * 18700
-      const estimatedNet = estimatedRev * 0.246
-
-      setMetrics((prev) => ({
-        ...prev,
-        grossRevenue: estimatedRev,
-        netIncome: estimatedNet,
-      }))
-    }
-  }, [startDate, endDate, apiData])
 
   const handleDateSubmit = (event) => {
     event.preventDefault()
@@ -451,11 +397,7 @@ function DashboardNewContent() {
   })
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col items-center justify-center">
-        <div className="text-slate-500">Loading dashboard...</div>
-      </div>
-    )
+    return <LoadingScreen label="Loading Dashboard..." />
   }
 
   if (error) {
@@ -471,16 +413,19 @@ function DashboardNewContent() {
       {/* MAIN CONTAINER */}
       <main className="pb-4 space-y-6 flex-1 max-w-8xl w-full mx-auto">
         {/* TOP TITLE & CONTROL BAR */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-black/10">
           <div>
             <div className="flex items-center space-x-3 mb-1">
+              <div className="w-9 h-9 rounded-lg bg-black flex items-center justify-center shrink-0">
+                <TrendingUp className="w-4.5 h-4.5 text-red-500" />
+              </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-                  Financial Executive Dashboard
+                <h1 className="text-2xl font-black text-black leading-tight tracking-tight">
+                  Financial <span className="text-red-600 italic">Executive</span> Dashboard
                 </h1>
               </div>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-gray-500">
               Real-time accounting overview, operating compliance, and GL ledger
               summaries
             </p>
@@ -501,18 +446,18 @@ function DashboardNewContent() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-slate-50 border border-slate-300 text-slate-700 font-medium rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  className="bg-slate-50 border border-slate-300 text-slate-700 font-medium rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
                 <span className="text-slate-400 font-medium">to</span>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-slate-50 border border-slate-300 text-slate-700 font-medium rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  className="bg-slate-50 border border-slate-300 text-slate-700 font-medium rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
                 <button
                   type="submit"
-                  className="px-3 py-1 bg-black hover:bg-slate-800 active:scale-[0.98] text-white font-semibold rounded-md transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1"
+                  className="px-3 py-1 bg-black hover:bg-red-600 active:scale-[0.98] text-white font-semibold rounded-md transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1"
                 >
                   Submit
                 </button>
@@ -542,7 +487,7 @@ function DashboardNewContent() {
                       ? 'Loading centers...'
                       : 'Search center...'
                   }
-                  className="w-44 bg-slate-50 border border-slate-300 text-slate-700 font-medium rounded-md px-2 py-1 pr-7 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  className="w-44 bg-slate-50 border border-slate-300 text-slate-700 font-medium rounded-md px-2 py-1 pr-7 focus:outline-none focus:ring-1 focus:ring-red-500"
                   aria-label="Search responsibility center"
                 />
                 {centerSearch && (
@@ -569,7 +514,7 @@ function DashboardNewContent() {
                         setSubmittedResponsibilityCenter('')
                         setIsCenterDropdownOpen(false)
                       }}
-                      className="block w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-sky-50 cursor-pointer"
+                      className="block w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-red-50 cursor-pointer"
                     >
                       All Responsibility Centers
                     </button>
@@ -596,7 +541,7 @@ function DashboardNewContent() {
                             setSubmittedResponsibilityCenter(center.name || '')
                             setIsCenterDropdownOpen(false)
                           }}
-                          className="block w-full border-t border-slate-100 px-3 py-2 text-left text-xs text-slate-700 hover:bg-sky-50 cursor-pointer"
+                          className="block w-full border-t border-slate-100 px-3 py-2 text-left text-xs text-slate-700 hover:bg-red-50 cursor-pointer"
                         >
                           <span className="font-semibold">{center.name}</span>
                           {center.code && (
@@ -622,38 +567,45 @@ function DashboardNewContent() {
         {/* TOP FINANCIAL KPI CARDS GRID */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* KPI 1: NET INCOME / PROFIT OR LOSS */}
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+          <div className="bg-black text-white rounded-xl p-5 border border-black shadow-lg shadow-black/20 hover:shadow-xl transition">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-300">
                 Net Profit / (Loss)
               </span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-bold">
                 <TrendingUp className="w-4 h-4" />
               </div>
             </div>
             <div className="flex items-baseline justify-between">
-              <div className="text-2xl font-bold text-slate-900">
+              <div className="text-2xl font-bold text-white">
                 ₱
                 {metrics.netIncome.toLocaleString('en-US', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </div>
-              <span className="text-xs font-medium text-emerald-600 flex items-center">
-                <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
-                +12.4%
+              <span className={`text-xs font-medium flex items-center ${metrics.netIncomeChangePercent >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                {metrics.netIncomeChangePercent >= 0 ? (
+                  <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
+                ) : (
+                  <ArrowDownRight className="w-3.5 h-3.5 mr-0.5" />
+                )}
+                {metrics.netIncomeChangePercent >= 0 ? '+' : ''}
+                {typeof metrics.netIncomeChangePercent === 'number'
+                  ? metrics.netIncomeChangePercent.toFixed(1)
+                  : metrics.netIncomeChangePercent}%
               </span>
             </div>
-            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <div className="mt-3 pt-3 border-t border-white/15 flex items-center justify-between text-xs text-gray-400">
               <span>
                 Gross Revenue:{' '}
-                <strong className="text-slate-700">
+                <strong className="text-gray-100">
                   ₱{(metrics.grossRevenue / 1000).toFixed(0)}k
                 </strong>
               </span>
               <span>
                 Margin:{' '}
-                <strong className="text-emerald-600">
+                <strong className="text-emerald-400">
                   {typeof metrics.margin === 'number'
                     ? metrics.margin.toFixed(1)
                     : metrics.margin}
@@ -664,21 +616,21 @@ function DashboardNewContent() {
           </div>
 
           {/* KPI 2: CASH & BANK BALANCES */}
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+          <div className="bg-red-600 text-white rounded-xl p-5 border border-red-700 shadow-lg shadow-red-600/20 hover:shadow-xl transition">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <span className="text-xs font-semibold uppercase tracking-wider text-red-100">
                 Cash & Liquidity
               </span>
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <div className="w-8 h-8 rounded-lg bg-black text-red-500 flex items-center justify-center font-bold">
                 <Landmark className="w-4 h-4" />
               </div>
             </div>
             <div className="flex items-baseline justify-between">
-              <div className="text-2xl font-bold text-slate-900">
+              <div className="text-2xl font-bold text-white">
                 ₱{metrics.cash.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </div>
               <span
-                className={`text-xs font-medium flex items-center ${metrics.netCashMovement >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                className={`text-xs font-medium flex items-center ${metrics.netCashMovement >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}
               >
                 {metrics.netCashMovement >= 0 ? (
                   <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
@@ -689,28 +641,28 @@ function DashboardNewContent() {
                 {(metrics.netCashMovement / 1000).toFixed(0)}k
               </span>
             </div>
-            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <div className="mt-3 pt-3 border-t border-white/20 flex items-center justify-between text-xs text-red-100">
               <span>
                 Bank:{' '}
-                <strong className="text-slate-700">
+                <strong className={`font-bold ${metrics.cashBreakdown.bankAccounts >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}>
                   ₱{(metrics.cashBreakdown.bankAccounts / 1000).toFixed(0)}k
                 </strong>
               </span>
               <span>
                 Cash:{' '}
-                <strong className="text-slate-700">
+                <strong className={`font-bold ${metrics.cashBreakdown.cashOnHand >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}>
                   ₱{(metrics.cashBreakdown.cashOnHand / 1000).toFixed(0)}k
                 </strong>
               </span>
               <span>
                 Petty:{' '}
-                <strong className="text-slate-700">
+                <strong className={`font-bold ${metrics.cashBreakdown.pettyCash >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}>
                   ₱{(metrics.cashBreakdown.pettyCash / 1000).toFixed(0)}k
                 </strong>
               </span>
               <span>
                 Checks:{' '}
-                <strong className="text-slate-700">
+                <strong className={`font-bold ${metrics.cashBreakdown.checks >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}>
                   ₱{(metrics.cashBreakdown.checks / 1000).toFixed(0)}k
                 </strong>
               </span>
@@ -718,12 +670,12 @@ function DashboardNewContent() {
           </div>
 
           {/* KPI 3: ACCOUNTS RECEIVABLE (AR) */}
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+          <div className="bg-white text-slate-800 rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Accounts Receivable (AR)
               </span>
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+              <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold">
                 <HandCoins className="w-4 h-4" />
               </div>
             </div>
@@ -742,7 +694,7 @@ function DashboardNewContent() {
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <span>
                 Collections Rate:{' '}
-                <strong className="text-slate-700">
+                <strong className="text-emerald-600">
                   {typeof metrics.collectionsRate === 'number'
                     ? metrics.collectionsRate.toFixed(1)
                     : metrics.collectionsRate}
@@ -752,7 +704,7 @@ function DashboardNewContent() {
               <button
                 type="button"
                 onClick={() => navigate('/collections')}
-                className="text-sky-600 font-medium hover:underline cursor-pointer"
+                className="text-sky-600 font-medium hover:text-sky-700 hover:underline cursor-pointer"
               >
                 Collect Bills
               </button>
@@ -760,12 +712,12 @@ function DashboardNewContent() {
           </div>
 
           {/* KPI 4: ACCOUNTS PAYABLE (AP) */}
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+          <div className="bg-white text-slate-800 rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Accounts Payable (AP)
               </span>
-              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+              <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold">
                 <FileText className="w-4 h-4" />
               </div>
             </div>
@@ -782,7 +734,7 @@ function DashboardNewContent() {
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <span>
                 Payments Rate:{' '}
-                <strong className="text-slate-700">
+                <strong className="text-emerald-600">
                   {typeof metrics.paymentsRate === 'number'
                     ? metrics.paymentsRate.toFixed(1)
                     : metrics.paymentsRate}
@@ -792,7 +744,7 @@ function DashboardNewContent() {
               <button
                 type="button"
                 onClick={() => navigate('/payments')}
-                className="text-sky-600 font-medium hover:underline cursor-pointer"
+                className="text-sky-600 font-medium hover:text-sky-700 hover:underline cursor-pointer"
               >
                 Pay Bills
               </button>
@@ -806,10 +758,10 @@ function DashboardNewContent() {
           <div className="lg:col-span-2 bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="font-bold text-slate-800 text-base">
-                  Financial Performance Trend
+                <h3 className="font-black text-black text-base tracking-tight">
+                  Financial Performance <span className="text-red-600">Trend</span>
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-gray-500">
                   Revenue, Operating Expenses, and Net Profit trajectory
                 </p>
               </div>
@@ -846,25 +798,25 @@ function DashboardNewContent() {
           </div>
 
           {/* Tax & Compliance Position Widget (VAT & Withholding Tax) */}
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div className="bg-black rounded-xl p-5 border border-black shadow-lg shadow-black/20 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-slate-800 text-base">
-                  Tax & Compliance Status
+                <h3 className="font-black text-white text-base tracking-tight">
+                  Tax & Compliance {" "}<span className="text-red-500">Status</span>
                 </h3>
-                <span className="px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700 rounded-full">
+                <span className="px-2 py-0.5 text-[10px] font-semibold bg-red-600 text-white rounded-full">
                   Monthly Return
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mb-4">
+              <p className="text-xs text-gray-400 mb-4">
                 Calculated output vs input VAT and withholding tax liabilities
               </p>
 
               {/* VAT Calculation Card */}
-              <div className="bg-slate-50 rounded-lg p-3.5 border border-slate-200 space-y-2 mb-4">
+              <div className="bg-white/5 rounded-lg p-3.5 border border-white/10 space-y-2 mb-4">
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">Output VAT (12% on Sales):</span>
-                  <span className="font-semibold text-slate-800">
+                  <span className="text-gray-400">Output VAT (12% on Sales):</span>
+                  <span className="font-semibold text-white">
                     ₱
                     {(apiData?.tax?.outputVAT || 0).toLocaleString('en-US', {
                       minimumFractionDigits: 2,
@@ -872,10 +824,10 @@ function DashboardNewContent() {
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">
+                  <span className="text-gray-400">
                     Less: Input VAT (Purchases):
                   </span>
-                  <span className="font-semibold text-slate-800">
+                  <span className="font-semibold text-white">
                     (₱
                     {(apiData?.tax?.inputVAT || 0).toLocaleString('en-US', {
                       minimumFractionDigits: 2,
@@ -883,9 +835,9 @@ function DashboardNewContent() {
                     )
                   </span>
                 </div>
-                <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-bold">
-                  <span className="text-slate-800">Net VAT Payable:</span>
-                  <span className="text-amber-600">
+                <div className="border-t border-white/15 pt-2 flex justify-between text-sm font-bold">
+                  <span className="text-white">Net VAT Payable:</span>
+                  <span className="text-amber-400">
                     ₱
                     {(apiData?.tax?.netVATPayable || 0).toLocaleString('en-US', {
                       minimumFractionDigits: 2,
@@ -895,12 +847,12 @@ function DashboardNewContent() {
               </div>
 
               {/* Withholding Tax Card */}
-              <div className="bg-slate-50 rounded-lg p-3.5 border border-slate-200 space-y-2">
+              <div className="bg-white/5 rounded-lg p-3.5 border border-white/10 space-y-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">
+                  <span className="text-gray-400">
                     Withholding Tax Payable (Expanded):
                   </span>
-                  <span className="font-semibold text-slate-800">
+                  <span className="font-semibold text-white">
                     ₱
                     {(apiData?.tax?.wtExpanded || 0).toLocaleString('en-US', {
                       minimumFractionDigits: 2,
@@ -908,10 +860,10 @@ function DashboardNewContent() {
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-600">
+                  <span className="text-gray-400">
                     Creditable Withholding Tax (2307):
                   </span>
-                  <span className="font-semibold text-emerald-600">
+                  <span className="font-semibold text-emerald-400">
                     ₱
                     {(apiData?.tax?.wtCreditable || 0).toLocaleString('en-US', {
                       minimumFractionDigits: 2,
@@ -921,14 +873,14 @@ function DashboardNewContent() {
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-500 flex items-center">
+            <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between">
+              <span className="text-xs text-gray-400 flex items-center">
                 <Clock className="w-3.5 h-3.5 mr-1" /> Due in {ewtDeadline.days} days
               </span>
               <button
                 type="button"
                 onClick={() => navigate('/tax-compliance')}
-                className="text-xs text-sky-600 hover:text-sky-700 font-semibold flex items-center"
+                className="text-xs text-red-400 hover:text-red-300 font-semibold flex items-center"
               >
                 Generate Tax Return <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
               </button>
@@ -941,13 +893,13 @@ function DashboardNewContent() {
           {/* AR Aging Breakdown Chart */}
           <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-slate-800 text-sm">
-                Accounts Receivable Aging
+              <h3 className="font-black text-black text-sm tracking-tight">
+                Accounts Receivable <span className="text-red-600">Aging</span>
               </h3>
               <button
                 type="button"
                 onClick={() => navigate('/aging_receivables')}
-                className="text-xs text-sky-600 font-medium hover:underline cursor-pointer"
+                className="text-xs text-red-600 font-medium hover:text-red-700 hover:underline cursor-pointer"
               >
                 View Details
               </button>
@@ -986,13 +938,13 @@ function DashboardNewContent() {
           {/* AP Aging & Top Vendor Payables Due */}
           <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-slate-800 text-sm">
-                Top Vendor Payables Due
+              <h3 className="font-black text-black text-sm tracking-tight">
+                Top Vendor <span className="text-red-600">Payables Due</span>
               </h3>
               <button
                 type="button"
                 onClick={() => navigate('/aging_payables')}
-                className="text-xs text-sky-600 font-medium hover:underline cursor-pointer"
+                className="text-xs text-red-600 font-medium hover:text-red-700 hover:underline cursor-pointer"
               >
                 Schedule Payment
               </button>
@@ -1063,7 +1015,7 @@ function DashboardNewContent() {
           <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-slate-800 text-sm">
+                <h3 className="font-black text-black text-sm tracking-tight">
                   Bank Reconciliation Accounts
                 </h3>
                 <span className="text-xs text-slate-500">Month-End Sync</span>
@@ -1087,7 +1039,7 @@ function DashboardNewContent() {
                         })
                       }
                     }}
-                    className={`p-2.5 rounded-lg border text-xs space-y-1.5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-sky-500 ${
+                    className={`p-2.5 rounded-lg border text-xs space-y-1.5 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 ${
                       account.reconciled
                         ? 'border-slate-200'
                         : 'border-amber-200 bg-amber-50/40'
@@ -1148,7 +1100,7 @@ function DashboardNewContent() {
             <button
               type="button"
               onClick={() => navigate('/bank-reconciliation')}
-              className="w-full mt-4 py-2 bg-slate-900 hover:bg-slate-800 hover:shadow-md active:scale-[0.99] text-white rounded-lg text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
+              className="w-full mt-4 py-2 bg-black hover:bg-red-600 hover:shadow-md active:scale-[0.99] text-white rounded-lg text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2"
             >
               Launch Bank Reconciliation Tool
             </button>
@@ -1159,25 +1111,25 @@ function DashboardNewContent() {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="font-bold text-slate-800 text-base">
-                Recent Ledger & Operational Transactions
+              <h3 className="font-black text-black text-base tracking-tight">
+                Recent Ledger & Operational <span className="text-red-600">Transactions</span>
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-gray-500">
                 Live feed across Receipts, Disbursements, Sales, and Adjustments
               </p>
             </div>
             <div className="flex items-center space-x-2">
               <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search transaction or ref #"
-                  className="text-xs pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 w-48"
+                  className="text-xs pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 w-48"
                 />
               </div>
-              <button className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg border border-slate-300 transition flex items-center">
+              <button className="px-3 py-1.5 bg-black hover:bg-red-600 text-white text-xs font-medium rounded-lg border border-black transition flex items-center">
                 <Filter className="w-3.5 h-3.5 mr-1" /> Filter
               </button>
             </div>
@@ -1186,8 +1138,8 @@ function DashboardNewContent() {
           <div className="max-h-96 overflow-x-auto overflow-y-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
-                  <th className="p-3.5">Ref No.</th>
+                <tr className="bg-black border-b border-black text-white uppercase tracking-wider font-semibold">
+                  <th className="p-3.5"><span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>Ref No.</span></th>
                   <th className="p-3.5">Date</th>
                   <th className="p-3.5">Module / Type</th>
                   <th className="p-3.5">Resp. Center</th>
@@ -1199,7 +1151,7 @@ function DashboardNewContent() {
               <tbody className="divide-y divide-slate-100">
                 {filteredTransactions.map((item, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/80 transition">
-                    <td className="p-3.5 font-semibold text-sky-600">{item.ref}</td>
+                    <td className="p-3.5 font-semibold text-red-600">{item.ref}</td>
                     <td className="p-3.5 text-slate-600">{item.date}</td>
                     <td className="p-3.5">
                       <span
@@ -1254,7 +1206,7 @@ function DashboardNewContent() {
                           }
                         }}
                         disabled={!item.sourceRoute || !item.ref}
-                        className="text-slate-400 hover:text-sky-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                        className="text-slate-400 hover:text-red-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         title="View Detail"
                       >
                         <Eye className="w-4 h-4 mx-auto" />
@@ -1269,7 +1221,7 @@ function DashboardNewContent() {
       </main>
 
       {/* Footer */}
-      <footer className="p-4 text-center text-xs text-slate-400 border-t border-slate-200 bg-white mt-auto">
+      <footer className="p-4 text-center text-xs text-gray-400 border-t border-black/10 bg-white mt-auto">
         LedgerPulse Enterprise Accounting System &bull; Double-Entry General Ledger
         Compliant &bull; VAT & WHT Calculator Active
       </footer>

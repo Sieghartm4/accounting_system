@@ -14,6 +14,7 @@ import {
 import * as XLSX from 'xlsx'
 import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
+import LoadingScreen from '../../components/LoadingScreen'
 
 export default function BalanceSheet() {
   const navigate = useNavigate()
@@ -26,10 +27,6 @@ export default function BalanceSheet() {
   const { company } = useCompany()
 
   useEffect(() => {
-    fetchBalanceSheet()
-  }, [])
-
-  useEffect(() => {
     const timer = setTimeout(() => {
       fetchBalanceSheet()
     }, 500)
@@ -40,7 +37,7 @@ export default function BalanceSheet() {
     try {
       setLoading(true)
       setError('')
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       const params = new URLSearchParams()
       if (startDate) params.append('start_date', startDate)
@@ -585,16 +582,8 @@ export default function BalanceSheet() {
     }
   }
 
-  if (loading && !data) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center gap-4 min-h-[400px]">
-        <div className="w-10 h-10 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[3px] text-gray-400">
-          Recalculating Balance Sheet...
-        </p>
-      </div>
-    )
-  }
+  if (loading)
+    return <LoadingScreen label="Compiling Balance Sheet..." />
 
   if (error) {
     return (

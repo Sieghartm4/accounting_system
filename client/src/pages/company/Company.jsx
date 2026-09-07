@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
+import LoadingScreen from '../../components/LoadingScreen'
 import useCompany from './useCompany'
 
 function CompanyContent() {
@@ -34,14 +35,7 @@ function CompanyContent() {
   }
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center gap-4 bg-[#f4f5f7]">
-        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-gray-500 font-medium">
-          Synchronizing Company Data...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Synchronizing Company Data..." />
   }
 
   return (

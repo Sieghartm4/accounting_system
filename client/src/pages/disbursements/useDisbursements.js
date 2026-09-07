@@ -290,7 +290,7 @@ export function useDisbursementForm({
   const fetchVendors = async () => {
     try {
       setVendorLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
         method: 'GET',
@@ -322,7 +322,7 @@ export function useDisbursementForm({
     contact,
   }) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
         method: 'POST',
@@ -367,7 +367,7 @@ export function useDisbursementForm({
     unit,
   }) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/product_service`,
@@ -406,7 +406,7 @@ export function useDisbursementForm({
   const fetchChartsOfAccounts = async () => {
     try {
       setCoaLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
@@ -432,7 +432,7 @@ export function useDisbursementForm({
   const fetchProducts = async () => {
     try {
       setProductLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/product_service`,
@@ -458,7 +458,7 @@ export function useDisbursementForm({
   const fetchVat = async () => {
     try {
       setVatLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat`, {
         method: 'GET',
@@ -492,7 +492,7 @@ export function useDisbursementForm({
   const fetchWht = async () => {
     try {
       setWhtLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/withholding_tax`,
@@ -1094,7 +1094,7 @@ export function useDisbursementForm({
   // ── Post / Submit ──
   const handlePostTransaction = async () => {
     try {
-      const userData = JSON.parse(localStorage.getItem('user') || '{}')
+      const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
 
       if (!selectedVendor) {
@@ -1125,7 +1125,7 @@ export function useDisbursementForm({
         return
       }
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         setToast({
           type: 'error',
@@ -1379,7 +1379,7 @@ const useDisbursements = () => {
           setLoading(true)
         }
         setError(null)
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
         if (!token) throw new Error('No authorization token found')
 
         const params = new URLSearchParams()

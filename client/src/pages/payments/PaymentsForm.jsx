@@ -206,6 +206,11 @@ function SearchableDropdown({
 //
 //  All other fields (gross, discAmt, vatAmt) are DERIVED for display only.
 // ─────────────────────────────────────────────────────────────────────────────
+const normalizeTaxRatePercent = (value) => {
+  const rate = parseFloat(value) || 0
+  return rate > 0 && rate <= 1 ? rate * 100 : rate
+}
+
 function computeItemAmounts(
   qty,
   price,
@@ -213,6 +218,7 @@ function computeItemAmounts(
   discountType,
   vatPct,
   whtPct,
+  vatType = 'VAT-EX',
 ) {
   const gross = qty * price
 
@@ -226,9 +232,16 @@ function computeItemAmounts(
   }
 
   const discounted = gross - discAmt
-  const vatAmt = discounted * (vatPct / 100)
-  const whtAmt = discounted * (whtPct / 100)
-  const amount = discounted + vatAmt - whtAmt // → ci_amount
+  const netBase =
+    vatType === 'VAT-INC' && vatPct > 0
+      ? discounted / (1 + vatPct / 100)
+      : discounted
+  const vatAmt =
+    vatType === 'VAT-INC' && vatPct > 0
+      ? discounted - netBase
+      : discounted * (vatPct / 100)
+  const whtAmt = netBase * (whtPct / 100)
+  const amount = (vatType === 'VAT-INC' ? discounted : netBase + vatAmt) - whtAmt
   return {
     gross: parseFloat(gross.toFixed(2)),
     discAmt: parseFloat(discAmt.toFixed(2)),
@@ -480,7 +493,7 @@ export default function PaymentsForm({
   const fetchVendors = async () => {
     try {
       setVendorLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -498,7 +511,7 @@ export default function PaymentsForm({
 
   const fetchChartsOfAccounts = async () => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
@@ -525,7 +538,7 @@ export default function PaymentsForm({
   }) => {
     try {
       setVendorCreateLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
         method: 'POST',
@@ -622,7 +635,7 @@ export default function PaymentsForm({
     try {
       setPurchaseDataLoading(true)
       setPurchaseDataError('')
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/payments/purchase-payment/`,
@@ -657,9 +670,18 @@ export default function PaymentsForm({
 
   // Auto-fill form from preSelectedPurchases (To Be Paid feature)
   useEffect(() => {
-    if (preSelectedPurchases && preSelectedPurchases.length > 0 && !isViewMode && !isEditMode && vendors.length > 0) {
+    if (
+      preSelectedPurchases &&
+      preSelectedPurchases.length > 0 &&
+      !isViewMode &&
+      !isEditMode &&
+      vendors.length > 0
+    ) {
       console.log('=== AUTO-FILL DEBUG ===')
-      console.log('preSelectedPurchases:', JSON.stringify(preSelectedPurchases, null, 2))
+      console.log(
+        'preSelectedPurchases:',
+        JSON.stringify(preSelectedPurchases, null, 2),
+      )
       console.log('preSelectedPurchaseItems:', preSelectedPurchaseItems)
       console.log('Available vendors:', JSON.stringify(vendors, null, 2))
 
@@ -674,19 +696,29 @@ export default function PaymentsForm({
 
       console.log('Searching for vendor match...')
       console.log('Checking vendor.name === vendorName for each vendor:')
-      vendors.forEach(v => {
-        console.log(`  - Vendor ID: ${v.id}, Name: "${v.name}" matches? ${v.name === vendorName}`)
+      vendors.forEach((v) => {
+        console.log(
+          `  - Vendor ID: ${v.id}, Name: "${v.name}" matches? ${v.name === vendorName}`,
+        )
       })
 
-      const matchingVendor = vendors.find(v => v.name === vendorName || v.id === vendorId)
+      const matchingVendor = vendors.find(
+        (v) => v.name === vendorName || v.id === vendorId,
+      )
       if (matchingVendor) {
         console.log('✓ Found matching vendor:', matchingVendor)
         setSelectedVendor(matchingVendor.id)
         setVendorSearch(matchingVendor.name) // Also set the display value
       } else {
         console.log('✗ No matching vendor found')
-        console.log('Available vendor names:', vendors.map(v => v.name))
-        console.log('Available vendor IDs:', vendors.map(v => v.id))
+        console.log(
+          'Available vendor names:',
+          vendors.map((v) => v.name),
+        )
+        console.log(
+          'Available vendor IDs:',
+          vendors.map((v) => v.id),
+        )
         if (vendors.length > 0) {
           console.log('Using first vendor as fallback:', vendors[0])
           setSelectedVendor(vendors[0].id)
@@ -701,21 +733,19 @@ export default function PaymentsForm({
           console.log('Processing purchase item:', item)
           const gross = parseFloat(item.purchase_price) || 0
           const discount = parseFloat(item.discount) || 0
-          const discountType = item.discount_type || 'percentage'
-          const vat = parseFloat(item.vat) || 0
-          const wht = parseFloat(item.witholding_tax) || 0
-
-          let discAmt = 0
-          if (discountType === 'percentage') {
-            discAmt = gross * (discount / 100)
-          } else {
-            discAmt = discount
-          }
-
-          const discounted = gross - discAmt
-          const vatAmt = discounted * (vat / 100)
-          const whtAmount = discounted * (wht / 100)
-          const amount = discounted + vatAmt - whtAmount
+          const discountType = item.discount_type || 'PERCENT'
+          const vatPct = normalizeTaxRatePercent(item.vat)
+          const whtPct = normalizeTaxRatePercent(item.witholding_tax)
+          const vatType = item.vat_type || 'VAT-EX'
+          const computed = computeItemAmounts(
+            parseFloat(item.quantity) || 1,
+            gross,
+            discount,
+            discountType,
+            vatPct,
+            whtPct,
+            vatType,
+          )
 
           return {
             id: `auto-${index}`,
@@ -723,11 +753,12 @@ export default function PaymentsForm({
             invoiceRef: item.document_reference || item.invoice_ref || '',
             description: item.product_service_name || item.description || '',
             responsibilityCenter: item.responsibility_center || '',
-            gross,
-            discAmt,
-            vatAmt,
-            whtAmount,
-            amount,
+            gross: computed.gross,
+            discAmt: computed.discAmt,
+            vatAmt: computed.vatAmt,
+            vatType,
+            whtAmount: computed.whtAmount,
+            amount: computed.amount,
             isOther: false,
           }
         })
@@ -739,21 +770,33 @@ export default function PaymentsForm({
         const items = preSelectedPurchases.map((purchase, index) => ({
           id: `auto-${index}`,
           purchaseItemId: purchase.id,
-          invoiceRef: purchase.doc_ref || purchase.document_reference || purchase.purchase_number || '',
+          invoiceRef:
+            purchase.doc_ref ||
+            purchase.document_reference ||
+            purchase.purchase_number ||
+            '',
           description: purchase.description || '',
           responsibilityCenter: '',
-          gross: parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
+          gross:
+            parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
           discAmt: 0,
           vatAmt: 0,
           whtAmount: 0,
-          amount: parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
+          amount:
+            parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
           isOther: false,
         }))
         console.log('Auto-filled payment items from placeholder data:', items)
         setPaymentItems(items)
       }
     }
-  }, [preSelectedPurchases, preSelectedPurchaseItems, isViewMode, isEditMode, vendors])
+  }, [
+    preSelectedPurchases,
+    preSelectedPurchaseItems,
+    isViewMode,
+    isEditMode,
+    vendors,
+  ])
 
   // Populate form with payment data when in view or edit mode
   useEffect(() => {
@@ -825,6 +868,7 @@ export default function PaymentsForm({
             (parseFloat(item.amount) || 0) + (parseFloat(item.witholding_tax) || 0),
           discAmt: parseFloat(item.discount) || 0,
           vatAmt: parseFloat(item.vat) || 0,
+          vatType: item.vat_type || 'VAT-EX',
           whtAmount: parseFloat(item.witholding_tax) || 0,
           amount: parseFloat(item.amount) || 0,
           isOther: false,
@@ -949,7 +993,7 @@ export default function PaymentsForm({
         })
         return
       }
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
 
       const queryParams = new URLSearchParams()
@@ -977,8 +1021,9 @@ export default function PaymentsForm({
         const price = parseFloat(s.purchase_price) || 0
         const discountVal = parseFloat(s.discount) || 0
         const discountType = s.discount_type || 'PERCENT'
-        const vatPct = parseFloat(s.vat) || 0 // ← MUST include VAT
-        const whtPct = parseFloat(s.witholding_tax) || 0
+        const vatPct = normalizeTaxRatePercent(s.vat)
+        const whtPct = normalizeTaxRatePercent(s.witholding_tax)
+        const vatType = s.vat_type || 'VAT-EX'
 
         const computed = computeItemAmounts(
           qty,
@@ -987,6 +1032,7 @@ export default function PaymentsForm({
           discountType,
           vatPct,
           whtPct,
+          vatType,
         )
 
         return {
@@ -1131,9 +1177,10 @@ export default function PaymentsForm({
   //    DR side = amount + discAmt + vatAmt + whtAmount
   //            = (discounted + vatAmt − whtAmt) + discAmt + vatAmt + whtAmount
   //            = discounted + discAmt + 2*vatAmt
-  //            = (gross − discAmt) + discAmt + 2*vatAmt
-  //            = gross + 2*vatAmt   ← note: AP was originally booked at gross + vatAmt in the Purchase JE
-  //    CR side = gross + 2*vatAmt  ✅
+  // Payment entry per item:
+  //   DR Accounts Payable = net payable already stored on the payment item
+  //   CR Cash/Bank = actual payment disbursed
+  // The purchase entry already recorded the withholding-tax component.
   // ─────────────────────────────────────────────────────────────────────────
   const generateJournalEntries = () => {
     if (paymentItems.length === 0) {
@@ -1143,59 +1190,78 @@ export default function PaymentsForm({
 
     const entries = []
 
-    // Resolve cash/payment account
+    // Resolve cash/payment account using normalized mode labels and COA names.
+    const normalizedMode = String(modeOfPayment || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[\s/-]+/g, '_')
+    const accountLabel = (account) =>
+      String(
+        account.name || account.account_name || account.coa_name || '',
+      ).toLowerCase()
+    const findAccount = (terms) =>
+      chartsOfAccounts.find((account) => {
+        const label = accountLabel(account)
+        return terms.some((term) => label.includes(term))
+      })
+
     let paymentAccount = null
-    if (modeOfPayment === 'CASH') {
+    if (normalizedMode === 'CASH' || normalizedMode.includes('CASH')) {
       paymentAccount =
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('cash on hand'),
-        ) ??
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('petty cash'),
-        )
-    } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
+        findAccount(['cash on hand']) ??
+        findAccount(['cash and cash equivalents']) ??
+        findAccount(['cash account']) ??
+        findAccount(['cash'])
+    } else if (
+      normalizedMode === 'CHECK' ||
+      normalizedMode.includes('BANK') ||
+      normalizedMode.includes('CHECK')
+    ) {
       if (bankName) {
-        paymentAccount = chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes(bankName.toLowerCase()),
-        )
+        paymentAccount = findAccount([String(bankName).toLowerCase()])
       }
-      paymentAccount ??= chartsOfAccounts.find((a) =>
-        (a.name || '').toLowerCase().includes('cash in bank'),
-      )
+      paymentAccount ??= findAccount([
+        'cash in bank',
+        'bank account',
+        'savings',
+        'checking',
+        'bank',
+      ])
     }
 
     const apAccount = chartsOfAccounts.find((a) =>
-      (a.name || '').toLowerCase().includes('accounts payable'),
+      accountLabel(a).includes('accounts payable'),
     )
-
+    const journalResponsibilityCenter = bulkResponsibilityCenter || ''
     let totalCash = 0
 
     paymentItems
       .filter((i) => !i.isOther)
       .forEach((item) => {
-        totalCash += item.amount || 0
+        const invoiceAmount = Number(item.amount || 0)
+        totalCash += invoiceAmount
 
-        // DR  Accounts Payable — amount paid
-        if (apAccount && item.amount > 0) {
+        // DR Accounts Payable — close the full invoice balance.
+        if (apAccount && invoiceAmount > 0) {
           entries.push({
             id: Date.now() + Math.random(),
             account: apAccount.id,
             accountSearch: apAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: parseFloat(item.amount.toFixed(2)),
+            center: item.responsibilityCenter || journalResponsibilityCenter,
+            debit: parseFloat(invoiceAmount.toFixed(2)),
             credit: 0,
             isManual: false,
           })
         }
       })
 
-    // CR  Cash / Bank — one combined entry
+    // CR Cash / Bank — one combined entry for net payment
     if (paymentAccount && totalCash > 0) {
       entries.push({
         id: Date.now() + Math.random(),
         account: paymentAccount.id,
         accountSearch: paymentAccount.name,
-        center: '',
+        center: journalResponsibilityCenter,
         debit: 0,
         credit: parseFloat(totalCash.toFixed(2)),
         isManual: false,
@@ -1259,6 +1325,7 @@ export default function PaymentsForm({
     paymentItems,
     modeOfPayment,
     bankName,
+    bulkResponsibilityCenter,
     chartsOfAccounts,
     isViewMode,
     isEditMode,
@@ -1320,7 +1387,7 @@ export default function PaymentsForm({
         return
       }
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         setToast({
           type: 'error',
@@ -1349,7 +1416,7 @@ export default function PaymentsForm({
         return
       }
 
-      const userData = JSON.parse(localStorage.getItem('user') || '{}')
+      const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
 
       // ── payment_items payload — ONLY what the DB schema stores ──
@@ -1754,7 +1821,9 @@ export default function PaymentsForm({
               <div className="px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white flex items-center justify-between border-b border-red-800 shadow-sm flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Calculator size={18} className="text-red-100" />
-                  <h3 className="text-sm font-bold tracking-tight">Financial Summary</h3>
+                  <h3 className="text-sm font-bold tracking-tight">
+                    Financial Summary
+                  </h3>
                 </div>
                 <span className="text-xs bg-zinc-900 text-zinc-100 px-2.5 py-0.5 rounded-full border border-zinc-800 font-mono font-semibold">
                   PHP (₱)
@@ -1845,19 +1914,29 @@ export default function PaymentsForm({
                     <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-semibold text-sm">
                       <Landmark size={14} />
                     </div>
-                    <h2 className="text-base font-bold tracking-tight">Basic Details</h2>
+                    <h2 className="text-base font-bold tracking-tight">
+                      Basic Details
+                    </h2>
                   </div>
                   <button
-                    onClick={() => setIsBasicDetailsCollapsed(!isBasicDetailsCollapsed)}
+                    onClick={() =>
+                      setIsBasicDetailsCollapsed(!isBasicDetailsCollapsed)
+                    }
                     className="text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
                     title={isBasicDetailsCollapsed ? 'Expand' : 'Collapse'}
                   >
-                    {isBasicDetailsCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                    {isBasicDetailsCollapsed ? (
+                      <ChevronDown size={16} />
+                    ) : (
+                      <ChevronUp size={16} />
+                    )}
                   </button>
                 </div>
                 {!isBasicDetailsCollapsed && (
                   <div className="p-4">
-                    <div className={`grid gap-4 ${modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-4'}`}>
+                    <div
+                      className={`grid gap-4 ${modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-4'}`}
+                    >
                       {/* Vendor Selection */}
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -1933,7 +2012,10 @@ export default function PaymentsForm({
                               setModeOfPayment(opt.value)
                               setModeSearch(opt.label)
                             }}
-                            options={modeOfPaymentOptions.map((m) => ({ label: m, value: m }))}
+                            options={modeOfPaymentOptions.map((m) => ({
+                              label: m,
+                              value: m,
+                            }))}
                             inputClassName={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${!modeOfPayment ? 'border-red-500' : 'border-zinc-300'}`}
                             emptyText="No modes found"
                           />
@@ -1955,7 +2037,8 @@ export default function PaymentsForm({
                       </div>
 
                       {/* Bank Name (conditional) */}
-                      {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+                      {(modeOfPayment === 'CHECK' ||
+                        modeOfPayment === 'BANK_TRANSFER') && (
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                             Bank Name
@@ -1972,7 +2055,8 @@ export default function PaymentsForm({
                       )}
 
                       {/* Check Number (conditional) */}
-                      {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+                      {(modeOfPayment === 'CHECK' ||
+                        modeOfPayment === 'BANK_TRANSFER') && (
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                             Check #
@@ -1999,7 +2083,9 @@ export default function PaymentsForm({
                       <Wallet size={14} />
                     </div>
                     <div>
-                      <h2 className="text-base font-bold tracking-tight">Payment Items</h2>
+                      <h2 className="text-base font-bold tracking-tight">
+                        Payment Items
+                      </h2>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -2034,11 +2120,17 @@ export default function PaymentsForm({
                       </div>
                     </div>
                     <button
-                      onClick={() => setIsPaymentItemsCollapsed(!isPaymentItemsCollapsed)}
+                      onClick={() =>
+                        setIsPaymentItemsCollapsed(!isPaymentItemsCollapsed)
+                      }
                       className="text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
                       title={isPaymentItemsCollapsed ? 'Expand' : 'Collapse'}
                     >
-                      {isPaymentItemsCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                      {isPaymentItemsCollapsed ? (
+                        <ChevronDown size={16} />
+                      ) : (
+                        <ChevronUp size={16} />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -2063,14 +2155,24 @@ export default function PaymentsForm({
                         </colgroup>
                         <thead className="bg-zinc-100 border-b border-zinc-200 uppercase font-bold text-zinc-700 tracking-wider">
                           <tr>
-                            <th className="py-3 px-3 min-w-[180px] text-center">Invoice Ref</th>
-                            <th className="py-3 px-2 min-w-[120px] text-center">Product/Service</th>
-                            <th className="py-3 px-2 min-w-[150px] text-center">Gross Amt</th>
+                            <th className="py-3 px-3 min-w-[180px] text-center">
+                              Invoice Ref
+                            </th>
+                            <th className="py-3 px-2 min-w-[120px] text-center">
+                              Product/Service
+                            </th>
+                            <th className="py-3 px-2 min-w-[150px] text-center">
+                              Gross Amt
+                            </th>
                             <th className="py-3 px-2 w-16 text-center">Discount</th>
                             <th className="py-3 px-2 w-28 text-center">VAT</th>
                             <th className="py-3 px-2 w-24 text-center">WHT</th>
-                            <th className="py-3 px-2 w-20 text-center">Amount Due</th>
-                            <th className="py-3 px-2 w-20 text-center">Resp. Center</th>
+                            <th className="py-3 px-2 w-20 text-center">
+                              Amount Due
+                            </th>
+                            <th className="py-3 px-2 w-20 text-center">
+                              Resp. Center
+                            </th>
                             <th className="py-3 px-2 w-10 text-center"></th>
                           </tr>
                         </thead>
@@ -2089,7 +2191,9 @@ export default function PaymentsForm({
                                 className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 truncate"
                                 title={item.product_service_name || item.description}
                               >
-                                {item.product_service_name || item.description || '—'}
+                                {item.product_service_name ||
+                                  item.description ||
+                                  '—'}
                               </td>
                               <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-800 tabular-nums">
                                 {fmt(item.gross || 0)}
@@ -2124,12 +2228,27 @@ export default function PaymentsForm({
                         </tbody>
                         <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
                           <tr>
-                            <td colSpan={2} className="py-2.5 px-3 text-right text-xs font-black uppercase">Totals</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-xs">{fmt(summary.totalGross)}</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-orange-500 text-xs">({fmt(summary.totalDiscount)})</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-red-500 text-xs">+{fmt(summary.totalVAT)}</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-blue-600 text-xs">({fmt(summary.totalWHT)})</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-green-700 text-xs">{fmt(summary.totalCashCollected)}</td>
+                            <td
+                              colSpan={2}
+                              className="py-2.5 px-3 text-right text-xs font-black uppercase"
+                            >
+                              Totals
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-xs">
+                              {fmt(summary.totalGross)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-orange-500 text-xs">
+                              ({fmt(summary.totalDiscount)})
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-red-500 text-xs">
+                              +{fmt(summary.totalVAT)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-blue-600 text-xs">
+                              ({fmt(summary.totalWHT)})
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-green-700 text-xs">
+                              {fmt(summary.totalCashCollected)}
+                            </td>
                             <td />
                             <td />
                           </tr>
@@ -2144,7 +2263,10 @@ export default function PaymentsForm({
                         >
                           <Plus size={12} /> Add Purchase Items
                         </button>
-                        <span className="text-xs text-zinc-500 font-medium">{paymentItems.length} {paymentItems.length === 1 ? 'item' : 'items'} added</span>
+                        <span className="text-xs text-zinc-500 font-medium">
+                          {paymentItems.length}{' '}
+                          {paymentItems.length === 1 ? 'item' : 'items'} added
+                        </span>
                       </div>
                     )}
                   </>
@@ -2159,18 +2281,28 @@ export default function PaymentsForm({
                       <Layers size={14} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-base font-bold tracking-tight">Journal Entries</h2>
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-800 text-zinc-100 border border-zinc-700`}>
+                      <h2 className="text-base font-bold tracking-tight">
+                        Journal Entries
+                      </h2>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-800 text-zinc-100 border border-zinc-700`}
+                      >
                         {isBalanced ? 'Balanced' : 'Unbalanced'}
                       </span>
                     </div>
                   </div>
                   <button
-                    onClick={() => setIsJournalEntriesCollapsed(!isJournalEntriesCollapsed)}
+                    onClick={() =>
+                      setIsJournalEntriesCollapsed(!isJournalEntriesCollapsed)
+                    }
                     className="text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
                     title={isJournalEntriesCollapsed ? 'Expand' : 'Collapse'}
                   >
-                    {isJournalEntriesCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                    {isJournalEntriesCollapsed ? (
+                      <ChevronDown size={16} />
+                    ) : (
+                      <ChevronUp size={16} />
+                    )}
                   </button>
                 </div>
 
@@ -2190,10 +2322,18 @@ export default function PaymentsForm({
                         </colgroup>
                         <thead className="bg-zinc-100 border-b border-zinc-200 uppercase font-bold text-zinc-600 tracking-wider">
                           <tr>
-                            <th className="py-2.5 px-3 text-center">Chart of Account</th>
-                            <th className="py-2.5 px-3 text-center w-32">Debit (₱)</th>
-                            <th className="py-2.5 px-3 text-center w-32">Credit (₱)</th>
-                            <th className="py-2.5 px-3 text-center">Responsibility Center</th>
+                            <th className="py-2.5 px-3 text-center">
+                              Chart of Account
+                            </th>
+                            <th className="py-2.5 px-3 text-center w-32">
+                              Debit (₱)
+                            </th>
+                            <th className="py-2.5 px-3 text-center w-32">
+                              Credit (₱)
+                            </th>
+                            <th className="py-2.5 px-3 text-center">
+                              Responsibility Center
+                            </th>
                             <th className="py-2.5 px-3 w-10 text-center"></th>
                           </tr>
                         </thead>
@@ -2204,8 +2344,8 @@ export default function PaymentsForm({
                                 colSpan={5}
                                 className="py-6 text-[12px] text-gray-400 text-center"
                               >
-                                Journal entries auto-generate once items are added and
-                                mode of payment is selected.
+                                Journal entries auto-generate once items are added
+                                and mode of payment is selected.
                               </td>
                             </tr>
                           ) : (
@@ -2217,10 +2357,18 @@ export default function PaymentsForm({
                                     placeholder="Search account..."
                                     value={entry.accountSearch}
                                     onChange={(v) =>
-                                      updateJournalEntry(entry.id, 'accountSearch', v)
+                                      updateJournalEntry(
+                                        entry.id,
+                                        'accountSearch',
+                                        v,
+                                      )
                                     }
                                     onSelect={(opt) => {
-                                      updateJournalEntry(entry.id, 'account', opt.value)
+                                      updateJournalEntry(
+                                        entry.id,
+                                        'account',
+                                        opt.value,
+                                      )
                                       updateJournalEntry(
                                         entry.id,
                                         'accountSearch',
@@ -2312,9 +2460,18 @@ export default function PaymentsForm({
                         </tbody>
                         <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
                           <tr>
-                            <td colSpan={2} className="py-2.5 px-3 text-right text-xs">Total Ledger Balance:</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(totalDebit)}</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(totalCredit)}</td>
+                            <td
+                              colSpan={2}
+                              className="py-2.5 px-3 text-right text-xs"
+                            >
+                              Total Ledger Balance:
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">
+                              {fmt(totalDebit)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">
+                              {fmt(totalCredit)}
+                            </td>
                             <td />
                           </tr>
                         </tfoot>
@@ -2328,7 +2485,10 @@ export default function PaymentsForm({
                         >
                           <Plus size={12} /> Add Ledger Row
                         </button>
-                        <span className="text-xs text-zinc-500 font-medium">{journalEntries.length} {journalEntries.length === 1 ? 'entry' : 'entries'}</span>
+                        <span className="text-xs text-zinc-500 font-medium">
+                          {journalEntries.length}{' '}
+                          {journalEntries.length === 1 ? 'entry' : 'entries'}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -2342,9 +2502,14 @@ export default function PaymentsForm({
                   <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Paperclip className="text-red-500" size={16} />
-                      <h2 className="text-sm font-bold tracking-tight">Attachments</h2>
+                      <h2 className="text-sm font-bold tracking-tight">
+                        Attachments
+                      </h2>
                     </div>
-                    <span className="text-xs text-zinc-400 font-medium">{attachments.length} {attachments.length === 1 ? 'File' : 'Files'}</span>
+                    <span className="text-xs text-zinc-400 font-medium">
+                      {attachments.length}{' '}
+                      {attachments.length === 1 ? 'File' : 'Files'}
+                    </span>
                   </div>
                   <div className="p-4">
                     <div className="overflow-x-auto custom-table-scroller">
@@ -2361,20 +2526,16 @@ export default function PaymentsForm({
                         </colgroup>
                         <thead>
                           <tr className="border-b border-gray-100">
-                            {[
-                              'File Name',
-                              'File',
-                              'Remarks',
-                              'Uploaded By',
-                              '',
-                            ].map((h, i) => (
-                              <th
-                                key={i}
-                                className="pb-3 text-[12px] font-black uppercase text-gray-900 tracking-tighter text-center px-1"
-                              >
-                                {h}
-                              </th>
-                            ))}
+                            {['File Name', 'File', 'Remarks', 'Uploaded By', ''].map(
+                              (h, i) => (
+                                <th
+                                  key={i}
+                                  className="pb-3 text-[12px] font-black uppercase text-gray-900 tracking-tighter text-center px-1"
+                                >
+                                  {h}
+                                </th>
+                              ),
+                            )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
@@ -2439,7 +2600,8 @@ export default function PaymentsForm({
                                           e.target.parentNode.appendChild(fallback)
                                         }}
                                       />
-                                    ) : file.file && typeof file.file === 'string' ? (
+                                    ) : file.file &&
+                                      typeof file.file === 'string' ? (
                                       <span className="text-blue-600 text-[11px] font-bold">
                                         Non-image file (
                                         {Math.round(file.file.length / 1024)}KB)
@@ -2513,7 +2675,9 @@ export default function PaymentsForm({
                   <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileText className="text-red-500" size={16} />
-                      <h2 className="text-sm font-bold tracking-tight">Remarks & Internal Notes</h2>
+                      <h2 className="text-sm font-bold tracking-tight">
+                        Remarks & Internal Notes
+                      </h2>
                     </div>
                   </div>
                   <div className="p-4">
@@ -2773,19 +2937,19 @@ const SummaryRow = ({
   label,
   value,
   badge,
-  badgeColor = "text-zinc-400",
-  valuePrefix = "",
-  textColor = "text-zinc-900",
-  containerClassName = "py-1 border-b border-zinc-500",
+  badgeColor = 'text-zinc-400',
+  valuePrefix = '',
+  textColor = 'text-zinc-900',
+  containerClassName = 'py-1 border-b border-zinc-500',
   isNested = false,
 }) => {
-  const strVal = String(value || "");
+  const strVal = String(value || '')
 
   const getValueFontSize = (len) => {
-    if (len > 24) return "text-xs";
-    if (len > 18) return "text-sm";
-    return "text-sm sm:text-base";
-  };
+    if (len > 24) return 'text-xs'
+    if (len > 18) return 'text-sm'
+    return 'text-sm sm:text-base'
+  }
 
   return (
     <div
@@ -2794,21 +2958,18 @@ const SummaryRow = ({
       {/* Label & Badge */}
       <div className="flex items-center gap-1 min-w-max">
         <span
-          className={`font-bold text-zinc-800 ${isNested ? "text-xs" : "text-sm"
-            }`}
+          className={`font-bold text-zinc-800 ${isNested ? 'text-xs' : 'text-sm'}`}
         >
           {label}
         </span>
-        {badge && (
-          <span className={`text-xs font-bold ${badgeColor}`}>{badge}</span>
-        )}
+        {badge && <span className={`text-xs font-bold ${badgeColor}`}>{badge}</span>}
       </div>
 
       {/* Value */}
       <div className="flex-1 flex justify-end min-w-max text-right">
         <span
           className={`font-extrabold font-mono tracking-tight whitespace-nowrap ml-auto ${textColor} ${getValueFontSize(
-            strVal.length
+            strVal.length,
           )}`}
         >
           {valuePrefix && <span className="mr-0.5">{valuePrefix}</span>}
@@ -2817,31 +2978,31 @@ const SummaryRow = ({
         </span>
       </div>
     </div>
-  );
-};
+  )
+}
 
 const TotalHeroAmount = ({ value, fmt }) => {
-  const formattedVal = fmt(value);
-  const len = String(formattedVal || "").length;
+  const formattedVal = fmt(value)
+  const len = String(formattedVal || '').length
 
   const getHeroFontSize = (charCount) => {
-    if (charCount > 25) return "text-sm";
-    if (charCount > 18) return "text-base";
-    if (charCount > 12) return "text-xl";
-    return "text-2xl";
-  };
+    if (charCount > 25) return 'text-sm'
+    if (charCount > 18) return 'text-base'
+    if (charCount > 12) return 'text-xl'
+    return 'text-2xl'
+  }
 
   return (
     <div
       className={`font-black font-mono text-white tracking-tight drop-shadow-sm text-right whitespace-nowrap overflow-hidden transition-all duration-150 ${getHeroFontSize(
-        len
+        len,
       )}`}
     >
       <span className="text-emerald-300 mr-1">₱</span>
       <span>{formattedVal}</span>
     </div>
-  );
-};
+  )
+}
 
 function SidebarInput({
   label,

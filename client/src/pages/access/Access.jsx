@@ -17,6 +17,7 @@ import RightSideModal from '../../components/RightSideModal'
 import DynamicToast from '../../components/DynamicToast'
 import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
+import LoadingScreen from '../../components/LoadingScreen'
 import useAccess from './useAccess'
 
 export default function Access() {
@@ -199,14 +200,7 @@ function AccessContent() {
   ]
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Loading Permissions...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading Permissions..." />
   }
 
   if (error) {

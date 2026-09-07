@@ -459,6 +459,41 @@ const calculateTaxFromJournalEntries = async (req, res, next) => {
       })
     }
 
+    // Match dashboard/report behavior: only posted journals from approved
+    // source documents are eligible for tax calculations and filings.
+    const approvedJournalFilter = `
+      AND (
+        (je.je_db_name = 'receipts' AND EXISTS (
+          SELECT 1 FROM receipts r
+          WHERE r.r_id = je.je_db_id AND r.r_state = 'APPROVED'
+        ))
+        OR (je.je_db_name = 'cash_disbursements' AND EXISTS (
+          SELECT 1 FROM cash_disbursements cd
+          WHERE cd.cd_id = je.je_db_id AND cd.cd_state = 'APPROVED'
+        ))
+        OR (je.je_db_name = 'sales' AND EXISTS (
+          SELECT 1 FROM sales s
+          WHERE s.s_id = je.je_db_id AND s.s_state = 'APPROVED'
+        ))
+        OR (je.je_db_name = 'collections' AND EXISTS (
+          SELECT 1 FROM collections c
+          WHERE c.c_id = je.je_db_id AND c.c_state = 'APPROVED'
+        ))
+        OR (je.je_db_name = 'purchase' AND EXISTS (
+          SELECT 1 FROM purchase p
+          WHERE p.p_id = je.je_db_id AND p.p_state = 'APPROVED'
+        ))
+        OR (je.je_db_name = 'payments' AND EXISTS (
+          SELECT 1 FROM payments pay
+          WHERE pay.c_id = je.je_db_id AND pay.c_state = 'APPROVED'
+        ))
+        OR (je.je_db_name = 'adjustments' AND EXISTS (
+          SELECT 1 FROM adjustments a
+          WHERE a.a_id = je.je_db_id AND a.a_status = 'APPROVED'
+        ))
+      )
+    `
+
     // Query Output VAT (CREDIT balance from Output VAT account)
     const outputVATQuery = `
       SELECT 
@@ -469,10 +504,11 @@ const calculateTaxFromJournalEntries = async (req, res, next) => {
       INNER JOIN charts_of_accounts coa
         ON je.je_coa_id = coa.coa_id
       WHERE coa.coa_name = 'Output VAT'
-        AND je.je_db_id IS NOT NULL
-        AND je.je_coa_id IS NOT NULL
-        AND DATE(je.je_date) >= ?
-        AND DATE(je.je_date) <= ?
+      AND je.je_db_id IS NOT NULL
+      AND je.je_coa_id IS NOT NULL
+      AND DATE(je.je_date) >= ?
+      AND DATE(je.je_date) <= ?
+      ${approvedJournalFilter}
     `
 
     const outputVATResult = await Query(outputVATQuery, [start_date, end_date])
@@ -488,10 +524,11 @@ const calculateTaxFromJournalEntries = async (req, res, next) => {
       INNER JOIN charts_of_accounts coa
         ON je.je_coa_id = coa.coa_id
       WHERE coa.coa_name = 'Input VAT'
-        AND je.je_db_id IS NOT NULL
-        AND je.je_coa_id IS NOT NULL
-        AND DATE(je.je_date) >= ?
-        AND DATE(je.je_date) <= ?
+      AND je.je_db_id IS NOT NULL
+      AND je.je_coa_id IS NOT NULL
+      AND DATE(je.je_date) >= ?
+      AND DATE(je.je_date) <= ?
+      ${approvedJournalFilter}
     `
 
     const inputVATResult = await Query(inputVATQuery, [start_date, end_date])
@@ -507,10 +544,11 @@ const calculateTaxFromJournalEntries = async (req, res, next) => {
       INNER JOIN charts_of_accounts coa
         ON je.je_coa_id = coa.coa_id
       WHERE coa.coa_name = 'Withholding Tax - Expanded'
-        AND je.je_db_id IS NOT NULL
-        AND je.je_coa_id IS NOT NULL
-        AND DATE(je.je_date) >= ?
-        AND DATE(je.je_date) <= ?
+      AND je.je_db_id IS NOT NULL
+      AND je.je_coa_id IS NOT NULL
+      AND DATE(je.je_date) >= ?
+      AND DATE(je.je_date) <= ?
+      ${approvedJournalFilter}
     `
 
     const wtExpandedResult = await Query(wtExpandedQuery, [start_date, end_date])
@@ -526,10 +564,11 @@ const calculateTaxFromJournalEntries = async (req, res, next) => {
       INNER JOIN charts_of_accounts coa
         ON je.je_coa_id = coa.coa_id
       WHERE coa.coa_name = 'Creditable Withholding Tax'
-        AND je.je_db_id IS NOT NULL
-        AND je.je_coa_id IS NOT NULL
-        AND DATE(je.je_date) >= ?
-        AND DATE(je.je_date) <= ?
+      AND je.je_db_id IS NOT NULL
+      AND je.je_coa_id IS NOT NULL
+      AND DATE(je.je_date) >= ?
+      AND DATE(je.je_date) <= ?
+      ${approvedJournalFilter}
     `
 
     const wtCreditableResult = await Query(wtCreditableQuery, [start_date, end_date])
@@ -646,6 +685,7 @@ const calculateTaxFromJournalEntries = async (req, res, next) => {
         AND je.je_coa_id IS NOT NULL
         AND DATE(je.je_date) >= ?
         AND DATE(je.je_date) <= ?
+        ${approvedJournalFilter}
       ORDER BY je.je_date ASC, je.je_id ASC
     `
     const journalEntries = await Query(journalEntriesQuery, [start_date, end_date])

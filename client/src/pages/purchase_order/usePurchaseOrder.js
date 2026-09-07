@@ -9,7 +9,7 @@ const usePurchaseOrder = () => {
     try {
       setLoading(true)
       setError(null)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -45,7 +45,7 @@ const usePurchaseOrder = () => {
   const updatePurchaseOrderStatus = useCallback(
     async (poId, updates) => {
       try {
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
 
         if (!token) {
           throw new Error('No authorization token found')
@@ -86,7 +86,7 @@ const usePurchaseOrder = () => {
   const createPurchaseOrder = useCallback(
     async (payload) => {
       try {
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
 
         if (!token) {
           throw new Error('No authorization token found')

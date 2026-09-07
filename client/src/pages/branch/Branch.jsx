@@ -1,16 +1,13 @@
 import React from 'react';
 import DynamicTable from '../../components/DynamicTable';
+import LoadingScreen from '../../components/LoadingScreen';
 import useBranch from './useBranch';
 
 export default function Branch() {
   const { branch, loading, error } = useBranch();
 
   if (loading) {
-    return (
-      <div className="p-5 flex items-center justify-center">
-        <div className="text-gray-600">Loading branch...</div>
-      </div>
-    );
+    return <LoadingScreen label="Loading Branch Data..." />;
   }
 
   if (error) {

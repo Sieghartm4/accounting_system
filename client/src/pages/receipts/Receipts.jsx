@@ -21,6 +21,7 @@ import useReceipts from './useReceipts'
 import ReceiptsForm from './ReceiptsForm'
 import { hasRouteAccess, getAccessLevel } from '../../utils/routeProtection'
 import { generateReceiptPDF } from '../../utils/generateReceiptPDF' // <-- import PDF util
+import LoadingScreen from '../../components/LoadingScreen'
 
 export default function Receipts() {
   return (
@@ -79,7 +80,7 @@ function ReceiptsContent() {
 
     const fetchReceipt = async () => {
       try {
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
@@ -148,7 +149,7 @@ function ReceiptsContent() {
     }
   }, [prependReceipt])
 
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
   const accessLevel = getAccessLevel('receipts', user)
   const enableCheckboxes =
     accessLevel === 'Check Access' ||
@@ -181,7 +182,7 @@ function ReceiptsContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                const token = localStorage.getItem('token')
+                const token = sessionStorage.getItem('authenticated')
                 if (!token) throw new Error('No authentication token found')
 
                 const updates = approvableRows.map((row) => ({
@@ -244,7 +245,7 @@ function ReceiptsContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                const token = localStorage.getItem('token')
+                const token = sessionStorage.getItem('authenticated')
                 if (!token) throw new Error('No authentication token found')
 
                 const updates = cancellableRows.map((row) => ({
@@ -332,7 +333,7 @@ function ReceiptsContent() {
   // ─── Helper: fetch full receipt data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authentication token found')
 
       const receiptIds = selectedRows
@@ -408,14 +409,7 @@ function ReceiptsContent() {
     )
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Syncing Receipt Ledger...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading Receipts Data..." />
   }
 
   if (error) {
@@ -610,7 +604,7 @@ function ReceiptsContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  const token = localStorage.getItem('token')
+                  const token = sessionStorage.getItem('authenticated')
                   if (!token) throw new Error('No authentication token found')
 
                   const response = await fetch(
@@ -644,7 +638,7 @@ function ReceiptsContent() {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  const token = localStorage.getItem('token')
+                  const token = sessionStorage.getItem('authenticated')
                   if (!token) throw new Error('No authentication token found')
 
                   const response = await fetch(

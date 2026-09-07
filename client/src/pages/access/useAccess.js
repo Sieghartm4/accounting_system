@@ -25,7 +25,7 @@ const useAccess = () => {
     const fetchRouteAccess = async (accessId) => {
         try {
             setRouteAccessLoading(true);
-            const token = localStorage.getItem("token");
+            const token = sessionStorage.getItem('authenticated');
 
             if (!token) {
                 throw new Error("No authorization token found");
@@ -63,7 +63,7 @@ const useAccess = () => {
 
     const createAccess = async (access_name, status) => {
         try {
-            const token = localStorage.getItem("token");
+            const token = sessionStorage.getItem('authenticated');
 
             if (!token) {
                 throw new Error("No authorization token found");
@@ -102,7 +102,7 @@ const useAccess = () => {
 
     const updateRouteAccess = async (route_access_Data) => {
         try {
-            const token = localStorage.getItem("token");
+            const token = sessionStorage.getItem('authenticated');
 
             if (!token) {
                 throw new Error("No authorization token found");
@@ -139,7 +139,7 @@ const useAccess = () => {
 
     const updateSingleRouteAccess = async (route_id, status, access_id) => {
         try {
-            const token = localStorage.getItem("token");
+            const token = sessionStorage.getItem('authenticated');
 
             if (!token) {
                 throw new Error("No authorization token found");
@@ -184,7 +184,7 @@ const useAccess = () => {
         try {
             setLoading(true);
 
-            const token = localStorage.getItem("token");
+            const token = sessionStorage.getItem('authenticated');
 
             if (!token) {
                 throw new Error("No authorization token found");

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Users, ShieldCheck, Search, Download } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
+import LoadingScreen from '../../components/LoadingScreen'
 import useCustomerTransactions from './useCustomerTransactions'
 import CustomerTransactionDetail from './CustomerTransactionDetail'
 
@@ -32,14 +33,7 @@ function CustomerTransactionsContent() {
   }
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Loading Customer Transactions...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading Customer Transactions..." />
   }
 
   if (error) {

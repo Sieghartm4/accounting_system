@@ -27,6 +27,7 @@ import ProtectedAction from '../../components/ProtectedAction'
 import useAdjustments from './useAdjustments'
 import AdjustmentsForm from './AdjustmentsForm'
 import { getAccessLevel } from '../../utils/routeProtection'
+import LoadingScreen from '../../components/LoadingScreen'
 
 export default function Adjustments() {
   return (
@@ -89,7 +90,7 @@ function AdjustmentsContent() {
 
     const fetchAdjustment = async () => {
       try {
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
@@ -178,7 +179,7 @@ function AdjustmentsContent() {
   }, [prependAdjustment, refetchAdjustments])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
   const accessLevel = getAccessLevel('adjustments', user)
   const enableCheckboxes =
     accessLevel === 'Check Access' ||
@@ -323,14 +324,7 @@ function AdjustmentsContent() {
     )
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Retrieving Adjustments...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading Adjustments Data..." />
   }
 
   if (error) {
@@ -491,7 +485,7 @@ function AdjustmentsContent() {
                 try {
                   console.log('Viewing adjustment:', row)
 
-                  const token = localStorage.getItem('token')
+                  const token = sessionStorage.getItem('authenticated')
                   if (!token) {
                     throw new Error('No authentication token found')
                   }
@@ -533,7 +527,7 @@ function AdjustmentsContent() {
                 try {
                   console.log('Editing adjustment:', row)
 
-                  const token = localStorage.getItem('token')
+                  const token = sessionStorage.getItem('authenticated')
                   if (!token) {
                     throw new Error('No authentication token found')
                   }
@@ -608,7 +602,7 @@ function AdjustmentsContent() {
                     try {
                       console.log('Approving adjustments:', approvableRows)
 
-                      const token = localStorage.getItem('token')
+                      const token = sessionStorage.getItem('authenticated')
                       if (!token) {
                         throw new Error('No authentication token found')
                       }
@@ -682,7 +676,7 @@ function AdjustmentsContent() {
                     try {
                       console.log('Cancelling adjustments:', cancellableRows)
 
-                      const token = localStorage.getItem('token')
+                      const token = sessionStorage.getItem('authenticated')
                       if (!token) {
                         throw new Error('No authentication token found')
                       }

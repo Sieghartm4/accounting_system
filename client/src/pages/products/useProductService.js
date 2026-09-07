@@ -8,7 +8,7 @@ const useProductService = () => {
   const fetchProductService = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -55,7 +55,7 @@ const useProductService = () => {
     unit,
   ) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -105,7 +105,7 @@ const useProductService = () => {
 
   const syncProductService = async () => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         throw new Error('No authorization token found')
       }
@@ -149,7 +149,7 @@ const useProductService = () => {
     unit,
   ) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -199,7 +199,7 @@ const useProductService = () => {
 
   const previewProductServiceSync = async () => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -243,7 +243,7 @@ const useProductService = () => {
 
   const importProductService = async (items) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')

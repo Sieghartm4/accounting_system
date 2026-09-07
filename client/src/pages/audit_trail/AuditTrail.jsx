@@ -5,6 +5,7 @@ import DynamicTable from '../../components/DynamicTable'
 import DynamicToast from '../../components/DynamicToast'
 import RouteProtection from '../../components/RouteProtection'
 import useAuditTrail from './useAuditTrail'
+import LoadingScreen from '../../components/LoadingScreen'
 
 function AuditTrailContent() {
   const { auditTrails, loading, loadingMore, error, hasMore, refetch, loadMore } = useAuditTrail()
@@ -19,16 +20,8 @@ function AuditTrailContent() {
     setToast(null)
   }
 
-  if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Syncing Audit Trail Database...
-        </p>
-      </div>
-    )
-  }
+  if (loading)
+    return <LoadingScreen label="Loading Audit Trail..." />
 
   if (error) {
     return (

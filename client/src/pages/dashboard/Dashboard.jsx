@@ -18,6 +18,8 @@ import {
 
 import RouteProtection from '../../components/RouteProtection';
 
+import LoadingScreen from '../../components/LoadingScreen';
+
 import { useDashboard, fmt2 } from './useDashboard';
 
 
@@ -168,7 +170,7 @@ function DashboardContent() {
     isHealthy,
   } = useDashboard();
 
-  if (loading && !data) return <DashboardSkeleton />;
+  if (loading || refreshing) return <LoadingScreen label="Loading Dashboard..." />;
 
   if (error) return (
     <div className="flex items-center justify-center min-h-screen bg-[#0a0a0f] p-10">

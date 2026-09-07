@@ -8,7 +8,7 @@ const useWithholdingTax = () => {
   const fetchWithholdingTax = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -43,7 +43,7 @@ const useWithholdingTax = () => {
 
   const createWithholdingTaxEntry = async (withholdingTaxData) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -81,7 +81,7 @@ const useWithholdingTax = () => {
 
   const updateWithholdingTaxEntry = async (id, withholdingTaxData) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -119,7 +119,7 @@ const useWithholdingTax = () => {
 
   const importWithholdingTax = async (taxes) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')

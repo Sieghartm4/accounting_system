@@ -79,7 +79,7 @@ export default function Sidebar({ isCollapsed }) {
 
   useEffect(() => {
     try {
-      const userData = JSON.parse(localStorage.getItem('user'))
+      const userData = JSON.parse(sessionStorage.getItem('auth_user') || 'null')
 
       setUser(userData)
 
@@ -108,11 +108,11 @@ export default function Sidebar({ isCollapsed }) {
   }, [])
 
   // Fetch company data
-
   useEffect(() => {
     const fetchCompany = async () => {
       try {
-        const token = localStorage.getItem('token')
+        // ✅ Read token from sessionStorage (set during login)
+        const token = sessionStorage.getItem('authenticated')
 
         const response = await fetch(
           `${import.meta.env.VITE_SERVER_LINK}/company/single`,

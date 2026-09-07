@@ -35,7 +35,7 @@ const useCollections = () => {
       }
 
       try {
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
         if (!token) throw new Error('No authorization token found')
 
         const params = new URLSearchParams()

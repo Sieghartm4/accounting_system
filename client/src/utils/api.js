@@ -3,6 +3,21 @@
 // Global fetch interceptor for auto-logout on token expiration
 const originalFetch = window.fetch
 window.fetch = async function (...args) {
+  const requestOptions = args[1] || {}
+  const requestHeaders = new Headers(requestOptions.headers || {})
+
+  // The server authenticates through the httpOnly session cookie. Remove any
+  // legacy bearer header that older feature code may still construct.
+  if (sessionStorage.getItem('authenticated') === 'session') {
+    requestHeaders.delete('Authorization')
+  }
+
+  args[1] = {
+    ...requestOptions,
+    credentials: 'include',
+    headers: requestHeaders,
+  }
+
   // Normalize insecure http requests when the page is served over HTTPS
   try {
     const pageIsSecure = window.location && window.location.protocol === 'https:'
@@ -47,8 +62,6 @@ window.fetch = async function (...args) {
 }
 
 export async function fetchWithAuth(url, options = {}) {
-  const token = localStorage.getItem('token')
-
   if (typeof url === 'string' && url.startsWith('/')) {
     const serverLink = import.meta.env.VITE_SERVER_LINK || ''
     url = `${serverLink.replace(/\/$/, '')}${url}`
@@ -57,10 +70,6 @@ export async function fetchWithAuth(url, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
-  }
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
   }
 
   // If page is secure and caller passed an http URL, normalize to https
@@ -75,6 +84,7 @@ export async function fetchWithAuth(url, options = {}) {
 
   const response = await fetch(url, {
     ...options,
+    credentials: 'include',
     headers,
   })
 

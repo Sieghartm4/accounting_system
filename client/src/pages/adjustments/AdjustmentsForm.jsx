@@ -367,7 +367,7 @@ export default function AdjustmentsForm({
 
   const fetchChartsOfAccounts = async () => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
@@ -705,7 +705,7 @@ export default function AdjustmentsForm({
       //   return
       // }
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         setToast({
           type: 'error',
@@ -734,7 +734,7 @@ export default function AdjustmentsForm({
         return
       }
 
-      const userData = JSON.parse(localStorage.getItem('user') || '{}')
+      const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
 
       const preparedJournalEntries = journalEntries.map((entry) => {

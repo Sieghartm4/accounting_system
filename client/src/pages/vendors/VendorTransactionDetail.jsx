@@ -4,6 +4,7 @@ import { Truck, ArrowLeft, Calendar } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
 import DynamicToast from '../../components/DynamicToast'
+import LoadingScreen from '../../components/LoadingScreen'
 import useVendorTransactionDetail from './useVendorTransactionDetail'
 
 const formatCurrency = (value) =>
@@ -41,14 +42,7 @@ function VendorTransactionDetailContent({ vendorId, vendorName, onBack }) {
   const filteredPurchases = filterByDate(purchases, 'date_delivered', 'date_due')
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Loading Transaction Details...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading Transaction Details..." />
   }
 
   if (error) {

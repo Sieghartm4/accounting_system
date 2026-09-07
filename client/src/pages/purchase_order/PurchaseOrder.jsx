@@ -17,6 +17,7 @@ import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
 import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
+import LoadingScreen from '../../components/LoadingScreen'
 import usePurchaseOrder from './usePurchaseOrder'
 import {
   findDefaultVatOption,
@@ -205,7 +206,7 @@ function PurchaseOrderContent() {
       setApprovalLoading(true)
       setApprovalError(null)
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authentication token found')
 
       const responses = await Promise.all(
@@ -406,15 +407,8 @@ function PurchaseOrderContent() {
     ]
   }
 
-  if (loading && purchaseOrders.length === 0) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center gap-4">
-        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[3px] text-gray-400">
-          Loading Purchase Orders...
-        </p>
-      </div>
-    )
+  if (loading) {
+    return <LoadingScreen label="Loading Purchase Orders..." />
   }
 
   if (error && purchaseOrders.length === 0) {

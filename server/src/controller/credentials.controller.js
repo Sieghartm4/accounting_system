@@ -1,12 +1,23 @@
 const os = require('os')
 
-const { checkConnection, SelectAll, SelectWithCondition, Transaction, Query, Insert } = require('../database/util/queries.util')
+const {
+  checkConnection,
+  SelectAll,
+  SelectWithCondition,
+  Transaction,
+  Query,
+  Insert,
+} = require('../database/util/queries.util')
 
-const { formatMemoryUsage, formatTime, DataModeling } = require('../util/helper.util')
+const {
+  formatMemoryUsage,
+  formatTime,
+  DataModeling,
+} = require('../util/helper.util')
 
 const { Master } = require('../database/model/Master')
 
-const {CheckPassword, Encrypter, Decrypter} = require('../util/cryptography.util')
+const { CheckPassword, Encrypter, Decrypter } = require('../util/cryptography.util')
 
 const jwt = require('jsonwebtoken')
 
@@ -22,6 +33,23 @@ const mysql = require('mysql2/promise')
 
 require('dotenv').config()
 
+const getSessionCookieDomain = () => {
+  if (process.env._COOKIE_DOMAIN) return process.env._COOKIE_DOMAIN
+  const host = String(process.env._CLIENT_URL || process.env._SERVER_URL || '')
+    .replace(/^[a-z]+:\/\//i, '')
+    .split('/')[0]
+    .split(':')[0]
+    .trim()
+  const labels = host.split('.').filter(Boolean)
+  if (
+    !host ||
+    host === 'localhost' ||
+    /^(\d{1,3}\.){3}\d{1,3}$/.test(host) ||
+    host.includes(':')
+  )
+    return undefined
+  return labels.length >= 3 ? `.${labels.slice(1).join('.')}` : undefined
+}
 
 const logout = async (req, res, next) => {
   try {
@@ -47,14 +75,16 @@ const logout = async (req, res, next) => {
     // Delete the MongoDB session record
     if (userId || username) {
       try {
-        const mongoUrl = process.env._SUBSCRIPTION_MONGODB_URL || process.env._MONGODB_URL
-        const collectionName = process.env._SUBSCRIPTION_SESSION_COLLECTION || 'ACCOUNTINGSubscription'
-        
+        const mongoUrl =
+          process.env._SUBSCRIPTION_MONGODB_URL || process.env._MONGODB_URL
+        const collectionName =
+          process.env._SUBSCRIPTION_SESSION_COLLECTION || 'ACCOUNTINGSubscription'
+
         const client = new MongoClient(mongoUrl)
         await client.connect()
         const db = client.db()
         const collection = db.collection(collectionName)
-        
+
         // Delete by userId or username
         if (userId) {
           await collection.deleteOne({ userId: userId })
@@ -62,20 +92,27 @@ const logout = async (req, res, next) => {
         if (username) {
           await collection.deleteOne({ username: username })
         }
-        
+
         await client.close()
-        console.log('🔍 Logout - MongoDB session deleted for user:', username || userId)
+        console.log(
+          '🔍 Logout - MongoDB session deleted for user:',
+          username || userId,
+        )
       } catch (mongoError) {
         console.error('🔍 Logout - MongoDB session delete error:', mongoError)
         // Continue with logout even if MongoDB delete fails
       }
     }
 
-    // Destroy the express session
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('🔍 Logout - Session destroy error:', err)
-      }
+    await new Promise((resolve, reject) => {
+      req.session.destroy((err) => (err ? reject(err) : resolve()))
+    })
+    res.clearCookie(process.env._SESSION_COOKIE_NAME || 'accounting.sid', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: 'auto',
+      path: '/',
+      ...(getSessionCookieDomain() ? { domain: getSessionCookieDomain() } : {}),
     })
 
     res.status(200).json({
@@ -92,15 +129,12 @@ const logout = async (req, res, next) => {
   }
 }
 
-
 const login = async (req, res, next) => {
-
   const { username, password } = req.body
 
-  console.log('🔍 Login Controller - :', req.body)
+  console.log('🔍 Login Controller - authentication started')
 
   try {
-
     console.log('🔍 Login Controller - Starting authentication process...')
 
     // Step 1: Check if user is an admin in subscription admin database
@@ -109,7 +143,8 @@ const login = async (req, res, next) => {
       user: CONFIG[process.env.NODE_ENV].username,
       password: CONFIG[process.env.NODE_ENV].password,
       database: CONFIG[process.env.NODE_ENV].database,
-      multipleStatements: CONFIG[process.env.NODE_ENV].dialectOptions.multipleStatements,
+      multipleStatements:
+        CONFIG[process.env.NODE_ENV].dialectOptions.multipleStatements,
     })
 
     const adminQuery = `SELECT mu_id AS id, mu_username AS username, mu_password AS password, mu_role AS role, mu_status AS status
@@ -142,7 +177,8 @@ const login = async (req, res, next) => {
         }
 
         // Admin authenticated successfully - redirect to subscription admin panel
-        const subscriptionAdminUrl = process.env._SUBSCRIPTION_SERVER_URL || 'http://localhost:3012'
+        const subscriptionAdminUrl =
+          process.env._SUBSCRIPTION_SERVER_URL || 'http://localhost:3012'
         return res.json({
           success: true,
           message: 'Admin login successful',
@@ -157,7 +193,9 @@ const login = async (req, res, next) => {
       return
     }
 
-    console.log('🔍 Not an admin user, proceeding with tenant database authentication')
+    console.log(
+      '🔍 Not an admin user, proceeding with tenant database authentication',
+    )
 
     // Step 2: Get tenant pool from config (MongoDB lookup + pool creation)
     const { pool: tenantPool, tenantDb } = await CONFIG.getTenantPool(username)
@@ -168,16 +206,19 @@ const login = async (req, res, next) => {
     const query = `SELECT mu_id AS id, mu_username AS username, mu_password AS password, mu_fullname AS fullname, mu_access_id AS access_id, mu_email AS email, ma_access_name AS access
                    FROM master_user
                    INNER JOIN master_access ON mu_access_id = ma_access_id
-                   WHERE mu_username = ? AND mu_status = ?`;
+                   WHERE mu_username = ? AND mu_status = ?`
 
     console.log('🔍 SQL Query:', query)
     console.log('🔍 Query params:', [username, 'active'])
 
-    const users = await Query(query, [username, 'active'], [Master.master_user.prefix_, Master.master_access.prefix_], tenantPool)
+    const users = await Query(
+      query,
+      [username, 'active'],
+      [Master.master_user.prefix_, Master.master_access.prefix_],
+      tenantPool,
+    )
 
     console.log('🔍 Users found in tenant database:', users)
-
-    
 
     // Let's also check all users in the database to see their status
 
@@ -187,57 +228,43 @@ const login = async (req, res, next) => {
 
     console.log('🔍 All users with username:', allUsers)
 
-    const route_access_query = sql.select([
+    const route_access_query = sql
+      .select([
+        { col: Master.master_route_access.selectOptionColumns.name, as: 'name' },
 
-      { col: Master.master_route_access.selectOptionColumns.name, as: 'name' },
-
-      { col: Master.master_route_access.selectOptionColumns.status, as: 'status' },
-
-    ])
+        { col: Master.master_route_access.selectOptionColumns.status, as: 'status' },
+      ])
 
       .from(Master.master_route_access.tablename)
 
       .where(Master.master_route_access.selectOptionColumns.access_id)
 
-      .build();
+      .build()
 
     console.log('Tenant123:', tenantPool)
 
-    const route_access = await Query(route_access_query, [users[0].access_id], [Master.master_route_access.prefix_], tenantPool)
-
-    
+    const route_access = await Query(
+      route_access_query,
+      [users[0].access_id],
+      [Master.master_route_access.prefix_],
+      tenantPool,
+    )
 
     // Close the tenant pool
 
-    await tenantPool.end();
-
-    
+    await tenantPool.end()
 
     if (users.length === 0) {
-
       return res.status(401).json({
-
         success: false,
 
-        message: 'Invalid username or user not active'
-
+        message: 'Invalid username or user not active',
       })
-
     }
-
-    
 
     const user = users[0]
 
-    
-
     console.log('🔍 User found:', user.username)
-
-    console.log('🔍 Input password:', password)
-
-    console.log('🔍 Stored password hash:', user.password)
-
-    
 
     // Check if input is already an MD5 hash (32-character hex string) or plain text
 
@@ -245,171 +272,111 @@ const login = async (req, res, next) => {
 
     const isAlreadyHashed = /^[a-f0-9]{32}$/i.test(password)
 
-    console.log('🔍 Input password is already MD5 hash:', isAlreadyHashed)
-
-    
-
     let isPasswordValid
 
     if (isAlreadyHashed) {
-
       // Compare directly if already hashed
 
       isPasswordValid = password === user.password
 
       console.log('🔍 Direct hash comparison:', isPasswordValid)
-
     } else {
-
       // Hash and compare if plain text
 
       const manualHash = crypto.createHash('md5').update(password).digest('hex')
 
       isPasswordValid = manualHash === user.password
 
-      console.log('🔍 Manual MD5 hash of input password:', manualHash)
-
-      console.log('🔍 Stored password hash:', user.password)
-
       console.log('🔍 Hashes match:', isPasswordValid)
-
     }
-
-    
 
     // Use the result directly
 
     if (isPasswordValid) {
-
       console.log('🔍 Password validation successful')
 
-      
-
       const { password, ...userWithoutPassword } = user
-
-      
 
       // Create JWT with tenant database information
 
       const token = jwt.sign(
+        {
+          userId: user.id,
 
-        { 
+          username: user.username,
 
-          userId: user.id, 
-
-          username: user.username, 
-
-          dbName: tenantDb
-
+          dbName: tenantDb,
         },
 
         process.env._SECRET_KEY,
 
-        { expiresIn: '24h' }
-
+        { expiresIn: '24h' },
       )
 
-      
+      console.log('🔍 Login Controller - Storing JWT in session...')
 
-      console.log('🔍 Login Controller - Storing JWT in session...');
-
-      console.log('🔍 Session before storing JWT:', req.session);
-
-      
+      console.log('🔍 Session before storing JWT:', req.session)
 
       req.session.jwt = token
 
       req.session.tenantDb = tenantDb
+      req.session.userId = user.id
+      req.session.username = user.username
 
-      
-
-      console.log('🔍 JWT token created:', token);
-
-      console.log('🔍 Session after storing JWT:', req.session);
-
-      
+      console.log('🔍 Session authentication state stored')
 
       // Explicitly save the session
 
       req.session.save((err) => {
-
         if (err) {
-
-          console.error('🔍 Session save error:', err);
-
+          console.error('🔍 Session save error:', err)
         } else {
-
-          console.log('✅ Session saved successfully');
-
+          console.log('✅ Session saved successfully')
         }
-
-      });
-
-      
+      })
 
       res.status(200).json({
-
         success: true,
 
         message: 'Login successful',
 
         data: {
-
           ...userWithoutPassword,
 
           route_access,
 
-          token,
-
-          tenantDb: tenantDb
-
+          tenantDb: tenantDb,
         },
 
-        timestamp: new Date().toISOString()
-
+        timestamp: new Date().toISOString(),
       })
-
     } else {
-
       console.log('🔍 Password validation failed')
 
       return res.status(401).json({
-
         success: false,
 
-        message: 'Invalid password'
-
+        message: 'Invalid password',
       })
-
     }
-
-    
-
   } catch (error) {
-
     console.error('Credentials login error:', error)
 
-    return res.status(500).json({ 
-
+    return res.status(500).json({
       success: false,
 
       message: 'Server error during credentials login',
 
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
     })
-
   }
-
 }
-
-
 
 module.exports = {
-
   login,
 
-  logout
-
+  logout,
 }
-

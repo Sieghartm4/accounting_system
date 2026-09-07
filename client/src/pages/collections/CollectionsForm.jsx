@@ -206,6 +206,11 @@ function SearchableDropdown({
 //
 //  All other fields (gross, discAmt, vatAmt) are DERIVED for display only.
 // ─────────────────────────────────────────────────────────────────────────────
+const normalizeTaxRatePercent = (value) => {
+  const rate = parseFloat(value) || 0
+  return rate > 0 && rate <= 1 ? rate * 100 : rate
+}
+
 function computeItemAmounts(
   qty,
   price,
@@ -213,6 +218,7 @@ function computeItemAmounts(
   discountType,
   vatPct,
   whtPct,
+  vatType = 'VAT-EX',
 ) {
   const gross = qty * price
 
@@ -226,9 +232,16 @@ function computeItemAmounts(
   }
 
   const discounted = gross - discAmt
-  const vatAmt = discounted * (vatPct / 100)
-  const whtAmt = discounted * (whtPct / 100)
-  const amount = discounted + vatAmt - whtAmt // → ci_amount
+  const netBase =
+    vatType === 'VAT-INC' && vatPct > 0
+      ? discounted / (1 + vatPct / 100)
+      : discounted
+  const vatAmt =
+    vatType === 'VAT-INC' && vatPct > 0
+      ? discounted - netBase
+      : discounted * (vatPct / 100)
+  const whtAmt = netBase * (whtPct / 100)
+  const amount = (vatType === 'VAT-INC' ? discounted : netBase + vatAmt) - whtAmt
   return {
     gross: parseFloat(gross.toFixed(2)),
     discAmt: parseFloat(discAmt.toFixed(2)),
@@ -424,7 +437,7 @@ export default function CollectionsForm({
   const handleCustomerFormSubmit = async (e) => {
     e.preventDefault()
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
 
       const payload = {
@@ -492,7 +505,7 @@ export default function CollectionsForm({
   const fetchCustomers = async () => {
     try {
       setCustomerLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -510,7 +523,7 @@ export default function CollectionsForm({
 
   const fetchChartsOfAccounts = async () => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
@@ -528,7 +541,7 @@ export default function CollectionsForm({
     try {
       setSalesDataLoading(true)
       setSalesDataError('')
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/collections/sales-collection/`,
@@ -606,11 +619,21 @@ export default function CollectionsForm({
           console.log('Processing sales item:', item)
           const gross = parseFloat(item.sales_price) || 0
           const discount = parseFloat(item.discount) || 0
-          const vat = parseFloat(item.vat) || 0
-          const wht = parseFloat(item.witholding_tax) || 0
-          const amount = gross - discount + vat - wht
+          const discountType = item.discount_type || 'PERCENT'
+          const vatPct = normalizeTaxRatePercent(item.vat)
+          const whtPct = normalizeTaxRatePercent(item.witholding_tax)
+          const vatType = item.vat_type || 'VAT-EX'
+          const computed = computeItemAmounts(
+            1,
+            gross,
+            discount,
+            discountType,
+            vatPct,
+            whtPct,
+            vatType,
+          )
           console.log(
-            `Calculated: gross=${gross}, discount=${discount}, vat=${vat}, wht=${wht}, amount=${amount}`,
+            `Calculated: gross=${gross}, discount=${discount}, vat=${computed.vatAmt}, wht=${computed.whtAmount}, amount=${computed.amount}`,
           )
           return {
             id: `auto-${index}`,
@@ -618,11 +641,12 @@ export default function CollectionsForm({
             invoiceRef: item.document_reference || '',
             description: item.product_service_name || item.name || '',
             responsibilityCenter: item.responsibility_center || '',
-            gross: gross,
-            discAmt: discount,
-            vatAmt: vat,
-            whtAmount: wht,
-            amount: amount,
+            gross: computed.gross,
+            discAmt: computed.discAmt,
+            vatAmt: computed.vatAmt,
+            vatType,
+            whtAmount: computed.whtAmount,
+            amount: computed.amount,
             isOther: false,
           }
         })
@@ -697,6 +721,7 @@ export default function CollectionsForm({
           gross: parseFloat(item.gross) || 0,
           discAmt: parseFloat(item.discount) || 0,
           vatAmt: parseFloat(item.vat) || 0,
+          vatType: item.vat_type || 'VAT-EX',
           whtAmount: parseFloat(item.witholding_tax) || 0,
           amount: parseFloat(item.amount) || 0,
           isOther: false,
@@ -780,7 +805,7 @@ export default function CollectionsForm({
         })
         return
       }
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
 
       const queryParams = new URLSearchParams()
@@ -808,8 +833,9 @@ export default function CollectionsForm({
         const price = parseFloat(s.sales_price) || 0
         const discountVal = parseFloat(s.discount) || 0
         const discountType = s.discount_type || 'PERCENT'
-        const vatPct = parseFloat(s.vat) || 0 // ← MUST include VAT
-        const whtPct = parseFloat(s.witholding_tax) || 0
+        const vatPct = normalizeTaxRatePercent(s.vat)
+        const whtPct = normalizeTaxRatePercent(s.witholding_tax)
+        const vatType = s.vat_type || 'VAT-EX'
 
         const computed = computeItemAmounts(
           qty,
@@ -818,6 +844,7 @@ export default function CollectionsForm({
           discountType,
           vatPct,
           whtPct,
+          vatType,
         )
 
         return {
@@ -908,21 +935,10 @@ export default function CollectionsForm({
 
   // ── Auto-generate journal entries ─────────────────────────────────────────
   //
-  //  Per item:
-  //    CR  Accounts Receivable   gross      ← closes the full AR (asset decreases)
-  //    DR  Sales Discounts       discAmt    ← discount expense
-  //    DR  Creditable WHT        whtAmount  ← asset: BIR owes us later
-  //
-  //  One combined:
-  //    DR  Cash / Bank           totalCash  ← actual money received
-  //
-  //  Balance proof per item:
-  //    DR side = discAmt + whtAmount + (amount)
-  //            = discAmt + whtAmt + (discounted + vatAmt − whtAmt)
-  //            = discAmt + discounted + vatAmt
-  //            = discAmt + (gross − discAmt) + vatAmt
-  //            = gross + vatAmt   ← note: AR was originally booked at gross + vatAmt in the Sales JE
-  //    CR side = gross + vatAmt  ✅
+  // Settlement entry per item:
+  //   DR Cash/Bank = amount due less the withholding certificate
+  //   DR Creditable WHT = the certificate amount
+  //   CR Accounts Receivable = the full invoice balance being settled
   // ─────────────────────────────────────────────────────────────────────────
   const generateJournalEntries = () => {
     if (collectionItems.length === 0) {
@@ -932,47 +948,85 @@ export default function CollectionsForm({
 
     const entries = []
 
-    // Resolve cash/payment account
+    // Resolve cash/payment account using normalized mode labels and COA names.
+    const normalizedMode = String(modeOfPayment || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[\s/-]+/g, '_')
+    const accountLabel = (account) =>
+      String(
+        account.name || account.account_name || account.coa_name || '',
+      ).toLowerCase()
+    const findAccount = (terms) =>
+      chartsOfAccounts.find((account) => {
+        const label = accountLabel(account)
+        return terms.some((term) => label.includes(term))
+      })
+
     let paymentAccount = null
-    if (modeOfPayment === 'CASH') {
+    if (normalizedMode === 'CASH' || normalizedMode.includes('CASH')) {
       paymentAccount =
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('cash on hand'),
-        ) ??
-        chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes('petty cash'),
-        )
-    } else if (modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') {
+        findAccount(['cash on hand']) ??
+        findAccount(['cash and cash equivalents']) ??
+        findAccount(['cash account']) ??
+        findAccount(['cash'])
+    } else if (
+      normalizedMode === 'CHECK' ||
+      normalizedMode.includes('BANK') ||
+      normalizedMode.includes('CHECK')
+    ) {
       if (bankName) {
-        paymentAccount = chartsOfAccounts.find((a) =>
-          (a.name || '').toLowerCase().includes(bankName.toLowerCase()),
-        )
+        paymentAccount = findAccount([String(bankName).toLowerCase()])
       }
-      paymentAccount ??= chartsOfAccounts.find((a) =>
-        (a.name || '').toLowerCase().includes('cash in bank'),
-      )
+      paymentAccount ??= findAccount([
+        'cash in bank',
+        'bank account',
+        'savings',
+        'checking',
+        'bank',
+      ])
     }
 
     const arAccount = chartsOfAccounts.find((a) =>
-      (a.name || '').toLowerCase().includes('accounts receivable'),
+      accountLabel(a).includes('accounts receivable'),
     )
+    const cwtAccount = findAccount([
+      'creditable withholding tax',
+      'creditable witholding tax',
+    ])
 
     let totalCash = 0
 
     collectionItems
       .filter((i) => !i.isOther)
       .forEach((item) => {
-        totalCash += item.amount || 0
+        const invoiceAmount = Number(item.amount || 0)
+        const withholdingAmount = Number(item.whtAmount || 0)
+        const cashAmount = Math.max(0, invoiceAmount - withholdingAmount)
+        totalCash += cashAmount
 
-        // CR  Accounts Receivable — amount collected
-        if (arAccount && item.amount > 0) {
+        // CR Accounts Receivable — close the full invoice balance.
+        if (arAccount && invoiceAmount > 0) {
           entries.push({
             id: Date.now() + Math.random(),
             account: arAccount.id,
             accountSearch: arAccount.name,
             center: item.responsibilityCenter || '',
             debit: 0,
-            credit: parseFloat(item.amount.toFixed(2)),
+            credit: parseFloat(invoiceAmount.toFixed(2)),
+            isManual: false,
+          })
+        }
+
+        // DR Creditable WHT — recognize the 2307 certificate component.
+        if (cwtAccount && withholdingAmount > 0) {
+          entries.push({
+            id: Date.now() + Math.random(),
+            account: cwtAccount.id,
+            accountSearch: cwtAccount.name || cwtAccount.account_name,
+            center: item.responsibilityCenter || '',
+            debit: parseFloat(withholdingAmount.toFixed(2)),
+            credit: 0,
             isManual: false,
           })
         }
@@ -1048,7 +1102,7 @@ export default function CollectionsForm({
         return
       }
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         setToast({
           type: 'error',
@@ -1077,7 +1131,7 @@ export default function CollectionsForm({
         return
       }
 
-      const userData = JSON.parse(localStorage.getItem('user') || '{}')
+      const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
 
       // ── collection_items payload — ONLY what the DB schema stores ──

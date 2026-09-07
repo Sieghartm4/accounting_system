@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronRight
 } from 'lucide-react'
+import LoadingScreen from '../../components/LoadingScreen'
 
 export default function StatementOfComprehensiveIncome() {
   const [data, setData] = useState(null)
@@ -34,10 +35,6 @@ export default function StatementOfComprehensiveIncome() {
   }
 
   useEffect(() => {
-    fetchSCI()
-  }, [])
-
-  useEffect(() => {
     const timer = setTimeout(() => {
       fetchSCI()
     }, 500)
@@ -48,7 +45,7 @@ export default function StatementOfComprehensiveIncome() {
     try {
       setLoading(true)
       setError('')
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const params = new URLSearchParams()
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
@@ -76,15 +73,8 @@ export default function StatementOfComprehensiveIncome() {
       maximumFractionDigits: 2,
     }).format(n || 0)
 
-  if (loading && !data)
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center gap-4">
-        <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[3px] text-gray-400">
-          Calculating Comprehensive Income...
-        </p>
-      </div>
-    )
+  if (loading)
+    return <LoadingScreen label="Compiling Statement of Comprehensive Income..." />
 
   if (error)
     return (

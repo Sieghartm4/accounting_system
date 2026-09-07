@@ -22,6 +22,7 @@ import useCollections from './useCollections'
 import CollectionsForm from './CollectionsForm'
 import { getAccessLevel } from '../../utils/routeProtection'
 import { generateCollectionPDF } from '../../utils/generateCollectionPDF'
+import LoadingScreen from '../../components/LoadingScreen'
 
 export default function Collections() {
   return (
@@ -69,7 +70,7 @@ function CollectionsContent() {
   // Fetch sales items for selected sales
   const fetchSalesItems = async (salesIds) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authentication token found')
 
       const queryParams = new URLSearchParams()
@@ -112,7 +113,7 @@ function CollectionsContent() {
   const fetchToBeCollected = async () => {
     try {
       setLoadingToBeCollected(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authentication token found')
 
       const response = await fetch(
@@ -200,7 +201,7 @@ function CollectionsContent() {
 
     const fetchCollection = async () => {
       try {
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
@@ -270,7 +271,7 @@ function CollectionsContent() {
   }, [prependCollection])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
   const accessLevel = getAccessLevel('collections', user)
   const enableCheckboxes =
     accessLevel === 'Check Access' ||
@@ -299,7 +300,7 @@ function CollectionsContent() {
   // ─── Helper: fetch full collection data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authentication token found')
 
       const collectionIds = selectedRows
@@ -362,7 +363,7 @@ function CollectionsContent() {
               try {
                 console.log('Approving collections:', approvableRows)
 
-                const token = localStorage.getItem('token')
+                const token = sessionStorage.getItem('authenticated')
                 if (!token) {
                   throw new Error('No authentication token found')
                 }
@@ -436,7 +437,7 @@ function CollectionsContent() {
               try {
                 console.log('Cancelling collections:', cancellableRows)
 
-                const token = localStorage.getItem('token')
+                const token = sessionStorage.getItem('authenticated')
                 if (!token) {
                   throw new Error('No authentication token found')
                 }
@@ -581,14 +582,7 @@ function CollectionsContent() {
     )
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Retrieving Collections...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading Collections Data..." />
   }
 
   if (error) {
@@ -933,7 +927,7 @@ function CollectionsContent() {
                   try {
                     console.log('Viewing collection:', row)
 
-                    const token = localStorage.getItem('token')
+                    const token = sessionStorage.getItem('authenticated')
                     if (!token) {
                       throw new Error('No authentication token found')
                     }
@@ -975,7 +969,7 @@ function CollectionsContent() {
                   try {
                     console.log('Editing collection:', row)
 
-                    const token = localStorage.getItem('token')
+                    const token = sessionStorage.getItem('authenticated')
                     if (!token) {
                       throw new Error('No authentication token found')
                     }

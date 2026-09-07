@@ -9,11 +9,19 @@ const {
   getTaxFormDraft,
   calculateTaxFromJournalEntries,
 } = require('../controller/tax_compliance.controller')
+const {
+  validateReportQuery,
+} = require('../middlewares/reportQueryValidation.middleware')
 
 const taxComplianceRouter = express.Router()
 
 // Protected routes - all require authentication
-taxComplianceRouter.get('/calculate-tax', auth, calculateTaxFromJournalEntries)
+taxComplianceRouter.get(
+  '/calculate-tax',
+  auth,
+  validateReportQuery,
+  calculateTaxFromJournalEntries,
+)
 taxComplianceRouter.post('/save-draft', auth, saveTaxFormDraft)
 taxComplianceRouter.post('/export-pdf', auth, exportTaxFormPDF)
 taxComplianceRouter.post('/export-dat', auth, exportTaxFormDAT)

@@ -8,7 +8,7 @@ const useChartsOfAccounts = () => {
   const fetchChartsOfAccounts = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -47,7 +47,7 @@ const useChartsOfAccounts = () => {
 
   const createChartsOfAccount = async (code, name, type, description) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -96,7 +96,7 @@ const useChartsOfAccounts = () => {
     status,
   ) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -138,7 +138,7 @@ const useChartsOfAccounts = () => {
 
   const importChartsOfAccounts = async (accounts) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')

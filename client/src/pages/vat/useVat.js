@@ -8,7 +8,7 @@ const useVat = () => {
   const fetchVat = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -40,7 +40,7 @@ const useVat = () => {
 
   const createVatEntry = async (vatData) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -75,7 +75,7 @@ const useVat = () => {
 
   const updateVatEntry = async (id, vatData) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')
@@ -110,7 +110,7 @@ const useVat = () => {
 
   const importVat = async (vats) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')

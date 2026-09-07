@@ -191,10 +191,6 @@ const getTrialBalance = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching trial balance',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
     })
   }
 }
@@ -435,10 +431,6 @@ const getIncomeStatement = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching income statement',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
     })
   }
 }
@@ -737,10 +729,6 @@ const getGeneralLedger = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching general ledger',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
     })
   }
 }
@@ -987,10 +975,6 @@ const getBalanceSheet = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching balance sheet',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
     })
   }
 }
@@ -1407,10 +1391,6 @@ const getSearch = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while performing search',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
     })
   }
 }
@@ -1631,10 +1611,6 @@ const getStatementOfComprehensiveIncome = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching statement of comprehensive income',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
     })
   }
 }
@@ -1827,10 +1803,6 @@ const getBankReconciliation = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching bank reconciliation',
-      error:
-        process.env.NODE_ENV === 'development'
-          ? error.message
-          : 'Internal server error',
     })
   }
 }

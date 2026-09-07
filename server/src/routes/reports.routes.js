@@ -12,8 +12,12 @@ const {
   getJournalEntries,
   getAdvances,
 } = require('../controller/journal_entries.controller')
+const {
+  validateReportQuery,
+} = require('../middlewares/reportQueryValidation.middleware')
 
 const reportsRouter = express.Router()
+reportsRouter.use(validateReportQuery)
 
 reportsRouter.get('/trial-balance', getTrialBalance)
 

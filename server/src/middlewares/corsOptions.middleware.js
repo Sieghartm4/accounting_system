@@ -41,7 +41,39 @@ const getOrigins = () => {
 }
 
 const corsOptions = {
-  origin: getOrigins(),
+  origin: (origin, callback) => {
+    const allowedOrigins = getOrigins()
+
+    // If wildcard was configured, convert to specific origins for credentials mode
+    if (allowedOrigins === true) {
+      // Don't use wildcard with credentials - use specific origins instead
+      const defaultOrigins = [
+        `http://192.168.40.43:${process.env._CLIENT_PORT || 3000}`,
+        `http://192.168.40.43:${process.env._SERVER_PORT || 3001}`,
+        `http://192.168.40.43:${process.env._SUBSCRIPTION_SERVER_PORT || 3012}`,
+        `http://localhost:${process.env._CLIENT_PORT || 3000}`,
+        `http://localhost:${process.env._SERVER_PORT || 3001}`,
+        `http://localhost:${process.env._SUBSCRIPTION_SERVER_PORT || 3012}`,
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3001',
+        'http://127.0.0.1:3012',
+      ]
+
+      if (!origin || defaultOrigins.includes(origin)) {
+        callback(null, true)
+      } else {
+        callback(null, false)
+      }
+    } else if (Array.isArray(allowedOrigins)) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true)
+      } else {
+        callback(null, false)
+      }
+    } else {
+      callback(null, true)
+    }
+  },
   credentials: true,
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   allowedHeaders: [

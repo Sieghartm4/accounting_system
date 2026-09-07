@@ -14,6 +14,7 @@ import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
 import RightSideModal from '../../components/RightSideModal'
+import LoadingScreen from '../../components/LoadingScreen'
 import useUsers from './useUsers'
 
 export default function Users() {
@@ -64,7 +65,7 @@ function UsersContent() {
 
   const fetchAccessOptions = async () => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) return
 
       const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/access`, {
@@ -184,7 +185,7 @@ function UsersContent() {
     setEditSubmitting(true)
 
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         throw new Error('No authorization token found')
       }
@@ -243,7 +244,7 @@ function UsersContent() {
     setSubmitting(true)
 
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         throw new Error('No authorization token found')
       }
@@ -277,14 +278,7 @@ function UsersContent() {
   }
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Loading User Base...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading User Base..." />
   }
 
   if (error) {

@@ -22,7 +22,7 @@ const useAuditTrail = () => {
       }
       setError(null)
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       if (!token) {
         throw new Error('No authorization token found')

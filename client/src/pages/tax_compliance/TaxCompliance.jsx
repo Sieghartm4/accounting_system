@@ -24,6 +24,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { fetchWithAuth } from '../../utils/api'
+import LoadingScreen from '../../components/LoadingScreen'
 
 /* ------------------------------------------------------------------ */
 /* Data-model expectations                                             */
@@ -743,14 +744,7 @@ export default function App() {
           </div>
         )}
 
-        {loading && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3 no-print">
-            <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-            <span className="text-sm font-semibold text-blue-900">
-              Fetching tax data from journal entries...
-            </span>
-          </div>
-        )}
+        {loading && <LoadingScreen label="Loading Tax Compliance..." />}
 
         {fetchError && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 no-print">

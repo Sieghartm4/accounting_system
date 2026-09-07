@@ -25,7 +25,7 @@ const useCompany = () => {
     const fetchCompany = async () => {
       try {
         setLoading(true)
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
 
         if (!token) {
           throw new Error('No authorization token found')
@@ -130,7 +130,7 @@ const useCompany = () => {
     e.preventDefault()
 
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       // Check if we're in edit mode (company exists)
       const isEditMode = company !== null

@@ -12,6 +12,7 @@ import {
 import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
 import useAdvances from './useAdvances'
+import LoadingScreen from '../../components/LoadingScreen'
 
 const fmt = (value) =>
   new Intl.NumberFormat('en-PH', {
@@ -178,16 +179,8 @@ function AdvancesContent() {
     })
   }
 
-  if (loading && advances.length === 0) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center gap-4">
-        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[3px] text-gray-400">
-          Loading Advances...
-        </p>
-      </div>
-    )
-  }
+  if (loading)
+    return <LoadingScreen label="Loading Advances..." />
 
   if (error) {
     return (
@@ -360,7 +353,7 @@ function AdvancesContent() {
             enableCheckbox={true}
             enableActionColumn={true}
             enableRowClick={true}
-            isLoading={loading && advances.length === 0}
+            isLoading={loading}
             returnColumn="groupKey"
             onRowClick={(groupKey, row) => {
               const key = `${row.date}-${row.type}`
@@ -417,7 +410,7 @@ function AdvancesContent() {
             enableAddButton={false}
             enableCheckbox={true}
             enableActionColumn={false}
-            isLoading={loading && advances.length === 0}
+            isLoading={loading}
             checkboxColumn="id"
             onCheckboxChange={(selectedIds) => {
               const group = groupedAdvances.find(g => `${g.date}-${g.type}` === expandedGroup)

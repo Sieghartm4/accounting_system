@@ -5,6 +5,7 @@ import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
 import useAgeingPayables from './useAgeingPayables'
 import { AgingTimerCell } from '../aging_receivables/AgeingReceivables'
+import LoadingScreen from '../../components/LoadingScreen'
 
 const formatDate = (value) => {
   if (!value) return '—'
@@ -67,13 +68,8 @@ function AgeingPayablesContent() {
     [purchases, now],
   )
 
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center text-sm text-gray-500">
-        Syncing Aging Payables...
-      </div>
-    )
-  }
+  if (loading)
+    return <LoadingScreen label="Loading Aging Payables..." />
 
   if (error) {
     return <div className="p-10 text-red-600">{error}</div>

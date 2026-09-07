@@ -17,6 +17,7 @@ import {
   Activity,
 } from 'lucide-react'
 import DynamicToast from '../../components/DynamicToast'
+import LoadingScreen from '../../components/LoadingScreen'
 import BankReconciliationDetail from './BankReconciliationDetail'
 import { getItemSection, getItemMeta } from './useBankReconciliation'
 
@@ -82,7 +83,7 @@ export default function BankReconciliation() {
   }
 
   const fetchReconciliationSummaries = async (reconciliationsList) => {
-    const token = localStorage.getItem('token')
+    const token = sessionStorage.getItem('authenticated')
     const summaries = {}
 
     await Promise.all(
@@ -511,7 +512,7 @@ export default function BankReconciliation() {
     try {
       setLoading(true)
       setError('')
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation`,
         {
@@ -544,7 +545,7 @@ export default function BankReconciliation() {
 
   const fetchChartOfAccounts = async () => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
         {
@@ -585,7 +586,7 @@ export default function BankReconciliation() {
       return
     }
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation`,
         {
@@ -816,12 +817,7 @@ export default function BankReconciliation() {
 
         {/* Main Content */}
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <Loader className="w-10 h-10 text-gray-400 animate-spin mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">Loading reconciliations...</p>
-            </div>
-          </div>
+          <LoadingScreen label="Loading Bank Reconciliation..." />
         ) : error ? (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
             <AlertCircle className="text-red-600 shrink-0" size={18} />

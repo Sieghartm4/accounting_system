@@ -107,7 +107,7 @@ const DynamicTable = ({
     if (!actionButtons || actionButtons.length === 0) return actionButtons
 
     // Get current user and access level for this route
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
     const inferredRouteName = window.location.pathname
       .replace(/^\//, '')
       .split('/')[0]

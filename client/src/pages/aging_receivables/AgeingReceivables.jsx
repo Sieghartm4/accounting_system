@@ -5,6 +5,7 @@ import { Clock3, TrendingUp, Download, RefreshCw } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
 import useAgeingReceivables from './useAgeingReceivables'
+import LoadingScreen from '../../components/LoadingScreen'
 
 const formatDate = (value) => {
   if (!value) return '—'
@@ -174,16 +175,8 @@ function AgeingReceivablesContent() {
     })
   }, [sales, now])
 
-  if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Syncing Aging Receivables...
-        </p>
-      </div>
-    )
-  }
+  if (loading)
+    return <LoadingScreen label="Loading Aging Receivables..." />
 
   if (error) {
     return (

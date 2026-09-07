@@ -305,6 +305,8 @@ const getPurchaseItemsPayment = async (req, res, next) => {
 
         { col: Master.vat.selectOptionColumns.rate, as: 'vat' },
 
+        { col: Master.vat.selectOptionColumns.type, as: 'vat_type' },
+
         {
           col: Master.withholding_tax.selectOptionColumns.rate,
           as: 'witholding_tax',
@@ -549,6 +551,8 @@ const getAllPayments = async (req, res, next) => {
         },
 
         { col: Master.vat.selectOptionColumns.rate, as: 'vat_rate' },
+
+        { col: Master.vat.selectOptionColumns.type, as: 'vat_type' },
 
         { col: Accounting.payment_items.selectOptionColumns.amount, as: 'amount' },
 
@@ -1131,7 +1135,11 @@ const updatePaymentState = async (req, res, next) => {
       await connection.beginTransaction()
 
       // Get user full name from database
-      const userFullName = await getUserFullName(req.context.username, connection, Master)
+      const userFullName = await getUserFullName(
+        req.context.username,
+        connection,
+        Master,
+      )
 
       const updatePromises = updates.map(async (update) => {
         const { id, currentState } = update
@@ -1217,7 +1225,10 @@ const updatePaymentState = async (req, res, next) => {
                 },
               ])
               .from(Accounting.purchase_items.tablename)
-              .whereIn(Accounting.purchase_items.selectOptionColumns.id, uniquePurchaseItemIds)
+              .whereIn(
+                Accounting.purchase_items.selectOptionColumns.id,
+                uniquePurchaseItemIds,
+              )
               .build()
 
             const purchaseItems = await Query(
@@ -1246,8 +1257,13 @@ const updatePaymentState = async (req, res, next) => {
 
               const updatePurchaseValues = ['PAID', purchaseId, 'UNPAID']
 
-              const [result] = await connection.execute(updatePurchaseQuery, updatePurchaseValues)
-              console.log(`Updated purchase ID ${purchaseId} status to PAID, affected rows: ${result.affectedRows}`)
+              const [result] = await connection.execute(
+                updatePurchaseQuery,
+                updatePurchaseValues,
+              )
+              console.log(
+                `Updated purchase ID ${purchaseId} status to PAID, affected rows: ${result.affectedRows}`,
+              )
             }
           }
 
@@ -1371,7 +1387,8 @@ const cancelPaymentState = async (req, res, next) => {
         (update) =>
           !update ||
           !update.id ||
-          (update.currentState === 'CANCELLED' || update.currentState === 'REJECTED'),
+          update.currentState === 'CANCELLED' ||
+          update.currentState === 'REJECTED',
       )
 
       if (validUpdates.length === 0) {

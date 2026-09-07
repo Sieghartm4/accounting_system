@@ -574,7 +574,7 @@ export function useBankReconciliation(selectedReconciliation) {
       setJournalEntriesLoading(true)
       setJournalEntries([])
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/journal_entries${buildDateQuery(start, end)}`,
         {
@@ -621,7 +621,7 @@ export function useBankReconciliation(selectedReconciliation) {
       setJournalEntriesLoading(true)
       setJournalEntries([])
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/journal_entries/coa/${coaId}${buildDateQuery(start, end)}`,
         {
@@ -671,7 +671,7 @@ export function useBankReconciliation(selectedReconciliation) {
     try {
       setItemsLoading(true)
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}${buildDateQuery(startDate, endDate)}`,
@@ -735,7 +735,7 @@ export function useBankReconciliation(selectedReconciliation) {
     endDate = detailEndDate,
   ) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       const queryString = buildDateQuery(startDate, endDate)
 
@@ -824,7 +824,7 @@ export function useBankReconciliation(selectedReconciliation) {
     }
 
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/bank_statement_balance`,
@@ -872,7 +872,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
   const handleDeleteBankItem = async (itemId) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/item/${itemId}`,
         {
@@ -912,7 +912,7 @@ export function useBankReconciliation(selectedReconciliation) {
     skipRefresh = false,
   ) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/match`,
         {
@@ -956,7 +956,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
   const handleUnmatchBankFromLedger = async (bankItemId) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/unmatch/${bankItemId}`,
         {
@@ -996,7 +996,7 @@ export function useBankReconciliation(selectedReconciliation) {
     }
 
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/balance`,
@@ -1088,7 +1088,7 @@ export function useBankReconciliation(selectedReconciliation) {
     }
 
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       for (const row of rowsToSave) {
         const debit = parseFloat(row.debit) || 0
@@ -1232,7 +1232,7 @@ export function useBankReconciliation(selectedReconciliation) {
     if (!window.confirm('Are you sure you want to delete this item?')) return
 
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/item/${itemId}`,
@@ -1324,7 +1324,7 @@ export function useBankReconciliation(selectedReconciliation) {
     }
 
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/add`,
@@ -1396,7 +1396,7 @@ export function useBankReconciliation(selectedReconciliation) {
     }
 
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/add`,
@@ -1454,7 +1454,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
   const handleRemoveBankAdjustment = async (id) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/${id}`,
@@ -1491,7 +1491,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
   const handleRemoveBookAdjustment = async (id) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/${id}`,
@@ -1529,7 +1529,7 @@ export function useBankReconciliation(selectedReconciliation) {
   // Matching functionality
   const handleCreateMatch = async (stmtIds, bookIds) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/match/add`,
         {
@@ -1560,7 +1560,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
   const handleDeleteMatch = async (matchId) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/match/${matchId}`,
         {
@@ -1585,7 +1585,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
   const fetchMatches = async () => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/matches`,
         {
@@ -1612,7 +1612,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
     try {
       setAvailableMonthsLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliationId}/summary-months`,
         {
@@ -1753,7 +1753,7 @@ export function useBankReconciliation(selectedReconciliation) {
     }
 
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/summary/add`,
         {
@@ -1810,7 +1810,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
     try {
       setSummaryLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
 
       // Convert dates to YYYY-MM-DD format if they're in ISO format
       const normalizeDate = (dateStr) => {

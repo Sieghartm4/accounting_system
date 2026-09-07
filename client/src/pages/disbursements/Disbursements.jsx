@@ -23,6 +23,7 @@ import useDisbursements from './useDisbursements'
 import CashDisbursementForm from './CashDisbursementForm'
 import { getAccessLevel } from '../../utils/routeProtection'
 import { generateDisbursementPDF } from '../../utils/generateDisbursementPDF'
+import LoadingScreen from '../../components/LoadingScreen'
 
 export default function Disbursements() {
   return (
@@ -93,7 +94,7 @@ function DisbursementsContent() {
 
     const fetchDisbursement = async () => {
       try {
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
@@ -166,7 +167,7 @@ function DisbursementsContent() {
   }, [prependDisbursement])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
   const accessLevel = getAccessLevel('disbursement', user)
   const enableCheckboxes =
     accessLevel === 'Check Access' ||
@@ -184,7 +185,7 @@ function DisbursementsContent() {
   // ─── Helper: fetch full disbursement data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authentication token found')
 
       const disbursementIds = selectedRows
@@ -268,7 +269,7 @@ function DisbursementsContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                const token = localStorage.getItem('token')
+                const token = sessionStorage.getItem('authenticated')
                 if (!token) throw new Error('No authentication token found')
 
                 const updates = approvableRows.map((row) => ({
@@ -331,7 +332,7 @@ function DisbursementsContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                const token = localStorage.getItem('token')
+                const token = sessionStorage.getItem('authenticated')
                 if (!token) throw new Error('No authentication token found')
 
                 const updates = cancellableRows.map((row) => ({
@@ -449,14 +450,7 @@ function DisbursementsContent() {
     )
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Processing Disbursements...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading Disbursements Data..." />
   }
 
   if (error) {
@@ -653,7 +647,7 @@ function DisbursementsContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  const token = localStorage.getItem('token')
+                  const token = sessionStorage.getItem('authenticated')
                   if (!token) {
                     throw new Error('No authentication token found')
                   }
@@ -697,7 +691,7 @@ function DisbursementsContent() {
                 try {
                   console.log('Editing disbursement:', row)
 
-                  const token = localStorage.getItem('token')
+                  const token = sessionStorage.getItem('authenticated')
                   if (!token) {
                     throw new Error('No authentication token found')
                   }

@@ -16,6 +16,7 @@ import RightSideModal from '../../components/RightSideModal'
 import DynamicToast from '../../components/DynamicToast'
 import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
+import LoadingScreen from '../../components/LoadingScreen'
 import useChartsOfAccounts from './useChartsOfAccounts'
 
 function ChartsOfAccountsContent() {
@@ -266,14 +267,7 @@ function ChartsOfAccountsContent() {
   }
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Loading Financial Structure...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading Financial Structure..." />
   }
 
   if (error) {
@@ -320,13 +314,13 @@ function ChartsOfAccountsContent() {
           <div className="flex gap-3">
             <button
               onClick={handleExportCOA}
-              className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm"
+              className="flex items-center gap-2 px-5 py-3 bg-green-600 text-white text-xs font-bold rounded-xl hover:bg-green-700 transition-all shadow-sm"
             >
               <Download size={14} />
               EXPORT COA
             </button>
             <ProtectedAction routeName="charts">
-              <label className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm cursor-pointer">
+              <label className="flex items-center gap-2 px-5 py-3 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer">
                 <Upload size={14} />
                 {importing ? 'IMPORTING...' : 'IMPORT COA'}
                 <input

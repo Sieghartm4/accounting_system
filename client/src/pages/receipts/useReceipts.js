@@ -285,7 +285,7 @@ export function useReceiptsForm({
   const fetchCustomers = async () => {
     try {
       setCustomerLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
         method: 'GET',
@@ -322,7 +322,7 @@ export function useReceiptsForm({
   }) => {
     try {
       setCustomerLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
         method: 'POST',
@@ -369,7 +369,7 @@ export function useReceiptsForm({
     unit,
   }) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/product_service`,
@@ -408,7 +408,7 @@ export function useReceiptsForm({
   const fetchChartsOfAccounts = async () => {
     try {
       setCoaLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
@@ -434,7 +434,7 @@ export function useReceiptsForm({
   const fetchProducts = async () => {
     try {
       setProductLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/product_service`,
@@ -460,7 +460,7 @@ export function useReceiptsForm({
   const fetchVat = async () => {
     try {
       setVatLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat`, {
         method: 'GET',
@@ -494,7 +494,7 @@ export function useReceiptsForm({
   const fetchWht = async () => {
     try {
       setWhtLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/withholding_tax`,
@@ -978,7 +978,7 @@ export function useReceiptsForm({
   const handlePostTransaction = async () => {
     const receiptId = isEditMode && receiptData?.data?.[0]?.id
     try {
-      const userData = JSON.parse(localStorage.getItem('user') || '{}')
+      const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
 
       if (!selectedCustomer) {
@@ -1039,7 +1039,7 @@ export function useReceiptsForm({
         return
       }
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         setToast({
           type: 'error',
@@ -1282,7 +1282,7 @@ const useReceipts = () => {
       }
       setError(null)
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
 
       const offset = isLoadMore ? receiptsRef.current.length : 0

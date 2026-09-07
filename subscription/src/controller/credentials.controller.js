@@ -35,13 +35,41 @@ const pool = mysql.createPool({
 
 require('dotenv').config()
 
+const getSessionCookieDomain = () => {
+  if (process.env._COOKIE_DOMAIN) return process.env._COOKIE_DOMAIN
+  const host = String(process.env._CLIENT_URL || process.env._SERVER_URL || '')
+    .replace(/^[a-z]+:\/\//i, '')
+    .split('/')[0]
+    .split(':')[0]
+    .trim()
+  const labels = host.split('.').filter(Boolean)
+  if (
+    !host ||
+    host === 'localhost' ||
+    /^(\d{1,3}\.){3}\d{1,3}$/.test(host) ||
+    host.includes(':')
+  )
+    return undefined
+  return labels.length >= 3 ? `.${labels.slice(1).join('.')}` : undefined
+}
+
 const logout = async (req, res, next) => {
   try {
-    // Clear JWT from session
-    req.session.jwt = null
+    const sessionUserId = req.session?.userId
+    const sessionId = req.sessionID
+    await new Promise((resolve, reject) => {
+      req.session.destroy((error) => (error ? reject(error) : resolve()))
+    })
+    res.clearCookie(process.env._SESSION_COOKIE_NAME || 'accounting.sid', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: 'auto',
+      path: '/',
+      ...(getSessionCookieDomain() ? { domain: getSessionCookieDomain() } : {}),
+    })
 
     // Clear session data from MongoDB
-    const userId = req.user?.userId || req.body?.userId
+    const userId = sessionUserId || req.user?.userId || req.body?.userId
     if (userId) {
       try {
         const mongoClient = new MongoClient(process.env._SUBSCRIPTION_MONGODB_URL)
@@ -69,7 +97,10 @@ const logout = async (req, res, next) => {
     res.status(500).json({
       success: false,
       message: 'Logout failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
     })
   }
 }
@@ -115,7 +146,15 @@ const register = async (req, res, next) => {
         columns: Master.master_user.insertColumns,
         isTransaction: true,
       })
-      .values([username, hashedPassword, dbNameWithPrefix, email || null, 'active', 'USER', subscription_id || null])
+      .values([
+        username,
+        hashedPassword,
+        dbNameWithPrefix,
+        email || null,
+        'active',
+        'USER',
+        subscription_id || null,
+      ])
       .build()
 
     const checkDbQuery = sql
@@ -132,7 +171,15 @@ const register = async (req, res, next) => {
       [Master.master_user.prefix_],
     )
 
-    await Query(insertQuery, [username, hashedPassword, dbNameWithPrefix, email || null, 'active', 'USER', subscription_id || null])
+    await Query(insertQuery, [
+      username,
+      hashedPassword,
+      dbNameWithPrefix,
+      email || null,
+      'active',
+      'USER',
+      subscription_id || null,
+    ])
 
     if (existingDbs.length === 0) {
       try {
@@ -175,13 +222,20 @@ const register = async (req, res, next) => {
 }
 
 const registerWithProgress = async (req, res) => {
-  const { username, password, db_name, email, subscription_id, subscription_price, subscription_billing_cycle } = req.body
+  const {
+    username,
+    password,
+    db_name,
+    email,
+    subscription_id,
+    subscription_price,
+    subscription_billing_cycle,
+  } = req.body
 
   // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
   res.setHeader('Connection', 'keep-alive')
-  res.setHeader('Access-Control-Allow-Origin', '*')
 
   const sendProgress = (data) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`)
@@ -192,7 +246,11 @@ const registerWithProgress = async (req, res) => {
   }
 
   try {
-    sendProgress({ step: 'validating', message: 'Validating your information...', progress: 5 })
+    sendProgress({
+      step: 'validating',
+      message: 'Validating your information...',
+      progress: 5,
+    })
 
     const checkQuery = sql
       .select([
@@ -209,12 +267,20 @@ const registerWithProgress = async (req, res) => {
     )
 
     if (existingUsers.length > 0) {
-      sendProgress({ step: 'error', message: 'Username already exists', progress: 0 })
+      sendProgress({
+        step: 'error',
+        message: 'Username already exists',
+        progress: 0,
+      })
       res.end()
       return
     }
 
-    sendProgress({ step: 'hashing', message: 'Securing your password...', progress: 10 })
+    sendProgress({
+      step: 'hashing',
+      message: 'Securing your password...',
+      progress: 10,
+    })
 
     const hashedPassword = await new Promise((resolve, reject) => {
       Encrypter(password, (error, hashed) => {
@@ -229,14 +295,26 @@ const registerWithProgress = async (req, res) => {
     const sanitizedDbName = db_name.trim().replace(/\s+/g, '_').toLowerCase()
     const dbNameWithPrefix = `${sanitizedDbName}_accounting`
 
-    sendProgress({ step: 'creating_user', message: 'Creating your account...', progress: 15 })
+    sendProgress({
+      step: 'creating_user',
+      message: 'Creating your account...',
+      progress: 15,
+    })
 
     const insertQuery = sql
       .insert(Master.master_user.tablename, {
         columns: Master.master_user.insertColumns,
         isTransaction: true,
       })
-      .values([username, hashedPassword, dbNameWithPrefix, email || null, 'active', 'USER', subscription_id || null])
+      .values([
+        username,
+        hashedPassword,
+        dbNameWithPrefix,
+        email || null,
+        'active',
+        'USER',
+        subscription_id || null,
+      ])
       .build()
 
     const checkDbQuery = sql
@@ -253,7 +331,15 @@ const registerWithProgress = async (req, res) => {
       [Master.master_user.prefix_],
     )
 
-    await Query(insertQuery, [username, hashedPassword, dbNameWithPrefix, email || null, 'active', 'USER', subscription_id || null])
+    await Query(insertQuery, [
+      username,
+      hashedPassword,
+      dbNameWithPrefix,
+      email || null,
+      'active',
+      'USER',
+      subscription_id || null,
+    ])
 
     if (existingDbs.length === 0) {
       try {
@@ -263,14 +349,22 @@ const registerWithProgress = async (req, res) => {
           email: email || null,
           subscription_id: subscription_id || null,
         }
-        
+
         // Send progress before starting long-running operations
-        sendProgress({ step: 'starting_db_setup', message: 'Starting database setup...', progress: 20 })
-        
+        sendProgress({
+          step: 'starting_db_setup',
+          message: 'Starting database setup...',
+          progress: 20,
+        })
+
         await createTenantDatabase(dbNameWithPrefix, userData, db_name, sendProgress)
       } catch (dbError) {
         console.error('Tenant database creation failed:', dbError)
-        sendProgress({ step: 'error', message: 'Failed to create tenant database', progress: 0 })
+        sendProgress({
+          step: 'error',
+          message: 'Failed to create tenant database',
+          progress: 0,
+        })
         res.end()
         return
       }
@@ -278,30 +372,61 @@ const registerWithProgress = async (req, res) => {
       console.log(
         `Database ${dbNameWithPrefix} already exists, skipping database creation`,
       )
-      sendProgress({ step: 'database_exists', message: 'Database already exists, skipping...', progress: 95 })
+      sendProgress({
+        step: 'database_exists',
+        message: 'Database already exists, skipping...',
+        progress: 95,
+      })
     }
 
-    sendProgress({ step: 'complete', message: 'Registration successful!', progress: 100, success: true })
+    sendProgress({
+      step: 'complete',
+      message: 'Registration successful!',
+      progress: 100,
+      success: true,
+    })
     res.end()
   } catch (error) {
     console.error('Register error:', error)
-    sendProgress({ step: 'error', message: 'Registration failed. Please try again.', progress: 0 })
+    sendProgress({
+      step: 'error',
+      message: 'Registration failed. Please try again.',
+      progress: 0,
+    })
     res.end()
   }
 }
 
 const updateSubscription = async (req, res, next) => {
-  const { username, subscription_id, subscription_price, subscription_billing_cycle, payment_reference, payment_method } = req.body
-  console.log('Received subscription update request:', { username, subscription_id, subscription_price, subscription_billing_cycle, payment_reference, payment_method })
+  const {
+    username,
+    subscription_id,
+    subscription_price,
+    subscription_billing_cycle,
+    payment_reference,
+    payment_method,
+  } = req.body
+  console.log('Received subscription update request:', {
+    username,
+    subscription_id,
+    subscription_price,
+    subscription_billing_cycle,
+    payment_reference,
+    payment_method,
+  })
   try {
     const updateQuery = `UPDATE ${Master.master_user.tablename} SET subscription_id = ? WHERE mu_username = ?`
 
-    await Query(updateQuery, [subscription_id, username], [Master.master_user.prefix_])
+    await Query(
+      updateQuery,
+      [subscription_id, username],
+      [Master.master_user.prefix_],
+    )
 
     // Save subscription history after updating subscription
     try {
       console.log('Attempting to save subscription history for username:', username)
-      
+
       // Get user ID from username
       const userQuery = sql
         .select([Master.master_user.selectOptionColumns.id])
@@ -310,19 +435,15 @@ const updateSubscription = async (req, res, next) => {
         .build()
 
       console.log('User query:', userQuery)
-      
-      const users = await Query(
-        userQuery,
-        [username],
-        [Master.master_user.prefix_],
-      )
+
+      const users = await Query(userQuery, [username], [Master.master_user.prefix_])
 
       console.log('User query result:', users)
 
       if (users.length > 0) {
         const userId = users[0].id
         console.log('User ID found:', userId)
-        
+
         // Check if subscription history already exists for this user and subscription
         const checkHistoryQuery = sql
           .select(['sh_id'])
@@ -338,7 +459,8 @@ const updateSubscription = async (req, res, next) => {
 
         // Filter by subscription_id and status in the result
         const filteredHistory = existingHistory.filter(
-          h => h.sh_subscription_id === subscription_id && h.sh_status === 'active'
+          (h) =>
+            h.sh_subscription_id === subscription_id && h.sh_status === 'active',
         )
 
         console.log('Existing subscription history:', filteredHistory)
@@ -347,21 +469,23 @@ const updateSubscription = async (req, res, next) => {
         if (filteredHistory.length === 0) {
           // Convert billing cycle to human-readable format
           const convertBillingCycle = (cycle) => {
-            if (!cycle) return null;
-            const days = parseInt(cycle);
-            if (isNaN(days)) return cycle; // Already in human-readable format
-            if (days === 7) return 'week';
-            if (days === 30 || days === 31) return 'month';
-            if (days === 60 || days === 61) return '2 months';
-            if (days === 90 || days === 91) return '3 months';
-            if (days === 180 || days === 182) return '6 months';
-            if (days === 365 || days === 366) return 'year';
-            return `${days} days`;
-          };
+            if (!cycle) return null
+            const days = parseInt(cycle)
+            if (isNaN(days)) return cycle // Already in human-readable format
+            if (days === 7) return 'week'
+            if (days === 30 || days === 31) return 'month'
+            if (days === 60 || days === 61) return '2 months'
+            if (days === 90 || days === 91) return '3 months'
+            if (days === 180 || days === 182) return '6 months'
+            if (days === 365 || days === 366) return 'year'
+            return `${days} days`
+          }
 
-          const formattedBillingCycle = convertBillingCycle(subscription_billing_cycle);
-          console.log('Original billing cycle:', subscription_billing_cycle);
-          console.log('Formatted billing cycle:', formattedBillingCycle);
+          const formattedBillingCycle = convertBillingCycle(
+            subscription_billing_cycle,
+          )
+          console.log('Original billing cycle:', subscription_billing_cycle)
+          console.log('Formatted billing cycle:', formattedBillingCycle)
 
           // Calculate end date based on billing cycle
           let endDate = null
@@ -388,10 +512,13 @@ const updateSubscription = async (req, res, next) => {
               new Date(),
               endDate,
               'active',
-              payment_method || (subscription_price === 0 || subscription_price === '0' ? 'free_trial' : 'paymongo'),
+              payment_method ||
+                (subscription_price === 0 || subscription_price === '0'
+                  ? 'free_trial'
+                  : 'paymongo'),
               payment_reference || null,
               new Date(),
-              new Date()
+              new Date(),
             ])
             .build()
 
@@ -407,17 +534,22 @@ const updateSubscription = async (req, res, next) => {
               new Date(),
               endDate,
               'active',
-              payment_method || (subscription_price === 0 || subscription_price === '0' ? 'free_trial' : 'paymongo'),
+              payment_method ||
+                (subscription_price === 0 || subscription_price === '0'
+                  ? 'free_trial'
+                  : 'paymongo'),
               payment_reference || null,
               new Date(),
-              new Date()
+              new Date(),
             ],
             [Master.subscription_history.prefix_],
           )
 
           console.log('Subscription history saved after update for user:', username)
         } else {
-          console.log('Subscription history already exists for this user and subscription, skipping')
+          console.log(
+            'Subscription history already exists for this user and subscription, skipping',
+          )
         }
       } else {
         console.log('User not found for username:', username)
@@ -449,7 +581,7 @@ const getUserUsedFreeTrials = async (req, res, next) => {
   const { username } = req.query
   try {
     console.log('Fetching used free trials for username:', username)
-    
+
     // Get user ID from username
     const userQuery = sql
       .select([Master.master_user.selectOptionColumns.id])
@@ -457,11 +589,7 @@ const getUserUsedFreeTrials = async (req, res, next) => {
       .where(Master.master_user.selectOptionColumns.username)
       .build()
 
-    const users = await Query(
-      userQuery,
-      [username],
-      [Master.master_user.prefix_],
-    )
+    const users = await Query(userQuery, [username], [Master.master_user.prefix_])
 
     if (users.length === 0) {
       return res.status(404).json({
@@ -491,11 +619,15 @@ const getUserUsedFreeTrials = async (req, res, next) => {
     // Filter for free trials (price = 0 or '0')
     // Handle both prefixed and non-prefixed column names
     const freeTrialSubscriptions = history
-      .filter(h => {
-        const price = h.sh_price !== undefined ? h.sh_price : h.price;
-        return price === 0 || price === '0' || price === '0.00';
+      .filter((h) => {
+        const price = h.sh_price !== undefined ? h.sh_price : h.price
+        return price === 0 || price === '0' || price === '0.00'
       })
-      .map(h => h.sh_subscription_id !== undefined ? h.sh_subscription_id : h.subscription_id)
+      .map((h) =>
+        h.sh_subscription_id !== undefined
+          ? h.sh_subscription_id
+          : h.subscription_id,
+      )
 
     console.log('Free trial subscription IDs:', freeTrialSubscriptions)
 
@@ -519,7 +651,7 @@ const getUserUsedFreeTrials = async (req, res, next) => {
 
 const login = async (req, res, next) => {
   const { username, password } = req.body
-  console.log('Login request:', req.body)
+  console.log('Login request received')
   try {
     const query = sql
       .select([
@@ -529,7 +661,10 @@ const login = async (req, res, next) => {
         { col: Master.master_user.selectOptionColumns.db_name, as: 'db_name' },
         { col: Master.master_user.selectOptionColumns.status, as: 'status' },
         { col: Master.master_user.selectOptionColumns.role, as: 'role' },
-        { col: Master.master_user.selectOptionColumns.subscription_id, as: 'subscription_id' },
+        {
+          col: Master.master_user.selectOptionColumns.subscription_id,
+          as: 'subscription_id',
+        },
       ])
       .from(Master.master_user.tablename)
       .where(
@@ -574,11 +709,15 @@ const login = async (req, res, next) => {
       }
 
       // Check if user has a subscription (only for USER role, ADMIN can login without subscription)
-      if (user.role !== 'ADMIN' && (!user.subscription_id || user.subscription_id === null)) {
+      if (
+        user.role !== 'ADMIN' &&
+        (!user.subscription_id || user.subscription_id === null)
+      ) {
         console.log('User does not have a subscription')
         return res.status(403).json({
           success: false,
-          message: 'You do not have an active subscription. Please complete your registration by selecting a subscription plan.',
+          message:
+            'You do not have an active subscription. Please complete your registration by selecting a subscription plan.',
           requiresSubscription: true,
         })
       }
@@ -599,7 +738,6 @@ const login = async (req, res, next) => {
             $set: {
               userId: user.id,
               username: user.username,
-              password: userPassword,
               db_name: user.db_name,
               updatedAt: new Date(),
             },
@@ -694,6 +832,9 @@ const login = async (req, res, next) => {
       )
 
       req.session.jwt = token
+      req.session.userId = tenantUserId
+      req.session.username = user.username
+      req.session.tenantDb = user.db_name
 
       let routeAccess = null
       try {
@@ -713,18 +854,20 @@ const login = async (req, res, next) => {
       }
 
       // Return tenant database user data if available, otherwise fall back to subscription data
-      const responseData = tenantUserData ? {
-        ...tenantUserData,
-        db_name: user.db_name, // Ensure db_name is from subscription
-        role: user.role, // Include role from subscription database
-        mongodb_url: process.env._MONGODB_URL,
-        token,
-      } : {
-        ...userWithoutPassword,
-        route_access: routeAccess,
-        mongodb_url: process.env._MONGODB_URL,
-        token,
-      }
+      const responseData = tenantUserData
+        ? {
+            ...tenantUserData,
+            db_name: user.db_name, // Ensure db_name is from subscription
+            role: user.role, // Include role from subscription database
+          }
+        : {
+            ...userWithoutPassword,
+            route_access: routeAccess,
+          }
+
+      await new Promise((resolve, reject) => {
+        req.session.save((error) => (error ? reject(error) : resolve()))
+      })
 
       res.status(200).json({
         success: true,
@@ -764,11 +907,7 @@ const checkFreeTrialUsage = async (req, res) => {
       .where(Master.master_user.selectOptionColumns.username)
       .build()
 
-    const users = await Query(
-      userQuery,
-      [username],
-      [Master.master_user.prefix_],
-    )
+    const users = await Query(userQuery, [username], [Master.master_user.prefix_])
 
     if (users.length === 0) {
       return res.status(404).json({
@@ -784,7 +923,10 @@ const checkFreeTrialUsage = async (req, res) => {
       .select([
         { col: Master.subscription_history.selectOptionColumns.id, as: 'id' },
         { col: Master.subscription_history.selectOptionColumns.price, as: 'price' },
-        { col: Master.subscription_history.selectOptionColumns.status, as: 'status' },
+        {
+          col: Master.subscription_history.selectOptionColumns.status,
+          as: 'status',
+        },
       ])
       .from(Master.subscription_history.tablename)
       .where(Master.subscription_history.selectOptionColumns.mu_id)
@@ -798,7 +940,7 @@ const checkFreeTrialUsage = async (req, res) => {
 
     // Check if any subscription has price = 0 (free trial)
     const hasUsedFreeTrial = history.some(
-      (record) => parseFloat(record.sh_price) === 0
+      (record) => parseFloat(record.sh_price) === 0,
     )
 
     return res.status(200).json({
@@ -821,9 +963,23 @@ const checkFreeTrialUsage = async (req, res) => {
 
 const saveSubscriptionHistory = async (req, res) => {
   try {
-    const { username, subscription_id, price, billing_cycle, payment_method, payment_reference } = req.body
+    const {
+      username,
+      subscription_id,
+      price,
+      billing_cycle,
+      payment_method,
+      payment_reference,
+    } = req.body
 
-    console.log('saveSubscriptionHistory called with:', { username, subscription_id, price, billing_cycle, payment_method, payment_reference })
+    console.log('saveSubscriptionHistory called with:', {
+      username,
+      subscription_id,
+      price,
+      billing_cycle,
+      payment_method,
+      payment_reference,
+    })
 
     if (!username || !subscription_id) {
       console.log('Missing required fields:', { username, subscription_id })
@@ -840,11 +996,7 @@ const saveSubscriptionHistory = async (req, res) => {
       .where(Master.master_user.selectOptionColumns.username)
       .build()
 
-    const users = await Query(
-      userQuery,
-      [username],
-      [Master.master_user.prefix_],
-    )
+    const users = await Query(userQuery, [username], [Master.master_user.prefix_])
 
     console.log('User query result:', users)
 
@@ -886,7 +1038,7 @@ const saveSubscriptionHistory = async (req, res) => {
         endDate,
         'active',
         payment_method || null,
-        payment_reference || null
+        payment_reference || null,
       ])
       .build()
 
@@ -903,7 +1055,7 @@ const saveSubscriptionHistory = async (req, res) => {
         endDate,
         'active',
         payment_method || null,
-        payment_reference || null
+        payment_reference || null,
       ],
       [Master.subscription_history.prefix_],
     )
@@ -928,13 +1080,17 @@ const saveSubscriptionHistory = async (req, res) => {
 
 const expireSubscriptions = async (req, res, next) => {
   try {
-    console.log('[Subscription Expiry] Manual trigger - Running subscription expiry check...');
-    await Query('CALL expire_subscriptions()');
-    console.log('[Subscription Expiry] Manual trigger - Subscription expiry check completed successfully');
-    res.json({ success: true, message: 'Subscription expiry check completed' });
+    console.log(
+      '[Subscription Expiry] Manual trigger - Running subscription expiry check...',
+    )
+    await Query('CALL expire_subscriptions()')
+    console.log(
+      '[Subscription Expiry] Manual trigger - Subscription expiry check completed successfully',
+    )
+    res.json({ success: true, message: 'Subscription expiry check completed' })
   } catch (error) {
-    console.error('[Subscription Expiry] Manual trigger - Error:', error);
-    next(error);
+    console.error('[Subscription Expiry] Manual trigger - Error:', error)
+    next(error)
   }
 }
 

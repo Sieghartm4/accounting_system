@@ -35,7 +35,7 @@ export function useSales() {
     }
 
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
 
       const params = new URLSearchParams()
@@ -386,7 +386,7 @@ export default function useSalesForm({
   const fetchVendors = async () => {
     try {
       setVendorLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
         method: 'GET',
@@ -409,7 +409,7 @@ export default function useSalesForm({
   const fetchCustomers = async () => {
     try {
       setCustomerLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
         method: 'GET',
@@ -441,7 +441,7 @@ export default function useSalesForm({
     contact,
   }) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
         method: 'POST',
@@ -486,7 +486,7 @@ export default function useSalesForm({
     unit,
   }) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/product_service`,
@@ -525,7 +525,7 @@ export default function useSalesForm({
   const fetchChartsOfAccounts = async () => {
     try {
       setCoaLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
@@ -551,7 +551,7 @@ export default function useSalesForm({
   const fetchProducts = async () => {
     try {
       setProductLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/product_service`,
@@ -577,7 +577,7 @@ export default function useSalesForm({
   const fetchVat = async () => {
     try {
       setVatLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat`, {
         method: 'GET',
@@ -611,7 +611,7 @@ export default function useSalesForm({
   const fetchWht = async () => {
     try {
       setWhtLoading(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
         `${import.meta.env.VITE_SERVER_LINK}/withholding_tax`,
@@ -984,7 +984,7 @@ export default function useSalesForm({
 
   const handlePostTransaction = async () => {
     try {
-      const userData = JSON.parse(localStorage.getItem('user') || '{}')
+      const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
 
       if (!selectedCustomer) {
@@ -1032,7 +1032,7 @@ export default function useSalesForm({
         return
       }
 
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) {
         setToast({
           type: 'error',

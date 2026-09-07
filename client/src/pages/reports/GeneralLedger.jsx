@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
+import LoadingScreen from '../../components/LoadingScreen'
 
 export default function GeneralLedger() {
   const navigate = useNavigate()
@@ -51,7 +52,7 @@ export default function GeneralLedger() {
     try {
       setLoading(true)
       setError('')
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       const params = new URLSearchParams()
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
@@ -709,15 +710,8 @@ const handleExportPDF = async () => {
     }
   }
 
-  if (loading && ledgerEntries.length === 0)
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center gap-4">
-        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[3px] text-gray-400">
-          Loading Ledger Transactions...
-        </p>
-      </div>
-    )
+  if (loading)
+    return <LoadingScreen label="Loading General Ledger..." />
 
   if (error)
     return (

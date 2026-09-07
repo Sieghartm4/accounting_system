@@ -21,6 +21,7 @@ import usePurchase from './usePurchase'
 import PurchaseForm from './PurchaseForm'
 import { getAccessLevel } from '../../utils/routeProtection'
 import { generatePurchasePDF } from '../../utils/generatePurchasePDF'
+import LoadingScreen from '../../components/LoadingScreen'
 
 export default function Purchase() {
   return (
@@ -81,7 +82,7 @@ function PurchaseContent() {
 
     const fetchPurchase = async () => {
       try {
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
@@ -151,7 +152,7 @@ function PurchaseContent() {
   }, [prependPurchase])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
   const accessLevel = getAccessLevel('purchase', user)
   const enableCheckboxes =
     accessLevel === 'Check Access' ||
@@ -164,7 +165,7 @@ function PurchaseContent() {
   // ─── Helper: fetch full purchase data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authentication token found')
 
       const purchaseIds = selectedRows
@@ -248,7 +249,7 @@ function PurchaseContent() {
               try {
                 console.log('Approving purchases:', approvableRows)
 
-                const approveToken = localStorage.getItem('token')
+                const approveToken = sessionStorage.getItem('authenticated')
                 if (!approveToken) {
                   throw new Error('No authentication token found')
                 }
@@ -319,7 +320,7 @@ function PurchaseContent() {
               try {
                 console.log('Cancelling purchases:', cancellableRows)
 
-                const cancelToken = localStorage.getItem('token')
+                const cancelToken = sessionStorage.getItem('authenticated')
                 if (!cancelToken) {
                   throw new Error('No authentication token found')
                 }
@@ -458,14 +459,7 @@ function PurchaseContent() {
     )
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Loading Purchase Ledger...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading Purchase Data..." />
   }
 
   if (error) {
@@ -654,7 +648,7 @@ function PurchaseContent() {
                 try {
                   console.log('View purchase:', row)
 
-                  const authToken = localStorage.getItem('token')
+                  const authToken = sessionStorage.getItem('authenticated')
                   if (!authToken) {
                     throw new Error('No authentication token found')
                   }
@@ -698,7 +692,7 @@ function PurchaseContent() {
                 try {
                   console.log('Editing purchase:', row)
 
-                  const authToken = localStorage.getItem('token')
+                  const authToken = sessionStorage.getItem('authenticated')
                   if (!authToken) {
                     throw new Error('No authentication token found')
                   }

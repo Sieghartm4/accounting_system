@@ -22,6 +22,7 @@ import usePayments from './usePayments'
 import PaymentsForm from './PaymentsForm'
 import { getAccessLevel } from '../../utils/routeProtection'
 import { generatePaymentPDF } from '../../utils/generatePaymentPDF'
+import LoadingScreen from '../../components/LoadingScreen'
 
 export default function Payments() {
   return (
@@ -68,7 +69,7 @@ function PaymentsContent() {
   // Fetch purchase items for selected purchases
   const fetchPurchaseItems = async (purchaseIds) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authentication token found')
 
       const queryParams = new URLSearchParams()
@@ -106,7 +107,7 @@ function PaymentsContent() {
   const fetchToBePaid = async () => {
     try {
       setLoadingToBePaid(true)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authentication token found')
 
       const response = await fetch(
@@ -251,7 +252,7 @@ function PaymentsContent() {
 
     const fetchPayment = async () => {
       try {
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
@@ -291,7 +292,7 @@ function PaymentsContent() {
   }, [searchParams, setSearchParams])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
   const accessLevel = getAccessLevel('payments', user)
   const enableCheckboxes =
     accessLevel === 'Check Access' ||
@@ -304,7 +305,7 @@ function PaymentsContent() {
   // ─── Helper: fetch full payment data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authentication token found')
 
       const paymentIds = selectedRows
@@ -367,7 +368,7 @@ function PaymentsContent() {
               try {
                 console.log('Approving payments:', approvableRows)
 
-                const token = localStorage.getItem('token')
+                const token = sessionStorage.getItem('authenticated')
                 if (!token) {
                   throw new Error('No authentication token found')
                 }
@@ -438,7 +439,7 @@ function PaymentsContent() {
               try {
                 console.log('Cancelling payments:', cancellableRows)
 
-                const token = localStorage.getItem('token')
+                const token = sessionStorage.getItem('authenticated')
                 if (!token) {
                   throw new Error('No authentication token found')
                 }
@@ -568,14 +569,7 @@ function PaymentsContent() {
     )
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Retrieving Payments...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading Payments Data..." />
   }
 
   if (error) {
@@ -904,7 +898,7 @@ function PaymentsContent() {
                   try {
                     console.log('Viewing payment:', row)
 
-                    const token = localStorage.getItem('token')
+                    const token = sessionStorage.getItem('authenticated')
                     if (!token) {
                       throw new Error('No authentication token found')
                     }
@@ -946,7 +940,7 @@ function PaymentsContent() {
                   try {
                     console.log('Editing payment:', row)
 
-                    const token = localStorage.getItem('token')
+                    const token = sessionStorage.getItem('authenticated')
                     if (!token) {
                       throw new Error('No authentication token found')
                     }

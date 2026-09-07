@@ -294,6 +294,8 @@ const getSalesItemsCollection = async (req, res, next) => {
 
         { col: Master.vat.selectOptionColumns.rate, as: 'vat' },
 
+        { col: Master.vat.selectOptionColumns.type, as: 'vat_type' },
+
         {
           col: Master.withholding_tax.selectOptionColumns.rate,
           as: 'witholding_tax',
@@ -509,6 +511,16 @@ const getAllCollections = async (req, res, next) => {
         { col: Accounting.collection_items.selectOptionColumns.id, as: 'id' },
 
         {
+          col: Accounting.collection_items.selectOptionColumns.collection_id,
+          as: 'collection_id',
+        },
+
+        {
+          col: Accounting.collection_items.selectOptionColumns.sales_id,
+          as: 'sales_id',
+        },
+
+        {
           col: Accounting.sales.selectOptionColumns.document_reference,
           as: 'invoice_ref',
         },
@@ -546,15 +558,15 @@ const getAllCollections = async (req, res, next) => {
       .from(Accounting.collection_items.tablename)
 
       .innerJoin(
-        Accounting.sales.tablename,
-        Accounting.sales.selectOptionColumns.id,
+        Accounting.sales_items.tablename,
+        Accounting.sales_items.selectOptionColumns.id,
         Accounting.collection_items.selectOptionColumns.sales_id,
       )
 
       .innerJoin(
-        Accounting.sales_items.tablename,
-        Accounting.sales_items.selectOptionColumns.sales_id,
+        Accounting.sales.tablename,
         Accounting.sales.selectOptionColumns.id,
+        Accounting.sales_items.selectOptionColumns.sales_id,
       )
 
       .leftJoin(
@@ -1164,6 +1176,13 @@ const updateCollectionState = async (req, res, next) => {
 
           updateValues = [nextState, userFullName, id]
 
+          // Commit the state transition within this transaction before calculating
+          // linked sales, so the approved collection is visible to the query.
+          const [collectionUpdateResult] = await connection.execute(
+            updateQuery,
+            updateValues,
+          )
+
           // Special logic for APPROVED state: update related sales records to PAID
           // Get collection_items to find sales_item_ids
           const collectionItemsQuery = sql
@@ -1177,11 +1196,9 @@ const updateCollectionState = async (req, res, next) => {
             .where(Accounting.collection_items.selectOptionColumns.collection_id)
             .build()
 
-          let collection_items = await Query(
-            collectionItemsQuery,
-            [id],
-            [Accounting.collection_items.prefix_],
-          )
+          const [collection_items] = await connection.execute(collectionItemsQuery, [
+            id,
+          ])
 
           console.log('collection_items', collection_items)
 
@@ -1208,9 +1225,10 @@ const updateCollectionState = async (req, res, next) => {
               )
               .build()
 
-            const salesItems = await Query(salesItemsQuery, uniqueSalesItemIds, [
-              Accounting.sales_items.prefix_,
-            ])
+            const [salesItems] = await connection.execute(
+              salesItemsQuery,
+              uniqueSalesItemIds,
+            )
 
             console.log('salesItems', salesItems)
 
@@ -1225,21 +1243,9 @@ const updateCollectionState = async (req, res, next) => {
             for (const salesId of uniqueSalesIds) {
               const updateSalesQuery = `
                 UPDATE ${Accounting.sales.tablename} s
-                SET ${Accounting.sales.selectOptionColumns.status} = CASE
-                  WHEN s.${Accounting.sales.selectOptionColumns.total_amount_due} <= COALESCE((
-                    SELECT SUM(ci.${Accounting.collection_items.selectOptionColumns.amount})
-                    FROM ${Accounting.collection_items.tablename} ci
-                    INNER JOIN ${Accounting.sales_items.tablename} si
-                      ON si.${Accounting.sales_items.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.sales_id}
-                    INNER JOIN ${Accounting.collections.tablename} c
-                      ON c.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
-                    WHERE si.${Accounting.sales_items.selectOptionColumns.sales_id} = s.${Accounting.sales.selectOptionColumns.id}
-                      AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
-                  ), 0) THEN 'PAID'
-                  ELSE 'PARTIAL'
-                END
+                SET ${Accounting.sales.selectOptionColumns.status} = 'PAID'
                 WHERE s.${Accounting.sales.selectOptionColumns.id} = ?
-                  AND s.${Accounting.sales.selectOptionColumns.status} IN ('UNPAID', 'PARTIAL')
+                  AND s.${Accounting.sales.selectOptionColumns.status} = 'UNPAID'
               `
 
               const [result] = await connection.execute(updateSalesQuery, [salesId])
@@ -1249,7 +1255,7 @@ const updateCollectionState = async (req, res, next) => {
             }
           }
 
-          return connection.execute(updateQuery, updateValues)
+          return [collectionUpdateResult]
         } else {
           throw new Error(
             `Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`,

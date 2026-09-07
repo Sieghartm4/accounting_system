@@ -1,5 +1,6 @@
 require('dotenv').config()
 const cors = require('cors')
+const helmet = require('helmet')
 const express = require('express')
 const { initStaticFiles } = require('./src/startup/staticFiles.startup')
 const { initSession } = require('./src/startup/session.startup')
@@ -12,6 +13,8 @@ const { corsOptions } = require('./src/middlewares/corsOptions.middleware')
 const { logger } = require('./src/util/logger.util')
 
 const app = express()
+// Allows secure: 'auto' to detect HTTPS when TLS is terminated by a proxy.
+app.set('trust proxy', 1)
 
 const serverStart = async () => {
   try {
@@ -27,6 +30,7 @@ const serverStart = async () => {
 
     logger.info('Adding cors middleware')
     app.use(cors(corsOptions))
+    app.use(helmet())
 
     logger.info('Stablishing database connection.....')
     const connection = await checkConnection()
@@ -43,6 +47,15 @@ const serverStart = async () => {
 
     logger.info('Serving static files')
     initStaticFiles(app)
+
+    app.use((error, req, res, next) => {
+      logger.error(`Unhandled request error: ${error.message}`)
+      if (res.headersSent) return next(error)
+      res.status(error.status || 500).json({
+        success: false,
+        message: 'Internal server error',
+      })
+    })
 
     const server = app.listen(process.env._SERVER_PORT, () => {
       logger.info(

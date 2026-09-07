@@ -9,7 +9,7 @@ const useAgeingPayables = () => {
     try {
       setLoading(true)
       setError(null)
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
 
       const params = new URLSearchParams({ offset: '0', limit: '100' })

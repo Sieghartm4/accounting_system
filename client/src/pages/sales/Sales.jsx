@@ -21,6 +21,7 @@ import { useSales } from './useSales'
 import SalesForm from './SalesForm'
 import { getAccessLevel } from '../../utils/routeProtection'
 import { generateSalesPDF } from '../../utils/generateSalesPDF'
+import LoadingScreen from '../../components/LoadingScreen'
 
 export default function Sales() {
   return (
@@ -65,7 +66,7 @@ function SalesContent() {
 
     const fetchSales = async () => {
       try {
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('authenticated')
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
@@ -135,7 +136,7 @@ function SalesContent() {
   }, [prependSales])
 
   // Check if user has access to enable checkboxes
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
   const accessLevel = getAccessLevel('sales', user)
   const enableCheckboxes =
     accessLevel === 'Check Access' ||
@@ -164,7 +165,7 @@ function SalesContent() {
   // ─── Helper: fetch full sales data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
     try {
-      const token = localStorage.getItem('token')
+      const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authentication token found')
 
       const salesIds = selectedRows
@@ -228,7 +229,7 @@ function SalesContent() {
               try {
                 console.log('Approving sales:', validRows)
 
-                const token = localStorage.getItem('token')
+                const token = sessionStorage.getItem('authenticated')
                 if (!token) {
                   throw new Error('No authentication token found')
                 }
@@ -300,7 +301,7 @@ function SalesContent() {
               try {
                 console.log('Cancelling sales:', validRows)
 
-                const token = localStorage.getItem('token')
+                const token = sessionStorage.getItem('authenticated')
                 if (!token) {
                   throw new Error('No authentication token found')
                 }
@@ -434,14 +435,7 @@ function SalesContent() {
     )
 
   if (loading) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-black uppercase tracking-[3px] text-gray-400">
-          Loading Revenue Stream...
-        </p>
-      </div>
-    )
+    return <LoadingScreen label="Loading Sales Data..." />
   }
 
   if (error) {
@@ -629,7 +623,7 @@ function SalesContent() {
                 try {
                   console.log('View sales:', row)
 
-                  const token = localStorage.getItem('token')
+                  const token = sessionStorage.getItem('authenticated')
                   if (!token) {
                     throw new Error('No authentication token found')
                   }
@@ -673,7 +667,7 @@ function SalesContent() {
                 try {
                   console.log('Editing sales:', row)
 
-                  const token = localStorage.getItem('token')
+                  const token = sessionStorage.getItem('authenticated')
                   if (!token) {
                     throw new Error('No authentication token found')
                   }

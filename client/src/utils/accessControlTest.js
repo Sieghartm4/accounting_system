@@ -143,7 +143,7 @@ export function mockLocalStorageTest() {
   Object.entries(testUsers).forEach(([userType, user]) => {
     localStorage.setItem('user', JSON.stringify(user));
     
-    const storedUser = JSON.parse(localStorage.getItem('user'));
+    const storedUser = JSON.parse(sessionStorage.getItem('auth_user'));
     const isSameUser = storedUser.username === user.username;
     console.log(`${userType} user stored/retrieved correctly: ${isSameUser}`);
     
