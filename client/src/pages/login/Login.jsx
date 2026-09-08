@@ -14,13 +14,24 @@ import {
 import useLogin from './useLogin'
 
 export default function Login() {
-  const [formData, setFormData] = useState({ username: '', password: '' })
-  const [rememberDevice, setRememberDevice] = useState(false)
+  const [formData, setFormData] = useState({
+    username:
+      localStorage.getItem('rememberedUser') ||
+      sessionStorage.getItem('user_username') ||
+      '',
+    password: localStorage.getItem('rememberedPassword') || '',
+  })
+  const [rememberDevice, setRememberDevice] = useState(
+    () =>
+      !!localStorage.getItem('rememberedUser') ||
+      !!localStorage.getItem('rememberedPassword'),
+  )
   const [showPassword, setShowPassword] = useState(false)
   const { login, loading, error } = useLogin()
 
-  // ✅ REMOVED: localStorage.setItem('rememberedUser', ...) - Never store password
-  // Note: Browser's native password manager can still be used (via browser settings)
+  // Username and password are persisted only when "Remember device" is checked.
+  // This is the same local credential storage the browser's password manager uses
+  // for autofill; sessionStorage never holds secrets.
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -28,11 +39,21 @@ export default function Login() {
 
   const handleRememberDeviceChange = (e) => {
     setRememberDevice(e.target.checked)
-    // ✅ No localStorage storage - browser's native password manager handles this securely
+    if (!e.target.checked) {
+      localStorage.removeItem('rememberedUser')
+      localStorage.removeItem('rememberedPassword')
+    }
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (rememberDevice) {
+      localStorage.setItem('rememberedUser', formData.username)
+      localStorage.setItem('rememberedPassword', formData.password)
+    } else {
+      localStorage.removeItem('rememberedUser')
+      localStorage.removeItem('rememberedPassword')
+    }
     login(formData)
   }
 

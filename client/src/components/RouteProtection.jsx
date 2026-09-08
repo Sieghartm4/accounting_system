@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import LoadingScreen from './LoadingScreen'
 import { hasRouteAccess, getAccessLevel } from '../utils/routeProtection'
 
 const RouteProtection = ({ children, routeName }) => {
@@ -25,14 +26,7 @@ const RouteProtection = ({ children, routeName }) => {
   }, [user, isLoading, navigate, routeName])
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0B0B0B]">
-        <div className="text-white text-center">
-          <div className="w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p className="text-sm">Checking access...</p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen label="Checking Access..." />
   }
 
   if (!user) {

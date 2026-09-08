@@ -421,7 +421,8 @@ function DashboardNewContent() {
               </div>
               <div>
                 <h1 className="text-2xl font-black text-black leading-tight tracking-tight">
-                  Financial <span className="text-red-600 italic">Executive</span> Dashboard
+                  Financial <span className="text-red-600 italic">Executive</span>{' '}
+                  Dashboard
                 </h1>
               </div>
             </div>
@@ -577,14 +578,18 @@ function DashboardNewContent() {
               </div>
             </div>
             <div className="flex items-baseline justify-between">
-              <div className="text-2xl font-bold text-white">
+              <div
+                className={`text-2xl font-bold ${metrics.netIncome >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+              >
                 ₱
                 {metrics.netIncome.toLocaleString('en-US', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </div>
-              <span className={`text-xs font-medium flex items-center ${metrics.netIncomeChangePercent >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+              <span
+                className={`text-xs font-medium flex items-center ${metrics.netIncomeChangePercent >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}
+              >
                 {metrics.netIncomeChangePercent >= 0 ? (
                   <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
                 ) : (
@@ -593,7 +598,8 @@ function DashboardNewContent() {
                 {metrics.netIncomeChangePercent >= 0 ? '+' : ''}
                 {typeof metrics.netIncomeChangePercent === 'number'
                   ? metrics.netIncomeChangePercent.toFixed(1)
-                  : metrics.netIncomeChangePercent}%
+                  : metrics.netIncomeChangePercent}
+                %
               </span>
             </div>
             <div className="mt-3 pt-3 border-t border-white/15 flex items-center justify-between text-xs text-gray-400">
@@ -605,7 +611,11 @@ function DashboardNewContent() {
               </span>
               <span>
                 Margin:{' '}
-                <strong className="text-emerald-400">
+                <strong
+                  className={
+                    metrics.margin >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  }
+                >
                   {typeof metrics.margin === 'number'
                     ? metrics.margin.toFixed(1)
                     : metrics.margin}
@@ -644,25 +654,33 @@ function DashboardNewContent() {
             <div className="mt-3 pt-3 border-t border-white/20 flex items-center justify-between text-xs text-red-100">
               <span>
                 Bank:{' '}
-                <strong className={`font-bold ${metrics.cashBreakdown.bankAccounts >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}>
+                <strong
+                  className={`font-bold ${metrics.cashBreakdown.bankAccounts >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}
+                >
                   ₱{(metrics.cashBreakdown.bankAccounts / 1000).toFixed(0)}k
                 </strong>
               </span>
               <span>
                 Cash:{' '}
-                <strong className={`font-bold ${metrics.cashBreakdown.cashOnHand >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}>
+                <strong
+                  className={`font-bold ${metrics.cashBreakdown.cashOnHand >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}
+                >
                   ₱{(metrics.cashBreakdown.cashOnHand / 1000).toFixed(0)}k
                 </strong>
               </span>
               <span>
                 Petty:{' '}
-                <strong className={`font-bold ${metrics.cashBreakdown.pettyCash >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}>
+                <strong
+                  className={`font-bold ${metrics.cashBreakdown.pettyCash >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}
+                >
                   ₱{(metrics.cashBreakdown.pettyCash / 1000).toFixed(0)}k
                 </strong>
               </span>
               <span>
                 Checks:{' '}
-                <strong className={`font-bold ${metrics.cashBreakdown.checks >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}>
+                <strong
+                  className={`font-bold ${metrics.cashBreakdown.checks >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}
+                >
                   ₱{(metrics.cashBreakdown.checks / 1000).toFixed(0)}k
                 </strong>
               </span>
@@ -802,20 +820,20 @@ function DashboardNewContent() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-black text-white text-base tracking-tight">
-                  Tax & Compliance {" "}<span className="text-red-500">Status</span>
+                  Tax & Compliance <span className="text-red-500">Status</span>
                 </h3>
                 <span className="px-2 py-0.5 text-[10px] font-semibold bg-red-600 text-white rounded-full">
                   Monthly Return
                 </span>
               </div>
-              <p className="text-xs text-gray-400 mb-4">
+              <p className="text-xs text-gray-300 mb-4">
                 Calculated output vs input VAT and withholding tax liabilities
               </p>
 
               {/* VAT Calculation Card */}
               <div className="bg-white/5 rounded-lg p-3.5 border border-white/10 space-y-2 mb-4">
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Output VAT (12% on Sales):</span>
+                  <span className="text-gray-300">Output VAT (12% on Sales):</span>
                   <span className="font-semibold text-white">
                     ₱
                     {(apiData?.tax?.outputVAT || 0).toLocaleString('en-US', {
@@ -824,9 +842,7 @@ function DashboardNewContent() {
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">
-                    Less: Input VAT (Purchases):
-                  </span>
+                  <span className="text-gray-300">Less: Input VAT (Purchases):</span>
                   <span className="font-semibold text-white">
                     (₱
                     {(apiData?.tax?.inputVAT || 0).toLocaleString('en-US', {
@@ -849,7 +865,7 @@ function DashboardNewContent() {
               {/* Withholding Tax Card */}
               <div className="bg-white/5 rounded-lg p-3.5 border border-white/10 space-y-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">
+                  <span className="text-gray-300">
                     Withholding Tax Payable (Expanded):
                   </span>
                   <span className="font-semibold text-white">
@@ -860,7 +876,7 @@ function DashboardNewContent() {
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">
+                  <span className="text-gray-300">
                     Creditable Withholding Tax (2307):
                   </span>
                   <span className="font-semibold text-emerald-400">
@@ -880,7 +896,7 @@ function DashboardNewContent() {
               <button
                 type="button"
                 onClick={() => navigate('/tax-compliance')}
-                className="text-xs text-red-400 hover:text-red-300 font-semibold flex items-center"
+                className="text-xs text-red-400 hover:text-red-300 font-semibold flex items-center cursor-pointer"
               >
                 Generate Tax Return <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
               </button>
@@ -1112,7 +1128,8 @@ function DashboardNewContent() {
           <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="font-black text-black text-base tracking-tight">
-                Recent Ledger & Operational <span className="text-red-600">Transactions</span>
+                Recent Ledger & Operational{' '}
+                <span className="text-red-600">Transactions</span>
               </h3>
               <p className="text-xs text-gray-500">
                 Live feed across Receipts, Disbursements, Sales, and Adjustments
@@ -1139,7 +1156,12 @@ function DashboardNewContent() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-black border-b border-black text-white uppercase tracking-wider font-semibold">
-                  <th className="p-3.5"><span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>Ref No.</span></th>
+                  <th className="p-3.5">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>
+                      Ref No.
+                    </span>
+                  </th>
                   <th className="p-3.5">Date</th>
                   <th className="p-3.5">Module / Type</th>
                   <th className="p-3.5">Resp. Center</th>
