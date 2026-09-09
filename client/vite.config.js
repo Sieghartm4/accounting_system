@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: parseInt(env.PORT) || 3000,
       host: true,
+      allowedHosts: ['aloysius-books.5lsolutions.com'],
     },
     preview: {
       port: parseInt(env.PORT) || 8080,
