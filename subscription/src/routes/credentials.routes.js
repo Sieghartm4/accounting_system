@@ -9,6 +9,7 @@ const {
   saveSubscriptionHistory,
   getUserUsedFreeTrials,
   expireSubscriptions,
+  getMe,
 } = require('../controller/credentials.controller')
 const { loginRateLimiter } = require('../middlewares/security.middleware')
 
@@ -23,6 +24,7 @@ credentialsRouter.get('/check-free-trial', checkFreeTrialUsage)
 credentialsRouter.post('/subscription-history', saveSubscriptionHistory)
 credentialsRouter.get('/used-free-trials', getUserUsedFreeTrials)
 credentialsRouter.post('/expire-subscriptions', expireSubscriptions)
+credentialsRouter.get('/me', getMe)
 
 module.exports = {
   credentialsRouter,

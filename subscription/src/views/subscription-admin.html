@@ -1,108 +1,1010 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/logo.png">
     <title>Subscription Management Dashboard</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#fdf2f2',
-                            100: '#fde8e8',
-                            500: '#ef4444',
-                            600: '#dc2626',
-                            700: '#b91c1c',
-                            900: '#7f1d1d',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
     <!-- Google Fonts Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fafafa;
+            color: #18181b;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        body.dark {
+            background-color: #000000;
+            color: #fafafa;
+        }
+
+        /* Header */
+        header {
+            background-color: rgba(255, 255, 255, 0.8);
+            border-bottom: 1px solid #e4e4e7;
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            padding: 1rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            backdrop-filter: blur(12px);
+        }
+
+        body.dark header {
+            background-color: rgba(9, 9, 11, 0.8);
+            border-bottom-color: #27272a;
+        }
+
+        @media (min-width: 640px) {
+            header {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+            }
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo {
+            height: 2.5rem;
+            width: 2.5rem;
+            border-radius: 0.75rem;
+            background-color: #dc2626;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.3);
+        }
+
+        .header-title h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            color: #18181b;
+        }
+
+        body.dark .header-title h1 {
+            color: #fafafa;
+        }
+
+        .header-title p {
+            font-size: 0.75rem;
+            color: #71717a;
+        }
+
+        body.dark .header-title p {
+            color: #a1a1aa;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background-color: #f4f4f5;
+            border: 1px solid #e4e4e7;
+            padding: 0.5rem 0.875rem;
+            border-radius: 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #3f3f46;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        body.dark .theme-toggle {
+            background-color: #18181b;
+            border-color: #27272a;
+            color: #a1a1aa;
+        }
+
+        .theme-toggle:hover {
+            background-color: #e4e4e7;
+        }
+
+        body.dark .theme-toggle:hover {
+            background-color: #27272a;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background-color: #f4f4f5;
+            border: 1px solid #e4e4e7;
+            padding: 0.5rem 1rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        body.dark .user-info {
+            background-color: #18181b;
+            border-color: #27272a;
+        }
+
+        .user-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            height: 0.625rem;
+            width: 0.625rem;
+            border-radius: 50%;
+            background-color: #10b981;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .username {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #3f3f46;
+        }
+
+        body.dark .username {
+            color: #e4e4e7;
+        }
+
+        .divider {
+            height: 1rem;
+            width: 1px;
+            background-color: #e4e4e7;
+        }
+
+        body.dark .divider {
+            background-color: #27272a;
+        }
+
+        .logout-btn {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #dc2626;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: color 0.2s;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+
+        body.dark .logout-btn {
+            color: #f87171;
+        }
+
+        .logout-btn:hover {
+            color: #b91c1c;
+        }
+
+        body.dark .logout-btn:hover {
+            color: #fca5a5;
+        }
+
+        /* Main Content */
+        main {
+            flex: 1;
+            max-width: 80rem;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem 1rem 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media (min-width: 640px) {
+            main {
+                padding: 2rem 1.5rem 2rem;
+            }
+        }
+
+        .toolbar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (min-width: 640px) {
+            .toolbar {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+            }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            background-color: rgba(228, 228, 231, 0.6);
+            padding: 0.375rem;
+            border-radius: 0.75rem;
+            border: 1px solid #d4d4d8;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        body.dark .tabs {
+            background-color: #18181b;
+            border-color: #27272a;
+        }
+
+        .tab-btn {
+            padding: 0.625rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: none;
+            border: none;
+            color: #52525b;
+        }
+
+        body.dark .tab-btn {
+            color: #a1a1aa;
+        }
+
+        .tab-btn:hover {
+            color: #18181b;
+            background-color: rgba(212, 212, 215, 0.5);
+        }
+
+        body.dark .tab-btn:hover {
+            color: #fafafa;
+            background-color: #27272a;
+        }
+
+        .tab-btn.active {
+            background-color: #dc2626;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2);
+        }
+
+        .btn-primary {
+            background-color: #dc2626;
+            color: white;
+            font-weight: 500;
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.2);
+        }
+
+        .btn-primary:hover {
+            background-color: #b91c1c;
+        }
+
+        .btn-primary svg {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tab-content.hidden {
+            display: none;
+        }
+
+        .card {
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #e4e4e7;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(12px);
+        }
+
+        body.dark .card {
+            background-color: rgba(24, 24, 27, 0.6);
+            border-color: rgba(39, 39, 42, 0.8);
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        thead {
+            border-bottom: 1px solid #e4e4e7;
+            background-color: #f4f4f5;
+        }
+
+        body.dark thead {
+            border-bottom-color: #27272a;
+            background-color: rgba(3, 7, 18, 0.8);
+        }
+
+        th {
+            padding: 1rem 1.5rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+            color: #52525b;
+        }
+
+        body.dark th {
+            color: #a1a1aa;
+        }
+
+        tbody {
+            border-bottom: 1px solid #e4e4e7;
+        }
+
+        body.dark tbody {
+            border-bottom-color: rgba(39, 39, 42, 0.5);
+        }
+
+        tr {
+            border-bottom: 1px solid #e4e4e7;
+        }
+
+        body.dark tr {
+            border-bottom-color: rgba(39, 39, 42, 0.5);
+        }
+
+        tr:hover {
+            background-color: #fafafa;
+        }
+
+        body.dark tr:hover {
+            background-color: rgba(39, 39, 42, 0.3);
+        }
+
+        td {
+            padding: 1rem 1.5rem;
+            font-size: 0.875rem;
+        }
+
+        .text-red {
+            color: #dc2626;
+        }
+
+        body.dark .text-red {
+            color: #f87171;
+        }
+
+        .font-mono {
+            font-family: monospace;
+        }
+
+        .font-bold {
+            font-weight: 700;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.625rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-active {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .badge-admin {
+            background-color: rgba(220, 38, 38, 0.1);
+            color: #dc2626;
+            border: 1px solid rgba(220, 38, 38, 0.2);
+        }
+
+        body.dark .badge-admin {
+            color: #f87171;
+        }
+
+        .badge-user {
+            background-color: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .badge-public {
+            background-color: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .badge-private {
+            background-color: rgba(168, 85, 247, 0.1);
+            color: #a855f7;
+            border: 1px solid rgba(168, 85, 247, 0.2);
+        }
+
+        .action-btn {
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #e4e4e7;
+            background-color: #f4f4f5;
+            color: #52525b;
+            margin-right: 0.5rem;
+        }
+
+        body.dark .action-btn {
+            background-color: #27272a;
+            border-color: #3f3f46;
+            color: #a1a1aa;
+        }
+
+        .action-btn:hover {
+            color: #18181b;
+        }
+
+        body.dark .action-btn:hover {
+            color: #fafafa;
+        }
+
+        .action-btn.delete {
+            background-color: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.2);
+            color: #dc2626;
+        }
+
+        body.dark .action-btn.delete {
+            color: #f87171;
+        }
+
+        .action-btn.delete:hover {
+            color: #b91c1c;
+        }
+
+        body.dark .action-btn.delete:hover {
+            color: #fca5a5;
+        }
+
+        .avatar {
+            height: 1.75rem;
+            width: 1.75rem;
+            border-radius: 50%;
+            background-color: #e4e4e7;
+            border: 1px solid #d4d4d8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: #dc2626;
+            font-weight: 700;
+            margin-right: 0.5rem;
+        }
+
+        body.dark .avatar {
+            background-color: #27272a;
+            border-color: #3f3f46;
+        }
+
+        .user-cell {
+            display: flex;
+            align-items: center;
+        }
+
+        .link-btn {
+            color: #2563eb;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.875rem;
+            text-decoration: none;
+        }
+
+        body.dark .link-btn {
+            color: #60a5fa;
+        }
+
+        .link-btn:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+
+        body.dark .link-btn:hover {
+            color: #3b82f6;
+        }
+
+        /* Modals */
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background-color: white;
+            border: 1px solid #e4e4e7;
+            border-radius: 1.5rem;
+            max-width: 32rem;
+            width: 100%;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        body.dark .modal-content {
+            background-color: #18181b;
+            border-color: #27272a;
+        }
+
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #e4e4e7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #fafafa;
+        }
+
+        body.dark .modal-header {
+            border-bottom-color: #27272a;
+            background-color: #09090b;
+        }
+
+        .modal-header h2 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: #18181b;
+        }
+
+        body.dark .modal-header h2 {
+            color: #fafafa;
+        }
+
+        .close-btn {
+            color: #71717a;
+            cursor: pointer;
+            font-size: 1.25rem;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            background: none;
+            border: none;
+        }
+
+        .close-btn:hover {
+            color: #18181b;
+            background-color: #e4e4e7;
+        }
+
+        body.dark .close-btn {
+            color: #a1a1aa;
+        }
+
+        body.dark .close-btn:hover {
+            color: #fafafa;
+            background-color: #27272a;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            max-height: 75vh;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #71717a;
+            margin-bottom: 0.375rem;
+        }
+
+        body.dark .form-group label {
+            color: #a1a1aa;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        @media (min-width: 640px) {
+            .form-row {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            background-color: #fafafa;
+            border: 1px solid #e4e4e7;
+            border-radius: 0.75rem;
+            padding: 0.625rem 1rem;
+            font-size: 0.875rem;
+            color: #18181b;
+            transition: border-color 0.2s;
+        }
+
+        body.dark input[type="text"],
+        body.dark textarea,
+        body.dark select {
+            background-color: #000000;
+            border-color: #27272a;
+            color: #fafafa;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #dc2626;
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        .plan-items {
+            margin-top: 0.5rem;
+        }
+
+        .plan-items-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .add-item-btn {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #dc2626;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+
+        body.dark .add-item-btn {
+            color: #f87171;
+        }
+
+        .add-item-btn:hover {
+            color: #b91c1c;
+        }
+
+        body.dark .add-item-btn:hover {
+            color: #fca5a5;
+        }
+
+        .plan-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        @media (min-width: 640px) {
+            .plan-item {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+        }
+
+        .plan-item select {
+            width: 7rem;
+        }
+
+        @media (min-width: 640px) {
+            .plan-item select {
+                width: 7rem;
+            }
+        }
+
+        .plan-item input {
+            flex: 1;
+        }
+
+        .remove-item-btn {
+            width: 5rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.75rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid #e4e4e7;
+            background-color: #f4f4f5;
+            color: #52525b;
+        }
+
+        body.dark .remove-item-btn {
+            background-color: #27272a;
+            border-color: #3f3f46;
+            color: #a1a1aa;
+        }
+
+        .remove-item-btn:hover {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: #dc2626;
+        }
+
+        body.dark .remove-item-btn:hover {
+            color: #f87171;
+        }
+
+        .modal-footer {
+            padding-top: 1rem;
+            margin-top: 1rem;
+            border-top: 1px solid #e4e4e7;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        body.dark .modal-footer {
+            border-top-color: #27272a;
+        }
+
+        .btn-secondary {
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: none;
+            background-color: #f4f4f5;
+            color: #52525b;
+        }
+
+        body.dark .btn-secondary {
+            background-color: #27272a;
+            color: #a1a1aa;
+        }
+
+        .btn-secondary:hover {
+            background-color: #e4e4e7;
+        }
+
+        body.dark .btn-secondary:hover {
+            background-color: #3f3f46;
+        }
+
+        .btn-submit {
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: none;
+            background-color: #dc2626;
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.2);
+        }
+
+        .btn-submit:hover {
+            background-color: #b91c1c;
+        }
+
+        /* Confirm Modal */
+        .confirm-modal-content {
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .confirm-icon {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 50%;
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 1.25rem;
+        }
+
+        .confirm-modal-content h2 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: #18181b;
+            margin-bottom: 0.5rem;
+        }
+
+        body.dark .confirm-modal-content h2 {
+            color: #fafafa;
+        }
+
+        .confirm-modal-content p {
+            font-size: 0.875rem;
+            color: #71717a;
+            margin-bottom: 1.5rem;
+        }
+
+        body.dark .confirm-modal-content p {
+            color: #a1a1aa;
+        }
+
+        .confirm-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .confirm-actions button {
+            flex: 1;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 50;
+            background-color: white;
+            border: 1px solid #e4e4e7;
+            color: #18181b;
+            padding: 0.75rem 1.25rem;
+            border-radius: 1rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.875rem;
+            transform: translateY(5rem);
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        body.dark .toast {
+            background-color: #18181b;
+            border-color: #27272a;
+            color: #fafafa;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
-<body class="bg-zinc-50 dark:bg-black text-zinc-900 dark:text-white h-full flex flex-col selection:bg-red-600 selection:text-white transition-colors duration-200">
+<body>
 
-    <header class="bg-white/80 dark:bg-zinc-950/80 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-30 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 backdrop-blur-md">
-        <div class="flex items-center space-x-3">
-            <div class="h-10 w-10 rounded-xl bg-red-600 flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-red-600/30">S</div>
-            <div>
-                <h1 class="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">Subscription Management</h1>
-                <p class="text-xs text-zinc-500 dark:text-zinc-400">Admin Control Center</p>
+    <header>
+        <div class="header-left">
+            <div class="logo">S</div>
+            <div class="header-title">
+                <h1>Subscription Management</h1>
+                <p>Admin Control Center</p>
             </div>
         </div>
-        <div class="flex items-center space-x-3">
-            <!-- Theme Toggle Button -->
-            <button onclick="toggleTheme()" id="theme-toggle" class="flex items-center space-x-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3.5 py-2 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all shadow-sm">
-                <span id="theme-icon" class="text-base">🌙</span>
+        <div class="header-right">
+            <button id="theme-toggle" class="theme-toggle">
+                <span id="theme-icon">🌙</span>
                 <span id="theme-text" class="hidden sm:inline">Dark Mode</span>
             </button>
 
-            <div class="flex items-center space-x-4 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-2 rounded-xl shadow-sm">
-                <div class="flex items-center space-x-2">
-                    <span class="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span id="username" class="text-sm font-medium text-zinc-700 dark:text-zinc-200">Administrator</span>
+            <div class="user-info">
+                <div class="user-status">
+                    <span class="status-dot"></span>
+                    <span id="username" class="username">Administrator</span>
                 </div>
-                <div class="h-4 w-px bg-zinc-200 dark:bg-zinc-800"></div>
-                <button onclick="logout()" class="text-xs font-semibold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors uppercase tracking-wider">Logout</button>
+                <div class="divider"></div>
+                <button id="logout-btn" class="logout-btn">Logout</button>
             </div>
         </div>
     </header>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-            <div class="flex space-x-2 bg-zinc-200/60 dark:bg-zinc-900 p-1.5 rounded-xl border border-zinc-300 dark:border-zinc-800 shadow-sm">
-                <button class="tab-btn active px-6 py-2.5 rounded-lg text-sm font-medium transition-all bg-red-600 text-white shadow-md shadow-red-600/20" data-tab="plans" onclick="switchTab('plans')">Plans</button>
-                <button class="tab-btn px-6 py-2.5 rounded-lg text-sm font-medium transition-all text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-300/50 dark:hover:bg-zinc-800" data-tab="users" onclick="switchTab('users')">Master Users</button>
+    <main>
+        <div class="toolbar">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="plans">Plans</button>
+                <button class="tab-btn" data-tab="users">Master Users</button>
             </div>
-            
+
             <div id="plans-actions">
-                <button class="btn btn-primary bg-red-600 hover:bg-red-700 text-white font-medium px-5 py-2.5 rounded-xl shadow-lg shadow-red-600/20 transition-all flex items-center space-x-2 text-sm" onclick="openPlanModal()">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <button id="new-plan-btn" class="btn-primary">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     <span>New Plan</span>
                 </button>
             </div>
         </div>
 
-        <div id="plans-tab" class="tab-content flex-1 flex flex-col">
-            <div class="bg-white/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
-                <div class="overflow-x-auto">
-                    <table id="plans-table" class="w-full text-left border-collapse">
+        <div id="plans-tab" class="tab-content">
+            <div class="card">
+                <div class="table-container">
+                    <table id="plans-table">
                         <thead>
-                            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950/80 text-zinc-600 dark:text-zinc-400 text-xs uppercase tracking-wider font-semibold">
-                                <th class="py-4 px-6">Code</th>
-                                <th class="py-4 px-6">Name</th>
-                                <th class="py-4 px-6">Price</th>
-                                <th class="py-4 px-6">Billing Cycle</th>
-                                <th class="py-4 px-6">Description</th>
-                                <th class="py-4 px-6">Items</th>
-                                <th class="py-4 px-6">Visibility</th>
-                                <th class="py-4 px-6 text-right">Actions</th>
+                            <tr>
+                                <th>Code</th>
+                                <th>Name</th>
+                                <th>Price</th>
+                                <th>Billing Cycle</th>
+                                <th>Description</th>
+                                <th>Items</th>
+                                <th>Visibility</th>
+                                <th style="text-align: right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800/50 text-sm">
-                            <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                                <td class="py-4 px-6 font-mono text-xs text-red-600 dark:text-red-400 font-bold">PRO_MONTHLY</td>
-                                <td class="py-4 px-6 font-medium text-zinc-900 dark:text-white">Professional Monthly</td>
-                                <td class="py-4 px-6 text-zinc-900 dark:text-white font-semibold">$29.00</td>
-                                <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 text-xs">Monthly</td>
-                                <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 max-w-xs truncate">Full access to advanced analytics and priority support.</td>
-                                <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 text-xs">3 items</td>
-                                <td class="py-4 px-6"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Active</span></td>
-                                <td class="py-4 px-6 text-right space-x-2">
-                                    <button onclick="editPlan('1')" class="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors text-xs font-medium bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700">Edit</button>
-                                    <button onclick="confirmDelete('1')" class="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors text-xs font-medium bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20">Delete</button>
+                        <tbody>
+                            <tr>
+                                <td class="font-mono text-red font-bold">PRO_MONTHLY</td>
+                                <td>Professional Monthly</td>
+                                <td>$29.00</td>
+                                <td>Monthly</td>
+                                <td>Full access to advanced analytics and priority support.</td>
+                                <td>3 items</td>
+                                <td><span class="badge badge-active">Active</span></td>
+                                <td style="text-align: right">
+                                    <button data-plan-id="1" class="action-btn edit-plan-btn">Edit</button>
+                                    <button data-plan-id="1" class="action-btn delete delete-plan-btn">Delete</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -111,30 +1013,30 @@
             </div>
         </div>
 
-        <div id="users-tab" class="tab-content hidden flex-1 flex flex-col">
-            <div class="bg-white/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
-                <div class="overflow-x-auto">
-                    <table id="users-table" class="w-full text-left border-collapse">
+        <div id="users-tab" class="tab-content hidden">
+            <div class="card">
+                <div class="table-container">
+                    <table id="users-table">
                         <thead>
-                            <tr class="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950/80 text-zinc-600 dark:text-zinc-400 text-xs uppercase tracking-wider font-semibold">
-                                <th class="py-4 px-6">Username</th>
-                                <th class="py-4 px-6">Email</th>
-                                <th class="py-4 px-6">Database</th>
-                                <th class="py-4 px-6">Role</th>
-                                <th class="py-4 px-6">Subscription</th>
-                                <th class="py-4 px-6">Status</th>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Database</th>
+                                <th>Role</th>
+                                <th>Subscription</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800/50 text-sm">
-                            <tr class="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                                <td class="py-4 px-6 font-medium text-zinc-900 dark:text-white flex items-center space-x-2">
-                                    <div class="h-7 w-7 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-xs text-red-600 dark:text-red-400 font-bold">JD</div>
+                        <tbody>
+                            <tr>
+                                <td class="user-cell">
+                                    <div class="avatar">JD</div>
                                     <span>johndoe</span>
                                 </td>
-                                <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400">john@example.com</td>
-                                <td class="py-4 px-6 font-mono text-xs text-zinc-700 dark:text-zinc-300">db_cluster_alpha</td>
-                                <td class="py-4 px-6"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">Master Admin</span></td>
-                                <td class="py-4 px-6"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Online</span></td>
+                                <td>john@example.com</td>
+                                <td class="font-mono">db_cluster_alpha</td>
+                                <td><span class="badge badge-admin">Master Admin</span></td>
+                                <td><span class="badge badge-active">Online</span></td>
                             </tr>
                         </tbody>
                     </table>
@@ -143,101 +1045,95 @@
         </div>
     </main>
 
-    <div id="plan-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
-        <div class="modal-content bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div class="modal-header px-6 py-5 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-950">
-                <h2 id="modal-title" class="text-lg font-bold text-zinc-900 dark:text-white">New Subscription Plan</h2>
-                <button class="close-btn text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white text-xl w-8 h-8 rounded-full flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors" onclick="closePlanModal()">&times;</button>
+    <div id="plan-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">New Subscription Plan</h2>
+                <button id="close-plan-modal" class="close-btn">&times;</button>
             </div>
-            <form id="plan-form" onsubmit="savePlan(event)" class="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+            <form id="plan-form" class="modal-body">
                 <input type="hidden" id="plan-id">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="space-y-1.5">
-                        <label for="plan-code" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Code</label>
-                        <input type="text" id="plan-code" required class="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors" placeholder="e.g. BASIC_MONTHLY">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="plan-code">Code</label>
+                        <input type="text" id="plan-code" required placeholder="e.g. BASIC_MONTHLY">
                     </div>
-                    <div class="space-y-1.5">
-                        <label for="plan-name" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Name</label>
-                        <input type="text" id="plan-name" required class="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors" placeholder="e.g. Basic Plan">
+                    <div class="form-group">
+                        <label for="plan-name">Name</label>
+                        <input type="text" id="plan-name" required placeholder="e.g. Basic Plan">
                     </div>
                 </div>
-                <div class="space-y-1.5">
-                    <label for="plan-description" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Description</label>
-                    <textarea id="plan-description" rows="3" class="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors" placeholder="Detailed description of features..."></textarea>
+                <div class="form-group">
+                    <label for="plan-description">Description</label>
+                    <textarea id="plan-description" rows="3" placeholder="Detailed description of features..."></textarea>
                 </div>
-                <div class="space-y-1.5">
-                    <label for="plan-status" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Visibility Status</label>
-                    <select id="plan-status" class="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors">
+                <div class="form-group">
+                    <label for="plan-status">Visibility Status</label>
+                    <select id="plan-status">
                         <option value="PUBLIC">Public - Visible to all users</option>
                         <option value="PRIVATE">Private - Admin only</option>
                     </select>
                 </div>
-                <div class="space-y-2">
-                    <div class="flex justify-between items-center">
-                        <label class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Plan Items</label>
-                        <button type="button" class="text-xs font-semibold text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-400" onclick="addPlanItem()">+ Add Item</button>
+                <div class="plan-items">
+                    <div class="plan-items-header">
+                        <label>Plan Items</label>
+                        <button type="button" id="add-plan-item" class="add-item-btn">+ Add Item</button>
                     </div>
-                    <div id="plan-items-container" class="space-y-2">
-                        <div class="plan-item flex flex-col sm:flex-row gap-2 items-start">
-                            <div class="w-full sm:w-28">
-                                <select class="item-type w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors">
-                                    <option value="BILLING_CYCLE">Billing Cycle</option>
-                                    <option value="PRICE">Price</option>
-                                    <option value="MODULES">Modules</option>
-                                    <option value="FEATURES">Features</option>
-                                    <option value="USERS">Users</option>
-                                </select>
-                            </div>
-                            <div class="flex-1 w-full">
-                                <input type="text" placeholder="Details" class="item-details w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors">
-                            </div>
-                            <div class="sm:w-20">
-                                <button type="button" class="btn btn-danger btn-sm w-full bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500/20 text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 px-3 py-2 rounded-xl text-xs transition-colors" onclick="removePlanItem(this)">Remove</button>
-                            </div>
+                    <div id="plan-items-container">
+                        <div class="plan-item">
+                            <select class="item-type">
+                                <option value="BILLING_CYCLE">Billing Cycle</option>
+                                <option value="PRICE">Price</option>
+                                <option value="MODULES">Modules</option>
+                                <option value="FEATURES">Features</option>
+                                <option value="USERS">Users</option>
+                            </select>
+                            <input type="text" placeholder="Details" class="item-details">
+                            <button type="button" class="remove-item-btn remove-plan-item-btn">Remove</button>
                         </div>
                     </div>
                 </div>
-                <div class="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end space-x-3">
-                    <button type="button" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors" onclick="closePlanModal()">Cancel</button>
-                    <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20 transition-all">Save Plan</button>
+                <div class="modal-footer">
+                    <button type="button" id="cancel-plan" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-submit">Save Plan</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="confirm-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
-        <div class="modal-content bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl p-6 text-center animate-in fade-in zoom-in-95 duration-200">
-            <div class="w-12 h-12 rounded-full bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center mx-auto mb-4 text-xl">⚠️</div>
-            <h2 class="text-lg font-bold text-zinc-900 dark:text-white mb-2">Confirm Action</h2>
-            <p id="confirm-message" class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">Are you sure you want to perform this action?</p>
-            <div class="flex space-x-3">
-                <button class="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors" onclick="closeConfirmModal()">Cancel</button>
-                <button class="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20 transition-all" onclick="confirmAction()">Confirm</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="subscription-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm hidden">
-        <div class="modal-content bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <div class="p-6">
-                <h2 class="text-lg font-bold text-zinc-900 dark:text-white mb-4">Change User Subscription</h2>
-                <div class="space-y-4">
-                    <div class="space-y-1.5">
-                        <label for="subscription-plan-select" class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Select Subscription Plan</label>
-                        <select id="subscription-plan-select" class="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors">
-                            <option value="">No Subscription</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="pt-4 mt-6 border-t border-zinc-200 dark:border-zinc-800 flex justify-end space-x-3">
-                    <button type="button" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors" onclick="closeSubscriptionModal()">Cancel</button>
-                    <button type="button" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20 transition-all" onclick="saveUserSubscription()">Save Changes</button>
+    <div id="confirm-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="confirm-modal-content">
+                <div class="confirm-icon">⚠️</div>
+                <h2>Confirm Action</h2>
+                <p id="confirm-message">Are you sure you want to perform this action?</p>
+                <div class="confirm-actions">
+                    <button id="cancel-confirm" class="btn-secondary">Cancel</button>
+                    <button id="confirm-action" class="btn-submit">Confirm</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="toast" class="fixed bottom-6 right-6 z-50 translate-y-20 opacity-0 transition-all duration-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 text-sm">
+    <div id="subscription-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-body">
+                <h2>Change User Subscription</h2>
+                <div class="form-group">
+                    <label for="subscription-plan-select">Select Subscription Plan</label>
+                    <select id="subscription-plan-select">
+                        <option value="">No Subscription</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="cancel-subscription" class="btn-secondary">Cancel</button>
+                    <button type="button" id="save-subscription" class="btn-submit">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">
         <span id="toast-icon">✨</span>
         <span id="toast-message">Action successful!</span>
     </div>
@@ -267,29 +1163,56 @@
         });
 
         // Check authentication
-        function checkAuth() {
-            const token = localStorage.getItem('token');
-            const user = JSON.parse(localStorage.getItem('user'));
-            
-            if (!token || !user) {
-                // Redirect to main client login page
-                const clientUrl = window.CLIENT_URL || window.location.origin.replace(/:\d+/, ':5050');
-                window.location.href = `${clientUrl}/login`;
-                return;
+        async function checkAuth() {
+            try {
+                // Try session-based authentication first
+                const response = await fetch(`${API_BASE}/credentials/me`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.data) {
+                        currentUser = data.data;
+                        document.getElementById('username').textContent = currentUser.username || currentUser.fullname || 'Administrator';
+                        // Fetch data
+                        fetchSubscriptionPlans();
+                        fetchMasterUsers();
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Session auth check failed:', error);
             }
             
-            currentUser = user;
-            document.getElementById('username').textContent = user.username || user.fullname || 'Administrator';
+            // Fallback to localStorage token
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
             
-            // Fetch data
-            fetchSubscriptionPlans();
-            fetchMasterUsers();
+            if (token && user) {
+                try {
+                    currentUser = JSON.parse(user);
+                    document.getElementById('username').textContent = currentUser.username || currentUser.fullname || 'Administrator';
+                    // Fetch data
+                    fetchSubscriptionPlans();
+                    fetchMasterUsers();
+                } catch (e) {
+                    console.error('Error parsing user data:', e);
+                    document.getElementById('username').textContent = 'Error loading user';
+                }
+            } else {
+                // No auth available
+                console.log('No authentication available');
+                document.getElementById('username').textContent = 'Guest (No Auth)';
+            }
         }
 
         // Fetch subscription plans
         async function fetchSubscriptionPlans() {
             try {
-                const response = await fetch(`${API_BASE}/subscription-plans`);
+                const response = await fetch(`${API_BASE}/subscription-plans`, {
+                    credentials: 'include'
+                });
                 const data = await response.json();
                 
                 if (data.success) {
@@ -309,7 +1232,7 @@
             tbody.innerHTML = '';
 
             if (plans.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-zinc-500 dark:text-zinc-400">No subscription plans found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="padding: 2rem; text-align: center; color: #71717a;">No subscription plans found</td></tr>';
                 return;
             }
 
@@ -325,22 +1248,21 @@
                 const itemsCount = plan.items ? plan.items.length : 0;
 
                 const tr = document.createElement('tr');
-                tr.className = 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors';
                 tr.innerHTML = `
-                    <td class="py-4 px-6 font-mono text-xs text-red-600 dark:text-red-400 font-bold">${plan.sp_code || ''}</td>
-                    <td class="py-4 px-6 font-medium text-zinc-900 dark:text-white">${plan.sp_name || ''}</td>
-                    <td class="py-4 px-6 text-zinc-900 dark:text-white font-semibold">₱${price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
-                    <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 text-xs">${billingCycle}</td>
-                    <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 max-w-xs truncate">${plan.sp_description || '-'}</td>
-                    <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400 text-xs">${itemsCount} item${itemsCount !== 1 ? 's' : ''}</td>
-                    <td class="py-4 px-6">
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${plan.sp_status === 'PUBLIC' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20' : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'}">
+                    <td class="font-mono text-red font-bold">${plan.sp_code || ''}</td>
+                    <td>${plan.sp_name || ''}</td>
+                    <td>₱${price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
+                    <td>${billingCycle}</td>
+                    <td>${plan.sp_description || '-'}</td>
+                    <td>${itemsCount} item${itemsCount !== 1 ? 's' : ''}</td>
+                    <td>
+                        <span class="badge ${plan.sp_status === 'PUBLIC' ? 'badge-public' : 'badge-private'}">
                             ${plan.sp_status || 'PUBLIC'}
                         </span>
                     </td>
-                    <td class="py-4 px-6 text-right space-x-2">
-                        <button onclick="editPlan(${plan.sp_id})" class="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors text-xs font-medium bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700">Edit</button>
-                        <button onclick="confirmDelete(${plan.sp_id})" class="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors text-xs font-medium bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-500/20">Delete</button>
+                    <td style="text-align: right">
+                        <button data-plan-id="${plan.sp_id}" class="action-btn edit-plan-btn">Edit</button>
+                        <button data-plan-id="${plan.sp_id}" class="action-btn delete delete-plan-btn">Delete</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -350,7 +1272,9 @@
         // Fetch master users
         async function fetchMasterUsers() {
             try {
-                const response = await fetch(`${API_BASE}/users`);
+                const response = await fetch(`${API_BASE}/users`, {
+                    credentials: 'include'
+                });
                 const data = await response.json();
                 
                 if (data.success) {
@@ -370,33 +1294,32 @@
             tbody.innerHTML = '';
 
             if (users.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-zinc-500 dark:text-zinc-400">No master users found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="padding: 2rem; text-align: center; color: #71717a;">No master users found</td></tr>';
                 return;
             }
 
             users.forEach(user => {
                 const initials = (user.username || 'U').substring(0, 2).toUpperCase();
                 const tr = document.createElement('tr');
-                tr.className = 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors';
                 tr.innerHTML = `
-                    <td class="py-4 px-6 font-medium text-zinc-900 dark:text-white flex items-center space-x-2">
-                        <div class="h-7 w-7 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-xs text-red-600 dark:text-red-400 font-bold">${initials}</div>
+                    <td class="user-cell">
+                        <div class="avatar">${initials}</div>
                         <span>${user.username || ''}</span>
                     </td>
-                    <td class="py-4 px-6 text-zinc-500 dark:text-zinc-400">${user.email || '-'}</td>
-                    <td class="py-4 px-6 font-mono text-xs text-zinc-700 dark:text-zinc-300">${user.db_name || '-'}</td>
-                    <td class="py-4 px-6">
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${user.role === 'ADMIN' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'}">
+                    <td>${user.email || '-'}</td>
+                    <td class="font-mono">${user.db_name || '-'}</td>
+                    <td>
+                        <span class="badge ${user.role === 'ADMIN' ? 'badge-admin' : 'badge-user'}">
                             ${user.role || 'USER'}
                         </span>
                     </td>
-                    <td class="py-4 px-6">
-                        <button onclick="openSubscriptionDropdown(${user.id}, '${user.subscription_plan_name || 'No Subscription'}', ${user.subscription_id || 'null'})" class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium text-sm cursor-pointer hover:underline">
+                    <td>
+                        <button data-user-id="${user.id}" data-plan-name="${user.subscription_plan_name || 'No Subscription'}" data-subscription-id="${user.subscription_id || 'null'}" class="link-btn">
                             ${user.subscription_plan_name || 'No Subscription'}
                         </button>
                     </td>
-                    <td class="py-4 px-6">
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${user.status === 'active' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'}">
+                    <td>
+                        <span class="badge ${user.status === 'active' ? 'badge-active' : 'badge-admin'}">
                             ${user.status || 'inactive'}
                         </span>
                     </td>
@@ -415,7 +1338,9 @@
 
             // Fetch all subscription plans
             try {
-                const response = await fetch(`${API_BASE}/subscription-plans`);
+                const response = await fetch(`${API_BASE}/subscription-plans`, {
+                    credentials: 'include'
+                });
                 const data = await response.json();
 
                 if (data.success) {
@@ -459,6 +1384,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    credentials: 'include',
                     body: JSON.stringify({ subscription_id: subscriptionId }),
                 });
 
@@ -517,14 +1443,12 @@
         function switchTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('bg-red-600', 'text-white', 'shadow-md', 'shadow-red-600/20');
-                btn.classList.add('text-zinc-600', 'dark:text-zinc-400', 'hover:text-zinc-900', 'dark:hover:text-white', 'hover:bg-zinc-300/50', 'dark:hover:bg-zinc-800');
+                btn.classList.remove('active');
             });
 
             document.getElementById(tabName + '-tab').classList.remove('hidden');
             const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
-            activeBtn.classList.add('bg-red-600', 'text-white', 'shadow-md', 'shadow-red-600/20');
-            activeBtn.classList.remove('text-zinc-600', 'dark:text-zinc-400', 'hover:text-zinc-900', 'dark:hover:text-white', 'hover:bg-zinc-300/50', 'dark:hover:bg-zinc-800');
+            activeBtn.classList.add('active');
 
             const plansActions = document.getElementById('plans-actions');
             if (tabName === 'plans') {
@@ -571,7 +1495,9 @@
 
         async function editPlan(planId) {
             try {
-                const response = await fetch(`${API_BASE}/subscription-plans/${planId}`);
+                const response = await fetch(`${API_BASE}/subscription-plans/${planId}`, {
+                    credentials: 'include'
+                });
                 const data = await response.json();
                 
                 if (data.success) {
@@ -588,23 +1514,17 @@
         function addPlanItem(type = 'BILLING_CYCLE', details = '') {
             const container = document.getElementById('plan-items-container');
             const div = document.createElement('div');
-            div.className = 'plan-item flex flex-col sm:flex-row gap-2 items-start';
+            div.className = 'plan-item';
             div.innerHTML = `
-                <div class="w-full sm:w-28">
-                    <select class="item-type w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors">
-                        <option value="BILLING_CYCLE" ${type === 'BILLING_CYCLE' ? 'selected' : ''}>Billing Cycle</option>
-                        <option value="PRICE" ${type === 'PRICE' ? 'selected' : ''}>Price</option>
-                        <option value="MODULES" ${type === 'MODULES' ? 'selected' : ''}>Modules</option>
-                        <option value="FEATURES" ${type === 'FEATURES' ? 'selected' : ''}>Features</option>
-                        <option value="USERS" ${type === 'USERS' ? 'selected' : ''}>Users</option>
-                    </select>
-                </div>
-                <div class="flex-1 w-full">
-                    <input type="text" placeholder="Details" class="item-details w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-red-600 transition-colors" value="${details}">
-                </div>
-                <div class="sm:w-20">
-                    <button type="button" class="btn btn-danger btn-sm w-full bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500/20 text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 px-3 py-2 rounded-xl text-xs transition-colors" onclick="removePlanItem(this)">Remove</button>
-                </div>
+                <select class="item-type">
+                    <option value="BILLING_CYCLE" ${type === 'BILLING_CYCLE' ? 'selected' : ''}>Billing Cycle</option>
+                    <option value="PRICE" ${type === 'PRICE' ? 'selected' : ''}>Price</option>
+                    <option value="MODULES" ${type === 'MODULES' ? 'selected' : ''}>Modules</option>
+                    <option value="FEATURES" ${type === 'FEATURES' ? 'selected' : ''}>Features</option>
+                    <option value="USERS" ${type === 'USERS' ? 'selected' : ''}>Users</option>
+                </select>
+                <input type="text" placeholder="Details" class="item-details" value="${details}">
+                <button type="button" class="remove-item-btn remove-plan-item-btn">Remove</button>
             `;
             container.appendChild(div);
         }
@@ -612,7 +1532,7 @@
         function removePlanItem(btn) {
             const container = document.getElementById('plan-items-container');
             if (container.children.length > 1) {
-                btn.parentElement.remove();
+                btn.closest('.plan-item').remove();
             } else {
                 showToast('Plan must have at least one item', '⚠️');
             }
@@ -621,12 +1541,9 @@
         function confirmDelete(id) {
             pendingAction = async () => {
                 try {
-                    const token = localStorage.getItem('token');
                     const response = await fetch(`${API_BASE}/subscription-plans/${id}`, {
                         method: 'DELETE',
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
+                        credentials: 'include'
                     });
                     const data = await response.json();
                     
@@ -712,7 +1629,6 @@
             console.log('Sending plan data:', planData);
             
             try {
-                const token = localStorage.getItem('token');
                 const url = planId ? `${API_BASE}/subscription-plans/${planId}` : `${API_BASE}/subscription-plans`;
                 const method = planId ? 'PUT' : 'POST';
                 
@@ -720,8 +1636,8 @@
                     method: method,
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
                     },
+                    credentials: 'include',
                     body: JSON.stringify(planData)
                 });
                 
@@ -744,22 +1660,17 @@
         async function logout() {
             pendingAction = async () => {
                 try {
-                    const token = localStorage.getItem('token');
-                    if (token) {
-                        await fetch(`${API_BASE}/credentials/logout`, {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${token}`
-                            }
-                        });
-                    }
+                    await fetch(`${API_BASE}/credentials/logout`, {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
                 } catch (error) {
                     console.error('Error calling logout endpoint:', error);
                 }
                 
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                window.location.href = `${window.CLIENT_URL}/login`;
+                window.location.href = `${window.CLIENT_URL || window.location.origin.replace(/:\d+/, ':5050')}/login`;
                 closeConfirmModal();
             };
             document.getElementById('confirm-message').innerText = 'Are you sure you want to logout from the admin center?';
@@ -770,15 +1681,82 @@
             const toast = document.getElementById('toast');
             const toastMessage = document.getElementById('toast-message');
             const toastIcon = document.getElementById('toast-icon');
-            
+
             if (toastMessage) toastMessage.innerText = message;
             if (toastIcon) toastIcon.innerText = icon;
-            
-            toast.classList.remove('translate-y-20', 'opacity-0');
+
+            toast.classList.add('show');
             setTimeout(() => {
-                toast.classList.add('translate-y-20', 'opacity-0');
+                toast.classList.remove('show');
             }, 3000);
         }
+
+        // Attach event listeners on DOM load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Theme toggle
+            document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+            // Logout button
+            document.getElementById('logout-btn').addEventListener('click', logout);
+
+            // Tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tabName = btn.getAttribute('data-tab');
+                    switchTab(tabName);
+                });
+            });
+
+            // New plan button
+            document.getElementById('new-plan-btn').addEventListener('click', () => openPlanModal());
+
+            // Plan modal
+            document.getElementById('close-plan-modal').addEventListener('click', closePlanModal);
+            document.getElementById('cancel-plan').addEventListener('click', closePlanModal);
+            document.getElementById('plan-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                savePlan(e);
+            });
+
+            // Plan items
+            document.getElementById('add-plan-item').addEventListener('click', () => addPlanItem());
+
+            // Remove plan item buttons (delegated)
+            document.getElementById('plan-items-container').addEventListener('click', (e) => {
+                if (e.target.classList.contains('remove-plan-item-btn')) {
+                    removePlanItem(e.target);
+                }
+            });
+
+            // Confirm modal
+            document.getElementById('cancel-confirm').addEventListener('click', closeConfirmModal);
+            document.getElementById('confirm-action').addEventListener('click', confirmAction);
+
+            // Subscription modal
+            document.getElementById('cancel-subscription').addEventListener('click', closeSubscriptionModal);
+            document.getElementById('save-subscription').addEventListener('click', saveUserSubscription);
+
+            // Delegated event listeners for dynamically added buttons
+            document.getElementById('plans-table').addEventListener('click', (e) => {
+                if (e.target.classList.contains('edit-plan-btn')) {
+                    const planId = e.target.getAttribute('data-plan-id');
+                    editPlan(planId);
+                }
+                if (e.target.classList.contains('delete-plan-btn')) {
+                    const planId = e.target.getAttribute('data-plan-id');
+                    confirmDelete(planId);
+                }
+            });
+
+            document.getElementById('users-table').addEventListener('click', (e) => {
+                if (e.target.classList.contains('link-btn')) {
+                    const userId = e.target.getAttribute('data-user-id');
+                    const planName = e.target.getAttribute('data-plan-name');
+                    const subscriptionId = e.target.getAttribute('data-subscription-id');
+                    openSubscriptionDropdown(userId, planName, subscriptionId);
+                }
+            });
+        });
     </script>
 </body>
 </html>

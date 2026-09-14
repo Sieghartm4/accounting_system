@@ -31,7 +31,9 @@ const serverStart = async () => {
 
     logger.info('Adding cors middleware')
     app.use(cors(corsOptions))
-    app.use(helmet())
+    app.use(helmet({
+      contentSecurityPolicy: false,
+    }))
 
     logger.info('Stablishing database connection.....')
     const connection = await checkConnection()

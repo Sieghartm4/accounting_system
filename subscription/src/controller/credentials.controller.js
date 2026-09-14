@@ -1094,6 +1094,29 @@ const expireSubscriptions = async (req, res, next) => {
   }
 }
 
+const getMe = async (req, res) => {
+  try {
+    if (!req.session || !req.session.userId) {
+      return res.status(401).json({ success: false, message: 'Not authenticated' })
+    }
+    const userQuery = sql
+      .select(Master.master_user.selectColumns)
+      .from(Master.master_user.tablename)
+      .where(Master.master_user.selectOptionColumns.id)
+      .build()
+    const users = await Query(userQuery, [req.session.userId], [Master.master_user.prefix_])
+    if (users.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+    const user = users[0]
+    const { password: _, ...userWithoutPassword } = user
+    res.status(200).json({ success: true, message: 'User retrieved successfully', data: userWithoutPassword })
+  } catch (error) {
+    console.error('Get me error:', error)
+    return res.status(500).json({ success: false, message: 'Server error retrieving user', error: error.message })
+  }
+}
+
 module.exports = {
   login,
   logout,
@@ -1104,4 +1127,5 @@ module.exports = {
   saveSubscriptionHistory,
   getUserUsedFreeTrials,
   expireSubscriptions,
+  getMe,
 }
