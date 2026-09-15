@@ -174,11 +174,15 @@ const regenerateCollectionsJournalEntries = async (
       .from(Accounting.collection_items.tablename)
 
       .innerJoin(
-        Accounting.sales_items.tablename,
-
-        Accounting.sales_items.selectOptionColumns.id,
-
+        Accounting.sales.tablename,
+        Accounting.sales.selectOptionColumns.id,
         Accounting.collection_items.selectOptionColumns.sales_id,
+      )
+
+      .innerJoin(
+        Accounting.sales_items.tablename,
+        Accounting.sales_items.selectOptionColumns.sales_id,
+        Accounting.sales.selectOptionColumns.id,
       )
 
       .where(Accounting.collection_items.selectOptionColumns.collection_id)
@@ -308,11 +312,14 @@ const getSales = async (req, res, next) => {
 
         { col: Accounting.sales.selectOptionColumns.date_due, as: 'date_due' },
 
-        { col: Accounting.sales.selectOptionColumns.remarks, as: 'remarks' },
-
         {
           col: Accounting.sales.selectOptionColumns.total_amount_due,
           as: 'amount_due',
+        },
+
+        {
+          col: Accounting.sales.selectOptionColumns.paid_amount,
+          as: 'paid_amount',
         },
 
         { col: Accounting.sales.selectOptionColumns.status, as: 'status' },
@@ -337,10 +344,7 @@ const getSales = async (req, res, next) => {
     if (excludeCollected) {
       const collectedSalesSubquery =
         `SELECT 1 FROM ${Accounting.collection_items.tablename} ci_coll ` +
-        `INNER JOIN ${Accounting.sales_items.tablename} si_inv ` +
-        `ON si_inv.${Accounting.sales_items.selectOptionColumns.id} = ` +
-        `ci_coll.${Accounting.collection_items.selectOptionColumns.sales_id} ` +
-        `WHERE si_inv.${Accounting.sales_items.selectOptionColumns.sales_id} = ` +
+        `WHERE ci_coll.${Accounting.collection_items.selectOptionColumns.sales_id} = ` +
         `${Accounting.sales.selectOptionColumns.id}`
 
       whereClause += ` WHERE NOT EXISTS (${collectedSalesSubquery})`
@@ -377,7 +381,6 @@ const getSales = async (req, res, next) => {
     let sales = await Query(paginatedQuery, queryParams, [
       Accounting.sales.prefix_,
       Master.customers.prefix_,
-      Accounting.collection_items.prefix_,
     ])
 
     res.status(200).json({
@@ -727,6 +730,8 @@ const createSales = async (req, res, next) => {
 
       total_amount_due,
 
+      paid_amount,
+
       created_by,
 
       checked_by,
@@ -795,6 +800,8 @@ const createSales = async (req, res, next) => {
         remarks || null,
 
         total_amount_due || null,
+
+        paid_amount || 0,
 
         'UNPAID',
 

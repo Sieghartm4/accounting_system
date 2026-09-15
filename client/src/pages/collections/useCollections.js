@@ -74,10 +74,15 @@ const useCollections = () => {
 
         const result = await response.json()
 
+        console.log('Collections API response:', result)
+        console.log('Collections data:', result.data)
+
         if (!result.success)
           throw new Error(result.message || 'Failed to fetch collections')
 
         const data = Array.isArray(result.data) ? result.data : []
+
+        console.log('Processed collections data:', data)
 
         if (append) {
           const next = [...(collectionsRef.current || []), ...data]

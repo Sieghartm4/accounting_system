@@ -37,6 +37,12 @@ module.exports = {
         type: Sequelize.STRING(300),
         allowNull: false
       },
+      c_collected_amount: {
+        type: Sequelize.DECIMAL(18, 2),
+        allowNull: false,
+        defaultValue: 0.00,
+        comment: 'Total amount collected in this payment',
+      },
       c_remarks: {
         type: Sequelize.TEXT('long'),
         allowNull: true

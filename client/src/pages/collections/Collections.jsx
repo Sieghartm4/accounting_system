@@ -912,6 +912,7 @@ function CollectionsContent() {
           transition={{ delay: 0.3 }}
           className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
         >
+          {console.log('Rendering DynamicTable with collections:', collections)}
           <DynamicTable
             data={collections}
             title="Collections Ledger"
@@ -920,6 +921,48 @@ function CollectionsContent() {
             enableActionColumn={true}
             checkboxColumn="id"
             checkboxCondition={checkboxCondition}
+            columns={[
+              {
+                key: 'document_reference',
+                label: 'Document Reference',
+              },
+              {
+                key: 'customer',
+                label: 'Customer',
+              },
+              {
+                key: 'collection_date',
+                label: 'Collection Date',
+              },
+              {
+                key: 'mode_of_payment',
+                label: 'Mode of Payment',
+              },
+              {
+                key: 'collected_amount',
+                label: 'Collected Amount',
+              },
+              {
+                key: 'remarks',
+                label: 'Remarks',
+              },
+              {
+                key: 'state',
+                label: 'State',
+              },
+            ]}
+            badgeColumns={[
+              {
+                column: 'state',
+                values: {
+                  PREPARED: 'orange',
+                  CHECKED: 'blue',
+                  APPROVED: 'green',
+                  REJECTED: 'red',
+                  CANCELLED: 'orange',
+                },
+              },
+            ]}
             actionButtons={[
               {
                 label: 'View',
@@ -1006,26 +1049,6 @@ function CollectionsContent() {
                       message: error.message || 'Failed to fetch collection details',
                     })
                   }
-                },
-              },
-            ]}
-            badgeColumns={[
-              {
-                column: 'status',
-                values: {
-                  COLLECTED: 'green',
-                  'NOT COLLECTED': 'red',
-                  'PARTIALLY COLLECTED': 'yellow',
-                },
-              },
-              {
-                column: 'state',
-                values: {
-                  PREPARED: 'orange',
-                  CHECKED: 'blue',
-                  APPROVED: 'green',
-                  REJECTED: 'red',
-                  CANCELLED: 'orange',
                 },
               },
             ]}

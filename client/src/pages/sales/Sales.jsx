@@ -712,7 +712,9 @@ function SalesContent() {
               values: {
                 PAID: 'green',
                 UNPAID: 'red',
-                'PARTIALLY PAID': 'yellow',
+                PARTIALLY_PAID: 'yellow',
+                OVERPAID: 'purple',
+                REJECTED: 'red',
               },
             },
             {

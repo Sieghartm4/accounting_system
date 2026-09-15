@@ -3,6 +3,7 @@ const { auth } = require('../middlewares/auth.middleware')
 const {
   getCollections,
   getAllCollections,
+  getUncollectedSales,
   getSalesCollection,
   getSalesItemsCollection,
   createCollection,

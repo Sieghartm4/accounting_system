@@ -49,6 +49,16 @@ module.exports = {
         allowNull: false,
         defaultValue: 0.0,
       },
+      bri_ledger_id: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'journal_entries',
+          key: 'je_id',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL',
+      },
       bri_created_by: {
         type: Sequelize.STRING(300),
         allowNull: false,

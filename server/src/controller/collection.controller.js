@@ -30,6 +30,9 @@ require('dotenv').config()
 
 const getCollections = async (req, res, next) => {
   try {
+    console.log('GET COLLECTIONS - Request received')
+    console.log('Query params:', req.query)
+
     const query = sql
       .select([
         { col: `${Accounting.collections.tablename}.c_id`, as: 'id' },
@@ -37,8 +40,8 @@ const getCollections = async (req, res, next) => {
         { col: `${Master.customers.tablename}.c_name`, as: 'customer' },
 
         {
-          col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.document_reference}`,
-          as: 'doc_ref',
+          col: `${Accounting.collections.tablename}.c_document_reference`,
+          as: 'document_reference',
         },
 
         {
@@ -58,6 +61,16 @@ const getCollections = async (req, res, next) => {
           as: 'collection_date',
         },
 
+        {
+          col: `${Accounting.collections.tablename}.c_collected_amount`,
+          as: 'collected_amount',
+        },
+
+        {
+          col: `${Accounting.collections.tablename}.c_remarks`,
+          as: 'remarks',
+        },
+
         { col: `${Accounting.collections.tablename}.c_state`, as: 'state' },
       ])
 
@@ -71,6 +84,8 @@ const getCollections = async (req, res, next) => {
 
       .build()
 
+    console.log('Generated SQL query:', query)
+
     const { offset, limit, dateFrom, dateTo, date_from, date_to } = req.query
     const collectionsDateFrom = dateFrom || date_from
     const collectionsDateTo = dateTo || date_to
@@ -79,6 +94,9 @@ const getCollections = async (req, res, next) => {
     const limitNum = shouldPaginate
       ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
       : null
+
+    console.log('Pagination params:', { shouldPaginate, offsetNum, limitNum })
+    console.log('Date filters:', { collectionsDateFrom, collectionsDateTo })
 
     const collectionDateColumn = `DATE(${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.collection_date})`
     let whereClause = ''
@@ -108,10 +126,16 @@ const getCollections = async (req, res, next) => {
       ? `${queryWithWhere} ORDER BY ${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
       : `${queryWithWhere} ORDER BY ${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id} DESC`
 
+    console.log('Final query:', paginatedQuery)
+    console.log('Query params:', queryParams)
+
     let collections = await Query(paginatedQuery, queryParams, [
       Accounting.collections.prefix_,
       Master.customers.prefix_,
     ])
+
+    console.log('Collections fetched:', collections)
+    console.log('Collections count:', collections ? collections.length : 0)
 
     res.status(200).json({
       success: true,
@@ -146,7 +170,7 @@ const getCollections = async (req, res, next) => {
   }
 }
 
-const getSalesCollection = async (req, res, next) => {
+const getUncollectedSales = async (req, res, next) => {
   try {
     const query = sql
       .select([
@@ -183,8 +207,7 @@ const getSalesCollection = async (req, res, next) => {
 
       .andWhereNotExists(
         `SELECT 1 FROM ${Accounting.collection_items.tablename} ci_coll ` +
-          `INNER JOIN ${Accounting.sales_items.tablename} si_inv ON si_inv.${Accounting.sales_items.selectOptionColumns.id} = ci_coll.${Accounting.collection_items.selectOptionColumns.sales_id} ` +
-          `WHERE si_inv.${Accounting.sales_items.selectOptionColumns.sales_id} = ${Accounting.sales.selectOptionColumns.id}`,
+          `WHERE ci_coll.${Accounting.collection_items.selectOptionColumns.sales_id} = ${Accounting.sales.selectOptionColumns.id}`,
       )
 
       .andWhereNot(Accounting.sales.selectOptionColumns.status)
@@ -217,6 +240,109 @@ const getSalesCollection = async (req, res, next) => {
       success: false,
 
       message: 'Failed to fetch sales data',
+
+      error: error.message,
+
+      timestamp: new Date().toISOString(),
+    })
+  }
+}
+
+const getSalesCollection = async (req, res, next) => {
+  try {
+    const { sales_id } = req.query
+
+    console.log('Sales IDs received:', req.query)
+    console.log('Raw sales_id:', sales_id)
+    console.log('Type of sales_id:', typeof sales_id)
+
+    const salesIds = (Array.isArray(sales_id) ? sales_id : [sales_id]).filter(
+      (id) => id !== undefined && id !== null && id !== '',
+    )
+
+    console.log('Processed salesIds:', salesIds)
+
+    if (salesIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+
+        message: 'No sales IDs provided',
+
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    const query = sql
+      .select([
+        { col: Accounting.sales.selectOptionColumns.id, as: 'id' },
+
+        { col: Master.customers.selectOptionColumns.name, as: 'customer' },
+
+        {
+          col: Accounting.sales.selectOptionColumns.document_reference,
+          as: 'document_reference',
+        },
+
+        { col: Accounting.sales.selectOptionColumns.terms, as: 'terms' },
+
+        {
+          col: Accounting.sales.selectOptionColumns.date_delivered,
+          as: 'date_delivered',
+        },
+
+        { col: Accounting.sales.selectOptionColumns.date_due, as: 'date_due' },
+
+        { col: Accounting.sales.selectOptionColumns.remarks, as: 'remarks' },
+
+        {
+          col: Accounting.sales.selectOptionColumns.total_amount_due,
+          as: 'total_amount_due',
+        },
+
+        {
+          col: Accounting.sales.selectOptionColumns.paid_amount,
+          as: 'paid_amount',
+        },
+      ])
+
+      .from(Accounting.sales.tablename)
+
+      .innerJoin(
+        Master.customers.tablename,
+        Accounting.sales.selectOptionColumns.customer_id,
+        Master.customers.selectOptionColumns.id,
+      )
+
+      .whereIn(Accounting.sales.selectOptionColumns.id, salesIds)
+
+      .build()
+
+    console.log('Generated SQL query:', query)
+    console.log('Query params:', salesIds)
+    
+    const sales = await Query(query, salesIds)
+    
+    console.log('Sales data fetched:', sales)
+    console.log('Sales data length:', sales ? sales.length : 0)
+
+    res.status(200).json({
+      success: true,
+
+      message: 'Sales retrieved successfully for partial payments',
+
+      data: sales,
+
+      count: sales.length,
+
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching sales for collection:', error)
+
+    res.status(500).json({
+      success: false,
+
+      message: 'Failed to fetch sales data for collection',
 
       error: error.message,
 
@@ -521,74 +647,52 @@ const getAllCollections = async (req, res, next) => {
         },
 
         {
+          col: Master.customers.selectOptionColumns.name,
+          as: 'customer',
+        },
+
+        {
           col: Accounting.sales.selectOptionColumns.document_reference,
           as: 'invoice_ref',
         },
 
+        { col: Accounting.sales.selectOptionColumns.terms, as: 'terms' },
+
         {
-          col: Master.products_service.selectOptionColumns.name,
-          as: 'product_service_name',
+          col: Accounting.sales.selectOptionColumns.date_delivered,
+          as: 'date_delivered',
         },
 
-        { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
+        { col: Accounting.sales.selectOptionColumns.date_due, as: 'date_due' },
 
         {
-          col: Accounting.sales_items.selectOptionColumns.discount_type,
-          as: 'discount_type',
-        },
-
-        { col: Master.vat.selectOptionColumns.rate, as: 'vat' },
-
-        {
-          col: Accounting.collection_items.selectOptionColumns.amount,
-          as: 'amount',
+          col: Accounting.sales.selectOptionColumns.total_amount_due,
+          as: 'gross',
         },
 
         {
-          col: Master.withholding_tax.selectOptionColumns.rate,
-          as: 'witholding_tax',
+          col: Accounting.sales.selectOptionColumns.paid_amount,
+          as: 'paid_amount',
         },
 
         {
-          col: Accounting.sales_items.selectOptionColumns.responsibility_center,
-          as: 'responsibility_center',
+          col: Accounting.collection_items.selectOptionColumns.amount_applied,
+          as: 'amount_applied',
         },
       ])
 
       .from(Accounting.collection_items.tablename)
 
       .innerJoin(
-        Accounting.sales_items.tablename,
-        Accounting.sales_items.selectOptionColumns.id,
+        Accounting.sales.tablename,
+        Accounting.sales.selectOptionColumns.id,
         Accounting.collection_items.selectOptionColumns.sales_id,
       )
 
       .innerJoin(
-        Accounting.sales.tablename,
-        Accounting.sales.selectOptionColumns.id,
-        Accounting.sales_items.selectOptionColumns.sales_id,
-      )
-
-      .leftJoin(
-        Master.vat.tablename,
-
-        Accounting.sales_items.selectOptionColumns.vat,
-
-        Master.vat.selectOptionColumns.id,
-      )
-
-      .leftJoin(
-        Master.withholding_tax.tablename,
-
-        Accounting.sales_items.selectOptionColumns.witholding_tax,
-
-        Master.withholding_tax.selectOptionColumns.id,
-      )
-
-      .leftJoin(
-        Master.products_service.tablename,
-        Master.products_service.selectOptionColumns.id,
-        Accounting.sales_items.selectOptionColumns.product_service,
+        Master.customers.tablename,
+        Accounting.sales.selectOptionColumns.customer_id,
+        Master.customers.selectOptionColumns.id,
       )
 
       .where(Accounting.collection_items.selectOptionColumns.collection_id)
@@ -598,7 +702,6 @@ const getAllCollections = async (req, res, next) => {
     let collection_items = await Query(
       collection_items_query,
       [collection_id],
-      [Accounting.collection_items.prefix_],
     )
 
     const collection_journal_query = sql
@@ -824,6 +927,15 @@ const createCollection = async (req, res, next) => {
         })
         .build()
 
+      // Calculate total collected amount from collection items
+      let totalCollectedAmount = 0
+      if (collection_items && collection_items.length > 0) {
+        totalCollectedAmount = collection_items.reduce(
+          (sum, item) => sum + (parseFloat(item.amount_applied || item.amount || 0)),
+          0
+        )
+      }
+
       const mainValues = [
         newCollectionId, // c_id
         customer_id || null,
@@ -837,6 +949,8 @@ const createCollection = async (req, res, next) => {
         check_number || null,
 
         collection_date || null,
+
+        totalCollectedAmount, // c_collected_amount
 
         remarks || null,
 
@@ -867,29 +981,27 @@ const createCollection = async (req, res, next) => {
             })
           }
 
-          const [salesItemRows] = await connection.execute(
-            `SELECT ${Accounting.sales_items.selectOptionColumns.id} FROM ${Accounting.sales_items.tablename} WHERE ${Accounting.sales_items.selectOptionColumns.id} = ? LIMIT 1`,
+          const [salesRows] = await connection.execute(
+            `SELECT ${Accounting.sales.selectOptionColumns.id} FROM ${Accounting.sales.tablename} WHERE ${Accounting.sales.selectOptionColumns.id} = ? LIMIT 1`,
             [item.sales_id],
           )
 
-          if (salesItemRows.length === 0) {
+          if (salesRows.length === 0) {
             await connection.rollback()
             return res.status(400).json({
               success: false,
-              message: `Collection item references a sales item that does not exist: ${item.sales_id}`,
+              message: `Collection item references a sales record that does not exist: ${item.sales_id}`,
             })
           }
 
-          const itemQuery = `INSERT INTO ${Accounting.collection_items.tablename} (ci_collection_id, ci_sales_id, ci_amount, ci_witholding_tax) VALUES (?, ?, ?, ?)`
+          const itemQuery = `INSERT INTO ${Accounting.collection_items.tablename} (ci_collection_id, ci_sales_id, ci_amount_applied) VALUES (?, ?, ?)`
 
           const itemValues = [
             collectionId,
 
             item.sales_id,
 
-            item.amount || 0,
-
-            item.witholding_tax || 0,
+            item.amount_applied || 0,
           ]
 
           await connection.execute(itemQuery, itemValues)
@@ -1184,12 +1296,12 @@ const updateCollectionState = async (req, res, next) => {
           )
 
           // Special logic for APPROVED state: update related sales records to PAID
-          // Get collection_items to find sales_item_ids
+          // Get collection_items to find sales_ids directly
           const collectionItemsQuery = sql
             .select([
               {
                 col: Accounting.collection_items.selectOptionColumns.sales_id,
-                as: 'sales_item_id',
+                as: 'sales_id',
               },
             ])
             .from(Accounting.collection_items.tablename)
@@ -1202,56 +1314,68 @@ const updateCollectionState = async (req, res, next) => {
 
           console.log('collection_items', collection_items)
 
-          // Get unique sales_item_ids
-          const uniqueSalesItemIds = [
-            ...new Set(collection_items.map((item) => item.sales_item_id)),
+          // Get unique sales_ids directly from collection_items
+          const uniqueSalesIds = [
+            ...new Set(collection_items.map((item) => item.sales_id)),
           ].filter((id) => id !== null && id !== undefined)
 
-          console.log('uniqueSalesItemIds', uniqueSalesItemIds)
+          console.log('uniqueSalesIds', uniqueSalesIds)
 
-          if (uniqueSalesItemIds.length > 0) {
-            // Get sales_ids from sales_items table
-            const salesItemsQuery = sql
-              .select([
-                {
-                  col: Accounting.sales_items.selectOptionColumns.sales_id,
-                  as: 'sales_id',
-                },
-              ])
-              .from(Accounting.sales_items.tablename)
-              .whereIn(
-                Accounting.sales_items.selectOptionColumns.id,
-                uniqueSalesItemIds,
-              )
-              .build()
-
-            const [salesItems] = await connection.execute(
-              salesItemsQuery,
-              uniqueSalesItemIds,
-            )
-
-            console.log('salesItems', salesItems)
-
-            // Get unique sales_ids
-            const uniqueSalesIds = [
-              ...new Set(salesItems.map((item) => item.sales_id)),
-            ].filter((id) => id !== null && id !== undefined)
-
-            console.log('uniqueSalesIds', uniqueSalesIds)
-
-            // Recalculate each sale status from all approved collection items.
+          if (uniqueSalesIds.length > 0) {
+            // Recalculate each sale status from all approved collection items for partial payment support
             for (const salesId of uniqueSalesIds) {
-              const updateSalesQuery = `
-                UPDATE ${Accounting.sales.tablename} s
-                SET ${Accounting.sales.selectOptionColumns.status} = 'PAID'
-                WHERE s.${Accounting.sales.selectOptionColumns.id} = ?
-                  AND s.${Accounting.sales.selectOptionColumns.status} = 'UNPAID'
+              // Calculate total paid for this sale
+              const paidAmountQuery = `
+                SELECT COALESCE(SUM(ci.ci_amount_applied), 0) as total_paid
+                FROM ${Accounting.collection_items.tablename} ci
+                INNER JOIN ${Accounting.collections.tablename} c
+                  ON c.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
+                WHERE ci.${Accounting.collection_items.selectOptionColumns.sales_id} = ?
+                  AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
               `
+              const [paidResult] = await connection.execute(paidAmountQuery, [salesId])
+              const totalPaid = parseFloat(paidResult[0]?.total_paid || 0)
 
-              const [result] = await connection.execute(updateSalesQuery, [salesId])
-              console.log(
-                `Updated sales ID ${salesId} status to PAID, affected rows: ${result.affectedRows}`,
-              )
+              // Get sale total amount due
+              const saleQuery = `
+                SELECT ${Accounting.sales.selectOptionColumns.total_amount_due}, ${Accounting.sales.selectOptionColumns.paid_amount}
+                FROM ${Accounting.sales.tablename}
+                WHERE ${Accounting.sales.selectOptionColumns.id} = ?
+              `
+              const [saleResult] = await connection.execute(saleQuery, [salesId])
+              
+              if (saleResult.length > 0) {
+                const totalDue = parseFloat(saleResult[0].s_total_amount_due)
+                const currentPaidAmount = parseFloat(saleResult[0].s_paid_amount || 0)
+                
+                // Update paid amount
+                const newPaidAmount = currentPaidAmount + totalPaid
+                const updatePaidAmountQuery = `
+                  UPDATE ${Accounting.sales.tablename}
+                  SET ${Accounting.sales.selectOptionColumns.paid_amount} = ?
+                  WHERE ${Accounting.sales.selectOptionColumns.id} = ?
+                `
+                await connection.execute(updatePaidAmountQuery, [newPaidAmount, salesId])
+
+                // Determine status based on payment
+                let newStatus = 'UNPAID'
+                if (newPaidAmount >= totalDue) {
+                  newStatus = 'PAID'
+                } else if (newPaidAmount > 0) {
+                  newStatus = 'PARTIALLY_PAID'
+                }
+
+                const updateSalesQuery = `
+                  UPDATE ${Accounting.sales.tablename}
+                  SET ${Accounting.sales.selectOptionColumns.status} = ?
+                  WHERE ${Accounting.sales.selectOptionColumns.id} = ?
+                `
+
+                const [result] = await connection.execute(updateSalesQuery, [newStatus, salesId])
+                console.log(
+                  `Updated sales ID ${salesId} status to ${newStatus}, paid amount: ${newPaidAmount}, affected rows: ${result.affectedRows}`,
+                )
+              }
             }
           }
 
@@ -1647,9 +1771,23 @@ const getPrintCollections = async (req, res, next) => {
         },
 
         {
+          col: Master.customers.selectOptionColumns.name,
+          as: 'customer',
+        },
+
+        {
           col: Accounting.sales.selectOptionColumns.document_reference,
           as: 'invoice_ref',
         },
+
+        { col: Accounting.sales.selectOptionColumns.terms, as: 'terms' },
+
+        {
+          col: Accounting.sales.selectOptionColumns.date_delivered,
+          as: 'date_delivered',
+        },
+
+        { col: Accounting.sales.selectOptionColumns.date_due, as: 'date_due' },
 
         {
           col: Accounting.sales.selectOptionColumns.total_amount_due,
@@ -1657,77 +1795,28 @@ const getPrintCollections = async (req, res, next) => {
         },
 
         {
-          col: Master.products_service.selectOptionColumns.name,
-          as: 'product_service_name',
+          col: Accounting.sales.selectOptionColumns.paid_amount,
+          as: 'paid_amount',
         },
 
         {
-          col: Accounting.sales_items.selectOptionColumns.description,
-          as: 'description',
-        },
-
-        { col: Accounting.sales_items.selectOptionColumns.quantity, as: 'quantity' },
-
-        {
-          col: Accounting.sales_items.selectOptionColumns.sales_price,
-          as: 'sales_price',
-        },
-
-        { col: Accounting.sales_items.selectOptionColumns.discount, as: 'discount' },
-
-        {
-          col: Accounting.sales_items.selectOptionColumns.discount_type,
-          as: 'discount_type',
-        },
-
-        { col: Master.vat.selectOptionColumns.rate, as: 'vat_rate' },
-
-        {
-          col: Master.withholding_tax.selectOptionColumns.rate,
-          as: 'withholding_tax_rate',
-        },
-
-        {
-          col: Accounting.collection_items.selectOptionColumns.amount,
+          col: Accounting.collection_items.selectOptionColumns.amount_applied,
           as: 'amount',
-        },
-
-        {
-          col: Accounting.sales_items.selectOptionColumns.responsibility_center,
-          as: 'responsibility_center',
         },
       ])
 
       .from(Accounting.collection_items.tablename)
 
       .innerJoin(
-        Accounting.sales_items.tablename,
-        Accounting.sales_items.selectOptionColumns.id,
+        Accounting.sales.tablename,
+        Accounting.sales.selectOptionColumns.id,
         Accounting.collection_items.selectOptionColumns.sales_id,
       )
 
       .innerJoin(
-        Accounting.sales.tablename,
-        Accounting.sales.selectOptionColumns.id,
-        Accounting.sales_items.selectOptionColumns.sales_id,
-      )
-
-      .leftJoin(
-        Master.vat.tablename,
-        Accounting.sales_items.selectOptionColumns.vat,
-        Master.vat.selectOptionColumns.id,
-      )
-
-      .leftJoin(
-        Master.withholding_tax.tablename,
-        Accounting.sales_items.selectOptionColumns.witholding_tax,
-        Master.withholding_tax.selectOptionColumns.id,
-      )
-
-      .leftJoin(
-        Master.products_service.tablename,
-        Accounting.sales_items.selectOptionColumns.product_service,
-        Master.products_service.selectOptionColumns.id,
+        Master.customers.tablename,
+        Accounting.sales.selectOptionColumns.customer_id,
+        Master.customers.selectOptionColumns.id,
       )
 
       .whereIn(
@@ -1740,11 +1829,6 @@ const getPrintCollections = async (req, res, next) => {
     let collection_items = await Query(
       collection_items_query,
       [...collectionIds],
-      [
-        Accounting.collection_items.prefix_,
-        Accounting.sales.prefix_,
-        Master.products_service.prefix_,
-      ],
     )
 
     // Fetch journal entries
@@ -1890,28 +1974,6 @@ const getPrintCollections = async (req, res, next) => {
             )
 
       const mappedItems = items.map((item) => {
-        const quantity = parseFloat(item.quantity || 1)
-
-        const salesPrice = parseFloat(item.sales_price || 0)
-
-        const discount = parseFloat(item.discount || 0)
-
-        const vatRate = parseFloat(item.vat_rate || 0)
-
-        const whtRate = parseFloat(item.withholding_tax_rate || 0)
-
-        const totalPrice = salesPrice * quantity
-
-        const discountAmount = totalPrice * (discount / 100)
-
-        const discountedPrice = totalPrice - discountAmount
-
-        const vatAmount = discountedPrice * (vatRate / 100)
-
-        const whtAmount = discountedPrice * (whtRate / 100)
-
-        const amountDue = discountedPrice + vatAmount - whtAmount
-
         return {
           id: item.id,
 
@@ -1919,35 +1981,21 @@ const getPrintCollections = async (req, res, next) => {
 
           invoice_ref: item.invoice_ref || '—',
 
-          product_name: item.product_service_name || '—',
+          customer: item.customer || '—',
 
-          description: item.description || '—',
+          terms: item.terms || '—',
 
-          unit: 'pcs',
+          date_delivered: item.date_delivered || '—',
 
-          quantity: quantity,
+          date_due: item.date_due || '—',
 
-          purchase_price: salesPrice,
+          invoice_amount: parseFloat(item.invoice_amount || 0),
 
-          total_price: totalPrice,
+          paid_amount: parseFloat(item.paid_amount || 0),
 
-          discount_amount: discountAmount,
+          amount: parseFloat(item.amount || 0),
 
-          vat_percentage: vatRate,
-
-          vat_amount: vatAmount,
-
-          wht_percentage: whtRate,
-
-          wht_amount: whtAmount,
-
-          amount_due: amountDue,
-
-          vatable_sales: vatRate > 0 ? discountedPrice : 0,
-
-          vat_exempt_sales: vatRate === 0 ? discountedPrice : 0,
-
-          zero_rated_sales: 0,
+          witholding_tax: parseFloat(item.witholding_tax || 0),
         }
       })
 
@@ -2199,7 +2247,7 @@ const updateCollection = async (req, res, next) => {
             },
 
             {
-              col: Accounting.collection_items.selectOptionColumns.amount,
+              col: Accounting.collection_items.selectOptionColumns.amount_applied,
               as: 'amount',
             },
           ])
@@ -3037,6 +3085,8 @@ module.exports = {
   getCollections,
 
   getAllCollections,
+
+  getUncollectedSales,
 
   getSalesCollection,
 

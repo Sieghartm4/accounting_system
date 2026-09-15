@@ -259,15 +259,11 @@ function computeSummary(items) {
     (acc, item) => ({
       totalGross: acc.totalGross + (item.gross || 0),
       totalDiscount: acc.totalDiscount + (item.discAmt || 0),
-      totalVAT: acc.totalVAT + (item.vatAmt || 0),
-      totalWHT: acc.totalWHT + (item.whtAmount || 0),
-      totalCashCollected: acc.totalCashCollected + (item.amount || 0),
+      totalCashCollected: acc.totalCashCollected + (item.toPay || 0),
     }),
     {
       totalGross: 0,
       totalDiscount: 0,
-      totalVAT: 0,
-      totalWHT: 0,
       totalCashCollected: 0,
     },
   )
@@ -612,52 +608,84 @@ export default function CollectionsForm({
         setCustomerSearch(customerName)
       }
 
-      // Use fetched sales items if available, otherwise create placeholder items
-      if (preSelectedSalesItems && preSelectedSalesItems.length > 0) {
-        console.log('Using fetched sales items')
-        const items = preSelectedSalesItems.map((item, index) => {
-          console.log('Processing sales item:', item)
-          const gross = parseFloat(item.sales_price) || 0
-          const discount = parseFloat(item.discount) || 0
-          const discountType = item.discount_type || 'PERCENT'
-          const vatPct = normalizeTaxRatePercent(item.vat)
-          const whtPct = normalizeTaxRatePercent(item.witholding_tax)
-          const vatType = item.vat_type || 'VAT-EX'
-          const computed = computeItemAmounts(
-            1,
-            gross,
-            discount,
-            discountType,
-            vatPct,
-            whtPct,
-            vatType,
-          )
-          console.log(
-            `Calculated: gross=${gross}, discount=${discount}, vat=${computed.vatAmt}, wht=${computed.whtAmount}, amount=${computed.amount}`,
-          )
-          return {
-            id: `auto-${index}`,
-            salesItemId: item.id,
-            invoiceRef: item.document_reference || '',
-            description: item.product_service_name || item.name || '',
-            responsibilityCenter: item.responsibility_center || '',
-            gross: computed.gross,
-            discAmt: computed.discAmt,
-            vatAmt: computed.vatAmt,
-            vatType,
-            whtAmount: computed.whtAmount,
-            amount: computed.amount,
-            isOther: false,
+      // Fetch sales data directly for partial payments (new logic)
+      if (preSelectedSales && preSelectedSales.length > 0) {
+        console.log('Fetching sales data for partial payments')
+        console.log('preSelectedSales:', preSelectedSales)
+        console.log('preSelectedSales types:', preSelectedSales.map(item => typeof item))
+        
+        // Extract IDs from sales objects
+        const salesIds = preSelectedSales.map(sale => {
+          // Handle both object and string/number ID formats
+          if (typeof sale === 'object' && sale !== null) {
+            return sale.id || sale.sales_number || sale.doc_ref
           }
-        })
-        setCollectionItems(items)
-        console.log('Auto-filled collection items from fetched data:', items)
-      } else {
-        console.warn('No sales items were returned for the selected sales')
-        setCollectionItems([])
+          return sale
+        }).filter(id => id !== undefined && id !== null && id !== '')
+        
+        console.log('Extracted salesIds:', salesIds)
+        
+        const fetchSalesData = async () => {
+          try {
+            const token = sessionStorage.getItem('authenticated')
+            if (!token) throw new Error('No authorization token found')
+
+            const queryParams = new URLSearchParams()
+            salesIds.forEach((id) => {
+              console.log('Appending sales_id:', id, 'type:', typeof id)
+              queryParams.append('sales_id', id)
+            })
+
+            const url = `${import.meta.env.VITE_SERVER_LINK}/collections/sales-collection?${queryParams.toString()}`
+            console.log('Fetching from URL:', url)
+
+            const response = await fetch(url, {
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            })
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+            const result = await response.json()
+
+            console.log('Sales collection API response:', result)
+
+            if (!result.success)
+              throw new Error(result.message || 'Failed to fetch sales data')
+
+            // Map sales → collection items for partial payments
+            const newItems = result.data.map((s) => {
+              console.log('Processing sales item:', s)
+              const totalDue = parseFloat(s.total_amount_due) || 0
+              const paidAmount = parseFloat(s.paid_amount) || 0
+              const remainingBalance = totalDue - paidAmount
+
+              return {
+                id: Date.now() + Math.random(),
+                salesItemId: s.id,
+                invoiceRef: s.document_reference || '',
+                remarks: s.remarks || '',
+                gross: totalDue,
+                paidAmount: paidAmount,
+                toPay: remainingBalance, // Auto-calculate: amount due - paid amount
+                discAmt: 0,
+                amount: remainingBalance,
+                isOther: false,
+              }
+            })
+
+            setCollectionItems(newItems)
+            console.log('Auto-filled collection items from sales data:', newItems)
+          } catch (error) {
+            console.error('Error fetching sales data:', error)
+            setCollectionItems([])
+          }
+        }
+
+        fetchSalesData()
       }
     }
-  }, [preSelectedSales, preSelectedSalesItems, isViewMode, isEditMode, customers])
+  }, [preSelectedSales, isViewMode, isEditMode, customers])
 
   // Populate form with collection data when in view or edit mode
   useEffect(() => {
@@ -716,14 +744,12 @@ export default function CollectionsForm({
           id: item.id,
           salesItemId: item.sales_id,
           invoiceRef: item.invoice_ref || '',
-          description: item.product_service_name || item.description || '',
-          responsibilityCenter: item.responsibility_center || '',
-          gross: parseFloat(item.gross) || 0,
-          discAmt: parseFloat(item.discount) || 0,
-          vatAmt: parseFloat(item.vat) || 0,
-          vatType: item.vat_type || 'VAT-EX',
-          whtAmount: parseFloat(item.witholding_tax) || 0,
-          amount: parseFloat(item.amount) || 0,
+          remarks: item.remarks || '',
+          gross: parseFloat(item.invoice_amount || item.gross || 0),
+          paidAmount: parseFloat(item.paid_amount || 0),
+          toPay: parseFloat(item.amount_applied || item.amount || 0),
+          discAmt: 0,
+          amount: parseFloat(item.amount_applied || item.amount || 0),
           isOther: false,
         }))
         console.log('Setting collection items:', items)
@@ -790,6 +816,10 @@ export default function CollectionsForm({
   // ── Item helpers ──────────────────────────────────────────────────────────
   const removeCollectionItem = (id) =>
     setCollectionItems((prev) => prev.filter((i) => i.id !== id))
+  const updateCollectionItem = (id, field, value) =>
+    setCollectionItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, [field]: value } : i)),
+    )
   const toggleSalesSelection = (saleId) =>
     setSelectedSales((prev) =>
       prev.includes(saleId) ? prev.filter((id) => id !== saleId) : [...prev, saleId],
@@ -812,7 +842,7 @@ export default function CollectionsForm({
       selectedSales.forEach((id) => queryParams.append('sales_id', id))
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/collections/sales-items-collection?${queryParams.toString()}`,
+        `${import.meta.env.VITE_SERVER_LINK}/collections/sales-collection?${queryParams.toString()}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -822,42 +852,36 @@ export default function CollectionsForm({
       )
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
       const result = await response.json()
+
+      console.log('Sales collection API response:', result)
+
       if (!result.success)
         throw new Error(result.message || 'Failed to fetch sales items')
 
-      // ── Map sales_items → collection items ──────────────────────────────
-      //  We compute amounts here so the accountant sees the full breakdown.
-      //  vat IS included — it is part of ci_amount (Discounted + VAT − WHT).
+      // ── Map sales → collection items for partial payments ──────────────────────
+      //  For partial payments, we now work with sales records directly
+      //  The user can specify how much to apply to each sales invoice
       const newItems = result.data.map((s) => {
-        const qty = parseFloat(s.quantity) || 0
-        const price = parseFloat(s.sales_price) || 0
-        const discountVal = parseFloat(s.discount) || 0
-        const discountType = s.discount_type || 'PERCENT'
-        const vatPct = normalizeTaxRatePercent(s.vat)
-        const whtPct = normalizeTaxRatePercent(s.witholding_tax)
-        const vatType = s.vat_type || 'VAT-EX'
-
-        const computed = computeItemAmounts(
-          qty,
-          price,
-          discountVal,
-          discountType,
-          vatPct,
-          whtPct,
-          vatType,
-        )
+        console.log('Processing sales item:', s)
+        const totalDue = parseFloat(s.total_amount_due) || 0
+        const paidAmount = parseFloat(s.paid_amount) || 0
+        const remainingBalance = totalDue - paidAmount
 
         return {
           id: Date.now() + Math.random(),
-          salesItemId: s.id, // → ci_sales_id (now using sales item ID)
+          salesItemId: s.id, // → ci_sales_id (now using sales ID)
+          customer: s.customer || '', // display only
           invoiceRef: s.document_reference || '', // display only
-          description: s.product_service_name || s.description || '', // display only
-          responsibilityCenter: s.responsibility_center || '', // display only
-          gross: computed.gross, // display only
-          discAmt: computed.discAmt, // display only
-          vatAmt: computed.vatAmt, // display only
-          whtAmount: computed.whtAmount, // → ci_witholding_tax
-          amount: computed.amount, // → ci_amount
+          terms: s.terms || '', // display only
+          dateDelivered: s.date_delivered || '', // display only
+          dateDue: s.date_due || '', // display only
+          remarks: s.remarks || '', // display only
+          gross: totalDue, // display only - total amount due
+          paidAmount: paidAmount, // display only - amount already paid
+          discAmt: 0, // display only
+          vatAmt: 0, // display only
+          whtAmount: 0, // → ci_witholding_tax
+          amount: remainingBalance, // → ci_amount_applied (default to remaining balance)
           isOther: false,
         }
       })
@@ -990,49 +1014,19 @@ export default function CollectionsForm({
     const arAccount = chartsOfAccounts.find((a) =>
       accountLabel(a).includes('accounts receivable'),
     )
-    const cwtAccount = findAccount([
-      'creditable withholding tax',
-      'creditable witholding tax',
-    ])
 
     let totalCash = 0
+    let totalAR = 0
 
     collectionItems
       .filter((i) => !i.isOther)
       .forEach((item) => {
-        const invoiceAmount = Number(item.amount || 0)
-        const withholdingAmount = Number(item.whtAmount || 0)
-        const cashAmount = Math.max(0, invoiceAmount - withholdingAmount)
-        totalCash += cashAmount
-
-        // CR Accounts Receivable — close the full invoice balance.
-        if (arAccount && invoiceAmount > 0) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: arAccount.id,
-            accountSearch: arAccount.name,
-            center: item.responsibilityCenter || '',
-            debit: 0,
-            credit: parseFloat(invoiceAmount.toFixed(2)),
-            isManual: false,
-          })
-        }
-
-        // DR Creditable WHT — recognize the 2307 certificate component.
-        if (cwtAccount && withholdingAmount > 0) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: cwtAccount.id,
-            accountSearch: cwtAccount.name || cwtAccount.account_name,
-            center: item.responsibilityCenter || '',
-            debit: parseFloat(withholdingAmount.toFixed(2)),
-            credit: 0,
-            isManual: false,
-          })
-        }
+        const invoiceAmount = Number(item.toPay || 0) // Use toPay amount from user input
+        totalCash += invoiceAmount
+        totalAR += invoiceAmount
       })
 
-    // DR  Cash / Bank — one combined entry
+    // DR Cash / Bank — one combined entry
     if (paymentAccount && totalCash > 0) {
       entries.push({
         id: Date.now() + Math.random(),
@@ -1041,6 +1035,19 @@ export default function CollectionsForm({
         center: '',
         debit: parseFloat(totalCash.toFixed(2)),
         credit: 0,
+        isManual: false,
+      })
+    }
+
+    // CR Accounts Receivable — one combined entry
+    if (arAccount && totalAR > 0) {
+      entries.push({
+        id: Date.now() + Math.random(),
+        account: arAccount.id,
+        accountSearch: arAccount.name,
+        center: '',
+        debit: 0,
+        credit: parseFloat(totalAR.toFixed(2)),
         isManual: false,
       })
     }
@@ -1102,6 +1109,16 @@ export default function CollectionsForm({
         return
       }
 
+      // Validate that all collection items have toPay > 0
+      const invalidItems = collectionItems.filter((i) => !i.isOther && (!i.toPay || i.toPay <= 0))
+      if (invalidItems.length > 0) {
+        setToast({
+          type: 'warning',
+          message: 'All collection items must have a "To Pay" amount greater than 0',
+        })
+        return
+      }
+
       const token = sessionStorage.getItem('authenticated')
       if (!token) {
         setToast({
@@ -1135,15 +1152,13 @@ export default function CollectionsForm({
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
 
       // ── collection_items payload — ONLY what the DB schema stores ──
-      //   ci_sales_id       → salesItemId
-      //   ci_amount         → amount       (discounted + VAT − WHT)
-      //   ci_witholding_tax → whtAmount
+      //   ci_sales_id       → salesItemId (now sales ID for partial payments)
+      //   ci_amount_applied → toPay        (amount to apply to this sales invoice)
       const preparedItems = collectionItems
         .filter((item) => !item.isOther)
         .map((item) => ({
           sales_id: item.salesItemId,
-          amount: item.amount,
-          witholding_tax: item.whtAmount,
+          amount_applied: item.toPay,
         }))
 
       const preparedJournalEntries = journalEntries.map((entry) => ({
@@ -1549,25 +1564,6 @@ export default function CollectionsForm({
                   value={fmt(summary.totalGross - summary.totalDiscount)}
                   containerClassName="p-2 rounded-md bg-red-50/70 border-l-3 border-red-500 my-1"
                 />
-
-                {/* 4. Total Output VAT (+) - Border explicitly removed (border-b-0) */}
-                <SummaryRow
-                  label="Total VAT (%):"
-                  value={fmt(summary.totalVAT)}
-                  badge="(+)"
-                  badgeColor="text-zinc-400"
-                  containerClassName="py-1 border-b-0"
-                />
-
-                {/* 5. Total Withholding Tax (-) */}
-                <SummaryRow
-                  label="Total Withholding Tax (WHT):"
-                  value={fmt(summary.totalWHT)}
-                  badge="(-)"
-                  badgeColor="text-red-500"
-                  valuePrefix="-"
-                  textColor="text-red-600"
-                />
               </div>
 
               {/* TOTAL AMOUNT HERO BOX */}
@@ -1830,43 +1826,26 @@ export default function CollectionsForm({
                   <>
                     <div className="overflow-x-auto custom-scrollbar">
                       <table
-                        className="w-full text-left text-xs text-slate-600"
-                        style={{ tableLayout: 'fixed', minWidth: 860 }}
+                        className="w-full text-left text-xs"
+                        style={{ tableLayout: 'fixed', minWidth: 1200 }}
                       >
                         <colgroup>
-                          <col style={{ width: '16%' }} /> {/* Invoice Ref */}
-                          <col style={{ width: '20%' }} /> {/* Product/Service */}
-                          <col style={{ width: '12%' }} /> {/* Gross Amt */}
-                          <col style={{ width: '10%' }} /> {/* Discount */}
-                          <col style={{ width: '10%' }} /> {/* VAT */}
-                          <col style={{ width: '12%' }} />{' '}
-                          {/* WHT → ci_witholding_tax */}
-                          <col style={{ width: '14%' }} />{' '}
-                          {/* Amount Due → ci_amount */}
-                          <col style={{ width: '10%' }} />{' '}
-                          {/* Responsibility Center */}
+                          <col style={{ width: '10%' }} /> {/* ID */}
+                          <col style={{ width: '15%' }} /> {/* Doc Ref */}
+                          <col style={{ width: '15%' }} /> {/* Remarks */}
+                          <col style={{ width: '12%' }} /> {/* Amount Due */}
+                          <col style={{ width: '12%' }} /> {/* Paid Amount */}
+                          <col style={{ width: '12%' }} /> {/* To Pay */}
                           <col style={{ width: '6%' }} /> {/* Delete */}
                         </colgroup>
                         <thead className="bg-zinc-100 border-b border-zinc-200 uppercase font-bold text-zinc-700 tracking-wider">
                           <tr>
-                            <th className="py-3 px-3 min-w-[180px] text-center">
-                              Invoice Ref
-                            </th>
-                            <th className="py-3 px-2 min-w-[120px] text-center">
-                              Product/Service
-                            </th>
-                            <th className="py-3 px-2 min-w-[150px] text-center">
-                              Gross Amt
-                            </th>
-                            <th className="py-3 px-2 w-16 text-center">Discount</th>
-                            <th className="py-3 px-2 w-28 text-center">VAT</th>
-                            <th className="py-3 px-2 w-24 text-center">WHT</th>
-                            <th className="py-3 px-2 w-20 text-center">
-                              Amount Due
-                            </th>
-                            <th className="py-3 px-2 w-20 text-center">
-                              Resp. Center
-                            </th>
+                            <th className="py-3 px-2 text-center">ID</th>
+                            <th className="py-3 px-2 text-center">Doc Ref</th>
+                            <th className="py-3 px-2 text-center">Remarks</th>
+                            <th className="py-3 px-2 text-center">Amount Due</th>
+                            <th className="py-3 px-2 text-center">Paid Amount</th>
+                            <th className="py-3 px-2 text-center">To Pay</th>
                             <th className="py-3 px-2 w-10 text-center"></th>
                           </tr>
                         </thead>
@@ -1878,34 +1857,42 @@ export default function CollectionsForm({
                             >
                               <td className="py-2 px-2 text-center">
                                 <span className="font-mono text-[11px] bg-gray-100 px-2 py-0.5 rounded text-gray-700">
+                                  {item.salesItemId || '—'}
+                                </span>
+                              </td>
+                              <td className="py-2 px-2 text-center">
+                                <span className="font-mono text-[11px] bg-gray-100 px-2 py-0.5 rounded text-gray-700">
                                   {item.invoiceRef || '—'}
                                 </span>
                               </td>
-                              <td
-                                className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 truncate"
-                                title={item.product_service_name || item.description}
-                              >
-                                {item.product_service_name ||
-                                  item.description ||
-                                  '—'}
+                              <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 truncate" title={item.remarks}>
+                                {item.remarks || '—'}
                               </td>
                               <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-800 tabular-nums">
                                 {fmt(item.gross || 0)}
                               </td>
-                              <td className="py-2 px-2 text-[12px] font-bold text-center text-orange-500 tabular-nums">
-                                ({fmt(item.discAmt || 0)})
+                              <td className="py-2 px-2 text-[12px] font-bold text-center text-green-600 tabular-nums">
+                                {fmt(item.paidAmount || 0)}
                               </td>
-                              <td className="py-2 px-2 text-[12px] font-bold text-center text-red-500 tabular-nums">
-                                +{fmt(item.vatAmt || 0)}
-                              </td>
-                              <td className="py-2 px-2 text-[12px] font-bold text-center text-blue-600 tabular-nums">
-                                ({fmt(item.whtAmount || 0)})
-                              </td>
-                              <td className="py-2 px-2 text-[13px] font-black text-center text-green-700 tabular-nums">
-                                {fmt(item.amount || 0)}
-                              </td>
-                              <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 tabular-nums">
-                                {item.responsibilityCenter || '---'}
+                              <td className="py-2 px-2 text-center">
+                                {!isViewMode && !isEditMode ? (
+                                  <input
+                                    type="number"
+                                    min="0.01"
+                                    step="0.01"
+                                    value={item.toPay || ''}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value) || 0
+                                      updateCollectionItem(item.id, 'toPay', value)
+                                    }}
+                                    className="w-full px-2 py-1 text-right border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                                    placeholder="0.00"
+                                  />
+                                ) : (
+                                  <span className="font-bold text-gray-800 tabular-nums">
+                                    {fmt(item.toPay || 0)}
+                                  </span>
+                                )}
                               </td>
                               <td className="py-2 px-1 text-center">
                                 {!isViewMode && !isEditMode && (
@@ -1923,25 +1910,19 @@ export default function CollectionsForm({
                         <tfoot>
                           <tr className="border-t-2 border-gray-200 bg-gray-50/80">
                             <td
-                              colSpan={2}
+                              colSpan={3}
                               className="py-2 px-2 text-[13px] font-black uppercase text-gray-900 text-left"
                             >
                               Totals
                             </td>
                             <td className="py-2 px-2 text-[12px] font-black tabular-nums">
-                              {fmt(summary.totalGross)}
+                              {fmt(collectionItems.reduce((sum, item) => sum + (item.gross || 0), 0))}
                             </td>
-                            <td className="py-2 px-2 text-[12px] font-black text-orange-500 tabular-nums">
-                              ({fmt(summary.totalDiscount)})
-                            </td>
-                            <td className="py-2 px-2 text-[12px] font-black text-red-500 tabular-nums">
-                              +{fmt(summary.totalVAT)}
+                            <td className="py-2 px-2 text-[12px] font-black text-green-600 tabular-nums">
+                              {fmt(collectionItems.reduce((sum, item) => sum + (item.paidAmount || 0), 0))}
                             </td>
                             <td className="py-2 px-2 text-[12px] font-black text-blue-600 tabular-nums">
-                              ({fmt(summary.totalWHT)})
-                            </td>
-                            <td className="py-2 px-2 text-[13px] font-black text-green-700 tabular-nums">
-                              {fmt(summary.totalCashCollected)}
+                              {fmt(collectionItems.reduce((sum, item) => sum + (item.toPay || 0), 0))}
                             </td>
                             <td />
                           </tr>
@@ -1954,7 +1935,7 @@ export default function CollectionsForm({
                           onClick={() => setIsModalOpen(true)}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
                         >
-                          <Plus size={12} /> Add Sales Items
+                          <Plus size={12} /> Add Sales
                         </button>
                         <span className="text-xs text-zinc-500 font-medium">
                           {collectionItems.length}{' '}
@@ -2154,18 +2135,16 @@ export default function CollectionsForm({
                         </tbody>
                         <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
                           <tr>
-                            <td
-                              colSpan={2}
-                              className="py-2.5 px-3 text-right text-xs"
-                            >
+                            <td className="py-2.5 px-3 text-center text-xs font-bold">
                               Total Ledger Balance:
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">
+                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">
                               {fmt(totalDebit)}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">
+                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">
                               {fmt(totalCredit)}
                             </td>
+                            <td />
                             <td />
                           </tr>
                         </tfoot>

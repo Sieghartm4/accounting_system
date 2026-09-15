@@ -22,17 +22,20 @@ module.exports = {
         type: Sequelize.STRING(300),
         allowNull: false,
         references: {
-          model: 'sales_items',
-          key: 'si_id',
+          model: 'sales',
+          key: 's_id',
         },
       },
-      ci_amount: {
-        type: Sequelize.NUMERIC,
-        allowNull: false,
-      },
-      ci_witholding_tax: {
+      ci_amount_applied: {
         type: Sequelize.DECIMAL(18, 2),
         allowNull: false,
+        comment: 'Amount applied from this collection to the sales invoice',
+      },
+      ci_created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+        comment: 'Audit trail timestamp for when this collection item was created',
       },
     })
   },
