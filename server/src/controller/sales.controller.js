@@ -161,7 +161,7 @@ const regenerateCollectionsJournalEntries = async (
     const itemsQuery = sql
       .select([
         {
-          col: Accounting.collection_items.selectOptionColumns.amount,
+          col: Accounting.collection_items.selectOptionColumns.amount_applied,
           as: 'amount',
         },
 

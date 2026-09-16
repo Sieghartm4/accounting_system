@@ -8,12 +8,12 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     server: {
-      port: parseInt(env.PORT) || 3000,
+      port: parseInt(env._CLIENT_PORT) || 3000,
       host: true,
       allowedHosts: ['aloysius-books.5lsolutions.com'],
     },
     preview: {
-      port: parseInt(env.PORT) || 8080,
+      port: parseInt(env._CLIENT_PORT) || 8080,
       host: true,
       allowedHosts: true,
     },

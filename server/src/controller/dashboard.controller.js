@@ -308,16 +308,14 @@ const getDashboardData = async (req, res, next) => {
       SELECT COALESCE(SUM(s.${Accounting.sales.selectOptionColumns.total_amount_due} - COALESCE(collected.amount, 0)), 0) AS totalReceivables
       FROM ${Accounting.sales.tablename} s
       LEFT JOIN (
-        SELECT si.${Accounting.sales_items.selectOptionColumns.sales_id} AS sales_id,
-               SUM(ci.${Accounting.collection_items.selectOptionColumns.amount}) AS amount
+        SELECT ci.${Accounting.collection_items.selectOptionColumns.sales_id} AS sales_id,
+               SUM(ci.${Accounting.collection_items.selectOptionColumns.amount_applied}) AS amount
         FROM ${Accounting.collection_items.tablename} ci
-        INNER JOIN ${Accounting.sales_items.tablename} si
-          ON si.${Accounting.sales_items.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.sales_id}
         INNER JOIN ${Accounting.collections.tablename} c
           ON c.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
         WHERE c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
           AND c.${Accounting.collections.selectOptionColumns.collection_date} <= '${endDate}'
-        GROUP BY si.${Accounting.sales_items.selectOptionColumns.sales_id}
+        GROUP BY ci.${Accounting.collection_items.selectOptionColumns.sales_id}
       ) collected ON collected.sales_id = s.${Accounting.sales.selectOptionColumns.id}
       WHERE s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
         AND s.${Accounting.sales.selectOptionColumns.date_delivered} <= '${endDate}'
@@ -353,7 +351,7 @@ const getDashboardData = async (req, res, next) => {
 
     // Total Collections this period is an amount, not a transaction count.
     const collections_count_query = `
-      SELECT COALESCE(SUM(ci.${Accounting.collection_items.selectOptionColumns.amount}), 0) AS totalCollections
+      SELECT COALESCE(SUM(ci.${Accounting.collection_items.selectOptionColumns.amount_applied}), 0) AS totalCollections
       FROM ${Accounting.collections.tablename} c
       INNER JOIN ${Accounting.collection_items.tablename} ci
         ON ci.${Accounting.collection_items.selectOptionColumns.collection_id} = c.${Accounting.collections.selectOptionColumns.id}
@@ -597,7 +595,7 @@ const getDashboardData = async (req, res, next) => {
         FROM ${Accounting.sales.tablename} s
         LEFT JOIN (
           SELECT si.${Accounting.sales_items.selectOptionColumns.sales_id} AS sales_id,
-                 SUM(ci.${Accounting.collection_items.selectOptionColumns.amount}) AS amount
+                 SUM(ci.${Accounting.collection_items.selectOptionColumns.amount_applied}) AS amount
           FROM ${Accounting.collection_items.tablename} ci
           INNER JOIN ${Accounting.sales_items.tablename} si
             ON si.${Accounting.sales_items.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.sales_id}
@@ -718,7 +716,7 @@ const getDashboardData = async (req, res, next) => {
       SELECT 
         'collection' AS type,
         SUBSTR(${Accounting.collections.selectOptionColumns.collection_date}, 1, 7) AS month,
-        COALESCE(SUM(${Accounting.collection_items.selectOptionColumns.amount}), 0) AS amount
+        COALESCE(SUM(${Accounting.collection_items.selectOptionColumns.amount_applied}), 0) AS amount
       FROM ${Accounting.collections.tablename}
       LEFT JOIN ${Accounting.collection_items.tablename}
         ON ${Accounting.collection_items.selectOptionColumns.collection_id} = ${Accounting.collections.selectOptionColumns.id}
@@ -993,7 +991,7 @@ const getDashboardData = async (req, res, next) => {
         FROM ${Accounting.sales.tablename} s
         LEFT JOIN (
           SELECT si.${Accounting.sales_items.selectOptionColumns.sales_id} AS sales_id,
-                 SUM(ci.${Accounting.collection_items.selectOptionColumns.amount}) AS amount
+                 SUM(ci.${Accounting.collection_items.selectOptionColumns.amount_applied}) AS amount
           FROM ${Accounting.collection_items.tablename} ci
           INNER JOIN ${Accounting.sales_items.tablename} si
             ON si.${Accounting.sales_items.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.sales_id}
