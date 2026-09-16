@@ -1880,13 +1880,30 @@ export default function CollectionsForm({
                                     type="number"
                                     min="0.01"
                                     step="0.01"
+                                    max={item.gross - item.paidAmount}
                                     value={item.toPay || ''}
                                     onChange={(e) => {
                                       const value = parseFloat(e.target.value) || 0
-                                      updateCollectionItem(item.id, 'toPay', value)
+                                      const remainingBalance = (item.gross || 0) - (item.paidAmount || 0)
+                                      const maxValue = Math.max(0, remainingBalance)
+                                      
+                                      if (value > maxValue) {
+                                        setToast({
+                                          type: 'warning',
+                                          message: `TO PAY cannot exceed remaining balance of ${fmt(maxValue)}`,
+                                        })
+                                        updateCollectionItem(item.id, 'toPay', maxValue)
+                                      } else {
+                                        updateCollectionItem(item.id, 'toPay', value)
+                                      }
                                     }}
-                                    className="w-full px-2 py-1 text-right border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                                    className={`w-full px-2 py-1 text-right border rounded focus:outline-none focus:ring-2 text-xs ${
+                                      item.toPay > (item.gross - item.paidAmount)
+                                        ? 'border-red-500 focus:ring-red-500 bg-red-50'
+                                        : 'border-gray-300 focus:ring-blue-500'
+                                    }`}
                                     placeholder="0.00"
+                                    title={`Maximum allowed: ${fmt(Math.max(0, item.gross - item.paidAmount))}`}
                                   />
                                 ) : (
                                   <span className="font-bold text-gray-800 tabular-nums">

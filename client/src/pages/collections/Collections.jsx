@@ -114,10 +114,10 @@ function CollectionsContent() {
     try {
       setLoadingToBeCollected(true)
       const token = sessionStorage.getItem('authenticated')
-      if (!token) throw new Error('No authentication token found')
+      if (!token) throw new Error('No authorization token found')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/sales?status=NOT PAID`,
+        `${import.meta.env.VITE_SERVER_LINK}/sales?forCollections=true`,
         {
           method: 'GET',
           headers: {
@@ -133,15 +133,10 @@ function CollectionsContent() {
 
       console.log('Sales data received:', result.data)
 
-      // Filter out sales with PAID status (case-insensitive) and only include APPROVED state
-      const unpaidSales =
-        result.data?.filter((sale) => {
-          const status = sale.status?.toLowerCase()
-          const state = sale.state?.toUpperCase()
-          return status !== 'paid' && state === 'APPROVED'
-        }) || []
+      // Backend now handles filtering based on collections sum vs amount due
+      const unpaidSales = result.data || []
 
-      console.log('Filtered unpaid sales (excluding PAID):', unpaidSales)
+      console.log('Sales from backend (already filtered):', unpaidSales)
 
       // Group by unique customers
       const customerMap = new Map()
@@ -157,12 +152,16 @@ function CollectionsContent() {
           })
         }
         const customer = customerMap.get(customerId)
-        // Use amount_due field from the sales object
-        const unpaidAmount = parseFloat(sale.amount_due) || 0
-        customer.totalUnpaid += unpaidAmount
+        // Calculate remaining balance for each sale
+        const totalDue = parseFloat(sale.amount_due) || 0
+        const paidAmount = parseFloat(sale.paid_amount) || 0
+        const remainingBalance = totalDue - paidAmount
+        customer.totalUnpaid += remainingBalance
         customer.sales.push({
           ...sale,
-          unpaidAmount,
+          remainingBalance,
+          totalDue,
+          paidAmount,
           sales_number: sale.sales_number || sale.document_reference || sale.id,
         })
       })

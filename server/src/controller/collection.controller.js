@@ -1324,7 +1324,7 @@ const updateCollectionState = async (req, res, next) => {
           if (uniqueSalesIds.length > 0) {
             // Recalculate each sale status from all approved collection items for partial payment support
             for (const salesId of uniqueSalesIds) {
-              // Calculate total paid for this sale
+              // Calculate total paid for this sale from all approved collections
               const paidAmountQuery = `
                 SELECT COALESCE(SUM(ci.ci_amount_applied), 0) as total_paid
                 FROM ${Accounting.collection_items.tablename} ci
@@ -1338,7 +1338,7 @@ const updateCollectionState = async (req, res, next) => {
 
               // Get sale total amount due
               const saleQuery = `
-                SELECT ${Accounting.sales.selectOptionColumns.total_amount_due}, ${Accounting.sales.selectOptionColumns.paid_amount}
+                SELECT ${Accounting.sales.selectOptionColumns.total_amount_due}
                 FROM ${Accounting.sales.tablename}
                 WHERE ${Accounting.sales.selectOptionColumns.id} = ?
               `
@@ -1346,22 +1346,20 @@ const updateCollectionState = async (req, res, next) => {
               
               if (saleResult.length > 0) {
                 const totalDue = parseFloat(saleResult[0].s_total_amount_due)
-                const currentPaidAmount = parseFloat(saleResult[0].s_paid_amount || 0)
                 
-                // Update paid amount
-                const newPaidAmount = currentPaidAmount + totalPaid
+                // Update paid amount to the sum of all approved collections (not adding to existing)
                 const updatePaidAmountQuery = `
                   UPDATE ${Accounting.sales.tablename}
                   SET ${Accounting.sales.selectOptionColumns.paid_amount} = ?
                   WHERE ${Accounting.sales.selectOptionColumns.id} = ?
                 `
-                await connection.execute(updatePaidAmountQuery, [newPaidAmount, salesId])
+                await connection.execute(updatePaidAmountQuery, [totalPaid, salesId])
 
                 // Determine status based on payment
                 let newStatus = 'UNPAID'
-                if (newPaidAmount >= totalDue) {
+                if (totalPaid >= totalDue) {
                   newStatus = 'PAID'
-                } else if (newPaidAmount > 0) {
+                } else if (totalPaid > 0) {
                   newStatus = 'PARTIALLY_PAID'
                 }
 
@@ -1373,7 +1371,7 @@ const updateCollectionState = async (req, res, next) => {
 
                 const [result] = await connection.execute(updateSalesQuery, [newStatus, salesId])
                 console.log(
-                  `Updated sales ID ${salesId} status to ${newStatus}, paid amount: ${newPaidAmount}, affected rows: ${result.affectedRows}`,
+                  `Updated sales ID ${salesId} status to ${newStatus}, paid amount: ${totalPaid}, affected rows: ${result.affectedRows}`,
                 )
               }
             }

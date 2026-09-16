@@ -289,7 +289,7 @@ const getSales = async (req, res, next) => {
     const salesDateFrom = dateFrom || date_from
     const salesDateTo = dateTo || date_to
 
-    const { status } = req.query || {}
+    const { status, forCollections } = req.query || {}
     const excludeCollected = status === 'NOT PAID'
 
     const baseQuery = sql
@@ -340,31 +340,27 @@ const getSales = async (req, res, next) => {
     let whereClause = ''
     const queryParams = []
 
-    // Filter out sales that already have collection items through their sales lines.
-    if (excludeCollected) {
-      const collectedSalesSubquery =
-        `SELECT 1 FROM ${Accounting.collection_items.tablename} ci_coll ` +
-        `WHERE ci_coll.${Accounting.collection_items.selectOptionColumns.sales_id} = ` +
-        `${Accounting.sales.selectOptionColumns.id}`
+    // Only apply collections filter when requested by collections page
+    if (forCollections) {
+      // Filter out sales where collections sum equals or exceeds amount due (regardless of collection state)
+      const collectionsSubquery =
+        `SELECT COALESCE(SUM(ci.${Accounting.collection_items.selectOptionColumns.amount_applied}), 0) as total_collected ` +
+        `FROM ${Accounting.collection_items.tablename} ci ` +
+        `WHERE ci.${Accounting.collection_items.selectOptionColumns.sales_id} = ${Accounting.sales.selectOptionColumns.id}`
 
-      whereClause += ` WHERE NOT EXISTS (${collectedSalesSubquery})`
+      whereClause += ` WHERE (${Accounting.sales.selectOptionColumns.total_amount_due} - COALESCE((${collectionsSubquery}), 0)) > 0`
+      whereClause += ` AND ${Accounting.sales.selectOptionColumns.state} = 'APPROVED'`
+      
+      console.log('Collections filter whereClause:', whereClause)
     }
 
     if (salesDateFrom) {
-      if (whereClause) {
-        whereClause += ` AND ${Accounting.sales.selectOptionColumns.date_delivered} >= ?`
-      } else {
-        whereClause += ` WHERE ${Accounting.sales.selectOptionColumns.date_delivered} >= ?`
-      }
+      whereClause += ` AND ${Accounting.sales.selectOptionColumns.date_delivered} >= ?`
       queryParams.push(salesDateFrom)
     }
 
     if (salesDateTo) {
-      if (whereClause) {
-        whereClause += ` AND ${Accounting.sales.selectOptionColumns.date_delivered} <= ?`
-      } else {
-        whereClause += ` WHERE ${Accounting.sales.selectOptionColumns.date_delivered} <= ?`
-      }
+      whereClause += ` AND ${Accounting.sales.selectOptionColumns.date_delivered} <= ?`
       queryParams.push(salesDateTo)
     }
 
