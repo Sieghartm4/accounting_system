@@ -303,6 +303,18 @@ const getSalesCollection = async (req, res, next) => {
           col: Accounting.sales.selectOptionColumns.paid_amount,
           as: 'paid_amount',
         },
+
+        // Include pending collections (not yet approved)
+        {
+          col: `COALESCE((
+            SELECT SUM(ci.${Accounting.collection_items.selectOptionColumns.amount_applied})
+            FROM ${Accounting.collection_items.tablename} ci
+            INNER JOIN ${Accounting.collections.tablename} c ON c.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
+            WHERE ci.${Accounting.collection_items.selectOptionColumns.sales_id} = ${Accounting.sales.selectOptionColumns.id}
+            AND c.${Accounting.collections.selectOptionColumns.state} != 'APPROVED'
+          ), 0)`,
+          as: 'pending_collections',
+        },
       ])
 
       .from(Accounting.sales.tablename)
