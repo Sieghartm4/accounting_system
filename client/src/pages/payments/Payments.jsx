@@ -75,9 +75,9 @@ function PaymentsContent() {
       const queryParams = new URLSearchParams()
       purchaseIds.forEach(id => queryParams.append('purchase_id', id))
 
-      console.log('Fetching purchase items for IDs:', purchaseIds)
+      console.log('Fetching purchase data for IDs:', purchaseIds)
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/payments/purchase-items-payment?${queryParams.toString()}`,
+        `${import.meta.env.VITE_SERVER_LINK}/payments/purchase-payment?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -88,16 +88,16 @@ function PaymentsContent() {
       )
 
       const result = await response.json()
-      if (!response.ok) throw new Error(result.message || 'Failed to fetch purchase items')
+      if (!response.ok) throw new Error(result.message || 'Failed to fetch purchase data')
 
-      console.log('Purchase items API response:', result)
-      console.log('Purchase items data:', result.data)
+      console.log('Purchase data API response:', result)
+      console.log('Purchase data:', result.data)
       return result.data || []
     } catch (error) {
-      console.error('Error fetching purchase items:', error)
+      console.error('Error fetching purchase data:', error)
       setToast({
         type: 'error',
-        message: error.message || 'Failed to fetch purchase items'
+        message: error.message || 'Failed to fetch purchase data'
       })
       return []
     }
@@ -108,10 +108,10 @@ function PaymentsContent() {
     try {
       setLoadingToBePaid(true)
       const token = sessionStorage.getItem('authenticated')
-      if (!token) throw new Error('No authentication token found')
+      if (!token) throw new Error('No authorization token found')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/purchase?status=NOT PAID`,
+        `${import.meta.env.VITE_SERVER_LINK}/purchase?forPayments=true`,
         {
           method: 'GET',
           headers: {
@@ -126,14 +126,10 @@ function PaymentsContent() {
 
       console.log('Purchases data received:', result.data)
 
-      // Filter out purchases with PAID status (case-insensitive) and only include APPROVED state
-      const unpaidPurchases = result.data?.filter(purchase => {
-        const status = purchase.status?.toLowerCase()
-        const state = purchase.state?.toUpperCase()
-        return status !== 'paid' && state === 'APPROVED'
-      }) || []
+      // Backend now handles filtering based on payments sum vs amount due
+      const unpaidPurchases = result.data || []
 
-      console.log('Filtered unpaid purchases (excluding PAID):', unpaidPurchases)
+      console.log('Purchases from backend (already filtered):', unpaidPurchases)
 
       // Group by unique vendors
       const vendorMap = new Map()
@@ -891,6 +887,26 @@ function PaymentsContent() {
             enableActionColumn={true}
             checkboxColumn="id"
             checkboxCondition={checkboxCondition}
+            columns={[
+              { key: 'id', label: 'Payment ID' },
+              { key: 'doc_ref', label: 'Doc Ref' },
+              { key: 'vendor', label: 'Vendor' },
+              { key: 'mode_of_payment', label: 'Mode of Payment' },
+              { key: 'bank_name', label: 'Bank Name' },
+              { key: 'check_number', label: 'Check Number' },
+              { key: 'payment_date', label: 'Payment Date' },
+              {
+                key: 'paid_amount',
+                label: 'Amount',
+                render: (value) => (
+                  <span>
+                    <span className="text-green-600">₱</span>
+                    <span className="ml-1">{isNaN(value) ? '0.00' : parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </span>
+                )
+              },
+              { key: 'state', label: 'State' },
+            ]}
             actionButtons={[
               {
                 label: 'View',
@@ -1134,8 +1150,7 @@ function PaymentsContent() {
                     },
                   ]}
                   columns={[
-                    { key: 'id', label: 'ID' },
-                    { key: 'vendor', label: 'Vendor' },
+                    { key: 'id', label: 'Purchase ID' },
                     { key: 'doc_ref', label: 'Doc Ref' },
                     { key: 'terms', label: 'Terms' },
                     { key: 'date_delivered', label: 'Date Delivered' },
@@ -1151,10 +1166,20 @@ function PaymentsContent() {
                         </span>
                       )
                     },
+                    {
+                      key: 'paid_amount',
+                      label: 'Paid Amount',
+                      render: (value) => (
+                        <span>
+                          <span className="text-green-600">₱</span>
+                          <span className="ml-1">{isNaN(value) ? '0.00' : parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </span>
+                      )
+                    },
                     { key: 'status', label: 'Status' },
                     { key: 'state', label: 'State' },
                   ]}
-                  hiddenColumns={new Set(['vendor_id'])}
+                  hiddenColumns={new Set(['vendor_id', 'vendor'])}
                   badgeColumns={[
                     {
                       column: 'status',
@@ -1162,6 +1187,8 @@ function PaymentsContent() {
                         PAID: 'green',
                         UNPAID: 'red',
                         'PARTIALLY PAID': 'yellow',
+                        OVERPAID: 'orange',
+                        REJECTED: 'red',
                       },
                     },
                     {

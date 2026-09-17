@@ -1316,7 +1316,7 @@ export default function CollectionsForm({
 
               const totalDue = parseFloat(s.total_amount_due) || 0
 
-              const paidAmount = parseFloat(s.paid_amount) || 0
+              const paidAmount = parseFloat(s.collected_amount) || 0
 
               const pendingCollections = parseFloat(s.pending_collections) || 0
 
@@ -1498,7 +1498,9 @@ export default function CollectionsForm({
 
           gross: parseFloat(item.invoice_amount || item.gross || 0),
 
-          paidAmount: parseFloat(item.paid_amount || 0),
+          paidAmount: parseFloat(item.collected_amount || 0),
+
+          pendingCollections: parseFloat(item.pending_collections || 0),
 
           toPay: parseFloat(item.amount_applied || item.amount || 0),
 
@@ -1734,7 +1736,7 @@ export default function CollectionsForm({
 
         const totalDue = parseFloat(s.total_amount_due) || 0
 
-        const paidAmount = parseFloat(s.paid_amount) || 0
+        const paidAmount = parseFloat(s.collected_amount) || 0
 
         const pendingCollections = parseFloat(s.pending_collections) || 0
 
@@ -2238,7 +2240,7 @@ export default function CollectionsForm({
 
           type: 'warning',
 
-          message: 'All collection items must have a "To Pay" amount greater than 0',
+          message: 'All collection items must have a "To Collect" amount greater than 0',
 
         })
 
@@ -3700,11 +3702,11 @@ export default function CollectionsForm({
 
                             <th className="py-3 px-2 text-center">Amount Due</th>
 
-                            <th className="py-3 px-2 text-center">Paid Amount</th>
+                            <th className="py-3 px-2 text-center">Collected Amount</th>
 
                             <th className="py-3 px-2 text-center">Pending Collections</th>
 
-                            <th className="py-3 px-2 text-center">To Pay</th>
+                            <th className="py-3 px-2 text-center">To Collect</th>
 
                             <th className="py-3 px-2 w-10 text-center"></th>
 
@@ -3800,7 +3802,7 @@ export default function CollectionsForm({
 
                                           type: 'warning',
 
-                                          message: `TO PAY cannot exceed remaining balance of ${fmt(maxValue)}`,
+                                          message: `TO COLLECT cannot exceed remaining balance of ${fmt(maxValue)}`,
 
                                         })
 
@@ -3881,7 +3883,7 @@ export default function CollectionsForm({
                               {fmt(collectionItems.reduce((sum, item) => sum + (item.gross || 0), 0))}
                             </td>
 
-                            {/* PAID AMOUNT TOTAL */}
+                            {/* COLLECTED AMOUNT TOTAL */}
                             <td className="py-3 px-2 text-center tabular-nums text-green-600">
                               {fmt(collectionItems.reduce((sum, item) => sum + (item.paidAmount || 0), 0))}
                             </td>
@@ -3891,7 +3893,7 @@ export default function CollectionsForm({
                               {fmt(collectionItems.reduce((sum, item) => sum + (item.pendingCollections || 0), 0))}
                             </td>
 
-                            {/* TO PAY TOTAL */}
+                            {/* TO COLLECT TOTAL */}
                             <td className="py-3 px-2 text-center tabular-nums text-blue-600">
                               {fmt(collectionItems.reduce((sum, item) => sum + (item.toPay || 0), 0))}
                             </td>

@@ -1669,9 +1669,10 @@ export default function SalesForm({
                         )
                         return (
                           <tr>
-                            <td colSpan={2} className="py-2.5 px-3 text-right text-xs">Total Ledger Balance:</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(totalDebit)}</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(totalCredit)}</td>
+                            <td className="py-2.5 px-3 text-center text-xs font-bold">Total Ledger Balance:</td>
+                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(totalDebit)}</td>
+                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(totalCredit)}</td>
+                            <td />
                             <td />
                           </tr>
                         )

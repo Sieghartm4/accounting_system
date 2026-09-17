@@ -740,7 +740,9 @@ function PurchaseContent() {
               values: {
                 PAID: 'green',
                 UNPAID: 'red',
-                REJECTED: 'yellow',
+                'PARTIALLY PAID': 'yellow',
+                OVERPAID: 'orange',
+                REJECTED: 'red',
               },
             },
             {
@@ -750,6 +752,7 @@ function PurchaseContent() {
                 CHECKED: 'blue',
                 APPROVED: 'green',
                 REJECTED: 'red',
+                CANCELLED: 'orange',
               },
             },
           ]}

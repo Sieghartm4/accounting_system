@@ -300,8 +300,8 @@ const getSalesCollection = async (req, res, next) => {
         },
 
         {
-          col: Accounting.sales.selectOptionColumns.paid_amount,
-          as: 'paid_amount',
+          col: Accounting.sales.selectOptionColumns.collected_amount,
+          as: 'collected_amount',
         },
 
         // Include pending collections (not yet approved)
@@ -683,13 +683,26 @@ const getAllCollections = async (req, res, next) => {
         },
 
         {
-          col: Accounting.sales.selectOptionColumns.paid_amount,
-          as: 'paid_amount',
+          col: Accounting.sales.selectOptionColumns.collected_amount,
+          as: 'collected_amount',
         },
 
         {
           col: Accounting.collection_items.selectOptionColumns.amount_applied,
           as: 'amount_applied',
+        },
+
+        // Include pending collections (not yet approved)
+        {
+          col: `COALESCE((
+            SELECT SUM(ci.${Accounting.collection_items.selectOptionColumns.amount_applied})
+            FROM ${Accounting.collection_items.tablename} ci
+            INNER JOIN ${Accounting.collections.tablename} c ON c.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
+            WHERE ci.${Accounting.collection_items.selectOptionColumns.sales_id} = ${Accounting.sales.selectOptionColumns.id}
+            AND c.${Accounting.collections.selectOptionColumns.id} != ?
+            AND c.${Accounting.collections.selectOptionColumns.state} != 'APPROVED'
+          ), 0)`,
+          as: 'pending_collections',
         },
       ])
 
@@ -713,7 +726,7 @@ const getAllCollections = async (req, res, next) => {
 
     let collection_items = await Query(
       collection_items_query,
-      [collection_id],
+      [collection_id, collection_id],
     )
 
     const collection_journal_query = sql
@@ -1359,20 +1372,20 @@ const updateCollectionState = async (req, res, next) => {
               if (saleResult.length > 0) {
                 const totalDue = parseFloat(saleResult[0].s_total_amount_due)
                 
-                // Update paid amount to the sum of all approved collections (not adding to existing)
-                const updatePaidAmountQuery = `
+                // Update collected amount to the sum of all approved collections (not adding to existing)
+                const updateCollectedAmountQuery = `
                   UPDATE ${Accounting.sales.tablename}
-                  SET ${Accounting.sales.selectOptionColumns.paid_amount} = ?
+                  SET ${Accounting.sales.selectOptionColumns.collected_amount} = ?
                   WHERE ${Accounting.sales.selectOptionColumns.id} = ?
                 `
-                await connection.execute(updatePaidAmountQuery, [totalPaid, salesId])
+                await connection.execute(updateCollectedAmountQuery, [totalPaid, salesId])
 
                 // Determine status based on payment
                 let newStatus = 'UNPAID'
                 if (totalPaid >= totalDue) {
                   newStatus = 'PAID'
                 } else if (totalPaid > 0) {
-                  newStatus = 'PARTIALLY_PAID'
+                  newStatus = 'PARTIALLY PAID'
                 }
 
                 const updateSalesQuery = `
@@ -1805,8 +1818,8 @@ const getPrintCollections = async (req, res, next) => {
         },
 
         {
-          col: Accounting.sales.selectOptionColumns.paid_amount,
-          as: 'paid_amount',
+          col: Accounting.sales.selectOptionColumns.collected_amount,
+          as: 'collected_amount',
         },
 
         {
@@ -2001,7 +2014,7 @@ const getPrintCollections = async (req, res, next) => {
 
           invoice_amount: parseFloat(item.invoice_amount || 0),
 
-          paid_amount: parseFloat(item.paid_amount || 0),
+          collected_amount: parseFloat(item.collected_amount || 0),
 
           amount: parseFloat(item.amount || 0),
 

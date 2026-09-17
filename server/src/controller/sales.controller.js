@@ -318,8 +318,20 @@ const getSales = async (req, res, next) => {
         },
 
         {
-          col: Accounting.sales.selectOptionColumns.paid_amount,
-          as: 'paid_amount',
+          col: Accounting.sales.selectOptionColumns.collected_amount,
+          as: 'collected_amount',
+        },
+
+        // Include pending collections (not yet approved)
+        {
+          col: `COALESCE((
+            SELECT SUM(ci.${Accounting.collection_items.selectOptionColumns.amount_applied})
+            FROM ${Accounting.collection_items.tablename} ci
+            INNER JOIN ${Accounting.collections.tablename} c ON c.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
+            WHERE ci.${Accounting.collection_items.selectOptionColumns.sales_id} = ${Accounting.sales.selectOptionColumns.id}
+            AND c.${Accounting.collections.selectOptionColumns.state} != 'APPROVED'
+          ), 0)`,
+          as: 'pending_collections',
         },
 
         { col: Accounting.sales.selectOptionColumns.status, as: 'status' },
@@ -726,7 +738,7 @@ const createSales = async (req, res, next) => {
 
       total_amount_due,
 
-      paid_amount,
+      collected_amount,
 
       created_by,
 
@@ -797,7 +809,7 @@ const createSales = async (req, res, next) => {
 
         total_amount_due || null,
 
-        paid_amount || 0,
+        collected_amount || 0,
 
         'UNPAID',
 

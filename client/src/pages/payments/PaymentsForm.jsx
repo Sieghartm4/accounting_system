@@ -252,22 +252,20 @@ function computeItemAmounts(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SUMMARY — derived entirely from pre-computed item fields
+// SUMMARY — derived entirely from pre-computed item fields for partial payments
 // ─────────────────────────────────────────────────────────────────────────────
 function computeSummary(items) {
   return items.reduce(
     (acc, item) => ({
       totalGross: acc.totalGross + (item.gross || 0),
-      totalDiscount: acc.totalDiscount + (item.discAmt || 0),
-      totalVAT: acc.totalVAT + (item.vatAmt || 0),
-      totalWHT: acc.totalWHT + (item.whtAmount || 0),
+      totalPaid: acc.totalPaid + (item.paidAmount || 0),
+      totalPending: acc.totalPending + (item.pendingPayments || 0),
       totalCashCollected: acc.totalCashCollected + (item.amount || 0),
     }),
     {
       totalGross: 0,
-      totalDiscount: 0,
-      totalVAT: 0,
-      totalWHT: 0,
+      totalPaid: 0,
+      totalPending: 0,
       totalCashCollected: 0,
     },
   )
@@ -726,43 +724,37 @@ export default function PaymentsForm({
         }
       }
 
-      // Use fetched purchase items if available, otherwise create placeholder items
+      // Use fetched purchase data if available, otherwise create placeholder items
       if (preSelectedPurchaseItems && preSelectedPurchaseItems.length > 0) {
-        console.log('Using fetched purchase items')
+        console.log('Using fetched purchase data')
         const items = preSelectedPurchaseItems.map((item, index) => {
-          console.log('Processing purchase item:', item)
-          const gross = parseFloat(item.purchase_price) || 0
-          const discount = parseFloat(item.discount) || 0
-          const discountType = item.discount_type || 'PERCENT'
-          const vatPct = normalizeTaxRatePercent(item.vat)
-          const whtPct = normalizeTaxRatePercent(item.witholding_tax)
-          const vatType = item.vat_type || 'VAT-EX'
-          const computed = computeItemAmounts(
-            parseFloat(item.quantity) || 1,
-            gross,
-            discount,
-            discountType,
-            vatPct,
-            whtPct,
-            vatType,
-          )
+          console.log('Processing purchase data:', item)
+          const totalDue = parseFloat(item.total_amount_due) || 0
+          const paidAmount = parseFloat(item.paid_amount) || 0
+          const pendingPayments = parseFloat(item.pending_payments) || 0
+          const remainingBalance = totalDue - paidAmount - pendingPayments
+          console.log('Calculated - totalDue:', totalDue, 'paidAmount:', paidAmount, 'pendingPayments:', pendingPayments, 'remainingBalance:', remainingBalance)
 
           return {
             id: `auto-${index}`,
-            purchaseItemId: item.pi_id || item.id,
-            invoiceRef: item.document_reference || item.invoice_ref || '',
-            description: item.product_service_name || item.description || '',
-            responsibilityCenter: item.responsibility_center || '',
-            gross: computed.gross,
-            discAmt: computed.discAmt,
-            vatAmt: computed.vatAmt,
-            vatType,
-            whtAmount: computed.whtAmount,
-            amount: computed.amount,
+            purchaseItemId: item.id, // Purchase ID
+            vendor: item.vendor || '',
+            invoiceRef: item.document_reference || '',
+            terms: item.terms || '',
+            dateDelivered: item.date_delivered || '',
+            dateDue: item.date_due || '',
+            remarks: item.remarks || '',
+            gross: totalDue, // Total amount due
+            paidAmount: paidAmount, // Amount already paid
+            pendingPayments: pendingPayments, // Pending payments not yet approved
+            discAmt: 0,
+            vatAmt: 0,
+            whtAmount: 0,
+            amount: remainingBalance, // Default to remaining balance
             isOther: false,
           }
         })
-        console.log('Auto-filled payment items from fetched data:', items)
+        console.log('Auto-filled payment items from fetched purchase data:', items)
         setPaymentItems(items)
       } else {
         console.log('No fetched items, using placeholder')
@@ -779,6 +771,8 @@ export default function PaymentsForm({
           responsibilityCenter: '',
           gross:
             parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
+          paidAmount: parseFloat(purchase.paid_amount) || 0,
+          pendingPayments: parseFloat(purchase.pending_payments) || 0,
           discAmt: 0,
           vatAmt: 0,
           whtAmount: 0,
@@ -866,6 +860,8 @@ export default function PaymentsForm({
           responsibilityCenter: item.responsibility_center || '',
           gross:
             (parseFloat(item.amount) || 0) + (parseFloat(item.witholding_tax) || 0),
+          paidAmount: parseFloat(item.paid_amount) || 0,
+          pendingPayments: parseFloat(item.pending_payments) || 0,
           discAmt: parseFloat(item.discount) || 0,
           vatAmt: parseFloat(item.vat) || 0,
           vatType: item.vat_type || 'VAT-EX',
@@ -976,6 +972,10 @@ export default function PaymentsForm({
   // ── Item helpers ──────────────────────────────────────────────────────────
   const removePaymentItem = (id) =>
     setPaymentItems((prev) => prev.filter((i) => i.id !== id))
+  const updatePaymentItem = (id, field, value) =>
+    setPaymentItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, [field]: value } : i)),
+    )
   const togglePurchaseSelection = (purchaseId) =>
     setSelectedPurchases((prev) =>
       prev.includes(purchaseId)
@@ -1000,7 +1000,7 @@ export default function PaymentsForm({
       selectedPurchases.forEach((id) => queryParams.append('purchase_id', id))
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/payments/purchase-items-payment?${queryParams.toString()}`,
+        `${import.meta.env.VITE_SERVER_LINK}/payments/purchase-payment?${queryParams.toString()}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -1013,39 +1013,36 @@ export default function PaymentsForm({
       if (!result.success)
         throw new Error(result.message || 'Failed to fetch purchase items')
 
-      // ── Map purchase_items → payment items ──────────────────────────────
-      //  We compute amounts here so the accountant sees the full breakdown.
-      //  vat IS included — it is part of ci_amount (Discounted + VAT − WHT).
+      // ── Map purchase → payment items for partial payments ──────────────────────
+      //  For partial payments, we now work with purchase records directly
+      //  The user can specify how much to apply to each purchase invoice
       const newItems = result.data.map((s) => {
-        const qty = parseFloat(s.quantity) || 0
-        const price = parseFloat(s.purchase_price) || 0
-        const discountVal = parseFloat(s.discount) || 0
-        const discountType = s.discount_type || 'PERCENT'
-        const vatPct = normalizeTaxRatePercent(s.vat)
-        const whtPct = normalizeTaxRatePercent(s.witholding_tax)
-        const vatType = s.vat_type || 'VAT-EX'
-
-        const computed = computeItemAmounts(
-          qty,
-          price,
-          discountVal,
-          discountType,
-          vatPct,
-          whtPct,
-          vatType,
-        )
+        console.log('Processing purchase item:', s)
+        console.log('total_amount_due:', s.total_amount_due)
+        console.log('paid_amount:', s.paid_amount)
+        console.log('pending_payments:', s.pending_payments)
+        const totalDue = parseFloat(s.total_amount_due) || 0
+        const paidAmount = parseFloat(s.paid_amount) || 0
+        const pendingPayments = parseFloat(s.pending_payments) || 0
+        const remainingBalance = totalDue - paidAmount - pendingPayments
+        console.log('Calculated - totalDue:', totalDue, 'paidAmount:', paidAmount, 'pendingPayments:', pendingPayments, 'remainingBalance:', remainingBalance)
 
         return {
           id: Date.now() + Math.random(),
-          purchaseItemId: s.id, // → ci_purchase_id (purchase item ID)
+          purchaseItemId: s.id, // → ci_purchase_id (now using purchase ID)
+          vendor: s.vendor || '', // display only
           invoiceRef: s.document_reference || '', // display only
-          description: s.product_service_name || s.description || '', // display only
-          responsibilityCenter: s.responsibility_center || '', // display only
-          gross: computed.gross, // display only
-          discAmt: computed.discAmt, // display only
-          vatAmt: computed.vatAmt, // display only
-          whtAmount: computed.whtAmount, // → ci_witholding_tax
-          amount: computed.amount, // → ci_amount
+          terms: s.terms || '', // display only
+          dateDelivered: s.date_delivered || '', // display only
+          dateDue: s.date_due || '', // display only
+          remarks: s.remarks || '', // display only
+          gross: totalDue, // display only - total amount due
+          paidAmount: paidAmount, // display only - amount already paid
+          pendingPayments: pendingPayments, // display only - pending payments not yet approved
+          discAmt: 0, // display only
+          vatAmt: 0, // display only
+          whtAmount: 0, // → ci_witholding_tax
+          amount: remainingBalance, // → ci_amount_applied (default to remaining balance)
           isOther: false,
         }
       })
@@ -1232,30 +1229,33 @@ export default function PaymentsForm({
     const apAccount = chartsOfAccounts.find((a) =>
       accountLabel(a).includes('accounts payable'),
     )
+
     const journalResponsibilityCenter = bulkResponsibilityCenter || ''
     let totalCash = 0
+    let totalAP = 0
 
     paymentItems
       .filter((i) => !i.isOther)
       .forEach((item) => {
-        const invoiceAmount = Number(item.amount || 0)
+        const invoiceAmount = Number(item.amount || 0) // Use amount (To Pay) from user input
         totalCash += invoiceAmount
-
-        // DR Accounts Payable — close the full invoice balance.
-        if (apAccount && invoiceAmount > 0) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: apAccount.id,
-            accountSearch: apAccount.name,
-            center: item.responsibilityCenter || journalResponsibilityCenter,
-            debit: parseFloat(invoiceAmount.toFixed(2)),
-            credit: 0,
-            isManual: false,
-          })
-        }
+        totalAP += invoiceAmount
       })
 
-    // CR Cash / Bank — one combined entry for net payment
+    // DR Accounts Payable — one combined entry
+    if (apAccount && totalAP > 0) {
+      entries.push({
+        id: Date.now() + Math.random(),
+        account: apAccount.id,
+        accountSearch: apAccount.name,
+        center: journalResponsibilityCenter,
+        debit: parseFloat(totalAP.toFixed(2)),
+        credit: 0,
+        isManual: false,
+      })
+    }
+
+    // CR Cash / Bank — one combined entry
     if (paymentAccount && totalCash > 0) {
       entries.push({
         id: Date.now() + Math.random(),
@@ -1277,9 +1277,8 @@ export default function PaymentsForm({
   useEffect(() => {
     // Auto-generate journal entries logic:
     // 1. Never in view mode
-    // 2. In create mode: always auto-generate when paymentItems or modeOfPayment changes
-    // 3. In edit mode: NEVER auto-generate if we're loading existing payment data
-    // 4. Auto-generation will replace all entries (both manual and auto) to maintain consistency
+    // 2. Always auto-generate when paymentItems, modeOfPayment, bankName, or bulkResponsibilityCenter changes
+    // 3. Skip auto-generation while loading data to prevent overwriting existing entries
 
     console.log(
       'DEBUG: useEffect running - isEditMode:',
@@ -1293,26 +1292,8 @@ export default function PaymentsForm({
     )
 
     if (!isViewMode && !isLoadingData.current) {
-      // In create mode, always auto-generate when paymentItems or modeOfPayment changes
-      if (!isEditMode) {
-        console.log('DEBUG: Auto-generating in create mode')
-        generateJournalEntries()
-      }
-      // In edit mode: only auto-generate if there are no payment items AND no existing entries AND we're not loading data
-      // This prevents overwriting existing database entries that are being loaded
-      else {
-        if (paymentItems.length === 0 && journalEntries.length === 0) {
-          console.log('DEBUG: Auto-generating in edit mode (no items, no entries)')
-          generateJournalEntries()
-        } else {
-          console.log(
-            'DEBUG: NOT auto-generating in edit mode - paymentItems:',
-            paymentItems.length,
-            'journalEntries:',
-            journalEntries.length,
-          )
-        }
-      }
+      console.log('DEBUG: Auto-generating journal entries')
+      generateJournalEntries()
     } else {
       console.log(
         'DEBUG: NOT auto-generating - isViewMode:',
@@ -1328,7 +1309,6 @@ export default function PaymentsForm({
     bulkResponsibilityCenter,
     chartsOfAccounts,
     isViewMode,
-    isEditMode,
   ])
 
   // Separate useEffect to handle when manual entries are added (should not trigger auto-generation)
@@ -1421,8 +1401,7 @@ export default function PaymentsForm({
 
       // ── payment_items payload — ONLY what the DB schema stores ──
       //   ci_purchase_id    → purchaseItemId
-      //   ci_amount         → amount       (discounted + VAT − WHT)
-      //   ci_witholding_tax → whtAmount
+      //   ci_amount_applied → amount_applied
       // Only include payment items if they're not from existing data (new items)
       // In edit mode, existing payment items should not be sent unless they're modified
       const preparedItems = isEditMode
@@ -1431,8 +1410,7 @@ export default function PaymentsForm({
             .filter((item) => !item.isOther)
             .map((item) => ({
               purchase_id: item.purchaseItemId,
-              amount: item.amount,
-              witholding_tax: item.whtAmount,
+              amount_applied: item.amount,
             }))
 
       const preparedJournalEntries = journalEntries.map((entry) => {
@@ -1838,40 +1816,34 @@ export default function PaymentsForm({
                   value={fmt(summary.totalGross)}
                 />
 
-                {/* 2. Total Discount (-) */}
+                {/* 2. Total Paid Amount */}
                 <SummaryRow
-                  label="Total Discount:"
-                  value={fmt(summary.totalDiscount)}
-                  badge="(-)"
-                  badgeColor="text-red-500"
-                  valuePrefix="-"
-                  textColor="text-red-600"
+                  label="Total Paid Amount:"
+                  value={fmt(summary.totalPaid)}
+                  textColor="text-green-600"
                 />
 
-                {/* 3. Total Discounted Amount - Red Left Border + Bottom Zinc Line */}
+                {/* 3. Total Pending Payments */}
                 <SummaryRow
-                  label="Total Discounted Amount:"
-                  value={fmt(summary.totalGross - summary.totalDiscount)}
+                  label="Total Pending Payments:"
+                  value={fmt(summary.totalPending)}
+                  textColor="text-orange-600"
+                />
+
+                {/* 4. Remaining Balance - Red Left Border + Bottom Zinc Line */}
+                <SummaryRow
+                  label="Remaining Balance:"
+                  value={fmt(summary.totalGross - summary.totalPaid - summary.totalPending)}
                   containerClassName="p-2 rounded-md bg-red-50/70 border-l-3 border-red-500 my-1"
                 />
 
-                {/* 4. Total Output VAT (+) - Border explicitly removed (border-b-0) */}
+                {/* 5. Current Payment Amount */}
                 <SummaryRow
-                  label="Total VAT (%):"
-                  value={fmt(summary.totalVAT)}
+                  label="Current Payment:"
+                  value={fmt(summary.totalCashCollected)}
                   badge="(+)"
                   badgeColor="text-zinc-400"
-                  containerClassName="py-1 border-b-0"
-                />
-
-                {/* 5. Total Withholding Tax (-) */}
-                <SummaryRow
-                  label="Total Withholding Tax (WHT):"
-                  value={fmt(summary.totalWHT)}
-                  badge="(-)"
-                  badgeColor="text-red-500"
-                  valuePrefix="-"
-                  textColor="text-red-600"
+                  textColor="text-blue-600"
                 />
               </div>
 
@@ -2140,38 +2112,36 @@ export default function PaymentsForm({
                     <div className="overflow-x-auto custom-scrollbar">
                       <table
                         className="w-full text-left text-xs text-slate-600"
-                        style={{ tableLayout: 'fixed', minWidth: 860 }}
+                        style={{ tableLayout: 'fixed', minWidth: 1200 }}
                       >
                         <colgroup>
-                          <col style={{ width: '16%' }} />
-                          <col style={{ width: '20%' }} />
-                          <col style={{ width: '12%' }} />
-                          <col style={{ width: '10%' }} />
-                          <col style={{ width: '10%' }} />
-                          <col style={{ width: '12%' }} />
-                          <col style={{ width: '14%' }} />
-                          <col style={{ width: '10%' }} />
+                          <col style={{ width: '15%' }} />
+                          <col style={{ width: '15%' }} />
+                          <col style={{ width: '18%' }} />
+                          <col style={{ width: '18%' }} />
+                          <col style={{ width: '18%' }} />
+                          <col style={{ width: '18%' }} />
                           <col style={{ width: '6%' }} />
                         </colgroup>
                         <thead className="bg-zinc-100 border-b border-zinc-200 uppercase font-bold text-zinc-700 tracking-wider">
                           <tr>
-                            <th className="py-3 px-3 min-w-[180px] text-center">
-                              Invoice Ref
+                            <th className="py-3 px-2 min-w-[120px] text-center">
+                              Purchase ID
                             </th>
                             <th className="py-3 px-2 min-w-[120px] text-center">
-                              Product/Service
+                              Doc Ref
                             </th>
-                            <th className="py-3 px-2 min-w-[150px] text-center">
-                              Gross Amt
-                            </th>
-                            <th className="py-3 px-2 w-16 text-center">Discount</th>
-                            <th className="py-3 px-2 w-28 text-center">VAT</th>
-                            <th className="py-3 px-2 w-24 text-center">WHT</th>
-                            <th className="py-3 px-2 w-20 text-center">
+                            <th className="py-3 px-2 min-w-[120px] text-center">
                               Amount Due
                             </th>
-                            <th className="py-3 px-2 w-20 text-center">
-                              Resp. Center
+                            <th className="py-3 px-2 min-w-[120px] text-center">
+                              Paid Amount
+                            </th>
+                            <th className="py-3 px-2 min-w-[120px] text-center">
+                              Pending Payments
+                            </th>
+                            <th className="py-3 px-2 min-w-[120px] text-center">
+                              To Pay
                             </th>
                             <th className="py-3 px-2 w-10 text-center"></th>
                           </tr>
@@ -2184,34 +2154,55 @@ export default function PaymentsForm({
                             >
                               <td className="py-2 px-2 text-center">
                                 <span className="font-mono text-[11px] bg-gray-100 px-2 py-0.5 rounded text-gray-700">
-                                  {item.invoiceRef || '—'}
+                                  {item.purchaseItemId || '—'}
                                 </span>
                               </td>
-                              <td
-                                className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 truncate"
-                                title={item.product_service_name || item.description}
-                              >
-                                {item.product_service_name ||
-                                  item.description ||
-                                  '—'}
+                              <td className="py-2 px-2 text-center">
+                                <span className="font-mono text-[11px] bg-gray-100 px-2 py-0.5 rounded text-gray-700">
+                                  {item.invoiceRef || '—'}
+                                </span>
                               </td>
                               <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-800 tabular-nums">
                                 {fmt(item.gross || 0)}
                               </td>
-                              <td className="py-2 px-2 text-[12px] font-bold text-center text-orange-500 tabular-nums">
-                                ({fmt(item.discAmt || 0)})
+                              <td className="py-2 px-2 text-[12px] font-bold text-center text-green-600 tabular-nums">
+                                {fmt(item.paidAmount || 0)}
                               </td>
-                              <td className="py-2 px-2 text-[12px] font-bold text-center text-red-500 tabular-nums">
-                                +{fmt(item.vatAmt || 0)}
+                              <td className="py-2 px-2 text-[12px] font-bold text-center text-orange-600 tabular-nums">
+                                {fmt(item.pendingPayments || 0)}
                               </td>
-                              <td className="py-2 px-2 text-[12px] font-bold text-center text-blue-600 tabular-nums">
-                                ({fmt(item.whtAmount || 0)})
-                              </td>
-                              <td className="py-2 px-2 text-[13px] font-black text-center text-green-700 tabular-nums">
-                                {fmt(item.amount || 0)}
-                              </td>
-                              <td className="py-2 px-2 text-[12px] font-bold text-center text-gray-700 tabular-nums">
-                                {item.responsibilityCenter || '---'}
+                              <td className="py-2 px-2 text-center">
+                                {!isViewMode && !isEditMode ? (
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={item.amount || ''}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value) || 0
+                                      const maxValue = item.gross - item.paidAmount - item.pendingPayments
+                                      if (value > maxValue) {
+                                        setToast({
+                                          type: 'warning',
+                                          message: `TO PAY cannot exceed remaining balance of ${fmt(maxValue)}`,
+                                        })
+                                        updatePaymentItem(item.id, 'amount', maxValue)
+                                      } else {
+                                        updatePaymentItem(item.id, 'amount', value)
+                                      }
+                                    }}
+                                    className={`w-full px-2 py-1 text-right border rounded focus:outline-none focus:ring-2 text-xs ${item.amount > (item.gross - item.paidAmount - item.pendingPayments)
+                                      ? 'border-red-500 focus:ring-red-500 bg-red-50'
+                                      : 'border-gray-300 focus:ring-blue-500'
+                                      }`}
+                                    placeholder="0.00"
+                                    title={`Maximum allowed: ${fmt(Math.max(0, item.gross - item.paidAmount - item.pendingPayments))}`}
+                                  />
+                                ) : (
+                                  <span className="font-bold text-gray-800 tabular-nums">
+                                    {fmt(item.amount || 0)}
+                                  </span>
+                                )}
                               </td>
                               <td className="py-2 px-1 text-center">
                                 {!isViewMode && !isEditMode && (
@@ -2226,31 +2217,38 @@ export default function PaymentsForm({
                             </tr>
                           ))}
                         </tbody>
-                        <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
+                        <tfoot className="border-t-2 border-gray-200 bg-gray-50/80 font-black text-xs">
                           <tr>
+                            {/* Spans Purchase ID and Doc Ref (2 columns) */}
                             <td
                               colSpan={2}
-                              className="py-2.5 px-3 text-right text-xs font-black uppercase"
+                              className="py-3 px-2 text-[13px] uppercase text-gray-900 text-left pl-4"
                             >
                               Totals
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-xs">
-                              {fmt(summary.totalGross)}
+
+                            {/* AMOUNT DUE TOTAL */}
+                            <td className="py-3 px-2 text-center tabular-nums text-gray-900">
+                              {fmt(paymentItems.reduce((sum, item) => sum + (item.gross || 0), 0))}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-orange-500 text-xs">
-                              ({fmt(summary.totalDiscount)})
+
+                            {/* PAID AMOUNT TOTAL */}
+                            <td className="py-3 px-2 text-center tabular-nums text-green-600">
+                              {fmt(paymentItems.reduce((sum, item) => sum + (item.paidAmount || 0), 0))}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-red-500 text-xs">
-                              +{fmt(summary.totalVAT)}
+
+                            {/* PENDING PAYMENTS TOTAL */}
+                            <td className="py-3 px-2 text-center tabular-nums text-orange-600">
+                              {fmt(paymentItems.reduce((sum, item) => sum + (item.pendingPayments || 0), 0))}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-blue-600 text-xs">
-                              ({fmt(summary.totalWHT)})
+
+                            {/* TO PAY TOTAL */}
+                            <td className="py-3 px-2 text-center tabular-nums text-blue-600">
+                              {fmt(paymentItems.reduce((sum, item) => sum + (item.amount || 0), 0))}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-green-700 text-xs">
-                              {fmt(summary.totalCashCollected)}
-                            </td>
-                            <td />
-                            <td />
+
+                            {/* DELETE COLUMN SPACER */}
+                            <td className="py-3 px-2" />
                           </tr>
                         </tfoot>
                       </table>
@@ -2261,11 +2259,11 @@ export default function PaymentsForm({
                           onClick={() => setIsModalOpen(true)}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
                         >
-                          <Plus size={12} /> Add Purchase Items
+                          <Plus size={12} /> Add Purchase Invoices
                         </button>
                         <span className="text-xs text-zinc-500 font-medium">
                           {paymentItems.length}{' '}
-                          {paymentItems.length === 1 ? 'item' : 'items'} added
+                          {paymentItems.length === 1 ? 'invoice' : 'invoices'} added
                         </span>
                       </div>
                     )}
@@ -2460,18 +2458,16 @@ export default function PaymentsForm({
                         </tbody>
                         <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
                           <tr>
-                            <td
-                              colSpan={2}
-                              className="py-2.5 px-3 text-right text-xs"
-                            >
+                            <td className="py-2.5 px-3 text-center text-xs font-bold">
                               Total Ledger Balance:
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">
+                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">
                               {fmt(totalDebit)}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">
+                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">
                               {fmt(totalCredit)}
                             </td>
+                            <td />
                             <td />
                           </tr>
                         </tfoot>

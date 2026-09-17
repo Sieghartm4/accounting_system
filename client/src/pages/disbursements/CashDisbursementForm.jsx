@@ -993,9 +993,13 @@ export default function CashDisbursementForm({
                                 disabled={isViewMode}
                                 placeholder="Search product..."
                                 value={item.productSearch}
-                                onChange={(v) =>
+                                onChange={(v) => {
                                   updateDisbursementItem(item.id, 'productSearch', v)
-                                }
+                                  // Clear productId when user manually changes search text
+                                  if (v === '') {
+                                    updateDisbursementItem(item.id, 'productId', '')
+                                  }
+                                }}
                                 onSelect={(opt) => {
                                   updateDisbursementItem(
                                     item.id,
@@ -1473,9 +1477,10 @@ export default function CashDisbursementForm({
                         const balance = calculateJournalBalance()
                         return (
                           <tr>
-                            <td colSpan={2} className="py-2.5 px-3 text-right text-xs">Total Ledger Balance:</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(balance.totalDebit)}</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(balance.totalCredit)}</td>
+                            <td className="py-2.5 px-3 text-center text-xs font-bold">Total Ledger Balance:</td>
+                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(balance.totalDebit)}</td>
+                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(balance.totalCredit)}</td>
+                            <td />
                             <td />
                           </tr>
                         )

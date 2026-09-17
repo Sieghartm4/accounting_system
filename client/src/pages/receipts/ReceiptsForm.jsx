@@ -1435,9 +1435,10 @@ export default function ReceiptsForm({
                             const balance = calculateJournalBalance()
                             return (
                               <tr>
-                                <td colSpan={2} className="py-2.5 px-3 text-right text-xs">Total Ledger Balance:</td>
-                                <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(balance.totalDebit)}</td>
-                                <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(balance.totalCredit)}</td>
+                                <td className="py-2.5 px-3 text-center text-xs font-bold">Total Ledger Balance:</td>
+                                <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(balance.totalDebit)}</td>
+                                <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(balance.totalCredit)}</td>
+                                <td />
                                 <td />
                               </tr>
                             )

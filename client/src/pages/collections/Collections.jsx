@@ -922,6 +922,10 @@ function CollectionsContent() {
             checkboxCondition={checkboxCondition}
             columns={[
               {
+                key: 'id',
+                label: 'ID',
+              },
+              {
                 key: 'document_reference',
                 label: 'Document Reference',
               },
@@ -1234,6 +1238,7 @@ function CollectionsContent() {
                     },
                   ]}
                   columns={[
+                    { key: 'id', label: 'Sales ID' },
                     { key: 'doc_ref', label: 'Doc Ref' },
                     { key: 'terms', label: 'Terms' },
                     { key: 'date_delivered', label: 'Date Delivered' },

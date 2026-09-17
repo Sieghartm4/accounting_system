@@ -1054,7 +1054,7 @@ export default function AdjustmentsForm({
 
               {/* 2. JOURNAL ENTRIES */}
               <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-                <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
+                <div className="px-4 py-2.5 bg-zinc-900 text-white flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-semibold text-sm">
                       <Layers size={14} />
@@ -1066,13 +1066,38 @@ export default function AdjustmentsForm({
                       </span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setIsJournalEntriesCollapsed(!isJournalEntriesCollapsed)}
-                    className="text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
-                    title={isJournalEntriesCollapsed ? 'Expand' : 'Collapse'}
-                  >
-                    {isJournalEntriesCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-white pointer-events-none" />
+                      <div className="pl-7">
+                        <SearchableDropdown
+                          placeholder="Resp. Center to All"
+                          value={bulkResponsibilityCenter}
+                          onChange={setBulkResponsibilityCenter}
+                          onSelect={(opt) => {
+                            setBulkResponsibilityCenter(opt.value)
+                            journalEntries.forEach((entry) =>
+                              updateJournalEntry(entry.id, 'center', opt.value),
+                            )
+                          }}
+                          options={responsibilityCenterOptions}
+                          inputClassName="w-full px-2 py-1.5 rounded-lg text-[11px] font-medium outline-none transition-all bg-zinc-800 border border-white text-white focus:ring-2 focus:ring-red-500"
+                          emptyText={
+                            responsibilityCentersError ||
+                            'No responsibility centers found'
+                          }
+                          disabled={isViewMode}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsJournalEntriesCollapsed(!isJournalEntriesCollapsed)}
+                      className="text-white bg-red-600 hover:bg-red-700 p-2 rounded-lg transition-colors"
+                      title={isJournalEntriesCollapsed ? 'Expand' : 'Collapse'}
+                    >
+                      {isJournalEntriesCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                    </button>
+                  </div>
                 </div>
 
                 {!isJournalEntriesCollapsed && (
@@ -1197,9 +1222,10 @@ export default function AdjustmentsForm({
                         </tbody>
                         <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
                           <tr>
-                            <td colSpan={2} className="py-2.5 px-3 text-right text-xs">Total Ledger Balance:</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(totalDebit)}</td>
-                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700 text-xs">{fmt(totalCredit)}</td>
+                            <td className="py-2.5 px-3 text-center text-xs font-bold">Total Ledger Balance:</td>
+                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(totalDebit)}</td>
+                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(totalCredit)}</td>
+                            <td />
                             <td />
                           </tr>
                         </tfoot>

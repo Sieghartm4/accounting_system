@@ -712,7 +712,7 @@ function SalesContent() {
               values: {
                 PAID: 'green',
                 UNPAID: 'red',
-                PARTIALLY_PAID: 'yellow',
+                'PARTIALLY PAID': 'yellow',
                 OVERPAID: 'purple',
                 REJECTED: 'red',
               },

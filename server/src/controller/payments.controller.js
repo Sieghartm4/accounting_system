@@ -85,6 +85,11 @@ const getPayments = async (req, res, next) => {
           as: 'payment_date',
         },
 
+        {
+          col: Accounting.payments.selectOptionColumns.paid_amount,
+          as: 'paid_amount',
+        },
+
         { col: Accounting.payments.selectOptionColumns.state, as: 'state' },
       ])
 
@@ -148,6 +153,28 @@ const getPayments = async (req, res, next) => {
 
 const getPurchasePayment = async (req, res, next) => {
   try {
+    const { purchase_id } = req.query
+
+    console.log('Purchase IDs received:', req.query)
+    console.log('Raw purchase_id:', purchase_id)
+    console.log('Type of purchase_id:', typeof purchase_id)
+
+    const purchaseIds = (Array.isArray(purchase_id) ? purchase_id : [purchase_id]).filter(
+      (id) => id !== undefined && id !== null && id !== '',
+    )
+
+    console.log('Processed purchaseIds:', purchaseIds)
+
+    if (purchaseIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+
+        message: 'No purchase IDs provided',
+
+        timestamp: new Date().toISOString(),
+      })
+    }
+
     const query = sql
       .select([
         { col: Accounting.purchase.selectOptionColumns.id, as: 'id' },
@@ -156,19 +183,41 @@ const getPurchasePayment = async (req, res, next) => {
 
         {
           col: Accounting.purchase.selectOptionColumns.document_reference,
-          as: 'doc_ref',
+          as: 'document_reference',
         },
 
         { col: Accounting.purchase.selectOptionColumns.terms, as: 'terms' },
 
+        {
+          col: Accounting.purchase.selectOptionColumns.date_delivered,
+          as: 'date_delivered',
+        },
+
         { col: Accounting.purchase.selectOptionColumns.date_due, as: 'date_due' },
+
+        { col: Accounting.purchase.selectOptionColumns.remarks, as: 'remarks' },
 
         {
           col: Accounting.purchase.selectOptionColumns.total_amount_due,
-          as: 'amount_due',
+          as: 'total_amount_due',
         },
 
-        { col: Accounting.purchase.selectOptionColumns.status, as: 'status' },
+        {
+          col: Accounting.purchase.selectOptionColumns.paid_amount,
+          as: 'paid_amount',
+        },
+
+        // Include pending payments (not yet approved)
+        {
+          col: `COALESCE((
+            SELECT SUM(pi.${Accounting.payment_items.selectOptionColumns.amount_applied})
+            FROM ${Accounting.payment_items.tablename} pi
+            INNER JOIN ${Accounting.payments.tablename} p ON p.${Accounting.payments.selectOptionColumns.id} = pi.${Accounting.payment_items.selectOptionColumns.payment_id}
+            WHERE pi.${Accounting.payment_items.selectOptionColumns.purchase_id} = ${Accounting.purchase.selectOptionColumns.id}
+            AND p.${Accounting.payments.selectOptionColumns.state} != 'APPROVED'
+          ), 0)`,
+          as: 'pending_payments',
+        },
       ])
 
       .from(Accounting.purchase.tablename)
@@ -179,32 +228,25 @@ const getPurchasePayment = async (req, res, next) => {
         Master.vendors.selectOptionColumns.id,
       )
 
-      .where(Accounting.purchase.selectOptionColumns.state)
-
-      .andWhereNotExists(
-        `SELECT 1 FROM ${Accounting.payment_items.tablename} pi_pay ` +
-          `INNER JOIN ${Accounting.purchase_items.tablename} pi_inv ON pi_inv.${Accounting.purchase_items.selectOptionColumns.id} = pi_pay.${Accounting.payment_items.selectOptionColumns.purchase_id} ` +
-          `WHERE pi_inv.${Accounting.purchase_items.selectOptionColumns.purchase_id} = ${Accounting.purchase.selectOptionColumns.id}`,
-      )
-
-      .andWhereNot(Accounting.purchase.selectOptionColumns.status)
+      .whereIn(Accounting.purchase.selectOptionColumns.id, purchaseIds)
 
       .build()
 
-    let purchases = await Query(
-      query,
-      ['APPROVED', 'PAID'],
-      [Accounting.purchase.prefix_, Master.vendors.prefix_],
-    )
-
-    console.log('PURCHASES QUERY 1', query)
-
-    console.log('PURCHASES QUERY 2', purchases)
+    console.log('Generated SQL query:', query)
+    console.log('Query params:', purchaseIds)
+    
+    const purchases = await Query(query, purchaseIds, [
+      Accounting.purchase.prefix_,
+      Master.vendors.prefix_,
+    ])
+    
+    console.log('Purchases data fetched:', purchases)
+    console.log('Purchases data length:', purchases ? purchases.length : 0)
 
     res.status(200).json({
       success: true,
 
-      message: 'Purchases retrieved successfully',
+      message: 'Purchases retrieved successfully for partial payments',
 
       data: purchases,
 
@@ -213,12 +255,12 @@ const getPurchasePayment = async (req, res, next) => {
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error('Error fetching purchases:', error)
+    console.error('Error fetching purchases for payment:', error)
 
     res.status(500).json({
       success: false,
 
-      message: 'Failed to fetch purchases data',
+      message: 'Failed to fetch purchase data for payment',
 
       error: error.message,
 
@@ -554,12 +596,7 @@ const getAllPayments = async (req, res, next) => {
 
         { col: Master.vat.selectOptionColumns.type, as: 'vat_type' },
 
-        { col: Accounting.payment_items.selectOptionColumns.amount, as: 'amount' },
-
-        {
-          col: Accounting.payment_items.selectOptionColumns.witholding_tax,
-          as: 'witholding_tax',
-        },
+        { col: Accounting.payment_items.selectOptionColumns.amount_applied, as: 'amount' },
 
         {
           col: Master.withholding_tax.selectOptionColumns.rate,
@@ -570,20 +607,38 @@ const getAllPayments = async (req, res, next) => {
           col: Accounting.purchase_items.selectOptionColumns.responsibility_center,
           as: 'responsibility_center',
         },
+
+        {
+          col: Accounting.purchase.selectOptionColumns.paid_amount,
+          as: 'paid_amount',
+        },
+
+        // Include pending payments (not yet approved)
+        {
+          col: `COALESCE((
+            SELECT SUM(pi.${Accounting.payment_items.selectOptionColumns.amount_applied})
+            FROM ${Accounting.payment_items.tablename} pi
+            INNER JOIN ${Accounting.payments.tablename} p ON p.${Accounting.payments.selectOptionColumns.id} = pi.${Accounting.payment_items.selectOptionColumns.payment_id}
+            WHERE pi.${Accounting.payment_items.selectOptionColumns.purchase_id} = ${Accounting.purchase.selectOptionColumns.id}
+            AND p.${Accounting.payments.selectOptionColumns.id} != ?
+            AND p.${Accounting.payments.selectOptionColumns.state} != 'APPROVED'
+          ), 0)`,
+          as: 'pending_payments',
+        },
       ])
 
       .from(Accounting.payment_items.tablename)
 
       .innerJoin(
-        Accounting.purchase_items.tablename,
-        Accounting.purchase_items.selectOptionColumns.id,
+        Accounting.purchase.tablename,
+        Accounting.purchase.selectOptionColumns.id,
         Accounting.payment_items.selectOptionColumns.purchase_id,
       )
 
-      .innerJoin(
-        Accounting.purchase.tablename,
-        Accounting.purchase.selectOptionColumns.id,
+      .leftJoin(
+        Accounting.purchase_items.tablename,
         Accounting.purchase_items.selectOptionColumns.purchase_id,
+        Accounting.payment_items.selectOptionColumns.purchase_id,
       )
 
       .leftJoin(
@@ -614,7 +669,7 @@ const getAllPayments = async (req, res, next) => {
 
     let payment_items = await Query(
       payment_items_query,
-      [payment_id],
+      [payment_id, payment_id],
       [Accounting.payment_items.prefix_],
     )
 
@@ -879,6 +934,8 @@ const createPayment = async (req, res, next) => {
 
         remarks || null,
 
+        payment_items?.reduce((sum, item) => sum + (parseFloat(item.amount_applied) || 0), 0) || 0, // paid_amount
+
         'PREPARED',
 
         new Date().toISOString().split('T')[0],
@@ -911,9 +968,7 @@ const createPayment = async (req, res, next) => {
 
             item.purchase_id || null,
 
-            item.amount || 0,
-
-            item.witholding_tax || 0,
+            item.amount_applied || 0,
           ]
 
           await connection.execute(itemQuery, itemValues)
@@ -1187,13 +1242,17 @@ const updatePaymentState = async (req, res, next) => {
 
           updateValues = [nextState, userFullName, id]
 
-          // Special logic for APPROVED state: update related purchase records to PAID
-          // Get payment_items to find purchase_item_ids
+          // Special logic for APPROVED state: update related purchase records with partial payment support
+          // Get payment_items to find purchase_ids and amounts
           const paymentItemsQuery = sql
             .select([
               {
                 col: Accounting.payment_items.selectOptionColumns.purchase_id,
-                as: 'purchase_item_id',
+                as: 'purchase_id',
+              },
+              {
+                col: Accounting.payment_items.selectOptionColumns.amount_applied,
+                as: 'amount',
               },
             ])
             .from(Accounting.payment_items.tablename)
@@ -1208,61 +1267,72 @@ const updatePaymentState = async (req, res, next) => {
 
           console.log('payment_items', payment_items)
 
-          // Get unique purchase_item_ids
-          const uniquePurchaseItemIds = [
-            ...new Set(payment_items.map((item) => item.purchase_item_id)),
-          ].filter((id) => id !== null && id !== undefined)
+          // Group by purchase_id and sum amounts
+          const purchaseAmounts = {}
+          payment_items.forEach((item) => {
+            const purchaseId = item.purchase_id
+            const amount = parseFloat(item.amount_applied) || 0
+            if (purchaseId) {
+              purchaseAmounts[purchaseId] = (purchaseAmounts[purchaseId] || 0) + amount
+            }
+          })
 
-          console.log('uniquePurchaseItemIds', uniquePurchaseItemIds)
+          console.log('purchaseAmounts', purchaseAmounts)
 
-          if (uniquePurchaseItemIds.length > 0) {
-            // Get purchase_ids from purchase_items table
-            const purchaseItemsQuery = sql
+          // Update each purchase's paid_amount and status
+          for (const [purchaseId, amountToAdd] of Object.entries(purchaseAmounts)) {
+            // Get current purchase data
+            const purchaseQuery = sql
               .select([
                 {
-                  col: Accounting.purchase_items.selectOptionColumns.purchase_id,
-                  as: 'purchase_id',
+                  col: Accounting.purchase.selectOptionColumns.total_amount_due,
+                  as: 'total_amount_due',
+                },
+                {
+                  col: Accounting.purchase.selectOptionColumns.paid_amount,
+                  as: 'paid_amount',
                 },
               ])
-              .from(Accounting.purchase_items.tablename)
-              .whereIn(
-                Accounting.purchase_items.selectOptionColumns.id,
-                uniquePurchaseItemIds,
-              )
+              .from(Accounting.purchase.tablename)
+              .where(Accounting.purchase.selectOptionColumns.id)
               .build()
 
-            const purchaseItems = await Query(
-              purchaseItemsQuery,
-              uniquePurchaseItemIds,
-              [Accounting.purchase_items.prefix_],
+            const [purchaseData] = await connection.execute(
+              purchaseQuery,
+              [purchaseId],
             )
 
-            console.log('purchaseItems', purchaseItems)
+            if (purchaseData && purchaseData.length > 0) {
+              const totalDue = parseFloat(purchaseData[0].total_amount_due) || 0
+              const currentPaid = parseFloat(purchaseData[0].paid_amount) || 0
+              const newPaidAmount = currentPaid + amountToAdd
 
-            // Get unique purchase_ids
-            const uniquePurchaseIds = [
-              ...new Set(purchaseItems.map((item) => item.purchase_id)),
-            ].filter((id) => id !== null && id !== undefined)
+              // Determine new status based on payment progress
+              let newStatus = 'UNPAID'
+              if (newPaidAmount >= totalDue) {
+                newStatus = newPaidAmount > totalDue ? 'OVERPAID' : 'PAID'
+              } else if (newPaidAmount > 0) {
+                newStatus = 'PARTIALLY PAID'
+              }
 
-            console.log('uniquePurchaseIds', uniquePurchaseIds)
-
-            // Update purchase status to PAID only if current status is UNPAID
-            for (const purchaseId of uniquePurchaseIds) {
+              // Update purchase with new paid_amount and status
               const updatePurchaseQuery = sql
                 .update(Accounting.purchase.tablename)
-                .set([Accounting.purchase.selectOptionColumns.status])
+                .set([
+                  Accounting.purchase.selectOptionColumns.paid_amount,
+                  Accounting.purchase.selectOptionColumns.status,
+                ])
                 .where(Accounting.purchase.selectOptionColumns.id)
-                .andWhere(Accounting.purchase.selectOptionColumns.status)
                 .build()
 
-              const updatePurchaseValues = ['PAID', purchaseId, 'UNPAID']
+              const updatePurchaseValues = [newPaidAmount, newStatus, purchaseId]
 
               const [result] = await connection.execute(
                 updatePurchaseQuery,
                 updatePurchaseValues,
               )
               console.log(
-                `Updated purchase ID ${purchaseId} status to PAID, affected rows: ${result.affectedRows}`,
+                `Updated purchase ID ${purchaseId}: paid_amount=${newPaidAmount}, status=${newStatus}, affected rows: ${result.affectedRows}`,
               )
             }
           }
