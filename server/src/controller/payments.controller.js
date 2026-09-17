@@ -1413,7 +1413,7 @@ const updatePaymentState = async (req, res, next) => {
         data: {
           updatedCount: results.length,
 
-          updates: results.map((result) => ({ id: result.insertId })),
+          updates: updates.map((u) => ({ id: u.id })),
         },
 
         timestamp: new Date().toISOString(),
