@@ -199,7 +199,7 @@ const getPurchasePayment = async (req, res, next) => {
 
         {
           col: Accounting.purchase.selectOptionColumns.total_amount_due,
-          as: 'total_amount_due',
+          as: 'amount_due',
         },
 
         {
