@@ -302,7 +302,7 @@ const regeneratePaymentsJournalEntries = async (connection, paymentIds = []) => 
 
       .select([
 
-        { col: Accounting.payment_items.selectOptionColumns.amount, as: 'amount' },
+        { col: Accounting.payment_items.selectOptionColumns.amount_applied, as: 'amount' },
 
 
 
