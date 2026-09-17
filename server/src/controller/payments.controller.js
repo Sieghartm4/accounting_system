@@ -625,7 +625,6 @@ const getAllPayments = async (req, res, next) => {
             FROM ${Accounting.payment_items.tablename} pi
             INNER JOIN ${Accounting.payments.tablename} p ON p.${Accounting.payments.selectOptionColumns.id} = pi.${Accounting.payment_items.selectOptionColumns.payment_id}
             WHERE pi.${Accounting.payment_items.selectOptionColumns.purchase_id} = ${Accounting.purchase.selectOptionColumns.id}
-            AND p.${Accounting.payments.selectOptionColumns.id} != ?
             AND p.${Accounting.payments.selectOptionColumns.state} != 'APPROVED'
           ), 0)`,
           as: 'pending_payments',
@@ -674,7 +673,7 @@ const getAllPayments = async (req, res, next) => {
 
     let payment_items = await Query(
       payment_items_query,
-      [payment_id, payment_id],
+      [payment_id],
       [Accounting.payment_items.prefix_],
     )
 
@@ -1247,6 +1246,13 @@ const updatePaymentState = async (req, res, next) => {
 
           updateValues = [nextState, userFullName, id]
 
+          // Commit the state transition within this transaction before calculating
+          // linked purchases, so the approved payment is visible to the query.
+          const [paymentUpdateResult] = await connection.execute(
+            updateQuery,
+            updateValues,
+          )
+
           // Special logic for APPROVED state: update related purchase records with partial payment support
           // Get payment_items to find purchase_ids and amounts
           const paymentItemsQuery = sql
@@ -1286,16 +1292,25 @@ const updatePaymentState = async (req, res, next) => {
 
           // Update each purchase's paid_amount and status
           for (const [purchaseId, amountToAdd] of Object.entries(purchaseAmounts)) {
-            // Get current purchase data
+            // Recalculate total paid for this purchase from all approved payments
+            const paidAmountQuery = `
+              SELECT COALESCE(SUM(pi.${Accounting.payment_items.selectOptionColumns.amount_applied}), 0) as total_paid
+              FROM ${Accounting.payment_items.tablename} pi
+              INNER JOIN ${Accounting.payments.tablename} p
+                ON p.${Accounting.payments.selectOptionColumns.id} = pi.${Accounting.payment_items.selectOptionColumns.payment_id}
+              WHERE pi.${Accounting.payment_items.selectOptionColumns.purchase_id} = ?
+                AND p.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+            `
+            const [paidResult] = await connection.execute(paidAmountQuery, [purchaseId])
+            const totalPaid = parseFloat(paidResult[0]?.total_paid || 0)
+            console.log(`Purchase ID ${purchaseId}: totalPaid from query = ${totalPaid}, amountToAdd = ${amountToAdd}`)
+
+            // Get total amount due for this purchase
             const purchaseQuery = sql
               .select([
                 {
                   col: Accounting.purchase.selectOptionColumns.total_amount_due,
                   as: 'total_amount_due',
-                },
-                {
-                  col: Accounting.purchase.selectOptionColumns.paid_amount,
-                  as: 'paid_amount',
                 },
               ])
               .from(Accounting.purchase.tablename)
@@ -1309,18 +1324,18 @@ const updatePaymentState = async (req, res, next) => {
 
             if (purchaseData && purchaseData.length > 0) {
               const totalDue = parseFloat(purchaseData[0].total_amount_due) || 0
-              const currentPaid = parseFloat(purchaseData[0].paid_amount) || 0
-              const newPaidAmount = currentPaid + amountToAdd
+              console.log(`Purchase ID ${purchaseId}: totalDue = ${totalDue}`)
 
               // Determine new status based on payment progress
               let newStatus = 'UNPAID'
-              if (newPaidAmount >= totalDue) {
-                newStatus = newPaidAmount > totalDue ? 'OVERPAID' : 'PAID'
-              } else if (newPaidAmount > 0) {
+              if (totalPaid >= totalDue) {
+                newStatus = totalPaid > totalDue ? 'OVERPAID' : 'PAID'
+              } else if (totalPaid > 0) {
                 newStatus = 'PARTIALLY PAID'
               }
+              console.log(`Purchase ID ${purchaseId}: newStatus = ${newStatus}`)
 
-              // Update purchase with new paid_amount and status
+              // Update purchase with recalculated paid_amount and status
               const updatePurchaseQuery = sql
                 .update(Accounting.purchase.tablename)
                 .set([
@@ -1330,26 +1345,24 @@ const updatePaymentState = async (req, res, next) => {
                 .where(Accounting.purchase.selectOptionColumns.id)
                 .build()
 
-              const updatePurchaseValues = [newPaidAmount, newStatus, purchaseId]
+              const updatePurchaseValues = [totalPaid, newStatus, purchaseId]
 
               const [result] = await connection.execute(
                 updatePurchaseQuery,
                 updatePurchaseValues,
               )
               console.log(
-                `Updated purchase ID ${purchaseId}: paid_amount=${newPaidAmount}, status=${newStatus}, affected rows: ${result.affectedRows}`,
+                `Updated purchase ID ${purchaseId}: paid_amount=${totalPaid}, status=${newStatus}, affected rows: ${result.affectedRows}`,
               )
             }
           }
 
-          return connection.execute(updateQuery, updateValues)
+          return paymentUpdateResult
         } else {
           throw new Error(
             `Invalid current state: ${currentState}. Only PREPARED and CHECKED can be updated.`,
           )
         }
-
-        return connection.execute(updateQuery, updateValues)
       })
 
       const results = await Promise.all(updatePromises)

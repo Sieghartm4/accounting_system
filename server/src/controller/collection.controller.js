@@ -699,7 +699,6 @@ const getAllCollections = async (req, res, next) => {
             FROM ${Accounting.collection_items.tablename} ci
             INNER JOIN ${Accounting.collections.tablename} c ON c.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
             WHERE ci.${Accounting.collection_items.selectOptionColumns.sales_id} = ${Accounting.sales.selectOptionColumns.id}
-            AND c.${Accounting.collections.selectOptionColumns.id} != ?
             AND c.${Accounting.collections.selectOptionColumns.state} != 'APPROVED'
           ), 0)`,
           as: 'pending_collections',
@@ -726,7 +725,7 @@ const getAllCollections = async (req, res, next) => {
 
     let collection_items = await Query(
       collection_items_query,
-      [collection_id, collection_id],
+      [collection_id],
     )
 
     const collection_journal_query = sql
