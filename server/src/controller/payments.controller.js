@@ -1229,6 +1229,8 @@ const updatePaymentState = async (req, res, next) => {
             .build()
 
           updateValues = [nextState, userFullName, id]
+
+          return connection.execute(updateQuery, updateValues)
         } else if (currentState === 'CHECKED') {
           nextState = 'APPROVED'
 
