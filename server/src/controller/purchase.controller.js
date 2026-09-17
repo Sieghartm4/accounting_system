@@ -652,7 +652,7 @@ const getPurchase = async (req, res, next) => {
 
       const paymentsSubquery =
 
-        `SELECT COALESCE(SUM(pi.${Accounting.payment_items.selectOptionColumns.amount}), 0) as total_paid ` +
+        `SELECT COALESCE(SUM(pi.${Accounting.payment_items.selectOptionColumns.amount_applied}), 0) as total_paid ` +
 
         `FROM ${Accounting.payment_items.tablename} pi ` +
 
