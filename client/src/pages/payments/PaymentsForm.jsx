@@ -729,7 +729,7 @@ export default function PaymentsForm({
         console.log('Using fetched purchase data')
         const items = preSelectedPurchaseItems.map((item, index) => {
           console.log('Processing purchase data:', item)
-          const totalDue = parseFloat(item.total_amount_due) || 0
+          const totalDue = parseFloat(item.amount_due) || 0
           const paidAmount = parseFloat(item.paid_amount) || 0
           const pendingPayments = parseFloat(item.pending_payments) || 0
           const remainingBalance = totalDue - paidAmount - pendingPayments
@@ -770,14 +770,14 @@ export default function PaymentsForm({
           description: purchase.description || '',
           responsibilityCenter: '',
           gross:
-            parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
+            parseFloat(purchase.amount_due) || parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
           paidAmount: parseFloat(purchase.paid_amount) || 0,
           pendingPayments: parseFloat(purchase.pending_payments) || 0,
           discAmt: 0,
           vatAmt: 0,
           whtAmount: 0,
           amount:
-            parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
+            parseFloat(purchase.amount_due) || parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
           isOther: false,
         }))
         console.log('Auto-filled payment items from placeholder data:', items)
@@ -858,8 +858,7 @@ export default function PaymentsForm({
           invoiceRef: item.invoice_ref || '',
           description: item.product_service_name || item.description || '',
           responsibilityCenter: item.responsibility_center || '',
-          gross:
-            (parseFloat(item.amount) || 0) + (parseFloat(item.witholding_tax) || 0),
+          gross: parseFloat(item.total_amount_due) || 0,
           paidAmount: parseFloat(item.paid_amount) || 0,
           pendingPayments: parseFloat(item.pending_payments) || 0,
           discAmt: parseFloat(item.discount) || 0,

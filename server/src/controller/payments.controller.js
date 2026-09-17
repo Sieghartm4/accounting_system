@@ -609,6 +609,11 @@ const getAllPayments = async (req, res, next) => {
         },
 
         {
+          col: Accounting.purchase.selectOptionColumns.total_amount_due,
+          as: 'total_amount_due',
+        },
+
+        {
           col: Accounting.purchase.selectOptionColumns.paid_amount,
           as: 'paid_amount',
         },
