@@ -434,7 +434,7 @@ const getDashboardData = async (req, res, next) => {
     const totalReceipts = parseFloat(receiptsResult[0]?.totalReceipts || 0)
 
     const payments_query = `
-      SELECT COALESCE(SUM(pi.${Accounting.payment_items.selectOptionColumns.amount}), 0) AS totalPayments
+      SELECT COALESCE(SUM(pi.${Accounting.payment_items.selectOptionColumns.amount_applied}), 0) AS totalPayments
       FROM ${Accounting.payments.tablename} pay
       INNER JOIN ${Accounting.payment_items.tablename} pi
         ON pi.${Accounting.payment_items.selectOptionColumns.payment_id} = pay.${Accounting.payments.selectOptionColumns.id}

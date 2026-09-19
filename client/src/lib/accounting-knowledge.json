@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "title": "Accounting Rulebook - Domain Knowledge Index",
+  "description": "Maps natural-language accounting requests to (1) the GAAP accounting classification, (2) the REAL route in this app where the transaction belongs, (3) the REAL element label to highlight, and (4) a plain-language explanation. Only real routes and real element labels that exist in this app are referenced. Never invent a route that is not listed here.",
+  "categoryMapping": {
+    "sales": {
+      "type": "Operating Revenue - Sale of Goods / Services",
+      "route": "/sales",
+      "targetLabel": "New Sales",
+      "explanation": "Standard sales of goods or services are Operating Revenue. Record them with New Sales: pick the customer, add product/service line items, set dates and terms, then draft or post."
+    },
+    "receipts": {
+      "type": "Cash Receipt - Money In from Customer",
+      "route": "/receipts",
+      "targetLabel": "New Receipt",
+      "explanation": "Money received from a customer is a Receipt (cash in). Record it with New Receipt: pick the customer, enter the amount, then draft or post."
+    },
+    "payments": {
+      "type": "Payments - Money Out to Vendor",
+      "route": "/payments",
+      "targetLabel": "New Payment",
+      "explanation": "Money paid to a vendor is a Payment. Record it with New Payment: pick the vendor, enter the amount and line items, then draft or post."
+    },
+    "disbursement": {
+      "type": "Cash Disbursement - Money Out from Cash Drawer",
+      "route": "/disbursement",
+      "targetLabel": "New Disbursement",
+      "explanation": "A cash disbursement is a payment made out of the cash drawer. Record it with New Disbursement: pick the vendor, add line items, then draft or post."
+    },
+    "collections": {
+      "type": "Collections - Customer Payments / Collections",
+      "route": "/collections",
+      "targetLabel": "New Collection",
+      "explanation": "A collection records money received from a customer against the invoice. Record it with New Collection: pick the customer, enter the amount, then draft or post."
+    },
+    "purchase": {
+      "type": "Purchases - Cost of Goods / Operating Expense",
+      "route": "/purchase",
+      "targetLabel": "New Purchase",
+      "explanation": "Purchases of goods/services for resale or expense are Operating Expenses. Record them with New Purchase: pick the vendor, add line items, then draft or post."
+    },
+    "purchaseOrder": {
+      "type": "Purchase Order - Pre-commitment (not yet an expense)",
+      "route": "/purchase_order",
+      "targetLabel": "New Purchase Order",
+      "explanation": "A Purchase Order is a pre-commitment to buy and is not yet an expense until goods arrive. Record it with New Purchase Order."
+    },
+    "adjustments": {
+      "type": "Adjustments - Journal Entries / Corrections",
+      "route": "/adjustments",
+      "targetLabel": "New Adjustment",
+      "explanation": "Adjusting and correcting journal entries belong in Adjustments. Note: this form is account-and-amount based (no product line items), but does have Remarks and Attachments."
+    },
+    "advances": {
+      "type": "Advances - Cash Advances (Employee / Other)",
+      "route": "/advances",
+      "targetLabel": "New Advance",
+      "explanation": "Cash advances given to employees are tracked in Advances as receivables until settled."
+    },
+    "otherIncome": {
+      "type": "Other Income / Capital Gains (not operating revenue)",
+      "route": "/adjustments",
+      "targetLabel": "New Adjustment",
+      "explanation": "Trading gains, investment income, interest income and capital gains are classified as Other Income / Capital Gains, NOT standard operating product sales. Use a journal/adjustment entry against an Other Income or Capital Gains account in the Chart of Accounts."
+    },
+    "customerTransactions": {
+      "type": "Customer Transactions (report)",
+      "route": "/customer-transactions",
+      "targetLabel": "Customer Transactions",
+      "explanation": "View every transaction belonging to a specific customer here."
+    },
+    "vendorTransactions": {
+      "type": "Vendor Transactions (report)",
+      "route": "/vendor-transactions",
+      "targetLabel": "Vendor Transactions",
+      "explanation": "View every transaction belonging to a specific vendor here."
+    },
+    "vat": {
+      "type": "Value-Added Tax (VAT)",
+      "route": "/vat",
+      "targetLabel": "VAT",
+      "explanation": "VAT input/output position is managed and reported in the VAT module and from the VAT % on each transaction line item."
+    },
+    "withholdingTax": {
+      "type": "Withholding Tax",
+      "route": "/witholding_tax",
+      "targetLabel": "Withholding Tax",
+      "explanation": "Withholding tax at source is computed from the WHT % on transaction line items and reported in the Withholding Tax module."
+    },
+    "taxCompliance": {
+      "type": "Tax Compliance (VAT + Withholding combined)",
+      "route": "/tax-compliance",
+      "targetLabel": "Tax Compliance",
+      "explanation": "The combined Tax Compliance module tracks both VAT and withholding tax compliance and filing."
+    },
+    "trialBalance": {
+      "type": "Trial Balance (report)",
+      "route": "/trial-balance",
+      "targetLabel": "Trial Balance",
+      "explanation": "The Trial Balance report shows the debit/credit balances of every account."
+    },
+    "incomeStatement": {
+      "type": "Income Statement (report)",
+      "route": "/income-statement",
+      "targetLabel": "Income Statement",
+      "explanation": "The Income Statement report shows revenue, cost of sales and operating expenses to reach net income."
+    },
+    "generalLedger": {
+      "type": "General Ledger (report)",
+      "route": "/general-ledger",
+      "targetLabel": "General Ledger",
+      "explanation": "The General Ledger report lists all ledger account activity and transactions."
+    },
+    "journalEntries": {
+      "type": "Journal Entries (report)",
+      "route": "/journal-entries",
+      "targetLabel": "Journal Entries",
+      "explanation": "The Journal Entries report lists every debit/credit entry behind each transaction."
+    },
+    "bankReconciliation": {
+      "type": "Bank Reconciliation",
+      "route": "/bank-reconciliation",
+      "targetLabel": "Bank Reconciliation",
+      "explanation": "Reconcile the bank statement against the cashbook to surface missing or duplicate items."
+    },
+    "auditTrail": {
+      "type": "Audit Trail (report)",
+      "route": "/audit-trail",
+      "targetLabel": "Audit Trail",
+      "explanation": "The Audit Trail records every change and action taken by users in the system."
+    }
+  },
+  "classificationKey": [
+    "If it is revenue from selling products/services to customers -> /sales (Operating Revenue).",
+    "If it is money IN from a customer -> /receipts or /collections.",
+    "If it is money OUT to a vendor -> /payments or /disbursement.",
+    "If it is buying goods -> /purchase; if it is only a pre-commitment before goods arrive -> /purchase_order.",
+    "If it is Other Income / Capital Gains / trading / interest / investment returns -> Other Income or Capital Gains account via /adjustments (NOT /sales).",
+    "If it is a correction or adjusting journal entry -> /adjustments.",
+    "If it relates to VAT or withholding tax -> /vat or /witholding_tax respectively."
+  ]
+}

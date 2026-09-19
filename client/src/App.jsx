@@ -5,45 +5,34 @@ import ClientOnly from './components/ClientOnly'
 import UserDocumentation from './pages/user_documentation/UserDocumentation'
 import DeveloperDocumentation from './pages/developer_documentation/App'
 import Layout from './components/layout/Layout'
-import ProtectedRoute from './components/ProtectedRoute'
-import DashboardNew from './pages/dashboard/DashboardNew'
-import Users from './pages/users/Users'
-import Vendors from './pages/vendors/Vendors'
-import VendorTransactions from './pages/vendors/VendorTransactions'
-import Access from './pages/access/Access'
-import Company from './pages/company/Company'
-import ChartsOfAccounts from './pages/charts/Charts'
-import Proforma from './pages/proforma/Proforma'
-import ProductService from './pages/products/Products'
-import Receipts from './pages/receipts/Receipts'
-import Disbursements from './pages/disbursements/Disbursements'
-import Sales from './pages/sales/Sales'
-import Collections from './pages/collections/Collections'
-import AgeingReceivables from './pages/aging_receivables/AgeingReceivables'
-import AgeingPayables from './pages/aging_payables/AgeingPayables'
-import Purchase from './pages/purchase/Purchase'
-import PurchaseOrder from './pages/purchase_order/PurchaseOrder'
-import Payments from './pages/payments/Payments'
-import Customer from './pages/customers/Customer'
-import CustomerTransactions from './pages/customers/CustomerTransactions'
-import Vat from './pages/vat/Vat'
-import ResponsibilityCenter from './pages/responsibility_center/ResponsibilityCenter'
-import WithholdingTax from './pages/withholding_tax/WithholdingTax'
-import TaxCompliance from './pages/tax_compliance/TaxCompliance'
-import Adjustments from './pages/adjustments/Adjustments'
-import TrialBalance from './pages/reports/TrialBalance'
-import IncomeStatement from './pages/reports/IncomeStatement'
-import GeneralLedger from './pages/reports/GeneralLedger'
-import BalanceSheet from './pages/reports/BalanceSheet'
-import JournalEntries from './pages/reports/JournalEntries'
-import StatementOfComprehensiveIncome from './pages/reports/StatementOfComprehensiveIncome'
-import BankReconciliation from './pages/reports/BankReconciliation'
-import Advances from './pages/advances/Advances'
-import AuditTrail from './pages/audit_trail/AuditTrail'
+import { APP_ROUTES } from './routesConfig'
+import { CopilotPopup } from '@copilotkit/react-ui'
+import AIGuideController from './components/AIGuideController'
+
+const GUIDE_INSTRUCTIONS = `You are a fast, minimal AI guide for this accounting app. Classify every message as COMMAND or QUESTION first, then act.
+
+COMMAND (imperative: "go to sales", "create a sale", "fill the search", "approve this invoice"):
+- Act immediately, no preamble, no narration, no confirmation - except before posting, approving or deleting a transaction.
+- "go to X" -> navigateTo. Clicks/fills on ordinary pages -> clickElement or fillForm. Any transaction form -> createTransactionRecord.
+QUESTION (interrogative or informational: "how do I make a customer", "where is the trial balance", "what does this button do"):
+- "how do I ..." -> call startGuide once so the user is SHOWN the steps on screen with highlights, then one short sentence.
+- "where is X" -> call navigateToAndHighlight once, then one short sentence.
+- General page guidance ("guide me on this page", "guide me around", "what can I do here", "explain this page", "teach me this page", "give me a tour of this page") -> call guideThisPage immediately. Never reply with a list of options like "would you like to..." or ask the user what they want to do.
+- Never take a destructive action from a question.
+
+RULES:
+- Answer in 1-2 sentences max. No "let me check", no numbered option lists, never enumerate questions or choices.
+- For a single field such as a search box, a filter, or a "date from"/"date to" filter, use interactWithCurrentPage(fieldLabel, value).
+- Convert natural-language dates yourself ("2025 to 2026" -> start 2025-01-01, end 2026-12-31; "last month", "this quarter") into the format the target date field expects. Never ask the user to reformat dates.
+- Navigation is always allowed, on any page, for any reason. Page rules never block navigation.
+- Only apply a page's rules when acting on that page. Never apply one page's rules to another page or to navigation.
+- Never invent routes, permissions, restrictions or "authorization" requirements; only reference routes, fields and buttons in the provided context. If data is missing, say you do not know it.
+- If truly ambiguous, ask ONE short question. Otherwise just do the action.`
 
 function App() {
   return (
     <BrowserRouter>
+      <AIGuideController />
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
@@ -61,292 +50,18 @@ function App() {
           element={<DeveloperDocumentation />}
         />
         <Route path="/" element={<Layout />}>
-          <Route
-            path="dashboard"
-            element={
-              <ProtectedRoute routeName="dashboard">
-                <DashboardNew />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="company"
-            element={
-              <ProtectedRoute routeName="company">
-                <Company />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="charts"
-            element={
-              <ProtectedRoute routeName="charts">
-                <ChartsOfAccounts />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="vendors"
-            element={
-              <ProtectedRoute routeName="vendors">
-                <Vendors />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="proforma_entries"
-            element={
-              <ProtectedRoute routeName="proforma_entries">
-                <Proforma />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="product_service"
-            element={
-              <ProtectedRoute routeName="product_service">
-                <ProductService />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="receipts"
-            element={
-              <ProtectedRoute routeName="receipts">
-                <Receipts />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="disbursement"
-            element={
-              <ProtectedRoute routeName="disbursement">
-                <Disbursements />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="sales"
-            element={
-              <ProtectedRoute routeName="sales">
-                <Sales />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="collections"
-            element={
-              <ProtectedRoute routeName="collections">
-                <Collections />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="aging_receivables"
-            element={
-              <ProtectedRoute routeName="aging_receivables">
-                <AgeingReceivables />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="aging_payables"
-            element={
-              <ProtectedRoute routeName={['aging_payables', 'purchase']}>
-                <AgeingPayables />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="purchase"
-            element={
-              <ProtectedRoute routeName="purchase">
-                <Purchase />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="purchase_order"
-            element={
-              <ProtectedRoute routeName="purchase_order">
-                <PurchaseOrder />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="payments"
-            element={
-              <ProtectedRoute routeName="payments">
-                <Payments />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="customers"
-            element={
-              <ProtectedRoute routeName="customers">
-                <Customer />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="customer-transactions"
-            element={
-              <ProtectedRoute routeName="customers">
-                <CustomerTransactions />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="access"
-            element={
-              <ProtectedRoute routeName="access">
-                <Access />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="users"
-            element={
-              <ProtectedRoute routeName="users">
-                <Users />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="vat"
-            element={
-              <ProtectedRoute routeName="vat">
-                <Vat />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="responsibility_center"
-            element={
-              <ProtectedRoute routeName="responsibility_center">
-                <ResponsibilityCenter />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="vendor-transactions"
-            element={
-              <ProtectedRoute routeName="vendors">
-                <VendorTransactions />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="witholding_tax"
-            element={
-              <ProtectedRoute routeName="witholding_tax">
-                <WithholdingTax />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="tax-compliance"
-            element={
-              <ProtectedRoute
-                routeName={['tax_compliance', 'vat', 'witholding_tax']}
-              >
-                <TaxCompliance />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="tax_compliance"
-            element={
-              <ProtectedRoute
-                routeName={['tax_compliance', 'vat', 'witholding_tax']}
-              >
-                <TaxCompliance />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="adjustments"
-            element={
-              <ProtectedRoute routeName="adjustments">
-                <Adjustments />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="trial-balance"
-            element={
-              <ProtectedRoute routeName="trial_balance">
-                <TrialBalance />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="income-statement"
-            element={
-              <ProtectedRoute routeName="income_statement">
-                <IncomeStatement />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="general-ledger"
-            element={
-              <ProtectedRoute routeName="general_ledger">
-                <GeneralLedger />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="balance-sheet"
-            element={
-              <ProtectedRoute routeName="balance_sheet">
-                <BalanceSheet />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="statement-of-comprehensive-income"
-            element={
-              <ProtectedRoute routeName="statement_of_comprehensive_income">
-                <StatementOfComprehensiveIncome />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="journal-entries"
-            element={
-              <ProtectedRoute routeName="journal_entries">
-                <JournalEntries />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="advances"
-            element={
-              <ProtectedRoute routeName={['adjustments', 'advances']}>
-                <Advances />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="bank-reconciliation"
-            element={
-              <ProtectedRoute routeName="bank_reconciliation">
-                <BankReconciliation />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="audit-trail"
-            element={
-              <ProtectedRoute routeName="audit_trail">
-                <AuditTrail />
-              </ProtectedRoute>
-            }
-          />
+          {APP_ROUTES.map((route) => (
+            <Route key={route.path} path={route.path} element={route.element} />
+          ))}
         </Route>
       </Routes>
+      <CopilotPopup
+        instructions={GUIDE_INSTRUCTIONS}
+        labels={{
+          title: 'Accounting Assistant',
+          initial: 'Hi! I can help you navigate the accounting system. What would you like to do?',
+        }}
+      />
     </BrowserRouter>
   )
 }

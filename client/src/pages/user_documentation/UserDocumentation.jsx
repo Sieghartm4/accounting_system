@@ -113,7 +113,7 @@ const SECTIONS = [
   },
 ]
 
-const DOC_CONTENT = {
+export const DOC_CONTENT = {
   1.1: {
     title: 'What this system does',
     body: 'This is a business accounting system accessible through a web browser. It helps you record and track money coming in, money going out, tax records, and financial reports.',

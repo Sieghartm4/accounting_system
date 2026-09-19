@@ -11,12 +11,15 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
+    "@copilotkit/react-core": "^1.72.0",
+    "@copilotkit/react-ui": "^1.72.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-query": "^5.90.11",
     "@tanstack/react-query-devtools": "^5.91.1",
     "axios": "^1.13.2",
     "chart.js": "^4.5.1",
     "date-fns": "^4.1.0",
+    "driver.js": "^1.8.0",
     "framer-motion": "^12.38.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",

@@ -11,6 +11,8 @@ const { httpLogger } = require('./src/middlewares/logger.middleware')
 const { checkConnection } = require('./src/database/util/queries.util')
 const { corsOptions } = require('./src/middlewares/corsOptions.middleware')
 const { logger } = require('./src/util/logger.util')
+const { CopilotRuntime, OpenAIAdapter, AnthropicAdapter, copilotRuntimeNodeExpressEndpoint } = require('@copilotkit/runtime')
+const OpenAI = require('openai')
 
 const app = express()
 // Allows secure: 'auto' to detect HTTPS when TLS is terminated by a proxy.
@@ -41,6 +43,43 @@ const serverStart = async () => {
 
     logger.info('Initializing docs')
     await initDocs(app)
+
+    logger.info('Initializing CopilotKit runtime')
+    const aiProvider = (process.env._AI_PROVIDER || 'ollama').toLowerCase()
+    const aiBaseURL = process.env._AI_BASE_URL || ''
+    const aiAPIKey = process.env._AI_API_KEY || ''
+    const aiModel = process.env._AI_MODEL || 'accounting-guide'
+    let serviceAdapter
+    if (aiProvider === 'anthropic') {
+      const Anthropic = require('@anthropic-ai/sdk').default
+      const anthropic = new Anthropic({
+        apiKey: aiAPIKey || process.env.ANTHROPIC_API_KEY,
+        ...(aiBaseURL && { baseURL: aiBaseURL })
+      })
+      serviceAdapter = new AnthropicAdapter({ anthropic, model: aiModel })
+      logger.info(`CopilotKit AI provider: anthropic, model: ${aiModel}`)
+    } else {
+      const openai = new OpenAI({
+        baseURL: aiBaseURL || 'http://localhost:11434/v1',
+        apiKey: aiAPIKey || 'ollama'
+      })
+      serviceAdapter = new OpenAIAdapter({ openai, model: aiModel })
+      logger.info(`CopilotKit AI provider: ${aiProvider || 'ollama'}, model: ${aiModel}`)
+    }
+    const runtime = new CopilotRuntime()
+    const copilotEndpoint = copilotRuntimeNodeExpressEndpoint({
+      endpoint: '/api/copilotkit',
+      runtime,
+      serviceAdapter,
+    })
+
+    // Mount CopilotKit before the global auth middleware registered by
+    // initRoutes so the assistant endpoints stay reachable, and restore the
+    // full URL because the runtime resolves its base path from req.url.
+    app.use('/api/copilotkit', (req, res) => {
+      req.url = req.originalUrl
+      return copilotEndpoint(req, res)
+    })
 
     logger.info('Initializing routes')
     initRoutes(app)

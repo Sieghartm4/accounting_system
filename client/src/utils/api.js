@@ -3,6 +3,11 @@
 // Global fetch interceptor for auto-logout on token expiration
 const originalFetch = window.fetch
 window.fetch = async function (...args) {
+  // Skip interception for CopilotKit requests
+  if (typeof args[0] === 'string' && args[0].includes('/api/copilotkit')) {
+    return originalFetch.apply(this, args)
+  }
+
   const requestOptions = args[1] || {}
   const requestHeaders = new Headers(requestOptions.headers || {})
 
