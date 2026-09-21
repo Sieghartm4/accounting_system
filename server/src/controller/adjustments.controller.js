@@ -15,6 +15,18 @@ const { Master } = require('../database/model/Master')
 const { Accounting } = require('../database/model/Accounting')
 const { SQLQueryBuilder } = require('../util/helper.util')
 const { getTenantPool } = require('../database/util/tenantConnection.util')
+
+const {
+  assertEditableDocument,
+  sendJournalLockError,
+  isPostedState,
+} = require('../util/journalLock.util')
+
+const {
+  assertPostedSafeEdit,
+  applyPostedSafeEdit,
+} = require('../util/postedSafeEdit.util')
+
 const { broadcastUpdates } = require('../startup/socket.startup')
 const sql = new SQLQueryBuilder()
 
@@ -706,21 +718,24 @@ const cancelAdjustmentState = async (req, res, next) => {
           update &&
           update.id &&
           update.currentState !== 'CANCELLED' &&
-          update.currentState !== 'REJECTED',
+          update.currentState !== 'REJECTED' &&
+          !isPostedState(update.currentState),
       )
 
       const invalidUpdates = updates.filter(
         (update) =>
           !update ||
           !update.id ||
-          (update.currentState === 'CANCELLED' || update.currentState === 'REJECTED'),
+          update.currentState === 'CANCELLED' ||
+          update.currentState === 'REJECTED' ||
+          isPostedState(update.currentState),
       )
 
       if (validUpdates.length === 0) {
         return res.status(400).json({
           success: false,
           message:
-            'No adjustments eligible for cancellation. Only adjustments not already CANCELLED or REJECTED can be cancelled.',
+            'No adjustments eligible for cancellation. Only adjustments not already CANCELLED, REJECTED or APPROVED/POSTED can be cancelled.',
           ignored: invalidUpdates.map((u) => ({
             id: u?.id,
             currentState: u?.currentState,
@@ -832,6 +847,41 @@ const updateAdjustmentData = async (req, res, next) => {
     try {
       connection = await getTenantPool().getConnection()
       await connection.beginTransaction()
+
+      // SAFE EDIT: an approved adjustment keeps its journal entries immutable
+      // but its remarks, attachments, and document reference can still be
+      // corrected in place. This path does NOT touch journal rows.
+      const postedSafeEdit = await assertPostedSafeEdit(
+        connection,
+        'adjustments',
+        adjustment_id,
+        req.body,
+      )
+
+      if (postedSafeEdit) {
+        await applyPostedSafeEdit(
+          connection,
+          'adjustments',
+          adjustment_id,
+          req.body,
+          postedSafeEdit,
+          req.context?.username || null,
+        )
+        await connection.commit()
+        return res.status(200).json({
+          success: true,
+          message: `Updated SAFE fields only (${postedSafeEdit.changedSafe.join(', ') || 'attachments'}) on ${postedSafeEdit.doc.state} Adjustment ${adjustment_id}. Journal entries were left unchanged.`,
+          data: {
+            id: adjustment_id,
+            state: postedSafeEdit.doc.state,
+            safe_fields_changed: postedSafeEdit.changedSafe,
+          },
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      // LOCK: a posted/approved adjustment can no longer be edited.
+      await assertEditableDocument(connection, 'adjustments', adjustment_id)
 
       // Fetch current data for audit trail BEFORE making any updates
       const currentAdjustmentQuery = sql
@@ -1342,6 +1392,10 @@ const updateAdjustmentData = async (req, res, next) => {
       }
     }
   } catch (error) {
+    if (sendJournalLockError(res, error)) {
+      return
+    }
+
     console.error('Error updating adjustment:', error)
     return res.status(500).json({
       success: false,

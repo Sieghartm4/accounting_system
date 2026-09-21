@@ -600,6 +600,8 @@ export default function CollectionsForm({
 
   isEditMode = false,
 
+  isPostedLocked = false,
+
   collectionData = null,
 
   preSelectedSales = null, // New prop for auto-filling from To Be Collected
@@ -607,6 +609,7 @@ export default function CollectionsForm({
   preSelectedSalesItems = null, // Fetched sales items for the selected sales
 
 }) {
+  const postedLock = isPostedLocked && !isViewMode
 
   // ── Collection items ──────────────────────────────────────────────────────
 
@@ -2652,6 +2655,10 @@ export default function CollectionsForm({
 
           .summary-row:hover .summary-tooltip { display: block; }
 
+          .posted-lock-zone input, .posted-lock-zone select, .posted-lock-zone button, .posted-lock-zone [role="combobox"] { pointer-events: none !important; }
+
+          .posted-lock-zone { opacity: .8; }
+
         `,
 
         }}
@@ -3026,7 +3033,17 @@ export default function CollectionsForm({
 
         {!isViewMode && (
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+
+            {postedLock && (
+
+              <span className="px-3 py-1.5 bg-amber-100 border border-amber-400 text-amber-800 text-[11px] font-black rounded-lg uppercase tracking-wide">
+
+                APPROVED - only remarks, attachments &amp; reference editable
+
+              </span>
+
+            )}
 
             <button className="px-4 py-2 bg-white border border-gray-200 text-[12px] font-black text-gray-400 rounded-lg hover:bg-gray-50 transition-all uppercase">
 
@@ -3278,7 +3295,7 @@ export default function CollectionsForm({
 
                         </label>
 
-                        {isViewMode ? (
+                        {isViewMode || postedLock ? (
 
                           <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
 
@@ -3392,7 +3409,7 @@ export default function CollectionsForm({
 
                         </label>
 
-                        {isViewMode ? (
+                        {isViewMode || postedLock ? (
 
                           <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
 
@@ -3462,7 +3479,7 @@ export default function CollectionsForm({
 
                           onChange={(e) => setCollectionDate(e.target.value)}
 
-                          disabled={isViewMode}
+                          disabled={isViewMode || postedLock}
 
                           className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!collectionDate ? 'border-red-500' : 'border-zinc-300'}`}
 
@@ -3496,7 +3513,7 @@ export default function CollectionsForm({
 
                               onChange={(e) => setBankName(e.target.value)}
 
-                              disabled={isViewMode}
+                              disabled={isViewMode || postedLock}
 
                               className={`w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
 
@@ -3532,7 +3549,7 @@ export default function CollectionsForm({
 
                               onChange={(e) => setCheckNumber(e.target.value)}
 
-                              disabled={isViewMode}
+                              disabled={isViewMode || postedLock}
 
                               className={`w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
 
@@ -3552,7 +3569,7 @@ export default function CollectionsForm({
 
               {/* 1. COLLECTION ITEMS */}
 
-              <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+              <section className={`bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden ${postedLock ? 'posted-lock-zone' : ''}`}>
 
                 <div className="px-4 py-2.5 bg-zinc-900 text-white flex flex-wrap items-center justify-between gap-3">
 
@@ -3945,7 +3962,7 @@ export default function CollectionsForm({
 
               {/* 2. JOURNAL ENTRIES */}
 
-              <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+              <section className={`bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden ${postedLock ? 'posted-lock-zone' : ''}`}>
 
                 <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
 

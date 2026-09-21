@@ -24,6 +24,17 @@ const { getTenantPool } = require('../database/util/tenantConnection.util')
 
 const { broadcastUpdates } = require('../startup/socket.startup')
 
+const {
+  assertEditableDocument,
+  sendJournalLockError,
+  isPostedState,
+} = require('../util/journalLock.util')
+
+const {
+  assertPostedSafeEdit,
+  applyPostedSafeEdit,
+} = require('../util/postedSafeEdit.util')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -1470,7 +1481,8 @@ const cancelPaymentState = async (req, res, next) => {
           update &&
           update.id &&
           update.currentState !== 'CANCELLED' &&
-          update.currentState !== 'REJECTED',
+          update.currentState !== 'REJECTED' &&
+          !isPostedState(update.currentState),
       )
 
       const invalidUpdates = updates.filter(
@@ -1478,14 +1490,15 @@ const cancelPaymentState = async (req, res, next) => {
           !update ||
           !update.id ||
           update.currentState === 'CANCELLED' ||
-          update.currentState === 'REJECTED',
+          update.currentState === 'REJECTED' ||
+          isPostedState(update.currentState),
       )
 
       if (validUpdates.length === 0) {
         return res.status(400).json({
           success: false,
           message:
-            'No payments eligible for cancellation. Only payments not already CANCELLED or REJECTED can be cancelled.',
+            'No payments eligible for cancellation. Only payments not already CANCELLED, REJECTED or APPROVED/POSTED can be cancelled.',
           ignored: invalidUpdates.map((u) => ({
             id: u?.id,
             currentState: u?.currentState,
@@ -1764,11 +1777,9 @@ const getPrintPayments = async (req, res, next) => {
 
         { col: Master.vat.selectOptionColumns.rate, as: 'vat_rate' },
 
-        { col: Accounting.payment_items.selectOptionColumns.amount, as: 'amount' },
-
         {
-          col: Accounting.payment_items.selectOptionColumns.witholding_tax,
-          as: 'witholding_tax',
+          col: Accounting.payment_items.selectOptionColumns.amount_applied,
+          as: 'amount',
         },
 
         {
@@ -2207,6 +2218,41 @@ const updatePayment = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      // SAFE EDIT: an approved document keeps its journal entries immutable
+      // but its remarks, attachments, and document reference can still be
+      // corrected in place. This path does NOT touch items or journal rows.
+      const postedSafeEdit = await assertPostedSafeEdit(
+        connection,
+        'payments',
+        payment_id,
+        req.body,
+      )
+
+      if (postedSafeEdit) {
+        await applyPostedSafeEdit(
+          connection,
+          'payments',
+          payment_id,
+          req.body,
+          postedSafeEdit,
+          req.context?.username || null,
+        )
+        await connection.commit()
+        return res.status(200).json({
+          success: true,
+          message: `Updated SAFE fields only (${postedSafeEdit.changedSafe.join(', ') || 'attachments'}) on ${postedSafeEdit.doc.state} Payment ${payment_id}. Journal entries were left unchanged.`,
+          data: {
+            id: payment_id,
+            state: postedSafeEdit.doc.state,
+            safe_fields_changed: postedSafeEdit.changedSafe,
+          },
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      // LOCK: a posted/approved document can no longer be edited.
+      await assertEditableDocument(connection, 'payments', payment_id)
+
       // Fetch current data for audit trail BEFORE making any updates
 
       const currentPaymentQuery = sql
@@ -2271,13 +2317,8 @@ const updatePayment = async (req, res, next) => {
             },
 
             {
-              col: Accounting.payment_items.selectOptionColumns.amount,
+              col: Accounting.payment_items.selectOptionColumns.amount_applied,
               as: 'amount',
-            },
-
-            {
-              col: Accounting.payment_items.selectOptionColumns.witholding_tax,
-              as: 'witholding_tax',
             },
           ])
 
@@ -3251,6 +3292,10 @@ const updatePayment = async (req, res, next) => {
       }
     }
   } catch (error) {
+    if (sendJournalLockError(res, error)) {
+      return
+    }
+
     console.error('Error updating payment:', error)
 
     return res.status(500).json({

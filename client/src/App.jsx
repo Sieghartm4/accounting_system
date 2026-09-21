@@ -40,6 +40,7 @@ import StatementOfComprehensiveIncome from './pages/reports/StatementOfComprehen
 import BankReconciliation from './pages/reports/BankReconciliation'
 import Advances from './pages/advances/Advances'
 import AuditTrail from './pages/audit_trail/AuditTrail'
+import RecurringJournals from './pages/recurring_journals/RecurringJournals'
 
 function App() {
   return (
@@ -326,6 +327,14 @@ function App() {
             element={
               <ProtectedRoute routeName={['adjustments', 'advances']}>
                 <Advances />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="recurring-journals"
+            element={
+              <ProtectedRoute routeName="recurring_journals">
+                <RecurringJournals />
               </ProtectedRoute>
             }
           />

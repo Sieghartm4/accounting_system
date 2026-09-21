@@ -6,8 +6,7 @@ module.exports = {
     await queryInterface.createTable('collections', {
       c_id: {
         type: Sequelize.STRING(300),
-        primaryKey: true,
-        autoIncrement: true
+        primaryKey: true
       },
       c_customer_id: {
         type: Sequelize.INTEGER,

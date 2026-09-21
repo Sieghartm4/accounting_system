@@ -6,7 +6,6 @@ module.exports = {
       a_id: {
         type: Sequelize.STRING(300),
         primaryKey: true,
-        autoIncrement: true,
         allowNull: false
       },
       a_document_reference: {

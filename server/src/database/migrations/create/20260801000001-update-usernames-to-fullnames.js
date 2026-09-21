@@ -3,6 +3,17 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
+    // Ensure master_user has mu_fullname (exists on fresh installs; may be
+    // missing if the master_user table predates the migration history)
+    const [fullnameCols] = await queryInterface.sequelize.query(
+      "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'master_user' AND COLUMN_NAME = 'mu_fullname'"
+    )
+    if (fullnameCols.length === 0) {
+      await queryInterface.sequelize.query(
+        'ALTER TABLE master_user ADD COLUMN mu_fullname VARCHAR(300) NULL'
+      )
+    }
+
     // Helper function to update a table's user fields
     const updateUserFieldsInTable = async (tableName, idColumn, createdByColumn, checkedByColumn, approvedByColumn) => {
       // Get all users from master_user

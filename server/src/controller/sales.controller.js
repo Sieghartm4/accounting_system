@@ -24,6 +24,17 @@ const { SQLQueryBuilder } = require('../util/helper.util')
 
 const { getTenantPool } = require('../database/util/tenantConnection.util')
 
+const {
+  assertEditableDocument,
+  sendJournalLockError,
+  isPostedState,
+} = require('../util/journalLock.util')
+
+const {
+  assertPostedSafeEdit,
+  applyPostedSafeEdit,
+} = require('../util/postedSafeEdit.util')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -149,6 +160,10 @@ const regenerateCollectionsJournalEntries = async (
     const header = headerRows[0]
 
     if (!header) continue
+
+    // DO NOT rewrite journal entries of an already posted/locked collection.
+    // Posted journal entries are immutable.
+    await assertEditableDocument(connection, 'collections', collectionId)
 
     const paymentAccountId = await resolveCollectionPaymentAccountId(
       connection,
@@ -1251,7 +1266,8 @@ const cancelSalesState = async (req, res, next) => {
           update &&
           update.id &&
           update.currentState !== 'CANCELLED' &&
-          update.currentState !== 'REJECTED',
+          update.currentState !== 'REJECTED' &&
+          !isPostedState(update.currentState),
       )
 
       const invalidUpdates = updates.filter(
@@ -1259,14 +1275,15 @@ const cancelSalesState = async (req, res, next) => {
           !update ||
           !update.id ||
           update.currentState === 'CANCELLED' ||
-          update.currentState === 'REJECTED',
+          update.currentState === 'REJECTED' ||
+          isPostedState(update.currentState),
       )
 
       if (validUpdates.length === 0) {
         return res.status(400).json({
           success: false,
           message:
-            'No sales eligible for cancellation. Only sales not already CANCELLED or REJECTED can be cancelled.',
+            'No sales eligible for cancellation. Only sales not already CANCELLED, REJECTED or APPROVED/POSTED can be cancelled.',
           ignored: invalidUpdates.map((u) => ({
             id: u?.id,
             currentState: u?.currentState,
@@ -1400,6 +1417,42 @@ const updateSale = async (req, res, next) => {
       connection = await getTenantPool().getConnection()
 
       await connection.beginTransaction()
+
+      // SAFE EDIT: an approved document keeps its journal entries immutable
+      // but its remarks, attachments, and document reference can still be
+      // corrected in place. This path does NOT touch items or journal rows.
+      const postedSafeEdit = await assertPostedSafeEdit(
+        connection,
+        'sales',
+        salesId,
+        req.body,
+      )
+
+      if (postedSafeEdit) {
+        await applyPostedSafeEdit(
+          connection,
+          'sales',
+          salesId,
+          req.body,
+          postedSafeEdit,
+          req.context?.username || null,
+        )
+        await connection.commit()
+        return res.status(200).json({
+          success: true,
+          message: `Updated SAFE fields only (${postedSafeEdit.changedSafe.join(', ') || 'attachments'}) on ${postedSafeEdit.doc.state} Sales ${salesId}. Journal entries were left unchanged.`,
+          data: {
+            id: salesId,
+            state: postedSafeEdit.doc.state,
+            safe_fields_changed: postedSafeEdit.changedSafe,
+          },
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      // LOCK: a posted/approved document can no longer be edited. This blocks
+      // any path that deletes + regenerates its journal entries.
+      await assertEditableDocument(connection, 'sales', salesId)
 
       // Fetch current data for audit trail BEFORE making any updates
 
@@ -2715,7 +2768,7 @@ const updateSale = async (req, res, next) => {
 
         timestamp: new Date().toISOString(),
       })
-    } catch (error) {
+} catch (error) {
       if (connection) {
         await connection.rollback()
       }
@@ -2727,6 +2780,10 @@ const updateSale = async (req, res, next) => {
       }
     }
   } catch (error) {
+    if (sendJournalLockError(res, error)) {
+      return
+    }
+
     console.error('Error updating sale:', error)
 
     return res.status(500).json({

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   FilePlus,
@@ -22,6 +22,7 @@ import useCollections from './useCollections'
 import CollectionsForm from './CollectionsForm'
 import { getAccessLevel } from '../../utils/routeProtection'
 import { generateCollectionPDF } from '../../utils/generateCollectionPDF'
+import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 
 export default function Collections() {
@@ -44,9 +45,11 @@ function CollectionsContent() {
     prependCollection,
   } = useCollections()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [isAdding, setIsAdding] = useState(false)
   const [isViewing, setIsViewing] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [isPostedEdit, setIsPostedEdit] = useState(false)
   const [viewingCollection, setViewingCollection] = useState(null)
   const [editingCollection, setEditingCollection] = useState(null)
   const [toast, setToast] = useState(null)
@@ -110,14 +113,19 @@ function CollectionsContent() {
   }
 
   // Fetch unpaid sales for To Be Collected tab
-  const fetchToBeCollected = async () => {
+  const fetchToBeCollected = async (filters = {}) => {
     try {
       setLoadingToBeCollected(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
 
+      const queryParams = new URLSearchParams()
+      queryParams.append('forCollections', 'true')
+      if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom)
+      if (filters.dateTo) queryParams.append('dateTo', filters.dateTo)
+
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/sales?forCollections=true`,
+        `${import.meta.env.VITE_SERVER_LINK}/sales?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -294,6 +302,22 @@ function CollectionsContent() {
     setActiveDateFrom(null)
     setActiveDateTo(null)
     await refetchCollections({ dateFrom: null, dateTo: null })
+  }
+
+  const applyToBeCollectedDateFilters = async () => {
+    const from = pendingDateFrom || null
+    const to = pendingDateTo || null
+    setActiveDateFrom(from)
+    setActiveDateTo(to)
+    await fetchToBeCollected({ dateFrom: from, dateTo: to })
+  }
+
+  const clearToBeCollectedDateFilters = async () => {
+    setPendingDateFrom('')
+    setPendingDateTo('')
+    setActiveDateFrom(null)
+    setActiveDateTo(null)
+    await fetchToBeCollected({ dateFrom: null, dateTo: null })
   }
 
   // ─── Helper: fetch full collection data then download as PDF ─────────────────
@@ -567,10 +591,12 @@ function CollectionsContent() {
       <RouteProtection routeName="collections">
         <CollectionsForm
           isEditMode={true}
+          isPostedLocked={isPostedEdit}
           collectionData={editingCollection}
           onBack={() => {
             setIsEditing(false)
             setEditingCollection(null)
+            setIsPostedEdit(false)
           }}
           onSuccess={async (nextToast) => {
             if (nextToast) setToast(nextToast)
@@ -648,53 +674,6 @@ function CollectionsContent() {
               </div>
 
               <div className="flex flex-col md:flex-row md:items-center gap-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
-                    <div className="flex flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-500">
-                          From
-                        </span>
-                        <input
-                          type="date"
-                          value={pendingDateFrom}
-                          onChange={(e) => setPendingDateFrom(e.target.value)}
-                          className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                          aria-label="Filter receipts from date"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-500">
-                          To
-                        </span>
-                        <input
-                          type="date"
-                          value={pendingDateTo}
-                          onChange={(e) => setPendingDateTo(e.target.value)}
-                          className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                          aria-label="Filter receipts to date"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
-                      <button
-                        onClick={applyDateFilters}
-                        className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-sm"
-                        type="button"
-                      >
-                        Apply
-                      </button>
-                      <button
-                        onClick={clearDateFilters}
-                        className="px-4 py-2 bg-gray-900 text-gray-100 text-xs font-bold rounded-xl hover:bg-gray-800 transition-all shadow-sm"
-                        type="button"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-                </div>
                 <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
                   <Download size={14} />
                   EXPORT DATA
@@ -770,53 +749,6 @@ function CollectionsContent() {
               </div>
 
               <div className="flex flex-col md:flex-row md:items-center gap-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
-                    <div className="flex flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-500">
-                          From
-                        </span>
-                        <input
-                          type="date"
-                          value={pendingDateFrom}
-                          onChange={(e) => setPendingDateFrom(e.target.value)}
-                          className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                          aria-label="Filter collections from date"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-500">
-                          To
-                        </span>
-                        <input
-                          type="date"
-                          value={pendingDateTo}
-                          onChange={(e) => setPendingDateTo(e.target.value)}
-                          className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                          aria-label="Filter collections to date"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
-                      <button
-                        onClick={applyDateFilters}
-                        className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-sm"
-                        type="button"
-                      >
-                        Apply
-                      </button>
-                      <button
-                        onClick={clearDateFilters}
-                        className="px-4 py-2 bg-gray-900 text-gray-100 text-xs font-bold rounded-xl hover:bg-gray-800 transition-all shadow-sm"
-                        type="button"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-                </div>
                 <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
                   <Download size={14} />
                   EXPORT DATA
@@ -915,6 +847,13 @@ function CollectionsContent() {
           <DynamicTable
             data={collections}
             title="Collections Ledger"
+            enableDateFilter={true}
+            dateFrom={pendingDateFrom}
+            dateTo={pendingDateTo}
+            onDateFromChange={setPendingDateFrom}
+            onDateToChange={setPendingDateTo}
+            onApplyDateFilter={applyDateFilters}
+            onClearDateFilter={clearDateFilters}
             enableAddButton={false}
             enableCheckbox={enableCheckboxes}
             enableActionColumn={true}
@@ -1015,6 +954,8 @@ function CollectionsContent() {
                   try {
                     console.log('Editing collection:', row)
 
+                    setIsPostedEdit(isPostedDocument(row.state))
+
                     const token = sessionStorage.getItem('authenticated')
                     if (!token) {
                       throw new Error('No authentication token found')
@@ -1052,6 +993,46 @@ function CollectionsContent() {
                       message: error.message || 'Failed to fetch collection details',
                     })
                   }
+                },
+              },
+              {
+                label: 'Reverse',
+                onClick: (row) => {
+                  if (!isPostedDocument(row.state)) {
+                    setToast({
+                      type: 'error',
+                      message: `Only APPROVED/POSTED transactions can be reversed (current: ${row.state}).`,
+                    })
+                    return
+                  }
+
+                  setConfirmModal({
+                    isOpen: true,
+                    onConfirm: async () => {
+                      try {
+                        const reversed = await createReversal({
+                          dbName: 'collections',
+                          dbId: row.id,
+                          remarks: 'Reversal initiated from the Collections module',
+                        })
+                        setToast({
+                          type: 'success',
+                          message: reversed.message || 'Reversal created',
+                        })
+                        navigate('/adjustments')
+                        await refetchCollections()
+                      } catch (error) {
+                        console.error('Error creating collection reversal:', error)
+                        setToast({
+                          type: 'error',
+                          message: error.message || 'Failed to create reversal',
+                        })
+                      }
+                    },
+                    title: 'Reverse Collection',
+                    message: `Create a REVERSAL for COLLECTION ${row.id}? The original transaction stays unchanged; the reversal (DR/CR mirrored) is created as a PREPARED adjustment and must be approved before it posts to the general journal.`,
+                    type: 'danger',
+                  })
                 },
               },
             ]}
@@ -1092,6 +1073,13 @@ function CollectionsContent() {
                 <DynamicTable
                   data={toBeCollectedData}
                   title=""
+                  enableDateFilter={true}
+                  dateFrom={pendingDateFrom}
+                  dateTo={pendingDateTo}
+                  onDateFromChange={setPendingDateFrom}
+                  onDateToChange={setPendingDateTo}
+                  onApplyDateFilter={applyToBeCollectedDateFilters}
+                  onClearDateFilter={clearToBeCollectedDateFilters}
                   enableAddButton={false}
                   enableCheckbox={false}
                   enableActionColumn={true}

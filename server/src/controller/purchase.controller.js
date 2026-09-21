@@ -52,6 +52,22 @@ const { getTenantPool } = require('../database/util/tenantConnection.util')
 
 
 
+const {
+  assertEditableDocument,
+
+  sendJournalLockError,
+
+  isPostedState,
+
+} = require('../util/journalLock.util')
+
+const {
+  assertPostedSafeEdit,
+  applyPostedSafeEdit,
+} = require('../util/postedSafeEdit.util')
+
+
+
 const sql = new SQLQueryBuilder()
 
 
@@ -279,6 +295,14 @@ const regeneratePaymentsJournalEntries = async (connection, paymentIds = []) => 
 
 
     if (!header) continue
+
+
+
+    // DO NOT rewrite journal entries of an already posted/locked payment.
+
+    // Posted journal entries are immutable.
+
+    await assertEditableDocument(connection, 'payments', paymentId)
 
 
 
@@ -2498,7 +2522,9 @@ const cancelPurchaseState = async (req, res, next) => {
 
           update.currentState !== 'CANCELLED' &&
 
-          update.currentState !== 'REJECTED',
+          update.currentState !== 'REJECTED' &&
+
+          !isPostedState(update.currentState),
 
       )
 
@@ -2514,7 +2540,9 @@ const cancelPurchaseState = async (req, res, next) => {
 
           update.currentState === 'CANCELLED' ||
 
-          update.currentState === 'REJECTED',
+          update.currentState === 'REJECTED' ||
+
+          isPostedState(update.currentState),
 
       )
 
@@ -2528,7 +2556,7 @@ const cancelPurchaseState = async (req, res, next) => {
 
           message:
 
-            'No purchases eligible for cancellation. Only purchases not already CANCELLED or REJECTED can be cancelled.',
+            'No purchases eligible for cancellation. Only purchases not already CANCELLED, REJECTED or APPROVED/POSTED can be cancelled.',
 
           ignored: invalidUpdates.map((u) => ({
 
@@ -2799,6 +2827,46 @@ const updatePurchase = async (req, res, next) => {
 
 
       await connection.beginTransaction()
+
+
+
+      // SAFE EDIT: an approved document keeps its journal entries immutable
+      // but its remarks, attachments, and document reference can still be
+      // corrected in place. This path does NOT touch items or journal rows.
+      const postedSafeEdit = await assertPostedSafeEdit(
+        connection,
+        'purchase',
+        purchaseId,
+        req.body,
+      )
+
+      if (postedSafeEdit) {
+        await applyPostedSafeEdit(
+          connection,
+          'purchase',
+          purchaseId,
+          req.body,
+          postedSafeEdit,
+          req.context?.username || null,
+        )
+        await connection.commit()
+        return res.status(200).json({
+          success: true,
+          message: `Updated SAFE fields only (${postedSafeEdit.changedSafe.join(', ') || 'attachments'}) on ${postedSafeEdit.doc.state} Purchase ${purchaseId}. Journal entries were left unchanged.`,
+          data: {
+            id: purchaseId,
+            state: postedSafeEdit.doc.state,
+            safe_fields_changed: postedSafeEdit.changedSafe,
+          },
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      // LOCK: a posted/approved document can no longer be edited. This blocks
+
+      // any path that deletes + regenerates its journal entries.
+
+      await assertEditableDocument(connection, 'purchase', purchaseId)
 
 
 
@@ -5218,7 +5286,7 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-      res.status(200).json({
+res.status(200).json({
 
         success: true,
 
@@ -5235,6 +5303,8 @@ const updatePurchase = async (req, res, next) => {
         timestamp: new Date().toISOString(),
 
       })
+
+
 
     } catch (error) {
 
@@ -5259,6 +5329,12 @@ const updatePurchase = async (req, res, next) => {
     }
 
   } catch (error) {
+
+    if (sendJournalLockError(res, error)) {
+
+      return
+
+    }
 
     console.error('Error updating purchase:', error)
 
@@ -5287,8 +5363,6 @@ const updatePurchase = async (req, res, next) => {
   }
 
 }
-
-
 
 const getPrintPurchases = async (req, res, next) => {
 

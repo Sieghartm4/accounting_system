@@ -125,6 +125,7 @@ const createAccess = async (req, res, next) => {
       'responsibility_center',
       'aging_payables',
       'tax_compliance',
+      'recurring_journals',
     ]
 
     let routeQueries = []

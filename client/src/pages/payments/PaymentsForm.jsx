@@ -363,10 +363,12 @@ export default function PaymentsForm({
   onSuccess,
   isViewMode = false,
   isEditMode = false,
+  isPostedLocked = false,
   paymentData = null,
   preSelectedPurchases = null, // New prop for auto-filling from To Be Paid
   preSelectedPurchaseItems = null, // Fetched purchase items for the selected purchases
 }) {
+  const postedLock = isPostedLocked && !isViewMode
   // ── Payment items ──────────────────────────────────────────────────────
   // Each item shape (what lives in state):
   // {
@@ -1585,6 +1587,8 @@ export default function PaymentsForm({
           .sidebar-scroll::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
           .summary-tooltip { display: none; }
           .summary-row:hover .summary-tooltip { display: block; }
+          .posted-lock-zone input, .posted-lock-zone select, .posted-lock-zone button, .posted-lock-zone [role="combobox"] { pointer-events: none !important; }
+          .posted-lock-zone { opacity: .8; }
         `,
         }}
       />
@@ -1774,7 +1778,12 @@ export default function PaymentsForm({
           <span className="text-white">Go Back</span>
         </nav>
         {!isViewMode && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {postedLock && (
+              <span className="px-3 py-1.5 bg-amber-100 border border-amber-400 text-amber-800 text-[11px] font-black rounded-lg uppercase tracking-wide">
+                APPROVED - only remarks, attachments &amp; reference editable
+              </span>
+            )}
             <button className="px-4 py-2 bg-white border border-gray-200 text-[12px] font-black text-gray-400 rounded-lg hover:bg-gray-50 transition-all uppercase">
               Save Draft
             </button>
@@ -1919,7 +1928,7 @@ export default function PaymentsForm({
                           </div>
                         ) : (
                           <SearchableDropdown
-                            disabled={isViewMode}
+                            disabled={isViewMode || postedLock}
                             placeholder="Search vendor..."
                             value={vendorSearch}
                             onChange={(v) => {
@@ -1967,7 +1976,7 @@ export default function PaymentsForm({
                         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                           Mode of Payment <span className="text-red-500">*</span>
                         </label>
-                        {isViewMode ? (
+                        {isViewMode || postedLock ? (
                           <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
                             {modeSearch || 'No mode selected'}
                           </div>
@@ -2002,7 +2011,7 @@ export default function PaymentsForm({
                           type="date"
                           value={paymentDate}
                           onChange={(e) => setPaymentDate(e.target.value)}
-                          disabled={isViewMode}
+                          disabled={isViewMode || postedLock}
                           className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!paymentDate ? 'border-red-500' : 'border-zinc-300'}`}
                         />
                       </div>
@@ -2019,7 +2028,7 @@ export default function PaymentsForm({
                             placeholder="Bank Name"
                             value={bankName}
                             onChange={(e) => setBankName(e.target.value)}
-                            disabled={isViewMode}
+                            disabled={isViewMode || postedLock}
                             className={`w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                           />
                         </div>
@@ -2037,7 +2046,7 @@ export default function PaymentsForm({
                             placeholder="Check #"
                             value={checkNumber}
                             onChange={(e) => setCheckNumber(e.target.value)}
-                            disabled={isViewMode}
+                            disabled={isViewMode || postedLock}
                             className={`w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                           />
                         </div>
@@ -2047,7 +2056,7 @@ export default function PaymentsForm({
                 )}
               </section>
               {/* PAYMENT ITEMS */}
-              <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+              <section className={`bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden ${postedLock ? 'posted-lock-zone' : ''}`}>
                 <div className="px-4 py-2.5 bg-zinc-900 text-white flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-semibold text-sm">
@@ -2271,7 +2280,7 @@ export default function PaymentsForm({
               </section>
 
               {/* JOURNAL ENTRIES */}
-              <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+              <section className={`bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden ${postedLock ? 'posted-lock-zone' : ''}`}>
                 <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-semibold text-sm">

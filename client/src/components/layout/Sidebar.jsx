@@ -30,6 +30,7 @@ import {
   Landmark,
   Clock3,
   ArrowRight,
+  Repeat,
 } from 'lucide-react'
 
 import { getSidebarItems } from '../../utils/routeProtection'
@@ -748,6 +749,7 @@ export default function Sidebar({ isCollapsed }) {
                     adjustments: FileSpreadsheet,
                     advances: ArrowRight,
                     bank_reconciliation: Landmark,
+                    recurring_journals: Repeat,
                   }
 
                   const Icon = iconMap[item.name] || Settings

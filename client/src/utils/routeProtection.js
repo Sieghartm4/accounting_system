@@ -456,6 +456,11 @@ export const ROUTE_CONFIG = {
     label: 'Advances',
     icon: 'ArrowRight',
   },
+  recurring_journals: {
+    name: 'recurring_journals',
+    label: 'Recurring Journals',
+    icon: 'Repeat',
+  },
   audit_trail: {
     name: 'audit_trail',
     label: 'Audit Trail',
@@ -552,7 +557,7 @@ export const getSidebarItems = (user) => {
   })
 
   // Adjustments section
-  const adjustmentRoutes = ['adjustments', 'bank_reconciliation', 'advances']
+  const adjustmentRoutes = ['adjustments', 'bank_reconciliation', 'advances', 'recurring_journals']
   adjustmentRoutes.forEach((route) => {
     const hasAccess =
       route === 'advances'

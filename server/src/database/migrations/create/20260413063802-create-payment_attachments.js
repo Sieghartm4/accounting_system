@@ -9,7 +9,7 @@ module.exports = {
         primaryKey: true
       },
       ca_payment_id: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.STRING(300),
         allowNull: false,
         references: {
           model: 'payments',

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Search, Filter, Columns, Plus, X, Maximize2, Eye, Edit } from 'lucide-react'
+import { Search, Filter, Columns, Plus, X, Maximize2, Eye, Edit, RotateCcw, Trash2, Zap } from 'lucide-react'
 import { getAccessLevel } from '../utils/routeProtection'
 
 const DynamicTable = ({
@@ -38,6 +38,14 @@ const DynamicTable = ({
   hasMore = false, // if true, more rows can be loaded
   isLoadingMore = false, // if true, currently loading more rows
   onLoadMore = null, // callback function to load more rows
+  // --- DATE FILTER PROPS ---
+  enableDateFilter = false, // if true, shows the date range filter next to the search input
+  dateFrom = '', // controlled value for the "from" date input
+  dateTo = '', // controlled value for the "to" date input
+  onDateFromChange = null, // callback (value) when "from" date changes
+  onDateToChange = null, // callback (value) when "to" date changes
+  onApplyDateFilter = null, // callback when Apply is pressed
+  onClearDateFilter = null, // callback when Clear is pressed
   // --- LOADING STATE ---
   isLoading = false, // if true, table is in initial loading state
 }) => {
@@ -471,11 +479,11 @@ const DynamicTable = ({
     <div className="h-full flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
       {/* --- INTEGRATED CONTROL BAR --- */}
       <div className="bg-black p-4 shrink-0">
-        <div className="flex items-center justify-between gap-4">
-          {/* LEFT SIDE: Title & Search */}
-          <div className="flex items-center flex-1 gap-4">
+        <div className="flex flex-col lg:flex-row lg:flex-wrap lg:items-center lg:justify-between gap-3 lg:gap-x-4">
+          {/* LEFT SIDE: Title, Search & Date Filter */}
+          <div className="flex flex-col lg:flex-row lg:items-center flex-1 min-w-0 gap-3">
             {/* Section 1: Title & Indicator */}
-            <div className="flex items-center gap-3 pr-4 border-r border-gray-800">
+            <div className="flex items-center gap-3 lg:pr-4 lg:border-r lg:border-gray-800 shrink-0">
               <div className="w-1.5 h-6 bg-red-600 rounded-full shadow-[0_0_10px_rgba(220,38,38,0.5)]" />
               <h2 className="text-xs font-black text-white uppercase tracking-[2px] whitespace-nowrap">
                 {title}
@@ -483,7 +491,7 @@ const DynamicTable = ({
             </div>
 
             {/* Section 2: Search */}
-            <div className="flex-1 relative group max-w-md">
+            <div className="w-full lg:flex-1 lg:min-w-[160px] lg:max-w-md relative group">
               <Search
                 size={14}
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-red-500 transition-colors z-10"
@@ -496,10 +504,59 @@ const DynamicTable = ({
                 className="w-full pl-11 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600/40 focus:bg-white focus:border-red-500 transition-all shadow-inner"
               />
             </div>
+
+            {/* Section 3: Date Filter (next to search input) */}
+            {enableDateFilter && (
+              <div className="w-full lg:w-auto lg:ml-auto flex flex-wrap items-center gap-2 px-3 py-1.5 bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                  <span className="text-[9px] font-black text-gray-900 uppercase tracking-widest whitespace-nowrap">
+                    From
+                  </span>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) =>
+                      onDateFromChange && onDateFromChange(e.target.value)
+                    }
+                    className="w-full sm:w-auto px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600/40 focus:border-red-500 transition-all [color-scheme:light] hover:border-red-300"
+                    aria-label="Filter from date"
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                  <span className="text-[9px] font-black text-gray-900 uppercase tracking-widest whitespace-nowrap">
+                    To
+                  </span>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) =>
+                      onDateToChange && onDateToChange(e.target.value)
+                    }
+                    className="w-full sm:w-auto px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600/40 focus:border-red-500 transition-all [color-scheme:light] hover:border-red-300"
+                    aria-label="Filter to date"
+                  />
+                </div>
+                <div className="w-full sm:w-auto flex items-center justify-end sm:justify-center gap-2 sm:ml-1">
+                  <div className="w-px h-5 bg-gray-200 mx-1 hidden sm:block" />
+                  <button
+                    onClick={onApplyDateFilter}
+                    className="flex-1 sm:flex-none px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all active:scale-95 shadow-sm"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    onClick={onClearDateFilter}
+                    className="flex-1 sm:flex-none px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 text-[10px] font-black uppercase tracking-widest rounded-lg border border-gray-200 transition-all active:scale-95"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* RIGHT SIDE: Filters & Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
             {/* Column Filter */}
             <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg hover:bg-gray-50 transition-colors">
               <Filter size={14} className="text-gray-600" />
@@ -816,25 +873,22 @@ const DynamicTable = ({
                               button.onClick(row)
                             }}
                             className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all border cursor-pointer ${
-                              button.label.toLowerCase() === 'view'
-                                ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500/50'
-                                : button.label.toLowerCase() === 'edit'
-                                  ? 'bg-orange-600 hover:bg-orange-700 text-white border-orange-500/50'
-                                  : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500/50'
+                              button.color || (
+                                button.label.toLowerCase() === 'view'
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500/50'
+                                  : button.label.toLowerCase() === 'edit'
+                                    ? 'bg-orange-600 hover:bg-orange-700 text-white border-orange-500/50'
+                                    : button.label.toLowerCase() === 'reverse'
+                                      ? 'bg-purple-600 hover:bg-purple-700 text-white border-purple-500/50'
+                                      : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500/50'
+                              )
                             }`}
                             title={button.label}
                           >
-                            {button.label.toLowerCase() === 'view' && (
-                              <Eye size={16} />
-                            )}
-                            {button.label.toLowerCase() === 'edit' && (
-                              <Edit size={16} />
-                            )}
-                            {button.label.toLowerCase() !== 'view' &&
-                              button.label.toLowerCase() !== 'edit' &&
-                              button.icon && (
-                                <span className="w-3 h-3">{button.icon}</span>
-                              )}
+                            {button.icon ? (() => {
+                              const Icon = button.icon
+                              return <Icon size={16} />
+                            })() : button.label.toLowerCase() === 'view' ? <Eye size={16} /> : button.label.toLowerCase() === 'edit' ? <Edit size={16} /> : button.label.toLowerCase() === 'reverse' ? <RotateCcw size={16} /> : button.label.toLowerCase() === 'delete' ? <Trash2 size={16} /> : button.label.toLowerCase() === 'generate' ? <Zap size={16} /> : null}
                           </button>
                         ))}
                       </div>

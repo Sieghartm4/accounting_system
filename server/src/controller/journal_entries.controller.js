@@ -3,6 +3,7 @@ const {
   checkConnection,
   SelectAll,
   Query,
+  Transaction,
 } = require('../database/util/queries.util')
 const {
   formatMemoryUsage,
@@ -14,6 +15,12 @@ const { Accounting } = require('../database/model/Accounting')
 const { Master } = require('../database/model/Master')
 const { getTenantPool } = require('../database/util/tenantConnection.util')
 const { broadcastUpdates } = require('../startup/socket.startup')
+const {
+  assertEditableDocument,
+  assertPostedDocument,
+  sendJournalLockError,
+  DOCUMENT_DEFINITIONS,
+} = require('../util/journalLock.util')
 
 const sql = new SQLQueryBuilder()
 
@@ -549,6 +556,17 @@ const createJournalEntries = async (req, res, next) => {
         continue // Skips COA resolution and DB insertion, moving to the next item
       }
 
+      // LOCK: refuse to write journal rows against an already posted document.
+      // This blocks the raw regeneration/duplication vector used to rewrite
+      // approved transactions.
+      if (
+        entry.db_name &&
+        DOCUMENT_DEFINITIONS[entry.db_name] &&
+        entry.db_id != null
+      ) {
+        await assertEditableDocument(connection, entry.db_name, entry.db_id)
+      }
+
       let coaId = parseInt(entry.coa_id)
       if (!Number.isInteger(coaId)) {
         const [coaRows] = await connection.execute(
@@ -613,7 +631,6 @@ const createJournalEntries = async (req, res, next) => {
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
-    console.error('Error creating journal entries:', error)
     if (connection) {
       try {
         await connection.rollback()
@@ -621,9 +638,248 @@ const createJournalEntries = async (req, res, next) => {
         console.error('Rollback error:', rbErr)
       }
     }
+    if (sendJournalLockError(res, error)) return
+    console.error('Error creating journal entries:', error)
     return res.status(500).json({
       success: false,
       message: 'Server error while creating journal entries',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  } finally {
+    if (connection) connection.release()
+  }
+}
+
+/**
+ * REVERSAL / adjusting entry for a posted transaction.
+ *
+ * Once a document is APPROVED/POSTED it is LOCKED and can no longer be edited,
+ * deleted, or replaced. The only correction path is a REVERSAL: a new
+ * adjustment that mirrors every journal row of the original with DR/CR swapped.
+ *
+ * The reversal is stored as an 'adjustments' header in PREPARED status so it
+ * flows through the same PREPARED → CHECKED → APPROVED control loop. When it is
+ * approved, both the original and the reversal appear in the general journal.
+ */
+const reverseJournalEntries = async (req, res, next) => {
+  let connection
+  try {
+    const payload = req.body && req.body.data ? req.body.data : req.body
+    const { db_name, db_id, posting_date, remarks, created_by } = payload || {}
+
+    if (!db_name || !db_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'db_name and db_id are required',
+      })
+    }
+
+    if (!DOCUMENT_DEFINITIONS[db_name]) {
+      return res.status(400).json({
+        success: false,
+        message: `Unsupported journal source type: ${db_name}`,
+      })
+    }
+
+    if (!posting_date) {
+      return res.status(400).json({
+        success: false,
+        message: 'posting_date is required',
+      })
+    }
+
+    connection = await getTenantPool().getConnection()
+    await connection.beginTransaction()
+
+    // Only APPROVED/POSTED transactions can be reversed.
+    const source = await assertPostedDocument(connection, db_name, db_id)
+
+    const [journalRows] = await connection.execute(
+      `SELECT ${Accounting.journal_entries.selectOptionColumns.id} AS id,
+              ${Accounting.journal_entries.selectOptionColumns.coa_id} AS coa_id,
+              ${Accounting.journal_entries.selectOptionColumns.responsibility_center} AS responsibility_center,
+              ${Accounting.journal_entries.selectOptionColumns.type} AS type,
+              ${Accounting.journal_entries.selectOptionColumns.amount} AS amount
+         FROM ${Accounting.journal_entries.tablename}
+        WHERE ${Accounting.journal_entries.selectOptionColumns.db_name} = ?
+          AND ${Accounting.journal_entries.selectOptionColumns.db_id} = ?`,
+      [db_name, String(db_id)],
+    )
+
+    if (!journalRows || journalRows.length === 0) {
+      await connection.rollback()
+      return res.status(400).json({
+        success: false,
+        message: `No journal entries found for ${String(db_name).toUpperCase()} ${db_id}`,
+      })
+    }
+
+    // Generate a REV reversal id (day-sequence), kept distinct from JV ids so a
+    // reversal is immediately recognizable in the Adjustments module.
+    const nowForId = new Date()
+    const mm = String(nowForId.getMonth() + 1).padStart(2, '0')
+    const dd = String(nowForId.getDate()).padStart(2, '0')
+    const yy = String(nowForId.getFullYear()).slice(-2)
+    const datePart = `${mm}${dd}${yy}`
+    const idPrefix = `REV-${datePart}-`
+
+    const [existing] = await connection.execute(
+      `SELECT ${Accounting.adjustments.selectOptionColumns.id} AS id
+         FROM ${Accounting.adjustments.tablename}
+        WHERE ${Accounting.adjustments.selectOptionColumns.id} LIKE ?
+        ORDER BY ${Accounting.adjustments.selectOptionColumns.id} DESC
+        LIMIT 1`,
+      [`${idPrefix}%`],
+    )
+
+    let seq = 1
+    if (existing && existing.length > 0) {
+      const lastSeq = parseInt(String(existing[0].id).split('-').pop() || '0', 10) || 0
+      seq = lastSeq + 1
+    }
+    const reversalId = `${idPrefix}${String(seq).padStart(4, '0')}`
+
+    const totalAmount = journalRows.reduce(
+      (sum, r) => sum + (parseFloat(r.amount) || 0),
+      0,
+    )
+
+    const docRef = source.document_reference || `${db_name}:${db_id}`
+
+    const headerQuery = sql
+      .insert(Accounting.adjustments.tablename, {
+        columns: Accounting.adjustments.insertColumns,
+        prefix: Accounting.adjustments.prefix,
+        isTransaction: true,
+      })
+      .build()
+
+    const headerValues = [
+      reversalId,
+      docRef,
+      posting_date,
+      remarks && remarks.trim() !== ''
+        ? remarks
+        : `REVERSAL of ${String(db_name).toUpperCase()} ${db_id}${source.document_reference ? ` (${source.document_reference})` : ''}`,
+      'PREPARED',
+      totalAmount,
+      new Date().toISOString().split('T')[0],
+      created_by || req.context?.username || null,
+      null,
+      null,
+    ]
+
+    await connection.execute(headerQuery, headerValues)
+
+    const reversalColumns = [
+      Accounting.journal_entries.selectOptionColumns.db_name,
+      Accounting.journal_entries.selectOptionColumns.db_id,
+      Accounting.journal_entries.selectOptionColumns.coa_id,
+      Accounting.journal_entries.selectOptionColumns.responsibility_center,
+      Accounting.journal_entries.selectOptionColumns.type,
+      Accounting.journal_entries.selectOptionColumns.amount,
+      Accounting.journal_entries.selectOptionColumns.date,
+      Accounting.journal_entries.selectOptionColumns.reversal_of_db_name,
+      Accounting.journal_entries.selectOptionColumns.reversal_of_db_id,
+    ].join(', ')
+
+    const reversedTypes = new Set()
+    const journalIds = []
+
+    for (const row of journalRows) {
+      const mirroredType =
+        String(row.type).toLowerCase() === 'debit' ? 'credit' : 'debit'
+      reversedTypes.add(mirroredType)
+
+      await connection.execute(
+        `INSERT INTO ${Accounting.journal_entries.tablename} (${reversalColumns})
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          'adjustments',
+          reversalId,
+          row.coa_id,
+          row.responsibility_center || '',
+          mirroredType,
+          row.amount,
+          posting_date,
+          db_name,
+          String(db_id),
+        ],
+      )
+      journalIds.push(row.id)
+    }
+
+    await connection.commit()
+
+    // Audit trail for the reversal
+    const now = new Date()
+    const auditQueries = [
+      {
+        sql: sql
+          .insert(Master.audit_trail.tablename, {
+            columns: Master.audit_trail.insertColumns,
+            prefix: Master.audit_trail.prefix,
+            isTransaction: true,
+          })
+          .build(),
+        values: [
+          reversalId,
+          'ADJUSTMENT',
+          req.context?.username || created_by || null,
+          now.toISOString().split('T')[0],
+          now.toTimeString().split(' ')[0],
+          `REVERSAL: ${String(db_name).toUpperCase()} ${db_id} → reversal ${reversalId} (${[...reversedTypes].join(' + ')})`,
+        ],
+      },
+    ]
+    await Transaction(auditQueries)
+
+    res.status(201).json({
+      success: true,
+      message: `Reversal ${reversalId} created for ${String(db_name).toUpperCase()} ${db_id}. It must be approved to post.`,
+      data: {
+        reversal_id: reversalId,
+        db_name,
+        db_id,
+        state: source.state,
+        total_amount: totalAmount,
+        reversed_source_journal_ids: journalIds,
+      },
+      timestamp: new Date().toISOString(),
+    })
+
+    setImmediate(async () => {
+      try {
+        broadcastUpdates(
+          {
+            reversal_id: reversalId,
+            db_name,
+            db_id,
+            document_reference: docRef,
+            total_amount: totalAmount,
+          },
+          'reversal_created',
+        )
+      } catch (err) {
+        console.error('Error broadcasting reversal creation:', err)
+      }
+    })
+  } catch (error) {
+    console.error('Error reversing journal entries:', error)
+    if (connection) {
+      try {
+        await connection.rollback()
+      } catch (rbErr) {
+        console.error('Rollback error:', rbErr)
+      }
+    }
+    if (sendJournalLockError(res, error)) return
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while reversing journal entries',
       error:
         process.env.NODE_ENV === 'development'
           ? error.message
@@ -639,4 +895,5 @@ module.exports = {
   getAdvances,
   getJournalEntriesByCoaId,
   createJournalEntries,
+  reverseJournalEntries,
 }

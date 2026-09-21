@@ -614,8 +614,10 @@ export default function PurchaseForm({
   onSuccess,
   isViewMode = false,
   isEditMode = false,
+  isPostedLocked = false,
   purchaseData = null,
 }) {
+  const postedLock = isPostedLocked && !isViewMode
   const [purchaseItems, setPurchaseItems] = useState([])
 
   const {
@@ -2078,6 +2080,8 @@ export default function PurchaseForm({
         .sidebar-scroll::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
         .summary-tooltip { display: none; }
         .summary-row:hover .summary-tooltip { display: block; }
+        .posted-lock-zone input, .posted-lock-zone select, .posted-lock-zone button, .posted-lock-zone [role="combobox"] { pointer-events: none !important; }
+        .posted-lock-zone { opacity: .8; }
       `,
         }}
       />
@@ -2417,7 +2421,12 @@ export default function PurchaseForm({
           <span className="text-white">Go Back</span>
         </nav>
         {!isViewMode && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {postedLock && (
+              <span className="px-3 py-1.5 bg-amber-100 border border-amber-400 text-amber-800 text-[11px] font-black rounded-lg uppercase tracking-wide">
+                APPROVED - only remarks, attachments &amp; reference editable
+              </span>
+            )}
             <button className="px-4 py-2 bg-white border border-gray-200 text-[12px] font-black text-gray-400 rounded-lg hover:bg-gray-50 transition-all uppercase">
               Save Draft
             </button>
@@ -2591,7 +2600,7 @@ export default function PurchaseForm({
                           </div>
                         ) : (
                           <SearchableDropdown
-                            disabled={isViewMode}
+                            disabled={isViewMode || postedLock}
                             placeholder="Search vendor..."
                             value={vendorSearch}
                             onChange={(v) => {
@@ -2641,7 +2650,7 @@ export default function PurchaseForm({
                         </label>
                         <div className="grid grid-cols-2 gap-2">
                           <select
-                            disabled={isViewMode}
+                            disabled={isViewMode || postedLock}
                             value={termsOption}
                             onChange={(e) => setTermsOption(e.target.value)}
                             className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
@@ -2653,7 +2662,7 @@ export default function PurchaseForm({
                             ))}
                           </select>
                           <input
-                            disabled={isViewMode}
+                            disabled={isViewMode || postedLock}
                             type="number"
                             placeholder="Number"
                             value={termsNumber}
@@ -2672,7 +2681,7 @@ export default function PurchaseForm({
                           type="date"
                           value={dateDelivered}
                           onChange={(e) => setDateDelivered(e.target.value)}
-                          disabled={isViewMode}
+                          disabled={isViewMode || postedLock}
                           className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                         />
                       </div>
@@ -2686,7 +2695,7 @@ export default function PurchaseForm({
                           type="date"
                           value={dateDue}
                           onChange={(e) => setDateDue(e.target.value)}
-                          disabled={isViewMode}
+                          disabled={isViewMode || postedLock}
                           className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                         />
                       </div>
@@ -2695,7 +2704,7 @@ export default function PurchaseForm({
                 )}
               </section>
               {/* 1. PURCHASE ITEMS */}
-              <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+              <section className={`bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden ${postedLock ? 'posted-lock-zone' : ''}`}>
                 <div className="px-4 py-2.5 bg-zinc-900 text-white flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-semibold text-sm">
@@ -3072,7 +3081,7 @@ export default function PurchaseForm({
               </section>
 
               {/* 2. JOURNAL ENTRIES */}
-              <section className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+              <section className={`bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden ${postedLock ? 'posted-lock-zone' : ''}`}>
                 <div className="px-4 py-2.5 bg-zinc-900 text-white flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-semibold text-sm">

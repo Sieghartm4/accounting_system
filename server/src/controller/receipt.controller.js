@@ -23,6 +23,17 @@ const { SQLQueryBuilder } = require('../util/helper.util')
 
 const { getTenantPool } = require('../database/util/tenantConnection.util')
 
+const {
+  assertEditableDocument,
+  sendJournalLockError,
+  isPostedState,
+} = require('../util/journalLock.util')
+
+const {
+  assertPostedSafeEdit,
+  applyPostedSafeEdit,
+} = require('../util/postedSafeEdit.util')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -1406,6 +1417,41 @@ const updateReceipt = async (req, res, next) => {
 
       await connection.beginTransaction()
 
+      // SAFE EDIT: an approved document keeps its journal entries immutable
+      // but its remarks, attachments, and document reference can still be
+      // corrected in place. This path does NOT touch items or journal rows.
+      const postedSafeEdit = await assertPostedSafeEdit(
+        connection,
+        'receipts',
+        receiptId,
+        req.body,
+      )
+
+      if (postedSafeEdit) {
+        await applyPostedSafeEdit(
+          connection,
+          'receipts',
+          receiptId,
+          req.body,
+          postedSafeEdit,
+          req.context?.username || null,
+        )
+        await connection.commit()
+        return res.status(200).json({
+          success: true,
+          message: `Updated SAFE fields only (${postedSafeEdit.changedSafe.join(', ') || 'attachments'}) on ${postedSafeEdit.doc.state} Receipt ${receiptId}. Journal entries were left unchanged.`,
+          data: {
+            id: receiptId,
+            state: postedSafeEdit.doc.state,
+            safe_fields_changed: postedSafeEdit.changedSafe,
+          },
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      // LOCK: a posted/approved document can no longer be edited.
+      await assertEditableDocument(connection, 'receipts', receiptId)
+
       // Fetch current data for audit trail BEFORE making any updates
 
       const currentReceiptQuery = sql
@@ -2302,6 +2348,10 @@ const updateReceipt = async (req, res, next) => {
       }
     }
   } catch (error) {
+    if (sendJournalLockError(res, error)) {
+      return
+    }
+
     console.error('Error updating receipt:', error)
 
     return res.status(500).json({
@@ -2649,21 +2699,24 @@ const cancelReceiptState = async (req, res, next) => {
           update &&
           update.id &&
           update.currentState !== 'CANCELLED' &&
-          update.currentState !== 'REJECTED',
+          update.currentState !== 'REJECTED' &&
+          !isPostedState(update.currentState),
       )
 
       const invalidUpdates = updates.filter(
         (update) =>
           !update ||
           !update.id ||
-          (update.currentState === 'CANCELLED' || update.currentState === 'REJECTED'),
+          update.currentState === 'CANCELLED' ||
+          update.currentState === 'REJECTED' ||
+          isPostedState(update.currentState),
       )
 
       if (validUpdates.length === 0) {
         return res.status(400).json({
           success: false,
           message:
-            'No receipts eligible for cancellation. Only receipts not already CANCELLED or REJECTED can be cancelled.',
+            'No receipts eligible for cancellation. Only receipts not already CANCELLED, REJECTED or APPROVED/POSTED can be cancelled.',
           ignored: invalidUpdates.map((u) => ({
             id: u?.id,
             currentState: u?.currentState,

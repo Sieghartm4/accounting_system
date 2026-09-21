@@ -13,7 +13,7 @@ module.exports = {
         allowNull: false,
         references: {
           model: 'payments',
-          key: 'p_id',
+          key: 'c_id',
         },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE',

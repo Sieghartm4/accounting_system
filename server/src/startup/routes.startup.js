@@ -50,6 +50,10 @@ const { withholdingTaxRouter } = require('../routes/withholding_tax.routes')
 
 const { adjustmentsRouter } = require('../routes/adjustments.routes')
 
+const {
+  recurringJournalsRouter,
+} = require('../routes/recurring_journals.routes')
+
 const { reportsRouter } = require('../routes/reports.routes')
 
 const { dashboardRouter } = require('../routes/dashboard.routes')
@@ -110,6 +114,8 @@ const initRoutes = (app) => {
   app.use('/withholding_tax', withholdingTaxRouter)
 
   app.use('/adjustments', adjustmentsRouter)
+
+  app.use('/recurring_journals', recurringJournalsRouter)
 
   app.use('/reports', reportsRouter)
 

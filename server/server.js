@@ -7,6 +7,10 @@ const { initSession } = require('./src/startup/session.startup')
 const { initDocs } = require('./src/startup/docs.startup')
 const { initRoutes } = require('./src/startup/routes.startup')
 const { initWebSocket } = require('./src/startup/socket.startup')
+const {
+  initRecurringScheduler,
+  stopRecurringScheduler,
+} = require('./src/startup/recurringScheduler.startup')
 const { httpLogger } = require('./src/middlewares/logger.middleware')
 const { checkConnection } = require('./src/database/util/queries.util')
 const { corsOptions } = require('./src/middlewares/corsOptions.middleware')
@@ -64,7 +68,9 @@ const serverStart = async () => {
     })
     logger.info('Initializing WebSockets')
     initWebSocket(server)
+    initRecurringScheduler()
     process.on('SIGINT', () => {
+      stopRecurringScheduler()
       logger.info('SIGINT signal received, Closing the application')
       server.close()
       logger.info('--------------------Server Closed----------------------')

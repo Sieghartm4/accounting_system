@@ -24,6 +24,17 @@ const { SQLQueryBuilder } = require('../util/helper.util')
 
 const { getTenantPool } = require('../database/util/tenantConnection.util')
 
+const {
+  assertEditableDocument,
+  sendJournalLockError,
+  isPostedState,
+} = require('../util/journalLock.util')
+
+const {
+  assertPostedSafeEdit,
+  applyPostedSafeEdit,
+} = require('../util/postedSafeEdit.util')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -1516,7 +1527,8 @@ const cancelCollectionState = async (req, res, next) => {
           update &&
           update.id &&
           update.currentState !== 'CANCELLED' &&
-          update.currentState !== 'REJECTED',
+          update.currentState !== 'REJECTED' &&
+          !isPostedState(update.currentState),
       )
 
       const invalidUpdates = updates.filter(
@@ -1524,14 +1536,15 @@ const cancelCollectionState = async (req, res, next) => {
           !update ||
           !update.id ||
           update.currentState === 'CANCELLED' ||
-          update.currentState === 'REJECTED',
+          update.currentState === 'REJECTED' ||
+          isPostedState(update.currentState),
       )
 
       if (validUpdates.length === 0) {
         return res.status(400).json({
           success: false,
           message:
-            'No collections eligible for cancellation. Only collections not already CANCELLED or REJECTED can be cancelled.',
+            'No collections eligible for cancellation. Only collections not already CANCELLED, REJECTED or APPROVED/POSTED can be cancelled.',
           ignored: invalidUpdates.map((u) => ({
             id: u?.id,
             currentState: u?.currentState,
@@ -2203,6 +2216,41 @@ const updateCollection = async (req, res, next) => {
       connection = await getTenantPool().getConnection()
 
       await connection.beginTransaction()
+
+      // SAFE EDIT: an approved document keeps its journal entries immutable
+      // but its remarks, attachments, and document reference can still be
+      // corrected in place. This path does NOT touch items or journal rows.
+      const postedSafeEdit = await assertPostedSafeEdit(
+        connection,
+        'collections',
+        collection_id,
+        req.body,
+      )
+
+      if (postedSafeEdit) {
+        await applyPostedSafeEdit(
+          connection,
+          'collections',
+          collection_id,
+          req.body,
+          postedSafeEdit,
+          req.context?.username || null,
+        )
+        await connection.commit()
+        return res.status(200).json({
+          success: true,
+          message: `Updated SAFE fields only (${postedSafeEdit.changedSafe.join(', ') || 'attachments'}) on ${postedSafeEdit.doc.state} Collection ${collection_id}. Journal entries were left unchanged.`,
+          data: {
+            id: collection_id,
+            state: postedSafeEdit.doc.state,
+            safe_fields_changed: postedSafeEdit.changedSafe,
+          },
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      // LOCK: a posted/approved document can no longer be edited.
+      await assertEditableDocument(connection, 'collections', collection_id)
 
       // Fetch current data for audit trail BEFORE making any updates
 
@@ -3088,6 +3136,10 @@ const updateCollection = async (req, res, next) => {
       }
     }
   } catch (error) {
+    if (sendJournalLockError(res, error)) {
+      return
+    }
+
     console.error('Error updating collection:', error)
 
     return res.status(500).json({

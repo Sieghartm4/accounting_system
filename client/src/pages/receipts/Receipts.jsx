@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Receipt,
@@ -21,6 +21,7 @@ import useReceipts from './useReceipts'
 import ReceiptsForm from './ReceiptsForm'
 import { hasRouteAccess, getAccessLevel } from '../../utils/routeProtection'
 import { generateReceiptPDF } from '../../utils/generateReceiptPDF' // <-- import PDF util
+import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 
 export default function Receipts() {
@@ -43,9 +44,11 @@ function ReceiptsContent() {
     prependReceipt,
   } = useReceipts()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [isAdding, setIsAdding] = useState(false)
   const [viewingReceipt, setViewingReceipt] = useState(null)
   const [isEditMode, setIsEditMode] = useState(false)
+  const [isPostedEdit, setIsPostedEdit] = useState(false)
   const [toast, setToast] = useState(null)
   const [pendingDateFrom, setPendingDateFrom] = useState('')
   const [pendingDateTo, setPendingDateTo] = useState('')
@@ -395,10 +398,12 @@ function ReceiptsContent() {
         <ReceiptsForm
           isViewMode={!isEditMode}
           isEditMode={isEditMode}
+          isPostedLocked={isPostedEdit}
           receiptData={viewingReceipt}
           onBack={() => {
             setViewingReceipt(null)
             setIsEditMode(false)
+            setIsPostedEdit(false)
           }}
           onSuccess={async (nextToast) => {
             if (nextToast) setToast(nextToast)
@@ -466,49 +471,6 @@ function ReceiptsContent() {
           </div>
 
           <div className="flex flex-col md:flex-row md:items-center gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 shadow-sm">
-                <div className="flex flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-gray-500">From</span>
-                    <input
-                      type="date"
-                      value={pendingDateFrom}
-                      onChange={(e) => setPendingDateFrom(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                      aria-label="Filter receipts from date"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-gray-500">To</span>
-                    <input
-                      type="date"
-                      value={pendingDateTo}
-                      onChange={(e) => setPendingDateTo(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                      aria-label="Filter receipts to date"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
-                  <button
-                    onClick={applyDateFilters}
-                    className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all shadow-sm"
-                    type="button"
-                  >
-                    Apply
-                  </button>
-                  <button
-                    onClick={clearDateFilters}
-                    className="px-4 py-2 bg-gray-900 text-gray-100 text-xs font-bold rounded-xl hover:bg-gray-800 transition-all shadow-sm"
-                    type="button"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-            </div>
             <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
               <Download size={14} />
               EXPORT DATA
@@ -576,6 +538,13 @@ function ReceiptsContent() {
         <DynamicTable
           data={receipts}
           title="Receipt Ledger"
+          enableDateFilter={true}
+          dateFrom={pendingDateFrom}
+          dateTo={pendingDateTo}
+          onDateFromChange={setPendingDateFrom}
+          onDateToChange={setPendingDateTo}
+          onApplyDateFilter={applyDateFilters}
+          onClearDateFilter={clearDateFilters}
           enableAddButton={false}
           enableCheckbox={enableCheckboxes}
           checkboxColumn="id"
@@ -638,6 +607,9 @@ function ReceiptsContent() {
               label: 'Edit',
               onClick: async (row) => {
                 try {
+                  const posted = isPostedDocument(row.state)
+                  setIsPostedEdit(posted)
+
                   const token = sessionStorage.getItem('authenticated')
                   if (!token) throw new Error('No authentication token found')
 
@@ -666,6 +638,46 @@ function ReceiptsContent() {
                     message: error.message || 'Failed to fetch receipt details',
                   })
                 }
+              },
+            },
+            {
+              label: 'Reverse',
+              onClick: (row) => {
+                if (!isPostedDocument(row.state)) {
+                  setToast({
+                    type: 'error',
+                    message: `Only APPROVED/POSTED transactions can be reversed (current: ${row.state}).`,
+                  })
+                  return
+                }
+
+                setConfirmModal({
+                  isOpen: true,
+                  onConfirm: async () => {
+                    try {
+                      const reversed = await createReversal({
+                        dbName: 'receipts',
+                        dbId: row.id,
+                        remarks: 'Reversal initiated from the Receipts module',
+                      })
+                      setToast({
+                        type: 'success',
+                        message: reversed.message || 'Reversal created',
+                      })
+                      navigate('/adjustments')
+                      await refetchReceipts()
+                    } catch (error) {
+                      console.error('Error creating receipt reversal:', error)
+                      setToast({
+                        type: 'error',
+                        message: error.message || 'Failed to create reversal',
+                      })
+                    }
+                  },
+                  title: 'Reverse Receipt',
+                  message: `Create a REVERSAL for RECEIPT ${row.id}? The original transaction stays unchanged; the reversal (DR/CR mirrored) is created as a PREPARED adjustment and must be approved before it posts to the general journal.`,
+                  type: 'danger',
+                })
               },
             },
           ]}
