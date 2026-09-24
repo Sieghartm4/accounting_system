@@ -35,6 +35,12 @@ const {
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
 
+const {
+  findPeriodForDateKey,
+  assertPeriodIsOpen,
+  getPeriodKeyForDate,
+} = require('../util/accountingPeriod.util')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -923,6 +929,11 @@ const createPayment = async (req, res, next) => {
       const seqStr = String(seq).padStart(4, '0')
       const newPaymentId = `${idPrefix}${seqStr}`
 
+      const transactionDateKey = getPeriodKeyForDate(
+        String(payment_date || new Date().toISOString().slice(0, 10)).slice(0, 10),
+      )
+      assertPeriodIsOpen(await findPeriodForDateKey(connection, transactionDateKey), 'create a payment')
+
       const mainQuery = sql
         .insert(Accounting.payments.tablename, {
           columns: Accounting.payments.insertColumns,
@@ -1170,10 +1181,17 @@ const createPayment = async (req, res, next) => {
   } catch (error) {
     console.error('Error creating payment:', error)
 
-    return res.status(500).json({
-      success: false,
+    const status = error.status && error.status >= 400 && error.status < 500 ? error.status : 500
 
-      message: 'Server error while creating payment',
+    return res.status(status).json({
+      success: false,
+      code: error.code || null,
+      message:
+        status < 500
+          ? error.message
+          : process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Server error while creating payment',
 
       error:
         process.env.NODE_ENV === 'development'

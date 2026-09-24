@@ -20,6 +20,20 @@ const app = express()
 // Allows secure: 'auto' to detect HTTPS when TLS is terminated by a proxy.
 app.set('trust proxy', 1)
 
+const extractMessage = (error) => {
+  const raw = String(
+    (error && (error.original?.message || error.message)) || '',
+  ).trim()
+  if (!raw) return 'Operation blocked by a database rule'
+  const markerIndex = raw.indexOf('MESSAGE_TEXT')
+  if (markerIndex !== -1) {
+    const after = raw.slice(markerIndex + 'MESSAGE_TEXT'.length).split(':')
+    const parsed = after.length > 1 ? after.slice(1).join(':').trim() : ''
+    if (parsed) return parsed
+  }
+  return raw.replace(/^(Error\s*:\s*)/i, '').trim()
+}
+
 const serverStart = async () => {
   try {
     logger.info('--------------------Server Starting--------------------')
@@ -53,6 +67,24 @@ const serverStart = async () => {
     initStaticFiles(app)
 
     app.use((error, req, res, next) => {
+      const isSignalException =
+        error &&
+        (String(error.sqlState || '') === '45000' ||
+          String(error.original?.sqlState || '') === '45000' ||
+          error.code === 'ER_SIGNAL_EXCEPTION')
+
+      if (isSignalException) {
+        logger.error(`Trigger-raised exception: ${error.message}`)
+        if (res.headersSent) return next(error)
+        return res.status(409).json({
+          success: false,
+          message: extractMessage(error),
+          error: String(
+            (error && (error.original?.message || error.message)) || '',
+          ),
+        })
+      }
+
       logger.error(`Unhandled request error: ${error.message}`)
       if (res.headersSent) return next(error)
       res.status(error.status || 500).json({

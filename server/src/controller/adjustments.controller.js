@@ -27,6 +27,12 @@ const {
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
 
+const {
+  findPeriodForDateKey,
+  assertPeriodIsOpen,
+  getPeriodKeyForDate,
+} = require('../util/accountingPeriod.util')
+
 const { broadcastUpdates } = require('../startup/socket.startup')
 const sql = new SQLQueryBuilder()
 
@@ -365,6 +371,11 @@ const createAdjustment = async (req, res, next) => {
       const seqStr = String(seq).padStart(4, '0')
       const newAdjustmentId = `${idPrefix}${seqStr}`
 
+      const transactionDateKey = getPeriodKeyForDate(
+        String(posting_date || new Date().toISOString().slice(0, 10)).slice(0, 10),
+      )
+      assertPeriodIsOpen(await findPeriodForDateKey(connection, transactionDateKey), 'create an adjustment')
+
       const mainQuery = sql
         .insert(Accounting.adjustments.tablename, {
           columns: Accounting.adjustments.insertColumns,
@@ -550,9 +561,18 @@ const createAdjustment = async (req, res, next) => {
     }
   } catch (error) {
     console.error('Error creating adjustment:', error)
-    return res.status(500).json({
+
+    const status = error.status && error.status >= 400 && error.status < 500 ? error.status : 500
+
+    return res.status(status).json({
       success: false,
-      message: 'Server error while creating adjustment',
+      code: error.code || null,
+      message:
+        status < 500
+          ? error.message
+          : process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Server error while creating adjustment',
       error:
         process.env.NODE_ENV === 'development'
           ? error.message

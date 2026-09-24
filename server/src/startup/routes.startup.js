@@ -54,6 +54,10 @@ const {
   recurringJournalsRouter,
 } = require('../routes/recurring_journals.routes')
 
+const {
+  accountingPeriodsRouter,
+} = require('../routes/accounting_periods.routes')
+
 const { reportsRouter } = require('../routes/reports.routes')
 
 const { dashboardRouter } = require('../routes/dashboard.routes')
@@ -116,6 +120,8 @@ const initRoutes = (app) => {
   app.use('/adjustments', adjustmentsRouter)
 
   app.use('/recurring_journals', recurringJournalsRouter)
+
+  app.use('/accounting_periods', accountingPeriodsRouter)
 
   app.use('/reports', reportsRouter)
 

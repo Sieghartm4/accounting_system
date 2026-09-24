@@ -156,7 +156,22 @@ const DynamicTable = ({
     })
   }
 
-  const handleRowClick = (row) => {
+  const handleRowClick = (row, idx) => {
+    // Handle checkbox toggling when checkboxes are enabled
+    if (enableCheckbox && shouldShowCheckbox(row)) {
+      const rowKey = getRowKey(row, idx)
+      setSelectedKeys((prev) => {
+        const next = new Set(prev)
+        if (next.has(rowKey)) {
+          next.delete(rowKey)
+        } else {
+          next.add(rowKey)
+        }
+        return next
+      })
+    }
+    
+    // Handle custom row click callback
     if (
       enableRowClick &&
       onRowClick &&
@@ -825,8 +840,8 @@ const DynamicTable = ({
               return (
                 <tr
                   key={idx}
-                  onClick={() => handleRowClick(row)}
-                  className={`group ${enableRowClick ? 'cursor-pointer' : ''} ${isChecked ? 'bg-red-50/60' : isHighlighted ? 'bg-red-100 border-l-4 border-red-600 shadow-sm' : 'hover:bg-red-50/30'} transition-colors`}
+                  onClick={() => handleRowClick(row, idx)}
+                  className={`group ${enableCheckbox ? 'cursor-pointer' : enableRowClick ? 'cursor-pointer' : ''} ${isChecked ? 'bg-red-100 border-l-4 border-red-600 shadow-sm' : isHighlighted ? 'bg-red-100 border-l-4 border-red-600 shadow-sm' : 'hover:bg-red-100 hover:border-l-4 hover:border-red-600 hover:shadow-sm'} transition-colors`}
                 >
                   {/* CHECKBOX ROW CELL */}
                   {enableCheckbox && (

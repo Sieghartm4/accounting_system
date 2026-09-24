@@ -141,7 +141,14 @@ const isDue = (template, today) => {
     console.log('❌ No next_due_date')
     return false
   }
-  if (nextDue.getTime() > today.getTime()) {
+  
+  // Compare dates by normalizing to midnight UTC to avoid timezone issues
+  const nextDueDate = new Date(Date.UTC(nextDue.getFullYear(), nextDue.getMonth(), nextDue.getDate()))
+  const todayDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()))
+  
+  console.log('📅 Date comparison - nextDueDate:', nextDueDate.toISOString(), 'todayDate:', todayDate.toISOString())
+  
+  if (nextDueDate.getTime() > todayDate.getTime()) {
     console.log('❌ next_due is in the future')
     return false
   }
@@ -415,7 +422,7 @@ const generateDueRecurringJournalEntries = async (connection, template, actor = 
   console.log('📅 First occurrence:', toDateStr(cursor))
   
   const storedNextDue = parseDate(template.next_due_date)
-  if (storedNextDue && storedNextDue.getTime() > cursor.getTime()) {
+  if (storedNextDue && new Date(Date.UTC(storedNextDue.getFullYear(), storedNextDue.getMonth(), storedNextDue.getDate())).getTime() > new Date(Date.UTC(cursor.getFullYear(), cursor.getMonth(), cursor.getDate())).getTime()) {
     cursor = storedNextDue
     console.log('📅 Using stored next_due as cursor:', toDateStr(cursor))
   }
@@ -426,15 +433,18 @@ const generateDueRecurringJournalEntries = async (connection, template, actor = 
   const generated = []
   let guard = 0
 
+  // Normalize today to midnight UTC for comparison
+  const todayMidnight = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()))
+  
   while (
     cursor &&
-    cursor.getTime() <= today.getTime() &&
+    new Date(Date.UTC(cursor.getFullYear(), cursor.getMonth(), cursor.getDate())).getTime() <= todayMidnight.getTime() &&
     guard < MAX_OCCURRENCES_PER_RUN
   ) {
     guard += 1
-    console.log(`🔄 Loop iteration ${guard}: cursor=${toDateStr(cursor)}, today=${todayStr()}`)
+    console.log(`🔄 Loop iteration ${guard}: cursor=${toDateStr(cursor)}, today=${todayStr()}, cursorTime=${cursor.getTime()}, todayTime=${todayMidnight.getTime()}`)
     
-    if (endDate && cursor.getTime() > endDate.getTime()) {
+    if (endDate && new Date(Date.UTC(cursor.getFullYear(), cursor.getMonth(), cursor.getDate())).getTime() > new Date(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())).getTime()) {
       console.log('❌ Cursor past end date, breaking')
       break
     }

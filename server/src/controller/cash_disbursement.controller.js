@@ -35,6 +35,12 @@ const {
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
 
+const {
+  findPeriodForDateKey,
+  assertPeriodIsOpen,
+  getPeriodKeyForDate,
+} = require('../util/accountingPeriod.util')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -610,6 +616,11 @@ const createCashDisbursement = async (req, res, next) => {
       const seqStr = String(seq).padStart(4, '0')
       const newCashDisbursementId = `${idPrefix}${seqStr}`
 
+      const transactionDateKey = getPeriodKeyForDate(
+        String(payment_date || new Date().toISOString().slice(0, 10)).slice(0, 10),
+      )
+      assertPeriodIsOpen(await findPeriodForDateKey(connection, transactionDateKey), 'create a cash disbursement')
+
       const mainQuery = sql
         .insert(Accounting.cash_disbursements.tablename, {
           columns: Accounting.cash_disbursements.insertColumns,
@@ -898,10 +909,17 @@ const createCashDisbursement = async (req, res, next) => {
   } catch (error) {
     console.error('Error creating cash disbursement:', error)
 
-    return res.status(500).json({
-      success: false,
+    const status = error.status && error.status >= 400 && error.status < 500 ? error.status : 500
 
-      message: 'Server error while creating cash disbursement',
+    return res.status(status).json({
+      success: false,
+      code: error.code || null,
+      message:
+        status < 500
+          ? error.message
+          : process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Server error while creating cash disbursement',
 
       error:
         process.env.NODE_ENV === 'development'

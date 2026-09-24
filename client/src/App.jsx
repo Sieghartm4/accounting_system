@@ -41,6 +41,7 @@ import BankReconciliation from './pages/reports/BankReconciliation'
 import Advances from './pages/advances/Advances'
 import AuditTrail from './pages/audit_trail/AuditTrail'
 import RecurringJournals from './pages/recurring_journals/RecurringJournals'
+import AccountingPeriods from './pages/accounting_periods/AccountingPeriods'
 
 function App() {
   return (
@@ -335,6 +336,22 @@ function App() {
             element={
               <ProtectedRoute routeName="recurring_journals">
                 <RecurringJournals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="accounting-periods"
+            element={
+              <ProtectedRoute routeName="accounting_periods">
+                <AccountingPeriods />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="accounting_periods"
+            element={
+              <ProtectedRoute routeName="accounting_periods">
+                <AccountingPeriods />
               </ProtectedRoute>
             }
           />

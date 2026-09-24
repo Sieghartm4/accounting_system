@@ -31,6 +31,7 @@ import {
   Clock3,
   ArrowRight,
   Repeat,
+  CalendarRange,
 } from 'lucide-react'
 
 import { getSidebarItems } from '../../utils/routeProtection'
@@ -173,7 +174,7 @@ export default function Sidebar({ isCollapsed }) {
     if (sidebarItems.masters?.length > 0) {
       checkAndSetState(
         'masters',
-        sidebarItems.masters.map((item) => item.name),
+        sidebarItems.masters.map((item) => item?.name).filter(Boolean),
         setIsMastersOpen,
       )
     }
@@ -181,7 +182,7 @@ export default function Sidebar({ isCollapsed }) {
     if (sidebarItems.receipts?.length > 0) {
       checkAndSetState(
         'receipts',
-        sidebarItems.receipts.map((item) => item.name),
+        sidebarItems.receipts.map((item) => item?.name).filter(Boolean),
         setIsReceiptsOpen,
       )
     }
@@ -189,7 +190,7 @@ export default function Sidebar({ isCollapsed }) {
     if (sidebarItems.sales?.length > 0) {
       checkAndSetState(
         'sales',
-        sidebarItems.sales.map((item) => item.name),
+        sidebarItems.sales.map((item) => item?.name).filter(Boolean),
         setIsSalesOpen,
       )
     }
@@ -197,7 +198,7 @@ export default function Sidebar({ isCollapsed }) {
     if (sidebarItems.purchase?.length > 0) {
       checkAndSetState(
         'purchase',
-        sidebarItems.purchase.map((item) => item.name),
+        sidebarItems.purchase.map((item) => item?.name).filter(Boolean),
         setIsPurchaseOpen,
       )
     }
@@ -205,7 +206,7 @@ export default function Sidebar({ isCollapsed }) {
     if (sidebarItems.adjustments?.length > 0) {
       checkAndSetState(
         'adjustments',
-        sidebarItems.adjustments.map((item) => item.name),
+        sidebarItems.adjustments.map((item) => item?.name).filter(Boolean),
         setIsAdjustmentsOpen,
       )
     }
@@ -213,7 +214,7 @@ export default function Sidebar({ isCollapsed }) {
     if (sidebarItems.partners?.length > 0) {
       checkAndSetState(
         'partners',
-        sidebarItems.partners.map((item) => item.name),
+        sidebarItems.partners.map((item) => item?.name).filter(Boolean),
         setIsPartnersOpen,
       )
     }
@@ -221,7 +222,7 @@ export default function Sidebar({ isCollapsed }) {
     if (sidebarItems.reports?.length > 0) {
       checkAndSetState(
         'reports',
-        sidebarItems.reports.map((item) => item.name),
+        sidebarItems.reports.map((item) => item?.name).filter(Boolean),
         setIsReportsOpen,
       )
     }
@@ -229,7 +230,7 @@ export default function Sidebar({ isCollapsed }) {
     if (sidebarItems.settings?.length > 0) {
       checkAndSetState(
         'settings',
-        sidebarItems.settings.map((item) => item.name),
+        sidebarItems.settings.map((item) => item?.name).filter(Boolean),
         setIsSettingsOpen,
       )
     }
@@ -882,6 +883,7 @@ export default function Sidebar({ isCollapsed }) {
 
                   const iconMap = {
                     audit_trail: FileSearch,
+                    accounting_periods: CalendarRange,
                   }
 
                   const Icon = iconMap[item.name] || Settings

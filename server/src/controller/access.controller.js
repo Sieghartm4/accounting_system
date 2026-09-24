@@ -126,6 +126,7 @@ const createAccess = async (req, res, next) => {
       'aging_payables',
       'tax_compliance',
       'recurring_journals',
+      'accounting_periods'
     ]
 
     let routeQueries = []

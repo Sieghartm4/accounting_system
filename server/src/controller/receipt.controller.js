@@ -34,6 +34,12 @@ const {
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
 
+const {
+  findPeriodForDateKey,
+  assertPeriodIsOpen,
+  getPeriodKeyForDate,
+} = require('../util/accountingPeriod.util')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -1073,6 +1079,11 @@ const createReceipts = async (req, res, next) => {
       const seqStr = String(seq).padStart(4, '0')
       const newReceiptId = `${idPrefix}${seqStr}`
 
+      const transactionDateKey = getPeriodKeyForDate(
+        String(payment_date || new Date().toISOString().slice(0, 10)).slice(0, 10),
+      )
+      assertPeriodIsOpen(await findPeriodForDateKey(connection, transactionDateKey), 'create a receipt')
+
       const mainQuery = sql
         .insert(Accounting.receipts.tablename, {
           columns: Accounting.receipts.insertColumns,
@@ -1347,10 +1358,17 @@ const createReceipts = async (req, res, next) => {
   } catch (error) {
     console.error('Error creating receipt:', error)
 
-    return res.status(500).json({
-      success: false,
+    const status = error.status && error.status >= 400 && error.status < 500 ? error.status : 500
 
-      message: 'Server error while creating receipt',
+    return res.status(status).json({
+      success: false,
+      code: error.code || null,
+      message:
+        status < 500
+          ? error.message
+          : process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Server error while creating receipt',
 
       error:
         process.env.NODE_ENV === 'development'

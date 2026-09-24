@@ -30,10 +30,17 @@ const {
   isPostedState,
 } = require('../util/journalLock.util')
 
+const { assertTransactionDateIsOpen } = require('../util/accountingPeriod.util')
 const {
   assertPostedSafeEdit,
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
+
+const {
+  findPeriodForDateKey,
+  assertPeriodIsOpen,
+  getPeriodKeyForDate,
+} = require('../util/accountingPeriod.util')
 
 const sql = new SQLQueryBuilder()
 
@@ -795,7 +802,23 @@ const createSales = async (req, res, next) => {
       // Get user full name from database
       const userFullName = await getUserFullName(created_by, connection, Master)
 
+      const transactionDateKey = getPeriodKeyForDate(
+        String(date_delivered || new Date().toISOString().slice(0, 10)).slice(0, 10),
+      )
+      const salePeriod = await findPeriodForDateKey(connection, transactionDateKey)
+      assertPeriodIsOpen(salePeriod, 'create a sale')
+
       const salesId = await generateSalesId(connection)
+
+      assertPeriodIsOpen(
+        await findPeriodForDateKey(
+          connection,
+          getPeriodKeyForDate(
+            String(date_delivered || date_due || new Date().toISOString().slice(0, 10)).slice(0, 10),
+          ),
+        ),
+        'create a sale',
+      )
 
       const mainQuery = sql
         .insert(Accounting.sales.tablename, {
@@ -1064,11 +1087,17 @@ const createSales = async (req, res, next) => {
   } catch (error) {
     console.error('Error creating sales:', error)
 
-    return res.status(500).json({
+    const status = error.status && error.status >= 400 && error.status < 500 ? error.status : 500
+
+    return res.status(status).json({
       success: false,
-
-      message: 'Server error while creating sales',
-
+      code: error.code || null,
+      message:
+        status < 500
+          ? error.message
+          : process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Server error while creating sales',
       error:
         process.env.NODE_ENV === 'development'
           ? error.message

@@ -66,7 +66,11 @@ const {
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
 
-
+const {
+  findPeriodForDateKey,
+  assertPeriodIsOpen,
+  getPeriodKeyForDate,
+} = require('../util/accountingPeriod.util')
 
 const sql = new SQLQueryBuilder()
 
@@ -1586,6 +1590,13 @@ const createPurchase = async (req, res, next) => {
 
 
 
+      const transactionDateKey = getPeriodKeyForDate(
+        String(date_delivered || date_due || new Date().toISOString().slice(0, 10)).slice(0, 10),
+      )
+      assertPeriodIsOpen(await findPeriodForDateKey(connection, transactionDateKey), 'create a purchase')
+
+
+
       const mainQuery = sql
 
         .insert(Accounting.purchase.tablename, {
@@ -2138,15 +2149,20 @@ const createPurchase = async (req, res, next) => {
 
 
 
-    return res.status(500).json({
+    const status = error.status && error.status >= 400 && error.status < 500 ? error.status : 500
+
+    return res.status(status).json({
 
       success: false,
 
+      code: error.code || null,
 
-
-      message: 'Server error while creating purchase',
-
-
+      message:
+        status < 500
+          ? error.message
+          : process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Server error while creating purchase',
 
       error:
 

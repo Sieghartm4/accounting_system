@@ -383,8 +383,8 @@ export const ROUTE_CONFIG = {
     label: 'Responsibility Center',
     icon: 'MapPin',
   },
-  witholding_tax: {
-    name: 'witholding_tax',
+  withholding_tax: {
+    name: 'withholding_tax',
     label: 'Withholding Tax',
     icon: 'Receipt',
   },
@@ -460,6 +460,11 @@ export const ROUTE_CONFIG = {
     name: 'recurring_journals',
     label: 'Recurring Journals',
     icon: 'Repeat',
+  },
+  accounting_periods: {
+    name: 'accounting_periods',
+    label: 'Accounting Periods',
+    icon: 'CalendarRange',
   },
   audit_trail: {
     name: 'audit_trail',
@@ -557,7 +562,12 @@ export const getSidebarItems = (user) => {
   })
 
   // Adjustments section
-  const adjustmentRoutes = ['adjustments', 'bank_reconciliation', 'advances', 'recurring_journals']
+  const adjustmentRoutes = [
+    'adjustments',
+    'bank_reconciliation',
+    'advances',
+    'recurring_journals',
+  ]
   adjustmentRoutes.forEach((route) => {
     const hasAccess =
       route === 'advances'
@@ -586,7 +596,7 @@ export const getSidebarItems = (user) => {
   })
 
   // Settings section
-  const settingRoutes = ['audit_trail']
+  const settingRoutes = ['audit_trail', 'accounting_periods']
   settingRoutes.forEach((route) => {
     if (hasRouteAccess(route, user)) {
       items.settings.push(ROUTE_CONFIG[route])
