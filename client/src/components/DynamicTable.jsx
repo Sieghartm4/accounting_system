@@ -699,7 +699,11 @@ const DynamicTable = ({
               <div key={i} className="w-px h-4 bg-red-200" />
             ) : action.type === 'dropdown' ? (
               <div key={i} className="flex items-center gap-1.5">
-                {action.icon && <span className="w-3 h-3">{action.icon}</span>}
+                {action.icon && action.icon.props
+                  ? <span className="w-3 h-3">{action.icon}</span>
+                  : action.icon
+                    ? <span className="w-3 h-3">{(() => { const Icon = action.icon; return <Icon size={14} /> })()}</span>
+                    : null}
                 <select
                   onChange={(e) => {
                     if (e.target.value && action.onChange) {
@@ -735,7 +739,11 @@ const DynamicTable = ({
                         : 'bg-green-600 border border-green-600 text-white hover:bg-green-200 hover:text-green-700 hover:border-green-300'
                 }`}
               >
-                {action.icon && <span className="w-3 h-3">{action.icon}</span>}
+                {action.icon && action.icon.props
+                  ? <span className="w-3 h-3">{action.icon}</span>
+                  : action.icon
+                    ? <span className="w-3 h-3">{(() => { const Icon = action.icon; return <Icon size={14} /> })()}</span>
+                    : null}
                 {action.label}
               </button>
             ),
@@ -900,10 +908,12 @@ const DynamicTable = ({
                             }`}
                             title={button.label}
                           >
-                            {button.icon ? (() => {
-                              const Icon = button.icon
-                              return <Icon size={16} />
-                            })() : button.label.toLowerCase() === 'view' ? <Eye size={16} /> : button.label.toLowerCase() === 'edit' ? <Edit size={16} /> : button.label.toLowerCase() === 'reverse' ? <RotateCcw size={16} /> : button.label.toLowerCase() === 'delete' ? <Trash2 size={16} /> : button.label.toLowerCase() === 'generate' ? <Zap size={16} /> : null}
+                            {button.icon ? (React.isValidElement(button.icon)
+                              ? button.icon
+                              : (() => {
+                                  const Icon = button.icon
+                                  return <Icon size={16} />
+                                })()) : button.label.toLowerCase() === 'view' ? <Eye size={16} /> : button.label.toLowerCase() === 'edit' ? <Edit size={16} /> : button.label.toLowerCase() === 'reverse' ? <RotateCcw size={16} /> : button.label.toLowerCase() === 'delete' ? <Trash2 size={16} /> : button.label.toLowerCase() === 'generate' ? <Zap size={16} /> : null}
                           </button>
                         ))}
                       </div>
