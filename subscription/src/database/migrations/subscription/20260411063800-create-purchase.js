@@ -42,8 +42,14 @@ module.exports = {
         type: Sequelize.DECIMAL(18, 2),
         allowNull: true,
       },
+      p_paid_amount: {
+        type: Sequelize.DECIMAL(18, 2),
+        allowNull: false,
+        defaultValue: 0.00,
+        comment: 'Running total of payments applied to this purchase',
+      },
       p_status: {
-        type: Sequelize.ENUM('PAID', 'UNPAID', 'REJECTED'),
+        type: Sequelize.ENUM('UNPAID', 'PARTIALLY_PAID', 'PAID', 'OVERPAID', 'REJECTED'),
         allowNull: false,
         defaultValue: 'UNPAID',
       },

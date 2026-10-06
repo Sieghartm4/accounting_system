@@ -383,8 +383,24 @@ export const ROUTE_CONFIG = {
     label: 'Responsibility Center',
     icon: 'MapPin',
   },
+  // Present in master_route_access and routed in App.jsx, but missing from this
+  // registry. A code with no entry here cannot be resolved by getSidebarItems,
+  // so the nav item was never rendered and the module could not be withheld.
+  purchase_order: {
+    name: 'purchase_order',
+    label: 'Purchase Order',
+    icon: 'ClipboardList',
+  },
   withholding_tax: {
     name: 'withholding_tax',
+    label: 'Withholding Tax',
+    icon: 'Receipt',
+  },
+  // Legacy alias for tenants created before the `witholding_tax` typo was
+  // migrated away. Kept so an older master_route_access row still resolves
+  // instead of hiding the nav entry for that tenant.
+  witholding_tax: {
+    name: 'witholding_tax',
     label: 'Withholding Tax',
     icon: 'Receipt',
   },
@@ -508,7 +524,10 @@ export const getSidebarItems = (user) => {
     'company',
     'vat',
     'responsibility_center',
-    'witholding_tax',
+    // Canonical spelling; the masterRoutes entry used to read 'witholding_tax'
+    // while this registry defined 'withholding_tax', so ROUTE_CONFIG lookup
+    // returned undefined and the nav entry silently disappeared.
+    'withholding_tax',
   ]
 
   const partnerRoutes = [

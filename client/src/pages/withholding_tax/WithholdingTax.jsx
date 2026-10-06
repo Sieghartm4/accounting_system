@@ -329,7 +329,7 @@ function WithholdingTaxContent() {
               <Download size={14} />
               EXPORT DATA
             </button>
-            <ProtectedAction routeName="witholding_tax">
+            <ProtectedAction routeName="withholding_tax">
               <label className="flex items-center gap-2 px-5 py-3 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer">
                 <Upload size={14} />
                 {importing ? 'IMPORTING...' : 'IMPORT DATA'}
@@ -342,7 +342,7 @@ function WithholdingTaxContent() {
                 />
               </label>
             </ProtectedAction>
-            <ProtectedAction routeName="witholding_tax">
+            <ProtectedAction routeName="withholding_tax">
               <button
                 onClick={() => openModal()}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
@@ -573,7 +573,7 @@ function SummaryCard({ icon, label, value, subText }) {
 
 export default function WithholdingTax() {
   return (
-    <RouteProtection routeName="witholding_tax">
+    <RouteProtection routeName="withholding_tax">
       <WithholdingTaxContent />
     </RouteProtection>
   )

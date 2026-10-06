@@ -1039,13 +1039,7 @@ function PaymentsContent() {
                 <DynamicTable
                   data={toBePaidData}
                   title=""
-                  enableDateFilter={true}
-                  dateFrom={pendingDateFrom}
-                  dateTo={pendingDateTo}
-                  onDateFromChange={setPendingDateFrom}
-                  onDateToChange={setPendingDateTo}
-                  onApplyDateFilter={applyToBePaidDateFilters}
-                  onClearDateFilter={clearToBePaidDateFilters}
+                  enableDateFilter={false}
                   enableAddButton={false}
                   enableCheckbox={false}
                   enableActionColumn={true}
@@ -1117,6 +1111,7 @@ function PaymentsContent() {
                 <DynamicTable
                   data={expandedVendor ? toBePaidData.find(v => v.vendorId === expandedVendor)?.purchases || [] : []}
                   title=""
+                  enableDateFilter={false}
                   enableAddButton={false}
                   enableCheckbox={true}
                   enableActionColumn={false}

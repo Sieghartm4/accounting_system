@@ -4,8 +4,9 @@ const useAgeingReceivables = () => {
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [asOf, setAsOf] = useState(null)
 
-  // filters: { date_from: 'YYYY-MM-DD', date_to: 'YYYY-MM-DD' }
+  // filters: { as_of: 'YYYY-MM-DD' }
   const refetchSales = useCallback(async (filters = {}) => {
     try {
       setLoading(true)
@@ -16,12 +17,9 @@ const useAgeingReceivables = () => {
         throw new Error('No authorization token found')
       }
 
-      // Build query string from filters
       const qs = []
-      if (filters.date_from)
-        qs.push(`date_from=${encodeURIComponent(filters.date_from)}`)
-      if (filters.date_to) qs.push(`date_to=${encodeURIComponent(filters.date_to)}`)
-      const url = `${import.meta.env.VITE_SERVER_LINK}/sales${qs.length ? `?${qs.join('&')}` : ''}`
+      if (filters.as_of) qs.push(`as_of=${encodeURIComponent(filters.as_of)}`)
+      const url = `${import.meta.env.VITE_SERVER_LINK}/sales/aging${qs.length ? `?${qs.join('&')}` : ''}`
 
       const response = await fetch(url, {
         method: 'GET',
@@ -37,17 +35,11 @@ const useAgeingReceivables = () => {
 
       const result = await response.json()
       if (!result.success) {
-        throw new Error(result.message || 'Failed to fetch sales')
+        throw new Error(result.message || 'Failed to fetch aging receivables')
       }
 
-      const filteredSales = Array.isArray(result.data)
-        ? result.data.filter((sale) => {
-            const status = (sale.status || '').toString().trim().toLowerCase()
-            return status !== 'paid'
-          })
-        : []
-
-      setSales(filteredSales)
+      setSales(Array.isArray(result.data) ? result.data : [])
+      if (result.as_of) setAsOf(result.as_of)
     } catch (err) {
       setError(err.message || 'Failed to load aging receivables')
       setSales([])
@@ -60,7 +52,7 @@ const useAgeingReceivables = () => {
     refetchSales()
   }, [refetchSales])
 
-  return { sales, loading, error, refetchSales }
+  return { sales, asOf, loading, error, refetchSales }
 }
 
 export default useAgeingReceivables

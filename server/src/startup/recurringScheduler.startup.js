@@ -20,8 +20,8 @@ const initRecurringScheduler = () => {
     return timer
   }
 
-  // Run the first tick shortly after startup (delayed so the server is ready).
-  setTimeout(() => {
+  // Run the first tick short after startup (delayed so the server is ready).
+  setTimeout(() => {  
     runRecurringSchedulerTick().catch((err) => {
       console.error('⏰ Recurring scheduler initial tick failed:', err.message)
     })

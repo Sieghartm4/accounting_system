@@ -1,124 +1,77 @@
 'use strict'
 
+/**
+ * Display copy and legacy values for the seeded plans.
+ *
+ * The limits that actually drive behaviour (max users, trial days, billing days)
+ * live in subscription_plans columns, and the modules live in plan_modules. This
+ * seeder keeps subscription_plan_items populated because the pricing UI still
+ * reads it for display, and because the historical USERS / BILLING_CYCLE /
+ * PRICE rows are what the earlier backfill read.
+ *
+ * Inserted one row at a time behind an existence check: db:seed:all re-runs
+ * every seeder, and the original bulkInsert created duplicates on each call.
+ */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.bulkInsert('subscription_plan_items', [
-      {
-        spi_id: 26,
-        spi_subscription_plan_id: 1,
-        spi_display_order: 1,
-        spi_details: '7',
-        spi_type: 'BILLING_CYCLE',
-      },
-      {
-        spi_id: 27,
-        spi_subscription_plan_id: 1,
-        spi_display_order: 2,
-        spi_details: '0',
-        spi_type: 'PRICE',
-      },
-      {
-        spi_id: 28,
-        spi_subscription_plan_id: 1,
-        spi_display_order: 3,
-        spi_details: '1',
-        spi_type: 'USERS',
-      },
-      {
-        spi_id: 29,
-        spi_subscription_plan_id: 1,
-        spi_display_order: 4,
-        spi_details: '7 days free trial',
-        spi_type: 'FEATURES',
-      },
-      {
-        spi_id: 30,
-        spi_subscription_plan_id: 2,
-        spi_display_order: 1,
-        spi_details: '30',
-        spi_type: 'BILLING_CYCLE',
-      },
-      {
-        spi_id: 31,
-        spi_subscription_plan_id: 2,
-        spi_display_order: 2,
-        spi_details: '4999',
-        spi_type: 'PRICE',
-      },
-      {
-        spi_id: 32,
-        spi_subscription_plan_id: 2,
-        spi_display_order: 3,
-        spi_details: 'All Modules included',
-        spi_type: 'MODULES',
-      },
-      {
-        spi_id: 33,
-        spi_subscription_plan_id: 2,
-        spi_display_order: 4,
-        spi_details: '2',
-        spi_type: 'USERS',
-      },
-      {
-        spi_id: 34,
-        spi_subscription_plan_id: 3,
-        spi_display_order: 1,
-        spi_details: '30',
-        spi_type: 'BILLING_CYCLE',
-      },
-      {
-        spi_id: 35,
-        spi_subscription_plan_id: 3,
-        spi_display_order: 2,
-        spi_details: '9999',
-        spi_type: 'PRICE',
-      },
-      {
-        spi_id: 36,
-        spi_subscription_plan_id: 3,
-        spi_display_order: 3,
-        spi_details: '5',
-        spi_type: 'USERS',
-      },
-      {
-        spi_id: 37,
-        spi_subscription_plan_id: 3,
-        spi_display_order: 4,
-        spi_details: 'All modules',
-        spi_type: 'FEATURES',
-      },
-      {
-        spi_id: 38,
-        spi_subscription_plan_id: 3,
-        spi_display_order: 5,
-        spi_details: 'Additional modules included',
-        spi_type: 'FEATURES',
-      },
-      {
-        spi_id: 39,
-        spi_subscription_plan_id: 4,
-        spi_display_order: 1,
-        spi_details: '365',
-        spi_type: 'BILLING_CYCLE',
-      },
-      {
-        spi_id: 40,
-        spi_subscription_plan_id: 4,
-        spi_display_order: 2,
-        spi_details: '0',
-        spi_type: 'PRICE',
-      },
-      {
-        spi_id: 41,
-        spi_subscription_plan_id: 4,
-        spi_display_order: 3,
-        spi_details: '1000',
-        spi_type: 'USERS',
-      },
-    ]);
+    const [plans] = await queryInterface.sequelize.query(
+      'SELECT sp_id, sp_code FROM subscription_plans',
+    )
+    const byCode = new Map(plans.map((p) => [p.sp_code, Number(p.sp_id)]))
+
+    // plan code -> items, in display order
+    const ITEMS = {
+      '34444': [
+        { spi_type: 'BILLING_CYCLE', spi_details: '7' },
+        { spi_type: 'PRICE', spi_details: '0' },
+        { spi_type: 'USERS', spi_details: '1' },
+        { spi_type: 'FEATURES', spi_details: '7 days free trial' },
+      ],
+      PRO: [
+        { spi_type: 'BILLING_CYCLE', spi_details: '30' },
+        { spi_type: 'PRICE', spi_details: '4999' },
+        { spi_type: 'MODULES', spi_details: 'All Modules included' },
+        { spi_type: 'USERS', spi_details: '2' },
+      ],
+      PREMIUM: [
+        { spi_type: 'BILLING_CYCLE', spi_details: '30' },
+        { spi_type: 'PRICE', spi_details: '9999' },
+        { spi_type: 'USERS', spi_details: '5' },
+        { spi_type: 'FEATURES', spi_details: 'All modules' },
+        { spi_type: 'FEATURES', spi_details: 'Additional modules included' },
+      ],
+      '5L': [
+        { spi_type: 'BILLING_CYCLE', spi_details: '365' },
+        { spi_type: 'PRICE', spi_details: '0' },
+        { spi_type: 'USERS', spi_details: '1000' },
+      ],
+    }
+
+    for (const [code, items] of Object.entries(ITEMS)) {
+      const planId = byCode.get(code)
+      if (!planId) continue
+
+      for (const [index, item] of items.entries()) {
+        const [existing] = await queryInterface.sequelize.query(
+          `SELECT spi_id FROM subscription_plan_items
+            WHERE spi_subscription_plan_id = ? AND spi_type = ? AND spi_display_order = ?`,
+          { replacements: [planId, item.spi_type, index + 1] },
+        )
+        if (existing.length === 0) {
+          await queryInterface.bulkInsert('subscription_plan_items', [
+            {
+              spi_subscription_plan_id: planId,
+              spi_display_order: index + 1,
+              spi_details: item.spi_details,
+              spi_type: item.spi_type,
+            },
+          ])
+        }
+      }
+    }
   },
 
   async down(queryInterface, Sequelize) {
     await queryInterface.bulkDelete('subscription_plan_items', null, {});
-  }
+  },
 };

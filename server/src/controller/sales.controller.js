@@ -446,6 +446,84 @@ const getSales = async (req, res, next) => {
   }
 }
 
+const getAgingReceivables = async (req, res, next) => {
+  try {
+    const asOf = req.query.as_of || req.query.asOf || new Date().toISOString().split('T')[0]
+
+    const aging_query = `
+      SELECT
+        s.${Accounting.sales.selectOptionColumns.id} AS id,
+        c.${Master.customers.selectOptionColumns.name} AS customer,
+        s.${Accounting.sales.selectOptionColumns.document_reference} AS doc_ref,
+        s.${Accounting.sales.selectOptionColumns.terms} AS terms,
+        s.${Accounting.sales.selectOptionColumns.date_delivered} AS date_delivered,
+        s.${Accounting.sales.selectOptionColumns.date_due} AS date_due,
+        s.${Accounting.sales.selectOptionColumns.total_amount_due} AS total_amount_due,
+        COALESCE(collected.amount, 0) AS collected_amount,
+        s.${Accounting.sales.selectOptionColumns.total_amount_due} - COALESCE(collected.amount, 0) AS open_amount,
+        COALESCE(
+          DATEDIFF(?, COALESCE(
+            STR_TO_DATE(s.${Accounting.sales.selectOptionColumns.date_due}, '%Y-%m-%d'),
+            STR_TO_DATE(s.${Accounting.sales.selectOptionColumns.date_due}, '%m/%d/%Y'),
+            STR_TO_DATE(s.${Accounting.sales.selectOptionColumns.date_due}, '%m-%d-%Y')
+          )),
+          0
+        ) AS days_overdue
+      FROM ${Accounting.sales.tablename} s
+      INNER JOIN ${Master.customers.tablename} c
+        ON c.${Master.customers.selectOptionColumns.id} = s.${Accounting.sales.selectOptionColumns.customer_id}
+      LEFT JOIN (
+        SELECT
+          ci.${Accounting.collection_items.selectOptionColumns.sales_id} AS sales_id,
+          SUM(ci.${Accounting.collection_items.selectOptionColumns.amount_applied}) AS amount
+        FROM ${Accounting.collection_items.tablename} ci
+        INNER JOIN ${Accounting.collections.tablename} coll
+          ON coll.${Accounting.collections.selectOptionColumns.id} = ci.${Accounting.collection_items.selectOptionColumns.collection_id}
+        WHERE coll.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+          AND coll.${Accounting.collections.selectOptionColumns.collection_date} <= ?
+        GROUP BY ci.${Accounting.collection_items.selectOptionColumns.sales_id}
+      ) collected ON collected.sales_id = s.${Accounting.sales.selectOptionColumns.id}
+      WHERE s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        AND (s.${Accounting.sales.selectOptionColumns.total_amount_due} - COALESCE(collected.amount, 0)) > 0
+      ORDER BY days_overdue DESC, s.${Accounting.sales.selectOptionColumns.id} DESC
+    `
+
+    const rows = await Query(aging_query, [asOf, asOf])
+
+    const data = rows.map((row) => {
+      const days = Math.max(Number(row.days_overdue) || 0, 0)
+      let agingBucket = 'Current'
+      if (days > 0 && days <= 30) agingBucket = '1-30'
+      else if (days > 30 && days <= 60) agingBucket = '31-60'
+      else if (days > 60 && days <= 90) agingBucket = '61-90'
+      else if (days > 90) agingBucket = '90+'
+
+      return {
+        ...row,
+        days_overdue: days,
+        aging_bucket: agingBucket,
+      }
+    })
+
+    res.status(200).json({
+      success: true,
+      message: 'Aging receivables retrieved successfully',
+      data,
+      as_of: asOf,
+    })
+  } catch (error) {
+    console.error('Error fetching aging receivables:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching aging receivables',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
 const getAllSales = async (req, res, next) => {
   const { id } = req.params
 
@@ -3301,6 +3379,8 @@ const getPrintSales = async (req, res, next) => {
 
 module.exports = {
   getSales,
+
+  getAgingReceivables,
 
   getAllSales,
 

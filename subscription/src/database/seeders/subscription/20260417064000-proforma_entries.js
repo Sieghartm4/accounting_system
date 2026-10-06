@@ -1,5 +1,7 @@
 'use strict';
 
+const { insertIfMissing } = require('./_helpers/insertIfMissing');
+
 module.exports = {
   async up(queryInterface, Sequelize) {
     const proformaEntries = [
@@ -49,7 +51,12 @@ module.exports = {
       { pe_module: 'Payment Taxes - VAT', pe_name: 'Input VAT', pe_coa_id: 14, pe_t_account: 'Credit' }
     ];
 
-    await queryInterface.bulkInsert('proforma_entries', proformaEntries, {});
+    // Keyed on the module/name pair, which together identify a pro-forma row.
+    // See _helpers/insertIfMissing for why a bare bulkInsert breaks a re-seed.
+    const inserted = await insertIfMissing(
+      queryInterface, 'proforma_entries', proformaEntries, ['pe_module', 'pe_name'],
+    );
+    console.log(`[seed] proforma_entries: ${inserted} of ${proformaEntries.length} rows inserted`);
   },
 
   async down(queryInterface, Sequelize) {

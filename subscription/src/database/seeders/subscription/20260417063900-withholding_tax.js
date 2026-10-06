@@ -1,5 +1,7 @@
 'use strict';
 
+const { insertIfMissing } = require('./_helpers/insertIfMissing');
+
 module.exports = {
   async up(queryInterface, Sequelize) {
     const withholdingTaxData = [
@@ -365,7 +367,12 @@ module.exports = {
       }
     ];
 
-    await queryInterface.bulkInsert('withholding_tax', withholdingTaxData);
+    // Keyed on the ATC code, the natural identifier for a withholding category.
+    // See _helpers/insertIfMissing for why a bare bulkInsert breaks a re-seed.
+    const inserted = await insertIfMissing(
+      queryInterface, 'withholding_tax', withholdingTaxData, ['wt_code'],
+    );
+    console.log(`[seed] withholding_tax: ${inserted} of ${withholdingTaxData.length} rows inserted`);
   },
 
   async down(queryInterface, Sequelize) {

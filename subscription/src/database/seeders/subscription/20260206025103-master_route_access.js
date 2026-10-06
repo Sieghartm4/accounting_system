@@ -3,15 +3,12 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    /**
-     * Add seed commands here.
-     *
-     * Example:
-     * await queryInterface.bulkInsert('People', [{
-     *   name: 'John Doe',
-     *   isBetaMember: false
-     * }], {});
-     */
+    // Kept in step with subscription/src/constants/moduleCatalog.js. A module
+    // missing here has no master_route_access row, so a subscription plan can
+    // name it but nothing can grant or withhold it - gating fails open.
+    //
+    // `witholding_tax` was seeded here (missing the 'h') while the client
+    // registry spelled it `withholding_tax`, so a plan could never match it.
     const routes = [
       'dashboard',
       'access',
@@ -30,7 +27,7 @@ module.exports = {
       'payments',
       'adjustments',
       'vat',
-      'witholding_tax',
+      'withholding_tax',
       'trial_balance',
       'income_statement',
       'general_ledger',
@@ -47,28 +44,37 @@ module.exports = {
       'responsibility_center',
       'aging_payables',
       'tax_compliance',
+      'recurring_journals',
+      'accounting_periods',
+      'accounting_tools',
+      'fiscal_periods',
     ]
 
-    const seedData = []
-    routes.forEach((route) => {
-      seedData.push({
-        mra_access_id: 1,
-        mra_name: route,
-        mra_status: 'Full Access',
-      })
-      seedData.push({
-        mra_access_id: 2,
-        mra_name: route,
-        mra_status: 'Full Access',
-      })
-    })
-
-    await queryInterface.bulkInsert('master_route_access', seedData)
+    // Inserted one row at a time behind an existence check. `db:seed:all`
+    // re-runs every seeder on each call, so an unguarded bulkInsert adds a
+    // duplicate row per access level every time a tenant is re-seeded.
+    for (const route of routes) {
+      for (const accessId of [1, 2]) {
+        const [existing] = await queryInterface.sequelize.query(
+          'SELECT mra_id FROM master_route_access WHERE mra_access_id = ? AND mra_name = ?',
+          { replacements: [accessId, route] },
+        )
+        if (existing.length === 0) {
+          await queryInterface.bulkInsert('master_route_access', [
+            {
+              mra_access_id: accessId,
+              mra_name: route,
+              mra_status: 'Full Access',
+            },
+          ])
+        }
+      }
+    }
   },
 
   async down(queryInterface, Sequelize) {
     /**
-     * Add commands to revert seed here.
+     * Add seed commands here.
      *
      * Example:
      * await queryInterface.bulkDelete('People', null, {});

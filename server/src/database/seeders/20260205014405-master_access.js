@@ -3,25 +3,26 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up (queryInterface, Sequelize) {
-    /**
-     * Add seed commands here.
-     *
-     * Example:
-     * await queryInterface.bulkInsert('People', [{
-     *   name: 'John Doe',
-     *   isBetaMember: false
-     * }], {});
-    */
-    // await queryInterface.bulkInsert('master_access', [
-    //   {
-    //     ma_access_name: 'Admin',
-    //     ma_status: 'active'
-    //   },
-    //   {
-    //     ma_access_name: 'User',
-    //     ma_status: 'active'
-    //   }
-    // ]);
+    const masterAccess = [
+      {
+        ma_access_name: 'Admin',
+        ma_status: 'active'
+      },
+      {
+        ma_access_name: 'User',
+        ma_status: 'active'
+      }
+    ];
+
+    for (const access of masterAccess) {
+      const [existing] = await queryInterface.sequelize.query(
+        'SELECT ma_access_id FROM master_access WHERE ma_access_name = ?',
+        { replacements: [access.ma_access_name] }
+      );
+      if (existing.length === 0) {
+        await queryInterface.bulkInsert('master_access', [access]);
+      }
+    }
   },
 
   async down (queryInterface, Sequelize) {

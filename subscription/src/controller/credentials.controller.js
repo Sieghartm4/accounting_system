@@ -13,6 +13,7 @@ const {
   DataModeling,
 } = require('../util/helper.util')
 const { Master } = require('../database/model/Master')
+const { resolveEntitlement } = require('../services/entitlement.service')
 const { CheckPassword, Encrypter, Decrypter } = require('../util/cryptography.util')
 const jwt = require('jsonwebtoken')
 const { SQLQueryBuilder } = require('../util/helper.util')
@@ -708,18 +709,47 @@ const login = async (req, res, next) => {
         })
       }
 
-      // Check if user has a subscription (only for USER role, ADMIN can login without subscription)
-      if (
-        user.role !== 'ADMIN' &&
-        (!user.subscription_id || user.subscription_id === null)
-      ) {
-        console.log('User does not have a subscription')
-        return res.status(403).json({
-          success: false,
-          message:
-            'You do not have an active subscription. Please complete your registration by selecting a subscription plan.',
-          requiresSubscription: true,
-        })
+      // Subscription gate.
+      //
+      // This used to test only `!user.subscription_id`, so it decided "has a
+      // plan" but never "is the plan still valid". Expiry was left entirely to
+      // the nightly expire_subscriptions() procedure, which NULLs the column at
+      // midnight - so a trial could run for up to 24 hours past its end.
+      //
+      // The check is now against master_company_subscription, keyed by db_name,
+      // because the plan belongs to the company rather than to whichever user
+      // happened to sign up first. A company with several users has several
+      // master_user rows pointing at one tenant database and one plan; anchoring
+      // on the user meant each of them carried an independent copy of a decision
+      // that is not theirs to make.
+      //
+      // ADMIN is exempt, so the platform operator can still repair a tenant that
+      // is locked out. That exemption is why the role test stays first.
+      if (user.role !== 'ADMIN') {
+        const entitlement = await resolveEntitlement(user.db_name)
+
+        if (!entitlement.subscribed) {
+          const expired =
+            entitlement.reason === 'TRIAL_EXPIRED' ||
+            entitlement.reason === 'PERIOD_EXPIRED' ||
+            entitlement.reason === 'EXPIRED'
+
+          // Distinct reasons so the client can say "your trial ended, pick a
+          // plan" rather than the misleading "you never had a subscription".
+          // Neither branch deletes anything: the company, its users and all its
+          // data are untouched and come straight back once a plan is chosen.
+          return res.status(403).json({
+            success: false,
+            message: expired
+              ? 'Your subscription has ended. Please choose a plan to continue using your account.'
+              : 'You do not have an active subscription. Please complete your registration by selecting a subscription plan.',
+            requiresSubscription: true,
+            reason: entitlement.reason,
+            trialExpired: expired,
+            planCode: expired ? entitlement.planCode : null,
+            planName: expired ? entitlement.planName : null,
+          })
+        }
       }
 
       const { password: userPassword, ...userWithoutPassword } = user

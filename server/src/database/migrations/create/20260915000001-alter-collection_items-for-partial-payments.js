@@ -39,7 +39,15 @@ module.exports = {
       MODIFY COLUMN ci_sales_id VARCHAR(300) NOT NULL
     `)
 
-    // Step 3: Add the new foreign key constraint pointing to sales table
+    // Step 3: Clean up orphaned collection_items records before adding foreign key
+    console.log('Cleaning up orphaned collection_items records...')
+    await queryInterface.sequelize.query(`
+      DELETE ci FROM collection_items ci
+      LEFT JOIN sales s ON ci.ci_sales_id = s.s_id
+      WHERE s.s_id IS NULL
+    `)
+
+    // Step 4: Add the new foreign key constraint pointing to sales table
     await queryInterface.sequelize.query(`
       ALTER TABLE collection_items 
       ADD CONSTRAINT collection_items_ci_sales_id_foreign 

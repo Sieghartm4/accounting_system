@@ -61,6 +61,56 @@ window.fetch = async function (...args) {
   return response
 }
 
+// A 402 means the request was well-formed and authenticated but the account
+// cannot pay for it: the subscription has lapsed, or the module is not in the
+// plan. These are not errors to retry, and leaving them to bubble up as failed
+// requests is what made the old gate invisible - the page just stopped working
+// with no explanation.
+//
+// Routed to the plan picker rather than to /login, because the credentials are
+// still valid and the tenant's data is untouched; only the plan needs choosing.
+// The 403 variant raised at login is handled in useLogin.js, which must not
+// store a password, so it is deliberately not handled here.
+if (typeof window !== 'undefined' && !window.__subscriptionGateInstalled) {
+  window.__subscriptionGateInstalled = true
+
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event && event.reason
+    const status = reason && (reason.status || reason.statusCode)
+    const payload = reason && (reason.payload || reason.data)
+    if (status !== 402 && !(payload && payload.requiresSubscription)) return
+
+    // A module the plan does not include is NOT handled here. ProtectedRoute now
+    // renders the upgrade screen for that case before the page issues a request,
+    // so redirecting here would yank the user off a screen that explains the
+    // situation and offers the upgrade. These 402s are swallowed instead: the
+    // page is already showing the right thing.
+    if (payload && payload.code === 'MODULE_NOT_IN_PLAN') {
+      event.preventDefault?.()
+      return
+    }
+
+    // Already on the plan page: re-announcing would fight the user's clicks.
+    if (window.location.pathname.startsWith('/register')) return
+
+    // Remember who they are so the plan step can prefill, exactly as the login
+    // 403 path does. The password is never stored.
+    const username =
+      (payload && payload.username) ||
+      (() => {
+        try {
+          return JSON.parse(sessionStorage.getItem('auth_user') || '{}').username
+        } catch (e) {
+          return null
+        }
+      })()
+    if (username) {
+      sessionStorage.setItem('pendingUser', JSON.stringify({ username }))
+    }
+    window.location.href = '/register?step=plan'
+  })
+}
+
 export async function fetchWithAuth(url, options = {}) {
   if (typeof url === 'string' && url.startsWith('/')) {
     const serverLink = import.meta.env.VITE_SERVER_LINK || ''

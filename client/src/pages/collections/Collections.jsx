@@ -1073,13 +1073,7 @@ function CollectionsContent() {
                 <DynamicTable
                   data={toBeCollectedData}
                   title=""
-                  enableDateFilter={true}
-                  dateFrom={pendingDateFrom}
-                  dateTo={pendingDateTo}
-                  onDateFromChange={setPendingDateFrom}
-                  onDateToChange={setPendingDateTo}
-                  onApplyDateFilter={applyToBeCollectedDateFilters}
-                  onClearDateFilter={clearToBeCollectedDateFilters}
+                  enableDateFilter={false}
                   enableAddButton={false}
                   enableCheckbox={false}
                   enableActionColumn={true}
@@ -1186,6 +1180,7 @@ function CollectionsContent() {
                       : []
                   }
                   title=""
+                  enableDateFilter={false}
                   enableAddButton={false}
                   enableCheckbox={true}
                   enableActionColumn={false}

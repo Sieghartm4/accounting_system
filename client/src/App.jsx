@@ -30,6 +30,7 @@ import Vat from './pages/vat/Vat'
 import ResponsibilityCenter from './pages/responsibility_center/ResponsibilityCenter'
 import WithholdingTax from './pages/withholding_tax/WithholdingTax'
 import TaxCompliance from './pages/tax_compliance/TaxCompliance'
+import TaxRegistry from './pages/tax_compliance/TaxRegistry'
 import Adjustments from './pages/adjustments/Adjustments'
 import TrialBalance from './pages/reports/TrialBalance'
 import IncomeStatement from './pages/reports/IncomeStatement'
@@ -154,7 +155,10 @@ function App() {
           <Route
             path="aging_payables"
             element={
-              <ProtectedRoute routeName={['aging_payables', 'purchase']}>
+              <ProtectedRoute
+                routeName={['aging_payables', 'purchase']}
+                moduleCode="aging_payables"
+              >
                 <AgeingPayables />
               </ProtectedRoute>
             }
@@ -239,21 +243,38 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* The sidebar builds links as `/${name.replace(/_/g, '-')}`, so the
+              canonical `withholding_tax` code resolves to /withholding-tax. The
+              historical `witholding_tax` path is kept alongside it so an old
+              bookmark or a stored redirect still lands somewhere real. */}
           <Route
-            path="witholding_tax"
+            path="withholding-tax"
             element={
-              <ProtectedRoute routeName="witholding_tax">
+              <ProtectedRoute routeName="withholding_tax">
                 <WithholdingTax />
               </ProtectedRoute>
             }
           />
           <Route
+            path="witholding_tax"
+            element={
+              <ProtectedRoute routeName="withholding_tax">
+                <WithholdingTax />
+              </ProtectedRoute>
+            }
+          />
+          {/* The sidebar builds links as `/${name.replace(/_/g, '-')}`, so the
+              "tax_compliance" access entry always resolves to /tax-compliance.
+              Both spellings serve the new page; the old one lives at
+              /tax-legacy until the exports are ported and it is deleted. */}
+          <Route
             path="tax-compliance"
             element={
               <ProtectedRoute
-                routeName={['tax_compliance', 'vat', 'witholding_tax']}
+                routeName={['tax_compliance', 'vat', 'withholding_tax']}
+                moduleCode="tax_compliance"
               >
-                <TaxCompliance />
+                <TaxRegistry />
               </ProtectedRoute>
             }
           />
@@ -261,7 +282,19 @@ function App() {
             path="tax_compliance"
             element={
               <ProtectedRoute
-                routeName={['tax_compliance', 'vat', 'witholding_tax']}
+                routeName={['tax_compliance', 'vat', 'withholding_tax']}
+                moduleCode="tax_compliance"
+              >
+                <TaxRegistry />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="tax-legacy"
+            element={
+              <ProtectedRoute
+                routeName={['tax_compliance', 'vat', 'withholding_tax']}
+                moduleCode="tax_compliance"
               >
                 <TaxCompliance />
               </ProtectedRoute>
@@ -326,7 +359,10 @@ function App() {
           <Route
             path="advances"
             element={
-              <ProtectedRoute routeName={['adjustments', 'advances']}>
+              <ProtectedRoute
+                routeName={['adjustments', 'advances']}
+                moduleCode="advances"
+              >
                 <Advances />
               </ProtectedRoute>
             }

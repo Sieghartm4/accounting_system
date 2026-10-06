@@ -16,6 +16,7 @@ const {
 } = require('../util/helper.util')
 
 const { Master } = require('../database/model/Master')
+const { resolveEntitlement } = require('../services/entitlement/entitlement.service')
 
 const { CheckPassword, Encrypter, Decrypter } = require('../util/cryptography.util')
 
@@ -294,6 +295,39 @@ const login = async (req, res, next) => {
 
     if (isPasswordValid) {
       console.log('🔍 Password validation successful')
+
+      // Subscription gate, on the accounting server's own login endpoint.
+      //
+      // The client logs in through the subscription server, which has this
+      // check, but this endpoint is mounted at /credentials on this app and is
+      // directly reachable. Without the same check here a tenant whose trial had
+      // ended could authenticate against the accounting API by calling this
+      // route directly, bypassing the subscription server entirely - so it is
+      // not redundant.
+      //
+      // Nothing is deleted when this refuses: the company, its users and all its
+      // data stay exactly as they are and access returns as soon as a plan is
+      // chosen.
+      const entitlement = await resolveEntitlement(tenantDb)
+
+      if (!entitlement.subscribed) {
+        const expired =
+          entitlement.reason === 'TRIAL_EXPIRED' ||
+          entitlement.reason === 'PERIOD_EXPIRED' ||
+          entitlement.reason === 'EXPIRED'
+
+        return res.status(403).json({
+          success: false,
+          message: expired
+            ? 'Your subscription has ended. Please choose a plan to continue using your account.'
+            : 'You do not have an active subscription. Please select a subscription plan to continue.',
+          requiresSubscription: true,
+          reason: entitlement.reason,
+          trialExpired: expired,
+          planCode: expired ? entitlement.planCode : null,
+          planName: expired ? entitlement.planName : null,
+        })
+      }
 
       const { password, ...userWithoutPassword } = user
 

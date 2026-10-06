@@ -541,16 +541,35 @@ const listTenantDatabases = async () => {
   const database = process.env._DATABASE_ADMIN
 
   const dbs = new Set()
-  if (database) dbs.add(database)
 
   let connection
   try {
     connection = await mysql.createConnection({ host, user, password, database })
+    
+    // Only use tenant databases from master_user, NOT the admin database from .env
     const [rows] = await connection.query(
       `SELECT DISTINCT db_name FROM master_user WHERE db_name IS NOT NULL AND db_name <> ''`,
     )
     for (const r of rows || []) {
-      if (r.db_name) dbs.add(r.db_name)
+      if (r.db_name) {
+        // Verify the database has the recurring_journals table before adding it
+        try {
+          const [checkRows] = await connection.query(
+            `SELECT 1 FROM information_schema.tables 
+             WHERE table_schema = ? AND table_name = 'recurring_journals' LIMIT 1`,
+            [r.db_name]
+          )
+          if (checkRows.length > 0) {
+            dbs.add(r.db_name)
+          } else {
+            console.log(`⏰ Skipping database ${r.db_name} - no recurring_journals table found`)
+          }
+        } catch (checkError) {
+          console.warn(`⏰ Could not verify table existence for ${r.db_name}:`, checkError.message)
+          // Still add it - let the main scheduler handle any errors
+          dbs.add(r.db_name)
+        }
+      }
     }
   } catch (error) {
     console.error('Error listing tenant databases:', error.message)
@@ -586,8 +605,13 @@ const runRecurringSchedulerTick = async () => {
           )
         }
       } catch (error) {
-        console.error(`⏰ Recurring scheduler: failed for ${db}:`, error.message)
-        failures.push(db)
+        // Skip databases that don't have the recurring_journals table
+        if (error.message && error.message.includes("doesn't exist")) {
+          console.warn(`⏰ Recurring scheduler: skipping ${db} (table not found - likely not an accounting database)`)
+        } else {
+          console.error(`⏰ Recurring scheduler: failed for ${db}:`, error.message)
+          failures.push(db)
+        }
       }
     }
     console.log(`⏰ Recurring scheduler tick complete: ${totalGenerated} generated`)

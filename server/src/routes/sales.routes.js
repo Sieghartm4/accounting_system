@@ -8,6 +8,7 @@ const {
   cancelSalesState,
   updateSale,
   getPrintSales,
+  getAgingReceivables,
 } = require('../controller/sales.controller')
 
 const salesRouter = express.Router()
@@ -15,6 +16,7 @@ const salesRouter = express.Router()
 salesRouter.use(auth) // Apply auth middleware to all sales routes
 salesRouter.get('/', getSales)
 
+salesRouter.get('/aging', getAgingReceivables)
 salesRouter.get('/print/:sales_id', getPrintSales)
 salesRouter.get('/:id', getAllSales)
 salesRouter.post('/', createSales)

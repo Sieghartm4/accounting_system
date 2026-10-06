@@ -44,6 +44,19 @@ const getTenantPool = (tenantDb = null, userId = null) => {
 
 /**
  * Create a pool for a specific database
+ *
+ * `charset` is declared explicitly rather than left to the driver default.
+ * Without it, mysql2 negotiates the connection charset but still sends string
+ * parameters in a way MySQL reads as `binary`, and a JSON column then rejects
+ * the assignment:
+ *
+ *   Cannot create a JSON value from a string with CHARACTER SET 'binary'
+ *
+ * A JSON document has to be read in a character set, and `binary` is not one.
+ * That is what made saving a BIR return fail intermittently - the tax forms
+ * carry typographic characters (en dash in "Jan-Feb", em dash in the 1601-C
+ * line labels, a curly apostrophe in "Previous Year's Surplus"), so the failure
+ * tracked which forms happened to contain them rather than any one request.
  */
 const createPoolForDb = (database) => {
   return mysql.createPool({
@@ -52,6 +65,12 @@ const createPoolForDb = (database) => {
     password: DecryptString(process.env._PASSWORD_ADMIN),
     database: database,
     multipleStatements: true,
+    charset: 'utf8mb4',
+    // Return BIGINT/DECIMAL as strings rather than lossy JS numbers, so a
+    // money figure cannot be rounded in transit.
+    decimalNumbers: false,
+    supportBigNumbers: true,
+    bigNumberStrings: true,
   })
 }
 

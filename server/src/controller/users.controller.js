@@ -12,6 +12,11 @@ const {
   DataModeling,
 } = require('../util/helper.util')
 const { Master } = require('../database/model/Master')
+const {
+  resolveEntitlement,
+  canAddUser,
+} = require('../services/entitlement/entitlement.service')
+const { adminExecute } = require('../database/util/adminDb.util')
 const { Master: SubscriptionMaster } = require('../database/model/Subscription')
 const CONFIG = require('../database/config/config')
 const { SQLQueryBuilder } = require('../util/helper.util')
@@ -72,7 +77,7 @@ const getUsers = async (req, res, next) => {
 
 const createUser = async (req, res, next) => {
   try {
-    const { fullname, username, password, email, access_id } = req.body
+    const { fullname, username, password, access_id } = req.body
 
     if (!fullname || !username || !password || !access_id) {
       return res.status(400).json({
@@ -83,6 +88,56 @@ const createUser = async (req, res, next) => {
     }
 
     const normalizedUsername = username.trim()
+    const currentTenantDb = req.context?.dbName || req.context?.tenantDb || null
+
+    // Seat cap, enforced server-side.
+    //
+    // The only previous guard on this action was a <ProtectedAction> wrapper on
+    // the button in Users.jsx, which reads a client-writable sessionStorage key.
+    // Calling this endpoint directly bypassed it completely, so a tenant on a
+    // one-seat plan could create unlimited accounts.
+    //
+    // The cap counts the company creator, since the creator is the first row in
+    // this same table. A plan with max_users = 2 therefore permits the creator
+    // plus one more account.
+    const entitlement = await resolveEntitlement(currentTenantDb)
+
+    if (!entitlement.subscribed) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your subscription is not active. Add users after choosing a plan.',
+        requiresSubscription: true,
+        reason: entitlement.reason,
+      })
+    }
+
+    const activeUsers = await Query(
+      `SELECT COUNT(*) AS user_count FROM ${Master.master_user.tablename} WHERE ${Master.master_user.selectOptionColumns.status} = 'active'`,
+      [],
+      [Master.master_user.prefix_],
+      null,
+      currentTenantDb,
+    )
+
+    const currentCount = Number(
+      (Array.isArray(activeUsers) ? activeUsers[0] : activeUsers)?.user_count ?? 0,
+    )
+    const seatCheck = canAddUser(entitlement, currentCount)
+
+    if (!seatCheck.allowed) {
+      return res.status(402).json({
+        success: false,
+        message: `Your plan allows ${entitlement.maxUsers} user account${entitlement.maxUsers === 1 ? '' : 's'}, including you, and ${currentCount} are already in use. Upgrade your plan to add more users.`,
+        code: seatCheck.reason,
+        data: {
+          maxUsers: seatCheck.maxUsers,
+          currentUsers: seatCheck.currentUsers,
+          planCode: entitlement.planCode,
+          planName: entitlement.planName,
+        },
+        timestamp: new Date().toISOString(),
+      })
+    }
 
     const existingUserQuery = `SELECT ${Master.master_user.selectOptionColumns.id} FROM ${Master.master_user.tablename} WHERE ${Master.master_user.selectOptionColumns.username} = ?`
     const existingUsers = await Query(existingUserQuery, [normalizedUsername])
@@ -118,8 +173,8 @@ const createUser = async (req, res, next) => {
       ],
     })
 
-    const currentTenantDb = req.context?.dbName || req.context?.tenantDb || null
-    await Transaction(queries, currentTenantDb)
+    const currentTenantDbForWrite = req.context?.dbName || req.context?.tenantDb || null
+    await Transaction(queries, currentTenantDbForWrite)
 
     const adminDbName = process.env._DATABASE_ADMIN
     const adminPassword = DecryptString(process.env._PASSWORD_ADMIN)
@@ -144,6 +199,37 @@ const createUser = async (req, res, next) => {
       await adminPool.execute(adminInsertSql, adminValues)
     } finally {
       await adminPool.end()
+    }
+
+    // Keep the seat count on the subscription row in step so the admin list can
+    // render it without opening every tenant database. Best effort: the seat
+    // check above reads the tenant's own master_user, so a failed counter update
+    // cannot let an extra user through.
+    //
+    // The count is read from the tenant database and written to the admin
+    // database, because these are two different databases with two different
+    // master_user tables. It cannot be a correlated subquery: the admin
+    // database's master_user is the platform row, not the tenant's.
+    try {
+      const refreshed = await Query(
+        `SELECT COUNT(*) AS user_count FROM ${Master.master_user.tablename} WHERE ${Master.master_user.selectOptionColumns.status} = 'active'`,
+        [],
+        [Master.master_user.prefix_],
+        null,
+        currentTenantDb,
+      )
+      const total = Number(
+        (Array.isArray(refreshed) ? refreshed[0] : refreshed)?.user_count ?? 0,
+      )
+      await adminExecute(
+        'UPDATE master_company_subscription SET mcs_current_users = ? WHERE mcs_db_name = ?',
+        [total, currentTenantDb],
+      )
+    } catch (counterError) {
+      console.error(
+        `Failed to update seat counter for ${currentTenantDb}:`,
+        counterError.message,
+      )
     }
 
     res.status(201).json({

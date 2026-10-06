@@ -23,17 +23,20 @@ module.exports = {
         type: Sequelize.STRING(300),
         allowNull: true,
         references: {
-          model: 'purchase_items',
-          key: 'pi_id',
+          model: 'purchase',
+          key: 'p_id',
         },
       },
-      ci_amount: {
-        type: Sequelize.NUMERIC,
-        allowNull: false,
-      },
-      ci_witholding_tax: {
+      ci_amount_applied: {
         type: Sequelize.DECIMAL(18, 2),
-        allowNull: true,
+        allowNull: false,
+        comment: 'Amount applied from this payment to the purchase invoice',
+      },
+      ci_created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+        comment: 'Audit trail timestamp for when this payment item was created',
       },
     })
   },

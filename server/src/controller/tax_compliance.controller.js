@@ -8,12 +8,105 @@ const { Readable } = require('stream')
 
 const sql = new SQLQueryBuilder()
 
+/**
+ * Resolve the company this request is acting for, from the tenant's records.
+ *
+ * `req.company` is never populated by the auth middleware, so the old
+ * `req.company?.id || 1` always evaluated to company 1. Every draft this
+ * controller saved, and every export it printed, carried company 1's identity
+ * regardless of which tenant was logged in. That is why this resolves from
+ * `master_company` and refuses when it cannot.
+ *
+ * A tenant with exactly one company does not have to send an id, which keeps
+ * the current client working. A tenant with several must say which one: there
+ * is no safe guess.
+ */
+const resolveTenantCompany = async (req) => {
+  const explicit = (req.body && req.body.companyId) || (req.query && req.query.companyId) || null
+
+  if (explicit) {
+    const rows = await Query(
+      `SELECT mc_company_id, mc_company_name, mc_tin
+         FROM master_company
+        WHERE mc_company_id = ?
+        LIMIT 1`,
+      [Number(explicit)],
+    )
+    if (!rows || rows.length === 0) return null
+    return rows[0]
+  }
+
+  const all = await Query(
+    `SELECT mc_company_id, mc_company_name, mc_tin
+       FROM master_company
+      ORDER BY mc_company_id`,
+    [],
+  )
+  if (!all || all.length !== 1) return null
+  return all[0]
+}
+
+/**
+ * The acting user.
+ *
+ * `tf_user_id` is NOT NULL and the default API token carries no user id, so
+ * there is nothing truthful to write. This fails closed rather than recording
+ * the work against user 1, who did not do it.
+ */
+const requireActorId = (req) => {
+  const ctx = req.context || {}
+  const userId = ctx.userId
+  if (userId === null || userId === undefined) {
+    const error = new Error(
+      'This endpoint needs a signed-in user. The default API token carries no user id, so there is no user to record against.',
+    )
+    error.status = 401
+    throw error
+  }
+  return Number(userId)
+}
+
+/** Escape the five XML entities. Names legitimately contain & and '. */
+const xmlEscape = (value) =>
+  String(value === null || value === undefined ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+
+/**
+ * Format a TIN for an export.
+ *
+ * A Philippine TIN is nine digits, optionally followed by an RDO branch
+ * suffix, commonly five. It is written 9-3 in the XML header and 9-5 in the
+ * SAWT DAT file. A nine-digit TIN with no branch is left nine digits: padding
+ * it out with zeros would invent an RDO code the filer never had.
+ */
+const formatTin = (tin) => {
+  const digits = String(tin === null || tin === undefined ? '' : tin).replace(/[^0-9]/g, '')
+  if (digits.length < 9) return null
+  const head = digits.slice(0, 9)
+  const suffix = digits.slice(9)
+  return { head, head3: `${head.slice(0, 3)}-${head.slice(3, 6)}-${head.slice(6, 9)}`, suffix }
+}
+
+const tinForXml = (tin) => {
+  const t = formatTin(tin)
+  if (!t) return null
+  return t.suffix ? `${t.head3}-${t.suffix}` : t.head3
+}
+
+const tinForDat = (tin) => {
+  const t = formatTin(tin)
+  if (!t) return null
+  return t.suffix ? `${t.head}-${t.suffix}` : t.head
+}
+
 // Save Tax Form Draft
 const saveTaxFormDraft = async (req, res, next) => {
   try {
     const { formType, dateRange, formRows, editedValues } = req.body
-    const userId = req.user?.id || 1 // Fallback to user 1
-    const companyId = req.company?.id || 1 // Fallback to company 1
 
     if (!formType || !dateRange || !formRows) {
       return res.status(400).json({
@@ -21,6 +114,20 @@ const saveTaxFormDraft = async (req, res, next) => {
         message: 'Missing required fields: formType, dateRange, formRows',
       })
     }
+
+    // Resolved, not defaulted. `req.user` and `req.company` are never populated
+    // by the auth middleware, so the previous `|| 1` silently filed every
+    // tenant's drafts under company 1 and user 1.
+    const userId = requireActorId(req)
+    const company = await resolveTenantCompany(req)
+    if (!company) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Cannot identify the filing company. Send companyId, or use an account with exactly one company.',
+      })
+    }
+    const companyId = company.mc_company_id
 
     const formData = {
       formType,
@@ -92,9 +199,15 @@ const saveTaxFormDraft = async (req, res, next) => {
     })
   } catch (error) {
     console.error('Error saving tax form draft:', error)
-    return res.status(500).json({
+    // An identity failure is a 401/400, not a server fault. Reporting it as a
+    // 500 would tell the caller to retry something that will never succeed.
+    const status = error.status || 500
+    return res.status(status).json({
       success: false,
-      message: 'Failed to save tax form draft',
+      message:
+        status === 500
+          ? 'Failed to save tax form draft'
+          : error.message,
       error: error.message,
     })
   }
@@ -103,7 +216,7 @@ const saveTaxFormDraft = async (req, res, next) => {
 // Export to PDF
 const exportTaxFormPDF = async (req, res, next) => {
   try {
-    const { formType, dateRange, formRows, company } = req.body
+    const { formType, dateRange, formRows } = req.body
 
     if (!formType || !dateRange || !formRows) {
       return res.status(400).json({
@@ -154,12 +267,23 @@ const exportTaxFormPDF = async (req, res, next) => {
     doc.moveDown()
 
     // Taxpayer Info
-    doc.fontSize(9).font('Helvetica-Bold').text('Taxpayer Information:', 'left')
+    doc.fontSize(9).font('Helvetica-Bold').text('Taxpayer Information:', { align: 'left' })
     doc.fontSize(8).font('Helvetica')
-    doc.text(`TIN: ${company?.tin || 'Not on file'}`)
-    doc.text(`Company: ${company?.name || 'Not on file'}`)
-    doc.text(`Address: ${company?.address || 'Not on file'}`)
-    doc.text(`Contact: ${company?.contactNumber || 'Not on file'}`)
+    // The identity on a filed return comes from the tenant's records, not from
+    // the request body. A client could otherwise print a 2550M bearing another
+    // company's TIN.
+    const filingCompany = await resolveTenantCompany(req)
+    if (filingCompany) {
+      doc.text(`TIN: ${filingCompany.mc_tin || 'Not on file'}`)
+      doc.text(`Company: ${filingCompany.mc_company_name || 'Not on file'}`)
+    } else {
+      // Stated plainly rather than filled with a plausible-looking value, so a
+      // printed return cannot be mistaken for one that can actually be filed.
+      doc
+        .fillColor('#b00020')
+        .text('TIN: NOT ON FILE - choose the filing company before submitting')
+        .fillColor('#000')
+    }
     doc.text(`Period: ${dateRange.start} to ${dateRange.end}`)
     doc.moveDown()
 
@@ -249,12 +373,22 @@ const exportTaxFormDAT = async (req, res, next) => {
     }
 
     // Generate DAT file content (SAWT format)
+    const companyRow = await resolveTenantCompany(req)
+    const datTin = tinForDat(companyRow && companyRow.mc_tin)
+    if (!datTin) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Cannot export: no TIN on file for the filing company, or this account has more than one company and did not say which.',
+      })
+    }
+
     let datContent = ''
 
     // Header
     datContent += '001|' // Record Type = Header
-    datContent += '008123456-00000|' // TIN
-    datContent += 'ACME FINANCIAL TECHNOLOGIES INC.|' // Company Name
+    datContent += datTin + '|' // TIN
+    datContent += (companyRow.mc_company_name || '') + '|' // Company Name
     datContent += '1|' // Form Type (1 for 2550M, etc.)
     datContent += dateRange.start + '|' // Period Start
     datContent += dateRange.end + '|' // Period End
@@ -308,11 +442,21 @@ const exportTaxFormXML = async (req, res, next) => {
     }
 
     // Generate XML content
+    const companyRow = await resolveTenantCompany(req)
+    const xmlTin = tinForXml(companyRow && companyRow.mc_tin)
+    if (!xmlTin) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Cannot export: no TIN on file for the filing company, or this account has more than one company and did not say which.',
+      })
+    }
+
     let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\r\n'
     xmlContent += '<BIRTaxReturn>\r\n'
     xmlContent += '  <Header>\r\n'
-    xmlContent += '    <TIN>008-123-456-00000</TIN>\r\n'
-    xmlContent += '    <Company>ACME FINANCIAL TECHNOLOGIES INC.</Company>\r\n'
+    xmlContent += `    <TIN>${xmlTin}</TIN>\r\n`
+    xmlContent += `    <Company>${xmlEscape(companyRow.mc_company_name)}</Company>\r\n`
     xmlContent += `    <FormType>${formType}</FormType>\r\n`
     xmlContent += `    <PeriodStart>${dateRange.start}</PeriodStart>\r\n`
     xmlContent += `    <PeriodEnd>${dateRange.end}</PeriodEnd>\r\n`
@@ -323,7 +467,9 @@ const exportTaxFormXML = async (req, res, next) => {
     formRows.forEach((row, idx) => {
       xmlContent += '    <Row>\r\n'
       xmlContent += `      <LineNumber>${idx + 1}</LineNumber>\r\n`
-      xmlContent += `      <Description>${row[0]}</Description>\r\n`
+      // Descriptions carry account and payee names, so they routinely contain
+      // & and '. Unescaped they produce a file the BIR parser rejects.
+      xmlContent += `      <Description>${xmlEscape(row[0])}</Description>\r\n`
       xmlContent += `      <BaseAmount>${row[1] || 0}</BaseAmount>\r\n`
       xmlContent += `      <TaxAmount>${row[2] || 0}</TaxAmount>\r\n`
       xmlContent += '    </Row>\r\n'
@@ -352,8 +498,6 @@ const exportTaxFormXML = async (req, res, next) => {
 const markTaxFormFiled = async (req, res, next) => {
   try {
     const { formType, dateRange, draftId } = req.body
-    const userId = req.user?.id || 1
-    const companyId = req.company?.id || 1
 
     if (!formType || !dateRange) {
       return res.status(400).json({
@@ -362,18 +506,29 @@ const markTaxFormFiled = async (req, res, next) => {
       })
     }
 
+    const company = await resolveTenantCompany(req)
+    if (!company) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Cannot identify the filing company. Send companyId, or use an account with exactly one company.',
+      })
+    }
+    const companyId = company.mc_company_id
+
     let updateQuery
     let params
 
     if (draftId) {
-      // Update specific draft by ID
+      // Scoped by company. Without this, a caller who guessed or reused a
+      // draft id could mark another company's return as filed.
       updateQuery = `
         UPDATE ${TaxCompliance.tax_forms.tablename}
         SET tf_status = 'filed_with_bir',
             tf_updated_at = NOW()
-        WHERE tf_id = ? AND tf_form_type = ?
+        WHERE tf_id = ? AND tf_form_type = ? AND tf_company_id = ?
       `
-      params = [draftId, formType]
+      params = [draftId, formType, companyId]
     } else {
       // Update latest draft for the period
       updateQuery = `
@@ -725,3 +880,4 @@ module.exports = {
   getTaxFormDraft,
   calculateTaxFromJournalEntries,
 }
+

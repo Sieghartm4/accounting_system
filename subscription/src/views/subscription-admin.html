@@ -705,9 +705,140 @@
             resize: vertical;
         }
 
-        .plan-items {
-            margin-top: 0.5rem;
-        }
+/* Limits block. Separated from the display items above because these fields are
+   what enforcement reads; the item rows below are only shown on the pricing page. */
+.plan-limits {
+     margin-top: 1rem;
+     padding: 0.875rem;
+     border: 1px solid #e5e7eb;
+     border-radius: 0.5rem;
+     background: #f9fafb;
+     }
+     
+     .plan-limits legend {
+     font-size: 0.6875rem;
+     font-weight: 700;
+     text-transform: uppercase;
+     letter-spacing: 0.1em;
+     color: #6b7280;
+     padding: 0 0.35rem;
+     }
+     
+     .plan-limits small {
+     display: block;
+     margin-top: 0.2rem;
+     font-size: 0.6875rem;
+     color: #6b7280;
+     font-weight: 500;
+     }
+     
+     /* Module picker */
+     .plan-modules {
+     margin-top: 1rem;
+     padding: 0.875rem;
+     border: 1px solid #e5e7eb;
+     border-radius: 0.5rem;
+     }
+     
+     .plan-modules-header {
+     display: flex;
+     justify-content: space-between;
+     align-items: center;
+     margin-bottom: 0.25rem;
+     }
+     
+     .module-count {
+     font-size: 0.6875rem;
+     font-weight: 700;
+     color: #374151;
+     background: #f3f4f6;
+     padding: 0.15rem 0.45rem;
+     border-radius: 999px;
+     }
+     
+     .plan-modules-hint,
+     .plan-items-hint {
+     font-size: 0.6875rem;
+     color: #6b7280;
+     margin-bottom: 0.6rem;
+     line-height: 1.5;
+     }
+     
+     .module-grid {
+     max-height: 16rem;
+     overflow-y: auto;
+     }
+     
+     .module-group {
+     margin-bottom: 0.75rem;
+     }
+     
+     .module-group:last-child {
+     margin-bottom: 0;
+     }
+     
+     .module-group-title {
+     font-size: 0.625rem;
+     font-weight: 800;
+     text-transform: uppercase;
+     letter-spacing: 0.1em;
+     color: #9ca3af;
+     margin-bottom: 0.3rem;
+     }
+     
+     .module-option {
+     display: flex;
+     align-items: center;
+     gap: 0.5rem;
+     padding: 0.3rem 0.4rem;
+     border-radius: 0.375rem;
+     cursor: pointer;
+     }
+     
+     .module-option:hover {
+     background: #f3f4f6;
+     }
+     
+     /* Required rows read as locked rather than merely unchecked, so it is clear
+        they cannot be changed rather than that the admin forgot them. */
+     .module-required {
+     cursor: not-allowed;
+     opacity: 0.85;
+     background: #f9fafb;
+     }
+     
+     .module-required:hover {
+     background: #f3f4f6;
+     }
+     
+     .module-label {
+     font-size: 0.75rem;
+     font-weight: 600;
+     color: #111827;
+     }
+     
+     .module-code {
+     margin-left: auto;
+     font-size: 0.625rem;
+     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+     color: #9ca3af;
+     }
+     
+     .form-error {
+     margin-top: 0.75rem;
+     padding: 0.6rem 0.75rem;
+     background: #fef2f2;
+     border: 1px solid #fecaca;
+     border-left: 4px solid #dc2626;
+     border-radius: 0.375rem;
+     font-size: 0.75rem;
+     font-weight: 600;
+     color: #991b1b;
+     }
+     
+     .plan-items {
+     margin-top: 0.5rem;
+     }
 
         .plan-items-header {
             display: flex;
@@ -1074,11 +1205,63 @@
                         <option value="PRIVATE">Private - Admin only</option>
                     </select>
                 </div>
+
+                <!-- Limits. These drive enforcement, unlike the plan items below,
+                     which are display copy only. sp_max_users counts the company
+                     creator, so 2 means the creator plus one more account. -->
+                <fieldset class="plan-limits">
+                    <legend>Limits</legend>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="plan-max-users">User accounts</label>
+                            <input type="number" id="plan-max-users" min="1" step="1" value="1" required>
+                            <small>Includes the company creator. 2 = creator plus one more.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="plan-trial-days">Trial days</label>
+                            <input type="number" id="plan-trial-days" min="0" step="1" placeholder="none">
+                            <small>Leave empty if this plan has no free trial.</small>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="plan-billing-days">Billing period (days)</label>
+                            <input type="number" id="plan-billing-days" min="1" step="1" value="30">
+                        </div>
+                        <div class="form-group">
+                            <label for="plan-price">Price (PHP)</label>
+                            <input type="number" id="plan-price" min="0" step="0.01" value="0">
+                            <small>0 means free. Stored as centavos.</small>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- Modules. Rendered from /subscription/module-catalog so the
+                     set the admin sees is the same set the API validates against;
+                     a code absent from the catalog cannot be granted at all. -->
+                <div class="plan-modules">
+                    <div class="plan-modules-header">
+                        <label>Modules included</label>
+                        <span id="module-count" class="module-count">0 selected</span>
+                    </div>
+                    <p class="plan-modules-hint">
+                        Required modules are part of every working tenant and cannot be removed.
+                        Everything else is optional and defaults as marked.
+                    </p>
+                    <div id="module-grid" class="module-grid">
+                        <p class="plan-items-hint">Loading module catalog&hellip;</p>
+                    </div>
+                </div>
+
                 <div class="plan-items">
                     <div class="plan-items-header">
-                        <label>Plan Items</label>
+                        <label>Display items</label>
                         <button type="button" id="add-plan-item" class="add-item-btn">+ Add Item</button>
                     </div>
+                    <p class="plan-items-hint">
+                        Free text shown on the pricing page. Limits and modules above are what
+                        actually get enforced.
+                    </p>
                     <div id="plan-items-container">
                         <div class="plan-item">
                             <select class="item-type">
@@ -1093,6 +1276,7 @@
                         </div>
                     </div>
                 </div>
+                <div id="plan-form-error" class="form-error hidden"></div>
                 <div class="modal-footer">
                     <button type="button" id="cancel-plan" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-submit">Save Plan</button>
@@ -1458,9 +1642,154 @@
             }
         }
 
-        function openPlanModal(plan = null) {
+        // Module catalog, fetched once from the server so the set the admin picks
+        // from is the same set the API validates against. Hardcoding the list
+        // here is how the old 'witholding_tax' mismatch happened.
+        let MODULE_CATALOG = null;
+
+        const MODULE_LABELS = {
+            dashboard: 'Dashboard',
+            users: 'User accounts',
+            access: 'Access control',
+            company: 'Company profile',
+            charts: 'Chart of accounts',
+            customers: 'Customers',
+            vendors: 'Vendors',
+            sales: 'Sales',
+            collections: 'Collections',
+            purchase: 'Purchase',
+            payments: 'Payments',
+            receipts: 'Receipts',
+            disbursement: 'Cash disbursements',
+            adjustments: 'Adjustments',
+            proforma_entries: 'Pro-forma entries',
+            journal_entries: 'Journal entries',
+            trial_balance: 'Trial balance',
+            income_statement: 'Income statement',
+            general_ledger: 'General ledger',
+            balance_sheet: 'Balance sheet',
+            statement_of_comprehensive_income: 'Statement of comprehensive income',
+            customer_transactions: 'Customer transactions',
+            vendor_transactions: 'Vendor transactions',
+            aging_receivables: 'Aging receivables',
+            aging_payables: 'Aging payables',
+            advances: 'Advances',
+            audit_trail: 'Audit trail',
+            bank_reconciliation: 'Bank reconciliation',
+            product_service: 'Products & services',
+            purchase_order: 'Purchase orders',
+            responsibility_center: 'Responsibility centers',
+            vat: 'VAT (legacy)',
+            withholding_tax: 'Withholding tax (legacy)',
+            tax_compliance: 'Tax & compliance (BIR returns)',
+            accounting_periods: 'Accounting periods',
+            recurring_journals: 'Recurring journals',
+        };
+
+        // Why a module is locked, shown as the tooltip on a disabled row.
+        const REQUIRED_REASON = 'Part of every working tenant: withholding it would leave the company unable to record transactions, post entries, or read its own results.';
+
+        async function loadModuleCatalog() {
+            if (MODULE_CATALOG) return MODULE_CATALOG;
+            try {
+                // subscriptionRouter is mounted at /subscription-plans (see
+                // src/startup/routes.startup.js), not /subscription, so this has to
+                // use the same prefix as every other plan call in this page.
+                const response = await fetch(`${API_BASE}/subscription-plans/module-catalog`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    // Surface the status rather than failing silently: a wrong path
+                    // here previously left the grid empty with no clue why, which
+                    // reads as "0 modules selected" instead of a failed request.
+                    throw new Error(`HTTP ${response.status} on /subscription-plans/module-catalog`);
+                }
+                const data = await response.json();
+                if (!data.success || !data.data || !Array.isArray(data.data.required)) {
+                    throw new Error('module-catalog returned an unexpected shape');
+                }
+                MODULE_CATALOG = data.data;
+            } catch (error) {
+                console.error('Error loading module catalog:', error);
+                showToast(`Could not load the module list: ${error.message}`, 'error');
+            }
+            return MODULE_CATALOG;
+        }
+
+        function renderModuleGrid(selected) {
+            const grid = document.getElementById('module-grid');
+            if (!MODULE_CATALOG) {
+                grid.innerHTML =
+                    '<p class="plan-items-hint">The module list could not be loaded, so modules cannot be edited. ' +
+                    'Check the console for the failing request. Limits above still save.</p>';
+                return;
+            }
+
+            const chosen = new Set(selected && selected.length ? selected : MODULE_CATALOG.defaultTemplate);
+            // Required modules are always on, whatever was stored or submitted.
+            MODULE_CATALOG.required.forEach(m => chosen.add(m));
+
+            const groups = [
+                ['Required in every plan', MODULE_CATALOG.required, true],
+                ['Included by default', MODULE_CATALOG.defaultOn, false],
+                ['Off by default', MODULE_CATALOG.defaultOff, false],
+            ];
+
+            grid.innerHTML = groups.map(([title, codes, locked]) => `
+                <div class="module-group">
+                    <div class="module-group-title">${title}</div>
+                    ${codes.map(code => `
+                        <label class="module-option${locked ? ' module-required' : ''}"
+                               title="${locked ? REQUIRED_REASON : ''}">
+                            <input type="checkbox" class="module-check" value="${code}"
+                                   ${chosen.has(code) ? 'checked' : ''} ${locked ? 'disabled' : ''}>
+                            <span class="module-label">${MODULE_LABELS[code] || code}</span>
+                            <code class="module-code">${code}</code>
+                        </label>
+                    `).join('')}
+                </div>
+            `).join('');
+
+            grid.querySelectorAll('.module-check').forEach(el => {
+                el.addEventListener('change', updateModuleCount);
+            });
+            updateModuleCount();
+        }
+
+        function selectedModules() {
+            return Array.from(document.querySelectorAll('.module-check'))
+                .filter(el => el.checked)
+                .map(el => el.value);
+        }
+
+        function updateModuleCount() {
+            const n = selectedModules().length;
+            const el = document.getElementById('module-count');
+            if (el) el.textContent = `${n} module${n === 1 ? '' : 's'} selected`;
+        }
+
+        function showPlanFormError(messages) {
+            const box = document.getElementById('plan-form-error');
+            if (!box) return;
+            const list = Array.isArray(messages) ? messages : [messages];
+            box.innerHTML = list.map(m => `<div>${m}</div>`).join('');
+            box.classList.remove('hidden');
+        }
+
+        function clearPlanFormError() {
+            const box = document.getElementById('plan-form-error');
+            if (box) {
+                box.classList.add('hidden');
+                box.innerHTML = '';
+            }
+        }
+
+        async function openPlanModal(plan = null) {
             document.getElementById('modal-title').innerText = plan ? 'Edit Subscription Plan' : 'New Subscription Plan';
             document.getElementById('plan-modal').classList.remove('hidden');
+            clearPlanFormError();
+
+            await loadModuleCatalog();
 
             if (plan) {
                 document.getElementById('plan-id').value = plan.sp_id || '';
@@ -1468,15 +1797,19 @@
                 document.getElementById('plan-name').value = plan.sp_name || '';
                 document.getElementById('plan-description').value = plan.sp_description || '';
                 document.getElementById('plan-status').value = plan.sp_status || 'PUBLIC';
+                document.getElementById('plan-max-users').value = plan.sp_max_users != null ? plan.sp_max_users : 1;
+                document.getElementById('plan-trial-days').value = plan.sp_trial_days != null ? plan.sp_trial_days : '';
+                document.getElementById('plan-billing-days').value = plan.sp_billing_days != null ? plan.sp_billing_days : 30;
+                document.getElementById('plan-price').value = plan.sp_price != null ? plan.sp_price : 0;
 
-                // Load plan items if available
+                renderModuleGrid(plan.modules || []);
+
                 if (plan.items && plan.items.length > 0) {
                     document.getElementById('plan-items-container').innerHTML = '';
                     plan.items.forEach(item => {
                         addPlanItem(item.spi_type || 'BILLING_CYCLE', item.spi_details || '');
                     });
                 } else {
-                    // Add empty item if no items
                     document.getElementById('plan-items-container').innerHTML = '';
                     addPlanItem();
                 }
@@ -1484,6 +1817,16 @@
                 document.getElementById('plan-form').reset();
                 document.getElementById('plan-id').value = '';
                 document.getElementById('plan-status').value = 'PUBLIC';
+                document.getElementById('plan-max-users').value = 1;
+                document.getElementById('plan-trial-days').value = '';
+                document.getElementById('plan-billing-days').value = 30;
+                document.getElementById('plan-price').value = 0;
+
+                // A new plan starts from the server's default template: everything
+                // required plus the default-on set, and not tax, accounting periods
+                // or recurring journals.
+                renderModuleGrid(null);
+
                 document.getElementById('plan-items-container').innerHTML = '';
                 addPlanItem();
             }
@@ -1550,6 +1893,10 @@
                     if (data.success) {
                         showToast('Plan deleted successfully', '🗑️');
                         fetchSubscriptionPlans();
+                    } else if (data.code === 'PLAN_IN_USE') {
+                        // The server refuses to delete a plan companies are still
+                        // on, because that would leave them pointing at nothing.
+                        showToast(data.message || 'Plan is still in use', 'error');
                     } else {
                         showToast(data.message || 'Failed to delete plan', 'error');
                     }
@@ -1589,20 +1936,50 @@
                 return;
             }
 
+            clearPlanFormError();
+
+            const maxUsers = parseInt(document.getElementById('plan-max-users').value, 10);
+            if (!Number.isFinite(maxUsers) || maxUsers < 1) {
+                showPlanFormError('User accounts must be at least 1.');
+                return;
+            }
+
+            const trialRaw = document.getElementById('plan-trial-days').value.trim();
+            const billingDays = parseInt(document.getElementById('plan-billing-days').value, 10);
+            if (!Number.isFinite(billingDays) || billingDays < 1) {
+                showPlanFormError('Billing period must be at least 1 day.');
+                return;
+            }
+
+            const modules = selectedModules();
+            if (modules.length === 0) {
+                showPlanFormError('Choose at least one module. A plan with no modules cannot be used.');
+                return;
+            }
+
             const planData = {
                 sp_code,
                 sp_name,
                 sp_description: sp_description || null,
                 sp_status,
+                sp_max_users: maxUsers,
+                sp_billing_days: billingDays,
+                // Left undefined rather than null when blank, so the server keeps
+                // the stored value on a partial update instead of clearing it.
+                sp_price: parseFloat(document.getElementById('plan-price').value || '0') || 0,
+                modules,
                 items: []
             };
-            
-            // Collect plan items
+            if (trialRaw !== '') {
+                planData.sp_trial_days = parseInt(trialRaw, 10);
+            }
+
+            // Collect display items
             const itemContainers = document.querySelectorAll('.plan-item');
             itemContainers.forEach((container, index) => {
                 const typeSelect = container.querySelector('.item-type');
                 const detailsInput = container.querySelector('.item-details');
-                
+
                 if (typeSelect && detailsInput && detailsInput.value.trim()) {
                     planData.items.push({
                         spi_type: typeSelect.value,
@@ -1611,19 +1988,34 @@
                     });
                 }
             });
-            
-            // Validate at least one PRICE item for pricing
+
+            // Price and billing cycle are display copy on the pricing page. They are
+            // no longer what enforcement reads, but the page still renders them, so
+            // they are kept in step with the real limit fields rather than left to
+            // drift: editing "3 user accounts" should also update the row that says 3.
             const hasPrice = planData.items.some(item => item.spi_type === 'PRICE');
             if (!hasPrice) {
-                showToast('Plan must have at least one PRICE item (for pricing)', '⚠️');
-                return;
+                planData.items.push({
+                    spi_type: 'PRICE',
+                    spi_details: String(planData.sp_price),
+                    spi_display_order: planData.items.length + 1
+                });
             }
-            
-            // Validate at least one BILLING_CYCLE item for duration
             const hasBillingCycle = planData.items.some(item => item.spi_type === 'BILLING_CYCLE');
             if (!hasBillingCycle) {
-                showToast('Plan must have at least one BILLING_CYCLE item (for duration)', '⚠️');
-                return;
+                planData.items.push({
+                    spi_type: 'BILLING_CYCLE',
+                    spi_details: String(billingDays),
+                    spi_display_order: planData.items.length + 1
+                });
+            }
+            const hasUsers = planData.items.some(item => item.spi_type === 'USERS');
+            if (!hasUsers) {
+                planData.items.push({
+                    spi_type: 'USERS',
+                    spi_details: String(maxUsers),
+                    spi_display_order: planData.items.length + 1
+                });
             }
             
             console.log('Sending plan data:', planData);
@@ -1649,7 +2041,16 @@
                     closePlanModal();
                     fetchSubscriptionPlans();
                 } else {
-                    showToast(data.message || 'Failed to save plan', 'error');
+                    // The server validates the module list and the limits and
+                    // returns every problem at once, so show them all rather than
+                    // the first: an admin who removed a required module should not
+                    // have to resubmit to discover the next problem.
+                    const problems = data.errors && data.errors.length ? data.errors : null;
+                    if (problems) {
+                        showPlanFormError(problems);
+                    } else {
+                        showToast(data.message || 'Failed to save plan', 'error');
+                    }
                 }
             } catch (error) {
                 console.error('Error saving plan:', error);

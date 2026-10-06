@@ -30,13 +30,14 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
+    // Deletes by name only. The previous filter also listed mra_access_id values
+    // for roles this seed never wrote to, so the rollback depended on ids up()
+    // never inserted. The row is identified by name, so removing every copy is
+    // correct and cannot touch an unrelated route.
     await queryInterface.bulkDelete(
       'master_route_access',
       {
         mra_name: 'responsibility_center',
-        mra_access_id: {
-          [Sequelize.Op.in]: [1, 2, 3, 4],
-        },
       },
       {},
     )

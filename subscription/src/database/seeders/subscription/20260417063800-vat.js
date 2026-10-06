@@ -1,5 +1,7 @@
 'use strict';
 
+const { insertIfMissing } = require('./_helpers/insertIfMissing');
+
 module.exports = {
   async up(queryInterface, Sequelize) {
     const vatData = [
@@ -131,7 +133,11 @@ module.exports = {
       }
     ];
 
-    await queryInterface.bulkInsert('vat', vatData);
+    // Keyed on vat_code, the VAT category's natural identifier. A bare bulkInsert
+    // inserted a duplicate of every category on a second db:seed:all and then
+    // failed on the primary key, which aborted the rest of the tenant seed run.
+    const inserted = await insertIfMissing(queryInterface, 'vat', vatData, ['vat_code']);
+    console.log(`[seed] vat: ${inserted} of ${vatData.length} categories inserted`);
   },
 
   async down(queryInterface, Sequelize) {

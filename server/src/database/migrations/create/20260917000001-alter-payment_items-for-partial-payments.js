@@ -39,7 +39,15 @@ module.exports = {
       MODIFY COLUMN ci_purchase_id VARCHAR(300) NOT NULL
     `)
 
-    // Step 3: Add the new foreign key constraint pointing to purchase table
+    // Step 3: Clean up orphaned payment_items records before adding foreign key
+    console.log('Cleaning up orphaned payment_items records...')
+    await queryInterface.sequelize.query(`
+      DELETE pi FROM payment_items pi
+      LEFT JOIN purchase p ON pi.ci_purchase_id = p.p_id
+      WHERE p.p_id IS NULL
+    `)
+
+    // Step 4: Add the new foreign key constraint pointing to purchase table
     await queryInterface.sequelize.query(`
       ALTER TABLE payment_items 
       ADD CONSTRAINT payment_items_ci_purchase_id_foreign 

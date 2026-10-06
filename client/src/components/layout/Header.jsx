@@ -7,15 +7,40 @@ import {
   ChevronDown,
   LogOut,
   User,
-  Building2,
-  Calendar,
   X,
   FileText,
   Shield,
+  LayoutDashboard,
+  Database,
+  ShieldCheck,
+  Users,
+  Warehouse,
+  BarChart,
+  Package,
+  DollarSign,
+  CreditCard,
+  TrendingUp,
+  HandCoins,
+  ShoppingCart,
+  FileSpreadsheet,
+  Scale,
+  BookOpen,
+  PieChart,
+  BarChart3,
+  Landmark,
+  Clock3,
+  ArrowRight,
+  Repeat,
+  CalendarRange,
+  History,
+  Receipt,
+  Percent,
+  MapPin,
+  Building2,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import RightSideModal from '../RightSideModal'
-import { hasRouteAccess, getAccessibleRoutes } from '../../utils/routeProtection'
+import { hasRouteAccess, getAccessibleRoutes, ROUTE_CONFIG } from '../../utils/routeProtection'
 import LoadingScreen from '../LoadingScreen'
 
 const SEARCH_ROUTE_DOCUMENT_TYPE_MAP = {
@@ -28,12 +53,80 @@ const SEARCH_ROUTE_DOCUMENT_TYPE_MAP = {
   adjustments: 'Adjustment',
 }
 
+const ICON_MAP = {
+  LayoutDashboard,
+  ShieldCheck,
+  Users,
+  Warehouse,
+  BarChart,
+  FileText,
+  Package,
+  Percent,
+  Receipt,
+  Scale,
+  BookOpen,
+  PieChart,
+  BarChart3,
+  Landmark,
+  Clock3,
+  ArrowRight,
+  Repeat,
+  CalendarRange,
+  History,
+  Database,
+  DollarSign,
+  CreditCard,
+  TrendingUp,
+  HandCoins,
+  ShoppingCart,
+  FileSpreadsheet,
+  MapPin,
+  PaymentCard: CreditCard, // Use CreditCard as fallback for PaymentCard
+}
+
+// Map ROUTE_CONFIG names to actual route paths in App.jsx
+const ROUTE_PATH_MAP = {
+  dashboard: 'dashboard',
+  access: 'access',
+  users: 'users',
+  customers: 'customers',
+  vendors: 'vendors',
+  charts: 'charts',
+  proforma_entries: 'proforma_entries',
+  product_service: 'product_service',
+  vat: 'vat',
+  responsibility_center: 'responsibility_center',
+  withholding_tax: 'witholding_tax', // Note: typo in original route
+  tax_compliance: 'tax-compliance',
+  customer_transactions: 'customer-transactions',
+  vendor_transactions: 'vendor-transactions',
+  receipts: 'receipts',
+  disbursement: 'disbursement',
+  sales: 'sales',
+  collections: 'collections',
+  aging_receivables: 'aging_receivables',
+  aging_payables: 'aging_payables',
+  purchase: 'purchase',
+  purchase_order: 'purchase_order',
+  payments: 'payments',
+  adjustments: 'adjustments',
+  trial_balance: 'trial-balance',
+  income_statement: 'income-statement',
+  general_ledger: 'general-ledger',
+  balance_sheet: 'balance-sheet',
+  statement_of_comprehensive_income: 'statement-of-comprehensive-income',
+  journal_entries: 'journal-entries',
+  bank_reconciliation: 'bank-reconciliation',
+  advances: 'advances',
+  recurring_journals: 'recurring-journals',
+  accounting_periods: 'accounting-periods',
+  audit_trail: 'audit-trail',
+}
+
 export default function Header({ isCollapsed, onToggleSidebar }) {
   const navigate = useNavigate()
   const [showDropdown, setShowDropdown] = useState(false)
   const [user, setUser] = useState(null)
-  const [companies, setCompanies] = useState([])
-  const [selectedCompany, setSelectedCompany] = useState(null)
   const [canAccessCompany, setCanAccessCompany] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [profile, setProfile] = useState({
@@ -64,6 +157,8 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
   const [showSearchModal, setShowSearchModal] = useState(false)
   const searchRef = useRef(null)
 
+  // Remove unused company-related state since we removed the company selector
+
   useEffect(() => {
     const userData = sessionStorage.getItem('auth_user')
     if (userData) {
@@ -72,7 +167,6 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
       // Check if user has access to company management
       setCanAccessCompany(hasRouteAccess('company', parsedUser))
     }
-    fetchCompanies()
 
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target))
@@ -91,27 +185,6 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     setSearchStartDate('')
     setSearchEndDate('')
   }, [])
-
-  const fetchCompanies = async () => {
-    try {
-      // ✅ Read token from sessionStorage (set during login)
-      const token = sessionStorage.getItem('authenticated')
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/company`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success) {
-          ;('')
-          setCompanies(result.data)
-          if (result.data.length > 0 && !selectedCompany)
-            setSelectedCompany(result.data[0])
-        }
-      }
-    } catch (error) {
-      console.error('Error:', error)
-    }
-  }
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -179,6 +252,37 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
       setShowSearchModal(false)
       setShowSearchResults(false)
     }
+  }
+
+  const getPageMatches = (query) => {
+    const term = query.trim().toLowerCase()
+    if (term.length < 2 || !user) return []
+
+    const matches = []
+
+    // Use ROUTE_CONFIG to get all possible pages and filter by user access
+    for (const [key, config] of Object.entries(ROUTE_CONFIG)) {
+      if (!config || !config.name) continue
+
+      // Check if user has access to this route
+      if (!hasRouteAccess(config.name, user)) continue
+
+      const itemName = config.name?.toLowerCase() || ''
+      const itemLabel = config.label?.toLowerCase() || ''
+
+      if (itemName.includes(term) || itemLabel.includes(term)) {
+        // Use ROUTE_PATH_MAP to get the correct route path
+        const routePath = ROUTE_PATH_MAP[config.name] || config.name.replace(/_/g, '-')
+        matches.push({
+          type: 'page',
+          route: `/${routePath}`,
+          label: config.label || config.name,
+          icon: config.icon,
+        })
+      }
+    }
+
+    return matches
   }
 
   const handleSearchInputKeyDown = (e) => {
@@ -277,6 +381,18 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     setNewPassword('')
 
     fetchProfile()
+  }
+
+  /**
+   * Open the company record from the profile dropdown.
+   *
+   * The dropdown previously offered only My Profile and Log Out, so the company
+   * record was reachable only through the sidebar's Masters group - which is
+   * collapsed on smaller screens and easy to miss entirely.
+   */
+  const handleCompanyOpen = () => {
+    setShowDropdown(false)
+    navigate('/company')
   }
 
   const handleProfileChange = (e) => {
@@ -433,158 +549,195 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
           <Menu size={20} />
         </button>
 
-        {/* Company Selector - Key for Accounting Systems */}
-        <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:border-red-600 transition-all">
-          <Building2 size={16} className="text-red-600" />
-          <span className="text-sm font-bold text-gray-700">
-            {selectedCompany?.name || 'Select Entity'}
-          </span>
-          <ChevronDown size={14} className="text-gray-400" />
-        </div>
+        <div className="flex-1 flex justify-center">
+          <div
+            className="hidden md:flex items-center relative max-w-md w-full"
+            ref={searchRef}
+          >
+            <button
+              type="button"
+              onClick={() => searchQuery.trim().length > 0 && handleSearch()}
+              className="bg-black border border-r-0 border-black rounded-l-xl px-3 h-9 flex items-center justify-center"
+            >
+              <Search className="text-white" size={16} />
+            </button>
+            <input
+              className="w-full pl-4 pr-4 h-9 bg-white border border-black rounded-r-xl text-sm focus:ring-2 focus:ring-black/10 focus:border-black outline-none transition-all placeholder-gray-400"
+              placeholder="Search pages, ledgers, invoices..."
+              type="text"
+              value={searchQuery}
+              onChange={handleSearchInputChange}
+              onKeyDown={handleSearchInputKeyDown}
+              onFocus={() => searchQuery.trim().length > 2 && setShowSearchModal(true)}
+            />
 
-        <div className="flex-1" />
+            {/* Search Modal */}
+            <AnimatePresence>
+              {showSearchModal && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-2xl border border-gray-100 p-4 z-50 w-96"
+                >
+                  <div className="space-y-3">
+                    {/* Page Matches */}
+                    {searchQuery.trim().length >= 2 && (() => {
+                      const pageMatches = getPageMatches(searchQuery)
+                      return (
+                        <div>
+                          <h4 className="text-xs font-semibold text-gray-700 mb-2">Pages</h4>
+                          <div className="space-y-1">
+                            {pageMatches.length > 0 ? (
+                              pageMatches.map((match, index) => {
+                                const IconComponent = ICON_MAP[match.icon] || FileText
+                                return (
+                                  <button
+                                    key={index}
+                                    type="button"
+                                    onClick={() => {
+                                      navigate(match.route)
+                                      setShowSearchModal(false)
+                                      setSearchQuery('')
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg hover:bg-red-50 hover:border-red-200 border border-transparent transition-all group cursor-pointer"
+                                  >
+                                    <IconComponent size={14} className="text-red-600 shrink-0 group-hover:text-red-700" />
+                                    <span className="text-xs font-medium text-gray-700 group-hover:text-red-900">{match.label}</span>
+                                  </button>
+                                )
+                              })
+                            ) : (
+                              <p className="text-xs text-gray-500 text-center py-2">No matching pages</p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
 
-        <div
-          className="hidden md:flex items-center relative max-w-xs w-full"
-          ref={searchRef}
-        >
-          <Search className="absolute left-3 text-gray-400" size={16} />
-          <input
-            className=" w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-500 rounded-xl text-sm focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none transition-all"
-            placeholder="Search ledgers, invoices..."
-            type="text"
-            value={searchQuery}
-            onChange={handleSearchInputChange}
-            onKeyDown={handleSearchInputKeyDown}
-            onFocus={() => searchQuery.trim().length > 2 && setShowSearchModal(true)}
-          />
-
-          {/* Search Modal */}
-          <AnimatePresence>
-            {showSearchModal && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                className="absolute top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border border-gray-100 p-4 z-50 w-96"
-              >
-                <form onSubmit={handleSearchSubmit} className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Date Range
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <input
-                          type="date"
-                          value={searchStartDate}
-                          onChange={(e) => setSearchStartDate(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <input
-                          type="date"
-                          value={searchEndDate}
-                          onChange={(e) => setSearchEndDate(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isSearching || !searchQuery.trim()}
-                    className="w-full bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                  >
-                    {isSearching ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Searching...
-                      </>
-                    ) : (
-                      <>
-                        <Search size={16} />
-                        Search Documents
-                      </>
-                    )}
-                  </button>
-                  {showSearchResults && (
-                    <div className="mt-4 border-t border-gray-100 pt-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-xs font-semibold text-gray-700">
-                          Results ({searchResults.length})
-                        </h4>
+                    {/* Document Search */}
+                    <div className="border-t border-gray-100 pt-3">
+                      <h4 className="text-xs font-semibold text-gray-700 mb-2">Documents</h4>
+                      <form onSubmit={handleSearchSubmit} className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Date Range
+                          </label>
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <input
+                                type="date"
+                                value={searchStartDate}
+                                onChange={(e) => setSearchStartDate(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <input
+                                type="date"
+                                value={searchEndDate}
+                                onChange={(e) => setSearchEndDate(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
                         <button
-                          type="button"
-                          onClick={() => setShowSearchModal(false)}
-                          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <X size={14} className="text-gray-400" />
-                        </button>
-                      </div>
-                      <div className="max-h-60 overflow-y-auto space-y-2">
-                        {searchResults.length > 0 ? (
-                          searchResults.map((result, index) => (
-                            <div
-                              key={index}
-                              className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                              onClick={() => handleSearchResultClick(result)}
+                          type="submit"
+                          disabled={isSearching || !searchQuery.trim()}
+                        className="w-full bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                      >
+                        {isSearching ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Searching...
+                          </>
+                        ) : (
+                          <>
+                            <Search size={16} />
+                            Search Documents
+                          </>
+                        )}
+                      </button>
+                      {showSearchResults && (
+                        <div className="mt-4 border-t border-gray-100 pt-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-xs font-semibold text-gray-700">
+                              Results ({searchResults.length})
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => setShowSearchModal(false)}
+                              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
                             >
-                              <div className="flex items-start gap-2">
-                                <FileText
-                                  size={14}
-                                  className="text-red-600 mt-0.5 shrink-0"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs font-semibold text-gray-900">
-                                      {result.document_type}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                      {result.document_date}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-between gap-2">
+                              <X size={14} className="text-gray-400" />
+                            </button>
+                          </div>
+                          <div className="max-h-60 overflow-y-auto space-y-2">
+                            {searchResults.length > 0 ? (
+                              searchResults.map((result, index) => (
+                                <div
+                                  key={index}
+                                  className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                                  onClick={() => handleSearchResultClick(result)}
+                                >
+                                  <div className="flex items-start gap-2">
+                                    <FileText
+                                      size={14}
+                                      className="text-red-600 mt-0.5 shrink-0"
+                                    />
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-xs text-gray-700 font-medium truncate">
-                                        {result.id}
-                                      </p>
-                                      <p className="text-xs text-gray-500 truncate">
-                                        {result.customer_name || result.vendor_name}
-                                      </p>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                      {result.amount && (
-                                        <p className="text-xs font-semibold text-red-600">
-                                          ₱
-                                          {parseFloat(result.amount).toLocaleString(
-                                            'en-PH',
-                                            { minimumFractionDigits: 2 },
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-semibold text-gray-900">
+                                          {result.document_type}
+                                        </span>
+                                        <span className="text-xs text-gray-500">
+                                          {result.document_date}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs text-gray-700 font-medium truncate">
+                                            {result.id}
+                                          </p>
+                                          <p className="text-xs text-gray-500 truncate">
+                                            {result.customer_name || result.vendor_name}
+                                          </p>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                          {result.amount && (
+                                            <p className="text-xs font-semibold text-red-600">
+                                              ₱
+                                              {parseFloat(result.amount).toLocaleString(
+                                                'en-PH',
+                                                { minimumFractionDigits: 2 },
+                                              )}
+                                            </p>
                                           )}
-                                        </p>
-                                      )}
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-xs text-gray-500 text-center py-4">
-                            No results found for "{searchQuery}"
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </form>
+                              ))
+                            ) : (
+                              <p className="text-xs text-gray-500 text-center py-4">
+                                No results found for "{searchQuery}"
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </form>
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 ml-auto">
           <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500 relative transition-all">
             <Bell size={20} />
             <span className="absolute top-2 right-2 w-2 h-2 bg-red-600 rounded-full border-2 border-white"></span>
@@ -627,10 +780,14 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                   >
                     <User size={16} className="text-gray-400" /> My Profile
                   </button>
+                  {/* Only shown when the tenant actually grants company access,
+                      so the entry cannot lead to a redirect for a user who has
+                      never been given the route. canAccessCompany is derived once
+                      when the user loads, rather than recomputed per render. */}
                   {canAccessCompany && (
                     <button
                       className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      onClick={() => navigate('/company')}
+                      onClick={handleCompanyOpen}
                     >
                       <Building2 size={16} className="text-gray-400" /> Company
                     </button>

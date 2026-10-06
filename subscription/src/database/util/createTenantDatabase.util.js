@@ -1,8 +1,76 @@
 const mysql = require('mysql2/promise')
 const { execSync } = require('child_process')
+const path = require('path')
 const { logger } = require('../../util/logger.util')
 const CONFIG = require('../config/config')
 require('dotenv').config({ path: '../.env' })
+
+// Two migration sets are applied to every new tenant, in this order.
+//
+// The subscription app keeps its own copy under migrations/subscription, but it
+// had fallen behind the accounting server's set by 41 migrations - including
+// every tax table, recurring journals and accounting periods. A company
+// registered through this path therefore got a schema with no tax_filing,
+// tax_form_registry, recurring_journals or accounting_periods, whatever plan it
+// was later put on. A plan can only control access to a module whose tables
+// exist, so a plan granting tax_compliance would have been unusable.
+//
+// Both sets are recorded in the same SequelizeMeta, so the 42 filenames they
+// share are applied once and skipped on the second pass. Running the accounting
+// server's set as well is therefore safe and is what brings the tenant up to the
+// schema the running app expects.
+//
+// The path is absolute. sequelize-cli resolves --migrations-path against its own
+// config rather than the caller's working directory, so a relative path to a
+// sibling app does not resolve from the subscription app's cwd.
+// Paths passed to sequelize-cli are absolute, and cwd is pinned to the
+// subscription app root rather than process.cwd(). sequelize-cli locates its
+// config.json relative to cwd, so leaving it unset made provisioning depend on
+// where the server happened to be started: from the repo root it died with
+// 'Cannot find config/config.json' and no tenant was created.
+const SUBSCRIPTION_APP_ROOT = path.join(__dirname, '..', '..', '..')
+
+const ACCOUNTING_MIGRATIONS_PATH = path.join(
+  __dirname,
+  // util -> database -> src -> subscription -> repo root
+  '..',
+  '..',
+  '..',
+  '..',
+  'server',
+  'src',
+  'database',
+  'migrations',
+  'create',
+)
+
+// Also absolute, so the seeders resolve without depending on cwd.
+const TENANT_SEEDERS_PATH = path.join(
+  SUBSCRIPTION_APP_ROOT,
+  'src',
+  'database',
+  'seeders',
+  'subscription',
+)
+
+const TENANT_MIGRATION_PATHS = [
+  path.join(SUBSCRIPTION_APP_ROOT, 'src', 'database', 'migrations', 'subscription'),
+  ACCOUNTING_MIGRATIONS_PATH,
+]
+
+// Tables a tenant must have before signup is allowed to succeed. Checked after
+// migration so a partial provisioning fails loudly instead of leaving a company
+// that looks registered but breaks the moment a module is opened.
+const REQUIRED_TENANT_TABLES = [
+  'master_user',
+  'master_access',
+  'master_route_access',
+  'master_company',
+  'tax_form_registry',
+  'tax_filing',
+  'recurring_journals',
+  'accounting_periods',
+]
 
 const createTenantDatabase = async (dbName, userData = null, companyName = null, progressCallback = null) => {
   const emitProgress = (step, message, progress) => {
@@ -54,19 +122,52 @@ const createTenantDatabase = async (dbName, userData = null, companyName = null,
     
     logger.info(`📦 Running migrations for ${dbName}...`)
     try {
-      execSync(
-        'npx sequelize-cli db:migrate --migrations-path ./src/database/migrations/subscription',
-        {
-          stdio: 'inherit',
-          cwd: process.cwd(),
-        },
-      )
+      for (const migrationPath of TENANT_MIGRATION_PATHS) {
+        logger.info(`📦 ${dbName}: applying ${migrationPath}`)
+        execSync(
+          `npx sequelize-cli db:migrate --migrations-path "${migrationPath}"`,
+          {
+            stdio: 'inherit',
+            cwd: SUBSCRIPTION_APP_ROOT,
+          },
+        )
+      }
       logger.info(`✅ Migrations completed for ${dbName}`)
       emitProgress('running_migrations', 'Migrations completed!', 60)
     } catch (migrationError) {
       logger.error(`❌ Migration error for ${dbName}:`, migrationError)
       emitProgress('error', 'Migration failed. Please try again.', 0)
       throw migrationError
+    }
+
+    // Verify the tenant actually has the schema the app needs. A signup that
+    // silently produced an incomplete tenant was the failure mode this whole
+    // change exists to prevent, so it is checked rather than assumed.
+    {
+      const verifyConnection = await mysql.createConnection({
+        host: dbHost,
+        user: dbUser,
+        password: dbPass,
+        database: dbName,
+      })
+      try {
+        const [missingTables] = await verifyConnection.query(
+          `SELECT TABLE_NAME FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (${REQUIRED_TENANT_TABLES.map(() => '?').join(',')})`,
+          [dbName, ...REQUIRED_TENANT_TABLES],
+        )
+        const present = new Set(missingTables.map((t) => t.TABLE_NAME))
+        const missing = REQUIRED_TENANT_TABLES.filter((t) => !present.has(t))
+        if (missing.length > 0) {
+          throw new Error(
+            `Tenant database ${dbName} is missing required tables: ${missing.join(', ')}. ` +
+              'The accounting server migration set did not apply.',
+          )
+        }
+        logger.info(`✅ Schema verified for ${dbName}`)
+      } finally {
+        await verifyConnection.end()
+      }
     }
 
     // Emit progress before seeders
@@ -78,10 +179,10 @@ const createTenantDatabase = async (dbName, userData = null, companyName = null,
     logger.info(`🌱 Running seeders for ${dbName}...`)
     try {
       execSync(
-        'npx sequelize-cli db:seed:all --seeders-path ./src/database/seeders/subscription',
+        `npx sequelize-cli db:seed:all --seeders-path "${TENANT_SEEDERS_PATH}"`,
         {
           stdio: 'inherit',
-          cwd: process.cwd(),
+          cwd: SUBSCRIPTION_APP_ROOT,
         },
       )
       logger.info(`✅ Seeders completed for ${dbName}`)
