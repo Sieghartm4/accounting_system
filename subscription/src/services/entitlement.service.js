@@ -71,7 +71,38 @@ const resolveEntitlement = async (dbName) => {
   }
 
   const row = rows && rows[0]
-  if (!row) return denied('NO_SUBSCRIPTION_ROW')
+  if (!row) {
+    // Fallback: check master_user.subscription_id for backward compatibility
+    // in case the migration hasn't been run yet
+    try {
+      const userRows = await Query(
+        `SELECT mu.subscription_id, mu.db_name
+           FROM master_user mu
+          WHERE mu.db_name = ?
+          LIMIT 1`,
+        [dbName],
+      )
+      if (userRows && userRows.length > 0 && userRows[0].subscription_id) {
+        // User has a subscription_id in master_user, treat as having a subscription
+        // The actual plan details will be fetched separately
+        return {
+          subscribed: true,
+          status: 'active',
+          reason: null,
+          planId: Number(userRows[0].subscription_id),
+          planCode: null,
+          planName: null,
+          maxUsers: 1,
+          trialEndsAt: null,
+          periodEndsAt: null,
+          modules: [...catalog.REQUIRED_MODULES],
+        }
+      }
+    } catch (fallbackError) {
+      console.error(`[entitlement] fallback check failed for ${dbName}:`, fallbackError.message)
+    }
+    return denied('NO_SUBSCRIPTION_ROW')
+  }
 
   // A row with no plan is a company that has never subscribed. It is not the
   // same as a lapsed one, and the client shows a different message for each.
