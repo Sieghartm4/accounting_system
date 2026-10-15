@@ -104,6 +104,18 @@ const readPlanModules = async (connection, planId) => {
 /** Module lists for many plans in one round trip rather than N+1 queries. */
 const readPlanModulesForPlans = async (connection, planIds) => {
   if (!planIds.length) return new Map()
+
+  // Check if plan_modules table exists
+  const [tables] = await connection.execute(
+    `SELECT TABLE_NAME FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'plan_modules'`
+  )
+
+  if (tables.length === 0) {
+    console.log('plan_modules table does not exist, using required modules only')
+    return new Map(planIds.map((id) => [id, [...catalog.REQUIRED_MODULES]]))
+  }
+
   const placeholders = planIds.map(() => '?').join(',')
   const [rows] = await connection.execute(
     `SELECT pm_plan_id, pm_module FROM plan_modules
@@ -211,11 +223,19 @@ const getPublicSubscriptionPlans = async (req, res, next) => {
 
     // Every plan's modules in one query, so the customer's plan page shows what
     // the operator actually granted rather than the generic FEATURES strings.
-    const byPlanModules = await readPlanModulesForPlans(
-      connection,
-      plans.map((p) => p.sp_id),
-    )
-    console.log('Fetched modules for plans')
+    let byPlanModules = new Map()
+    try {
+      byPlanModules = await readPlanModulesForPlans(
+        connection,
+        plans.map((p) => p.sp_id),
+      )
+      console.log('Fetched modules for plans')
+    } catch (moduleError) {
+      console.error('Error fetching plan modules:', moduleError)
+      // If plan_modules table doesn't exist or has issues, use required modules only
+      console.log('Using required modules as fallback')
+      byPlanModules = new Map(plans.map((p) => [p.sp_id, [...catalog.REQUIRED_MODULES]]))
+    }
 
     // Fetch subscription plan items for each plan
     const plansWithItems = await Promise.all(
