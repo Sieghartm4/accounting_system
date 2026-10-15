@@ -18,7 +18,11 @@
  */
 
 const express = require('express')
-const { resolveEntitlement, hasModule } = require('../services/entitlement/entitlement.service')
+const {
+  resolveEntitlement,
+  hasModule,
+  invalidate,
+} = require('../services/entitlement/entitlement.service')
 // Same catalog module the entitlement service resolves module codes against, so
 // the client's view of what exists cannot drift from what the server enforces.
 const catalog = require('../../../subscription/src/constants/moduleCatalog')
@@ -104,6 +108,55 @@ entitlementRouter.get('/module/:code', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Could not determine module access.',
+    })
+  }
+})
+
+/**
+ * Drop the cached entitlement for this company and return the fresh one.
+ *
+ * Called by the client immediately after a plan is chosen or a payment
+ * completes. Without it the 60-second resolver cache keeps serving the
+ * pre-upgrade module set, so a customer who has just paid sees the upgrade
+ * screen again on the page they were trying to open.
+ *
+ * Scoped to the caller's own company: the tenant database comes from the
+ * verified session, never from the request, so this cannot be used to probe or
+ * invalidate another company.
+ */
+entitlementRouter.post('/refresh', async (req, res) => {
+  const dbName = tenantOf(req)
+
+  if (!dbName) {
+    return res.status(400).json({
+      success: false,
+      message: 'No tenant database is associated with this session.',
+    })
+  }
+
+  try {
+    invalidate(dbName)
+    const entitlement = await resolveEntitlement(dbName, { force: true })
+
+    res.status(200).json({
+      success: true,
+      data: {
+        subscribed: entitlement.subscribed === true,
+        status: entitlement.status,
+        planId: entitlement.planId,
+        planCode: entitlement.planCode,
+        planName: entitlement.planName,
+        maxUsers: entitlement.maxUsers,
+        trialEndsAt: entitlement.trialEndsAt,
+        periodEndsAt: entitlement.periodEndsAt,
+        modules: Array.isArray(entitlement.modules) ? entitlement.modules : [],
+      },
+    })
+  } catch (error) {
+    console.error('[entitlement] POST /entitlement/refresh failed:', error.message)
+    res.status(500).json({
+      success: false,
+      message: 'Could not refresh the current subscription.',
     })
   }
 })

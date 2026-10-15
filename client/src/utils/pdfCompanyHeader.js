@@ -5,80 +5,130 @@ export function renderPDFCompanyHeader(
   margin,
   startY = 36,
 ) {
-  const LOGO_W = 60
-  const LOGO_H = 50
   const contentWidth = pageW - margin * 2
-  const leftBlockWidth = Math.round(contentWidth * 0.45)
-  const rightBlockWidth = contentWidth - leftBlockWidth
-  const leftStartX = margin
   const rightEndX = pageW - margin
-  const rightAlignX = rightEndX
-  const leftTextX = leftStartX + (company.logo ? LOGO_W + 10 : 0)
-  const leftTextMaxWidth = leftBlockWidth - (company.logo ? LOGO_W + 10 : 0)
-  const rightTextMaxWidth = rightBlockWidth - 8
+  const currentY = startY
 
-  const leftLines = []
-  if (company.company_name) leftLines.push(String(company.company_name))
-  if (company.owner_name) leftLines.push(String(company.owner_name))
+  // Exact square 50x50 aspect ratio
+  const LOGO_W = 50
+  const LOGO_H = 50
+  const hasLogo = Boolean(company.logo)
 
-  const rightLines = []
-  if (company.address) rightLines.push(String(company.address))
+  const leftX = margin + (hasLogo ? LOGO_W + 12 : 0)
+  const COLUMN_GAP = 16 // minimum space between the left and the right column
+  const rightMaxWidth = contentWidth * 0.42
+
+  // Line heights (text is drawn with baseline: 'top')
+  const TITLE_LINE = 15
+  const BODY_LINE = 11
+  // Empty space under the last line of text (line advance minus glyph size), so the
+  // *visible* text is centered and not the text plus its trailing gap
+  const TITLE_GAP = 2
+  const BODY_GAP = 2.5
+
+  // 1. Right column first: its real width decides how much room the left column has
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+
+  const rightSource = []
   const contactLine = [company.phone, company.email].filter(Boolean).join('  |  ')
-  if (contactLine) rightLines.push(contactLine)
+  if (contactLine) rightSource.push(contactLine)
+
   const tinWebLine = [company.tin ? `TIN: ${company.tin}` : null, company.website]
     .filter(Boolean)
     .join('  |  ')
-  if (tinWebLine) rightLines.push(tinWebLine)
+  if (tinWebLine) rightSource.push(tinWebLine)
 
-  if (company.logo) {
+  // Wrap long lines ourselves so the measured height is the real height
+  const rightLines = rightSource.flatMap((line) => doc.splitTextToSize(line, rightMaxWidth))
+  const rightWidth = rightLines.reduce((max, line) => Math.max(max, doc.getTextWidth(line)), 0)
+
+  // 2. Left column gets everything that is left, so it can never run into the right column
+  const leftMaxWidth = Math.max(
+    contentWidth * 0.3,
+    contentWidth - (hasLogo ? LOGO_W + 12 : 0) - rightWidth - COLUMN_GAP,
+  )
+
+  // Title wraps onto as many lines as it needs (measured with the bold title font)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(13)
+  const titleLines = company.company_name
+    ? doc.splitTextToSize(String(company.company_name), leftMaxWidth)
+    : []
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  const addressLines = company.address
+    ? doc.splitTextToSize(String(company.address), leftMaxWidth)
+    : []
+
+  const leftTextHeight = Math.max(
+    0,
+    titleLines.length * TITLE_LINE +
+      addressLines.length * BODY_LINE -
+      (addressLines.length ? BODY_GAP : titleLines.length ? TITLE_GAP : 0),
+  )
+  const rightTextHeight = Math.max(
+    0,
+    rightLines.length * BODY_LINE - (rightLines.length ? BODY_GAP : 0),
+  )
+
+  // 3. The header block is as tall as its tallest part; everything else is centered inside it
+  const blockHeight = Math.max(hasLogo ? LOGO_H : 0, leftTextHeight, rightTextHeight)
+  const centerOffset = (height) => (blockHeight - height) / 2
+
+  // 4. Logo - vertically centered with the text columns
+  if (hasLogo) {
     try {
-      const fmt = company.logo.startsWith('data:image/png')
-        ? 'PNG'
-        : company.logo.startsWith('data:image/jpeg')
-          ? 'JPEG'
-          : 'PNG'
-      doc.addImage(company.logo, fmt, leftStartX, startY, LOGO_W, LOGO_H)
+      const fmt = company.logo.startsWith('data:image/png') ? 'PNG' : 'JPEG'
+      doc.addImage(
+        company.logo,
+        fmt,
+        margin,
+        currentY + centerOffset(LOGO_H),
+        LOGO_W,
+        LOGO_H,
+      )
     } catch (err) {
-      console.warn('[PDF] Company logo render failed:', err.message)
+      console.warn('[PDF] Logo render failed:', err.message)
     }
   }
 
-  const titleY = startY + 14
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(13)
-  doc.setTextColor(17, 24, 39)
-  if (leftLines[0]) {
-    doc.text(leftLines[0], leftTextX, titleY, {
-      align: 'left',
-      maxWidth: leftTextMaxWidth,
+  // 5. Left column: company name (wrapped) & address - centered
+  let leftCursorY = currentY + centerOffset(leftTextHeight)
+
+  if (titleLines.length) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.setTextColor(15, 23, 42) // Slate 900
+    titleLines.forEach((line) => {
+      doc.text(line, leftX, leftCursorY, { baseline: 'top' })
+      leftCursorY += TITLE_LINE
     })
   }
 
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(107, 114, 128)
-  leftLines.slice(1).forEach((line, idx) => {
-    doc.text(line, leftTextX, titleY + 12 + idx * 10, {
-      align: 'left',
-      maxWidth: leftTextMaxWidth,
-    })
+  doc.setFontSize(8.5)
+  doc.setTextColor(100, 116, 139) // Slate 500
+  addressLines.forEach((line) => {
+    doc.text(line, leftX, leftCursorY, { baseline: 'top' })
+    leftCursorY += BODY_LINE
   })
 
-  rightLines.forEach((line, idx) => {
-    doc.text(line, rightAlignX, titleY + idx * 10, {
-      align: 'right',
-      maxWidth: rightTextMaxWidth,
-    })
+  // 6. Right column: contacts, TIN & website - centered
+  let rightCursorY = currentY + centerOffset(rightTextHeight)
+
+  rightLines.forEach((line) => {
+    doc.text(line, rightEndX, rightCursorY, { align: 'right', baseline: 'top' })
+    rightCursorY += BODY_LINE
   })
 
-  const leftHeight = company.logo ? LOGO_H : leftLines.length * 10 + 16
-  const rightHeight = rightLines.length * 10 + 12
-  const height = Math.max(leftHeight, rightHeight)
+  // 7. Divider line below the header block
+  const dividerY = currentY + blockHeight + 8
 
-  const dividerY = startY + height + 12
-  doc.setDrawColor(229, 231, 235)
+  doc.setDrawColor(203, 213, 225) // Slate 300
   doc.setLineWidth(0.75)
-  doc.line(margin, dividerY, pageW - margin, dividerY)
+  doc.line(margin, dividerY, rightEndX, dividerY)
 
-  return dividerY + 12
+  return dividerY + 14
 }

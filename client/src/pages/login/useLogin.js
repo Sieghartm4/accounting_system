@@ -29,12 +29,15 @@ const useLogin = () => {
 
         // Handle user without subscription - redirect to plan selection
         if (response.status === 403 && errorData.requiresSubscription) {
-          // ✅ DO NOT store password - only temporarily in sessionStorage for plan selection
+          // Carry enough to identify the account on the plan step: the username
+          // decides whose entitlement row gets updated, and existingAccount
+          // keeps the wording from implying they still need to sign up. No
+          // password is written, and none is needed - the account exists.
           sessionStorage.setItem(
             'pendingUser',
             JSON.stringify({
               username: credentials.username,
-              // ❌ DO NOT store password
+              existingAccount: true,
             }),
           )
           navigate('/register?step=plan')

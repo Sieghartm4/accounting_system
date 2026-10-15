@@ -24,6 +24,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import useRegister from './useRegister';
+import { REQUIRED_MODULES, moduleLabel } from '../../constants/modules';
 import DynamicToast from '../../components/DynamicToast';
 
 export default function Register() {
@@ -45,6 +46,9 @@ export default function Register() {
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [billingCycle, setBillingCycle] = useState('monthly');
   const [step, setStep] = useState(1); // Step 1: Account Creation, Step 2: Plan Selection, Step 3: Payment
+    // Whose subscription is being chosen. Null unless the caller identified a
+    // user, so the plan step can name them instead of speaking generically.
+    const [pendingAccount, setPendingAccount] = useState(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
   const [showToast, setShowToast] = useState(false);
@@ -103,15 +107,36 @@ export default function Register() {
         setFormData(prev => ({
           ...prev,
           username: userData.username,
-          password: userData.password
+          // No password is carried across. A blocked-login user has one in
+          // memory only; an upgrade has none because the account already
+          // exists. Leaving it undefined keeps the field genuinely empty rather
+          // than holding a stale value from a previous visit.
+          password: userData.password || '',
         }));
+
+        // Whose plan this is. Set only when the caller supplied it, so a
+        // blocked login shows no company name rather than an empty label.
+        setPendingAccount({
+          username: userData.username,
+          tenantDb: userData.tenantDb || null,
+          email: userData.email || null,
+          fullname: userData.fullname || null,
+          existingAccount: userData.existingAccount === true,
+        });
+
         setStep(2); // Skip to plan selection
-        
-        // Show toast notification
-        setToastMessage('You do not have an active subscription. Please complete your registration by selecting a subscription plan.');
+
+        // Worded for who is actually here. An upgrade is not "completing
+        // registration" - the account already exists - and saying so made a
+        // signed-in user look like they were being asked to sign up again.
+        setToastMessage(
+          userData.existingAccount
+            ? `Choose a plan for ${userData.username} to unlock the modules you don't have yet.`
+            : 'You do not have an active subscription. Please complete your registration by selecting a subscription plan.',
+        );
         setToastType('warning');
         setShowToast(true);
-        
+
         // Fetch user's used free trials
         fetchUsedFreeTrials(userData.username);
       }
@@ -129,6 +154,10 @@ export default function Register() {
         setToastMessage('Please create an account first.');
         setToastType('error');
         setShowToast(true);
+        // Drop the identified account too: the user is going back to register a
+        // different one, and leaving it would label the new signup with the old
+        // company on a later visit to this step.
+        setPendingAccount(null);
         setStep(1);
       }
     }
@@ -339,9 +368,10 @@ export default function Register() {
             
             if (plan.items && Array.isArray(plan.items)) {
               plan.items.forEach((item) => {
-                if (item.spi_type === 'MODULES') {
-                  features.push(item.spi_details);
-                } else if (item.spi_type === 'FEATURES') {
+                // MODULES items are deliberately not read here. The table is
+                // never seeded and nothing writes to it; the plan's real module
+                // list is plan.modules, built from the operator's choices.
+                if (item.spi_type === 'FEATURES') {
                   features.push(item.spi_details);
                 } else if (item.spi_type === 'USERS') {
                   const userCount = parseInt(item.spi_details);
@@ -379,7 +409,46 @@ export default function Register() {
             }
             
             plan.features = features;
+            plan.modules = Array.isArray(plan.modules) ? plan.modules : [];
             return plan;
+          });
+
+          // What the card advertises, built from the plan's real module grants.
+          //
+          // The legacy MODULES items in subscription_plan_items were never
+          // seeded, so reading the card's feature list from them showed only
+          // generic FEATURES strings ("All modules", "7 days free trial") and
+          // never the modules an operator had actually ticked. Modules now come
+          // from the plan itself.
+          const CORE_NOTE = 'All core accounting, journal entry and financial reporting modules';
+          plansWithItems.forEach((plan) => {
+            const list = [];
+            if (Number(plan.sp_max_users) > 0) {
+              list.push(`Up to ${plan.sp_max_users} user${Number(plan.sp_max_users) === 1 ? '' : 's'}`);
+            }
+            if (Number(plan.sp_trial_days) > 0) {
+              list.push(`${plan.sp_trial_days}-day free trial`);
+            }
+
+            const granted = plan.modules;
+            // The required set is always granted, so listing all 23 individually
+            // would bury the differences between plans. One line acknowledges
+            // them and the sellable modules are named.
+            list.push(CORE_NOTE);
+            if (Array.isArray(granted)) {
+              const optional = granted.filter((m) => !REQUIRED_MODULES.includes(m));
+              optional.forEach((m) => list.push(moduleLabel(m)));
+            }
+
+            // Keep any operator-written FEATURES text after the real list.
+            const extras = (plan.items || [])
+              .filter((i) => i.spi_type === 'FEATURES')
+              .map((i) => i.spi_details);
+            extras.forEach((e) => {
+              if (!list.includes(e)) list.push(e);
+            });
+
+            plan.features = list;
           });
 
           setPlans(plansWithItems);
@@ -603,6 +672,16 @@ export default function Register() {
             subscription_billing_cycle: billingCycleDays,
           }),
         });
+
+        // The new plan is recorded but the accounting server caches entitlement
+        // for 60 seconds, so the newly bought modules would still be refused on
+        // the next login. Cleared here so the redirect lands on a working tenant.
+        // Not fatal if it fails: the cache expires on its own within the minute.
+        try {
+          sessionStorage.removeItem('auth_entitlement');
+        } catch {
+          // Storage unavailable; the server-side TTL still clears it.
+        }
 
         // Clear sessionStorage and redirect to login
         if (typeof window !== 'undefined') {
@@ -895,6 +974,34 @@ export default function Register() {
                 <p className="text-lg text-slate-600">
                   Select the perfect operational workflow for your team. Switch billing options anytime.
                 </p>
+
+                {/* Who this plan is being bought for. Without it the page is
+                    indistinguishable from a first-time signup, and a signed-in
+                    user cannot tell the upgrade has been attributed to their
+                    account until they have already paid. */}
+                {pendingAccount?.username && (
+                  <div className="mx-auto mt-6 flex max-w-md items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white">
+                      <User size={16} />
+                    </div>
+                    <div className="min-w-0 text-left">
+                      <p className="truncate text-sm font-black text-slate-900">
+                        {pendingAccount.fullname || pendingAccount.username}
+                        {pendingAccount.existingAccount && (
+                          <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 align-middle text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                            Existing account
+                          </span>
+                        )}
+                      </p>
+                      <p className="truncate text-xs text-slate-500">
+                        {pendingAccount.email || `@${pendingAccount.username}`}
+                        {pendingAccount.tenantDb && (
+                          <span className="ml-2 text-slate-400">({pendingAccount.tenantDb})</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-4 flex items-center justify-center gap-3">
                   <span className={`text-sm font-bold ${billingCycle === 'monthly' ? 'text-black' : 'text-slate-500'}`}>Monthly</span>

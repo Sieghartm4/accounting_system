@@ -11,11 +11,14 @@ import {
   Calendar,
   FileText,
   ArrowUpRight,
+  Wallet,
+  ShieldCheck,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 import LoadingScreen from '../../components/LoadingScreen'
+import { currentReportPeriod } from '../../utils/reportPeriod'
 
 export default function IncomeStatement() {
   const navigate = useNavigate()
@@ -23,8 +26,8 @@ export default function IncomeStatement() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startDate, setStartDate] = useState(() => currentReportPeriod().start)
+  const [endDate, setEndDate] = useState(() => currentReportPeriod().end)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const { company } = useCompany()
 
@@ -308,7 +311,7 @@ export default function IncomeStatement() {
     setExportMenuOpen(false)
   }
 
-  const handleExportPDF = async () => {
+const handleExportPDF = async () => {
     try {
       const { jsPDF } = await import('jspdf')
       const { default: autoTable } = await import('jspdf-autotable')
@@ -319,52 +322,63 @@ export default function IncomeStatement() {
         format: 'letter',
       })
       const W = doc.internal.pageSize.getWidth()
+      const H = doc.internal.pageSize.getHeight()
       const M = 36
       let y = renderPDFCompanyHeader(doc, company, W, M)
 
-      const BLK = [17, 24, 39]
-      const GRN = [5, 150, 105]
-      const RED = [220, 38, 38]
-      const GRY = [107, 114, 128]
-      const LGT = [229, 231, 235]
+      const BLK = [17, 24, 39]      // Slate 900 (Unified Header Theme)
+      const GRY = [100, 116, 139]   // Slate 500
+      const LGT = [226, 232, 240]   // Slate 200
       const WHT = [255, 255, 255]
+      const BG_ALT = [248, 250, 252]// Slate 50
+      const SUCCESS = [16, 185, 129] // Emerald 500
+      const DANGER = [239, 68, 68]   // Red 500
 
-      doc.setFillColor(...BLK)
-      doc.rect(M, y - 14, W - M * 2, 32, 'F')
-      doc
-        .setFont('helvetica', 'bold')
-        .setFontSize(13)
-        .setTextColor(...WHT)
-      doc.text('INCOME STATEMENT', M + 8, y + 6)
-      doc.setFontSize(8).setTextColor(...GRY)
-      doc.text('Profit & Loss Summary', W - M - 8, y + 6, { align: 'right' })
-      y += 32
+      // Document Title Section
+      doc.setDrawColor(...LGT)
+      doc.setLineWidth(1)
+      doc.line(M, y, W - M, y)
+      y += 14
 
-      doc.setFillColor(...BLK)
-      doc.rect(M, y - 2, W - M * 2, 18, 'F')
-      doc
-        .setFont('helvetica', 'normal')
-        .setFontSize(8)
-        .setTextColor(...GRY)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.setTextColor(...BLK)
+      doc.text('INCOME STATEMENT', M, y)
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(...GRY)
+      doc.text('Profit & Loss Summary', W - M, y, { align: 'right' })
+
+      y += 12
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(...GRY)
       doc.text(
         `Period: ${formatDate(startDate) || 'All Dates'} — ${formatDate(endDate) || 'All Dates'}`,
-        M + 8,
-        y + 10,
+        M,
+        y,
       )
       doc.text(
         `Generated: ${new Date().toLocaleDateString('en-PH')}`,
-        W - M - 8,
-        y + 10,
+        W - M,
+        y,
         { align: 'right' },
       )
-      y += 22
+      y += 16
 
-      // REVENUES TABLE
+      // Currency formatter helper
+      const cleanFmt = (val) => {
+        const formatted = fmt(parseFloat(val || 0))
+        return formatted.replace('₱', 'Php ')
+      }
+
+      // ── 1. REVENUES TABLE ────────────────────────────────────────────────
       const revenueBody =
         data.revenues?.map((row) => [
-          row['Account Code'],
-          row['Account Name'],
-          fmt(parseFloat(row.Current || 0)),
+          row['Account Code'] || '',
+          row['Account Name'] || '',
+          cleanFmt(row.Current),
         ]) || []
 
       autoTable(doc, {
@@ -372,11 +386,13 @@ export default function IncomeStatement() {
         margin: { left: M, right: M },
         tableWidth: W - M * 2,
         head: [
-          [{ content: 'REVENUES', colSpan: 3, styles: { halign: 'left' } }],
           [
-            { content: 'CODE', styles: { halign: 'left' } },
+            { content: 'REVENUES', colSpan: 3, styles: { fillColor: BLK, textColor: WHT, fontStyle: 'bold', fontSize: 9 } }
+          ],
+          [
+            { content: 'ACCOUNT CODE', styles: { halign: 'left' } },
             { content: 'ACCOUNT NAME', styles: { halign: 'left' } },
-            { content: 'AMOUNT (₱)', styles: { halign: 'right' } },
+            { content: 'AMOUNT (Php)', styles: { halign: 'right' } },
           ],
         ],
         body: revenueBody,
@@ -388,53 +404,53 @@ export default function IncomeStatement() {
               styles: { halign: 'left', fontStyle: 'bold' },
             },
             {
-              content: fmt(data.totalRevenues || 0),
-              styles: { halign: 'right', fontStyle: 'bold' },
+              content: cleanFmt(data.totalRevenues || 0),
+              styles: { halign: 'right', fontStyle: 'bold', textColor: [16, 185, 129] },
             },
           ],
         ],
         theme: 'plain',
         headStyles: {
-          fillColor: GRN,
+          fillColor: [51, 65, 85], // Slate 700 for subheaders
           textColor: WHT,
           fontStyle: 'bold',
-          fontSize: 9,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: [55, 65, 81],
+          fontSize: 8.5,
+          cellPadding: { top: 6, bottom: 6, left: 8, right: 8 },
+        },
+        alternateRowStyles: { fillColor: BG_ALT },
+        styles: {
+          fontSize: 8.5,
+          font: 'helvetica',
+          cellPadding: { top: 5, bottom: 5, left: 8, right: 8 },
+          textColor: [30, 41, 59],
+          lineColor: LGT,
           lineWidth: 0.5,
+          valign: 'middle',
         },
         footStyles: {
-          fillColor: [55, 65, 81],
-          textColor: WHT,
+          fillColor: [241, 245, 249],
+          textColor: BLK,
           fontStyle: 'bold',
-          fontSize: 10,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: GRN,
-          lineWidth: { top: 2, bottom: 0, left: 0, right: 0 },
-        },
-        styles: {
           fontSize: 9,
-          cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
-          textColor: [55, 65, 81],
-          lineColor: LGT,
-          lineWidth: 0.3,
-          valign: 'top',
+          cellPadding: { top: 7, bottom: 7, left: 8, right: 8 },
+          lineColor: [203, 213, 225],
+          lineWidth: { top: 1, bottom: 1, left: 0, right: 0 },
         },
         columnStyles: {
-          0: { cellWidth: 45, halign: 'left' },
+          0: { cellWidth: 90, halign: 'left', fontStyle: 'bold' },
           1: { cellWidth: 'auto', halign: 'left' },
-          2: { cellWidth: 50, halign: 'right', fontStyle: 'bold', textColor: GRN },
+          2: { cellWidth: 110, halign: 'right', fontStyle: 'bold' },
         },
       })
 
-      y = doc.lastAutoTable.finalY + 12
+      y = doc.lastAutoTable.finalY + 14
 
-      // EXPENSES TABLE
+      // ── 2. EXPENSES TABLE ────────────────────────────────────────────────
       const expenseBody =
         data.expenses?.map((row) => [
-          row['Account Code'],
-          row['Account Name'],
-          fmt(parseFloat(row.Current || 0)),
+          row['Account Code'] || '',
+          row['Account Name'] || '',
+          cleanFmt(row.Current),
         ]) || []
 
       autoTable(doc, {
@@ -442,11 +458,13 @@ export default function IncomeStatement() {
         margin: { left: M, right: M },
         tableWidth: W - M * 2,
         head: [
-          [{ content: 'EXPENSES', colSpan: 3, styles: { halign: 'left' } }],
           [
-            { content: 'CODE', styles: { halign: 'left' } },
+            { content: 'EXPENSES', colSpan: 3, styles: { fillColor: BLK, textColor: WHT, fontStyle: 'bold', fontSize: 9 } }
+          ],
+          [
+            { content: 'ACCOUNT CODE', styles: { halign: 'left' } },
             { content: 'ACCOUNT NAME', styles: { halign: 'left' } },
-            { content: 'AMOUNT (₱)', styles: { halign: 'right' } },
+            { content: 'AMOUNT (Php)', styles: { halign: 'right' } },
           ],
         ],
         body: expenseBody,
@@ -458,58 +476,74 @@ export default function IncomeStatement() {
               styles: { halign: 'left', fontStyle: 'bold' },
             },
             {
-              content: fmt(data.totalExpenses || 0),
-              styles: { halign: 'right', fontStyle: 'bold' },
+              content: cleanFmt(data.totalExpenses || 0),
+              styles: { halign: 'right', fontStyle: 'bold', textColor: [239, 68, 68] },
             },
           ],
         ],
         theme: 'plain',
         headStyles: {
-          fillColor: RED,
+          fillColor: [51, 65, 85], // Slate 700 for subheaders
           textColor: WHT,
           fontStyle: 'bold',
-          fontSize: 9,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: [55, 65, 81],
+          fontSize: 8.5,
+          cellPadding: { top: 6, bottom: 6, left: 8, right: 8 },
+        },
+        alternateRowStyles: { fillColor: BG_ALT },
+        styles: {
+          fontSize: 8.5,
+          font: 'helvetica',
+          cellPadding: { top: 5, bottom: 5, left: 8, right: 8 },
+          textColor: [30, 41, 59],
+          lineColor: LGT,
           lineWidth: 0.5,
+          valign: 'middle',
         },
         footStyles: {
-          fillColor: [55, 65, 81],
-          textColor: WHT,
+          fillColor: [241, 245, 249],
+          textColor: BLK,
           fontStyle: 'bold',
-          fontSize: 10,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: RED,
-          lineWidth: { top: 2, bottom: 0, left: 0, right: 0 },
-        },
-        styles: {
           fontSize: 9,
-          cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
-          textColor: [55, 65, 81],
-          lineColor: LGT,
-          lineWidth: 0.3,
-          valign: 'top',
+          cellPadding: { top: 7, bottom: 7, left: 8, right: 8 },
+          lineColor: [203, 213, 225],
+          lineWidth: { top: 1, bottom: 1, left: 0, right: 0 },
         },
         columnStyles: {
-          0: { cellWidth: 45, halign: 'left' },
+          0: { cellWidth: 90, halign: 'left', fontStyle: 'bold' },
           1: { cellWidth: 'auto', halign: 'left' },
-          2: { cellWidth: 50, halign: 'right', fontStyle: 'bold', textColor: RED },
+          2: { cellWidth: 110, halign: 'right', fontStyle: 'bold' },
         },
       })
 
-      y = doc.lastAutoTable.finalY + 12
+      y = doc.lastAutoTable.finalY + 16
 
-      // NET INCOME SUMMARY
-      const netIncomeColor = data.netIncome >= 0 ? GRN : RED
-      doc.setFillColor(...netIncomeColor)
-      doc.rect(M, y, W - M * 2, 24, 'F')
-      doc
-        .setFont('helvetica', 'bold')
-        .setFontSize(12)
-        .setTextColor(...WHT)
-      doc.text('NET INCOME', M + 8, y + 15)
-      doc.setFontSize(14)
-      doc.text(fmt(data.netIncome || 0), W - M - 8, y + 15, { align: 'right' })
+      // ── 3. DYNAMIC NET INCOME / NET LOSS SUMMARY BOX ─────────────────────
+      const netIncomeVal = data.netIncome || 0
+      const isNetPositive = netIncomeVal >= 0
+      const netLabel = isNetPositive ? 'NET INCOME' : 'NET LOSS'
+      const netBgColor = isNetPositive ? [6, 95, 70] : [153, 27, 27] // Emerald for income, Red for loss
+
+      doc.setFillColor(...netBgColor)
+      doc.roundedRect(M, y, W - M * 2, 32, 4, 4, 'F')
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(11)
+      doc.setTextColor(...WHT)
+      doc.text(netLabel, M + 12, y + 20) // Displays ONLY one correct label
+
+      doc.setFontSize(12)
+      doc.text(cleanFmt(netIncomeVal), W - M - 12, y + 20, { align: 'right' })
+
+      // Page Footers (Page X of Y) across all pages
+      const totalPages = doc.internal.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.setTextColor(...GRY)
+        doc.text(`Page ${i} of ${totalPages}`, W - M, H - 20, { align: 'right' })
+        doc.text('Confidential — For Internal Financial Reporting Only', M, H - 20)
+      }
 
       doc.save(`income-statement-${new Date().toISOString().split('T')[0]}.pdf`)
       setExportMenuOpen(false)
@@ -538,7 +572,7 @@ export default function IncomeStatement() {
     )
 
   return (
-    <div className="flex flex-col gap-3 bg-[#F3F4F6] h-full custom-scrollbar">
+    <div className="flex flex-col gap-3 bg-[#F3F4F6] h-full  overflow-x-auto custom-scrollbar">
       {/* HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-3 flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -555,6 +589,33 @@ export default function IncomeStatement() {
           </div>
         </div>
         <div className="flex gap-2 items-center relative">
+          <div className="flex flex-col md:flex-row md:items-center gap-2 w-full md:w-auto rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-2 py-1.5 shadow-sm">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[2px]">From</span>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full md:w-auto bg-transparent px-1 py-1 md:py-0.5 text-[11px] font-bold text-slate-800 outline-none" />
+            <span className="hidden md:inline text-slate-300 text-[11px] leading-none">→</span>
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[2px]">To</span>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full md:w-auto bg-transparent px-1 py-1 md:py-0.5 text-[11px] font-bold text-slate-800 outline-none" />
+            <span className="hidden md:block mx-1 h-5 w-px bg-slate-200" />
+            <button
+              onClick={() => {
+              setStartDate('')
+              setEndDate('')
+            }}
+              className="w-full md:w-auto px-2.5 py-2 md:py-1 rounded-lg border border-slate-300 bg-white text-[9px] font-black text-slate-700 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-colors cursor-pointer"
+            >
+              Reset
+            </button>
+            <button
+              onClick={() => {
+              const t = new Date().toISOString().split('T')[0]
+              setStartDate(t)
+              setEndDate(t)
+            }}
+              className="w-full md:w-auto px-2.5 py-2 md:py-1 rounded-lg bg-slate-900 text-[9px] font-black text-white uppercase tracking-widest hover:bg-red-600 transition-colors cursor-pointer"
+            >
+              Today
+            </button>
+          </div>
           <div className="relative">
             <button
               onClick={() => setExportMenuOpen((p) => !p)}
@@ -592,95 +653,41 @@ export default function IncomeStatement() {
 
       {/* STAT CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-shrink-0">
-        <StatCard
-          iconBg="bg-green-50"
-          iconColor="text-green-600"
-          icon={<TrendingUp size={18} />}
+        <SummaryTile
           label="Total Revenue"
           value={`₱${fmt(data?.totalRevenues)}`}
-          sub="Gross Earnings"
-          valueClass="text-green-600"
+          subText="Gross Earnings"
+          color="emerald"
+          icon={TrendingUp}
         />
-        <StatCard
-          iconBg="bg-red-50"
-          iconColor="text-red-600"
-          icon={<TrendingDown size={18} />}
+        <SummaryTile
           label="Total Expenses"
           value={`₱${fmt(data?.totalExpenses)}`}
-          sub="Operating Costs"
-          valueClass="text-red-600"
+          subText="Operating Costs"
+          color="rose"
+          icon={TrendingDown}
         />
-        <StatCard
-          iconBg="bg-black"
-          iconColor="text-red-500"
-          icon={<DollarSign size={18} />}
+        <SummaryTile
           label="Net Income"
           value={`₱${fmt(data?.netIncome)}`}
-          sub="Bottom Line"
-          valueClass={data?.netIncome >= 0 ? 'text-black' : 'text-red-600'}
+          subText="Bottom Line"
+          color="dark"
+          icon={Wallet}
         />
-      </div>
-
-      {/* TOOLBAR */}
-      <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-4 flex-wrap shadow-sm flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-red-100 rounded-lg text-red-600">
-            <Calendar size={14} />
-          </div>
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-            Period Filter
-          </span>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
-          />
-          <span className="text-gray-300">to</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
-          />
-        </div>
-        <div className="ml-auto flex gap-2">
-          <button
-            onClick={() => {
-              setStartDate('')
-              setEndDate('')
-            }}
-            className="px-4 py-2 border border-gray-900 rounded-xl text-[10px] font-black text-gray-900 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-all bg-white cursor-pointer"
-          >
-            Reset
-          </button>
-          <button
-            onClick={() => {
-              const t = new Date().toISOString().split('T')[0]
-              setStartDate(t)
-              setEndDate(t)
-            }}
-            className="px-4 py-2 bg-black rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-red-600 cursor-pointer"
-          >
-            Today
-          </button>
-        </div>
       </div>
 
       {/* CONTENT GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
         {/* REVENUE TABLE */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col custom-scrollbar">
-          <div className="flex items-center gap-2 px-5 py-3 bg-black flex-shrink-0">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col  overflow-x-auto custom-scrollbar">
+          <div className="flex flex-wrap items-center gap-2 px-4 sm:px-5 py-3 bg-black flex-shrink-0">
             <TrendingUp size={14} className="text-green-500" />
             <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
               Revenues
             </span>
           </div>
           <div
-            className="overflow-y-auto custom-scrollbar flex-1 min-h-0"
+            className="overflow-y-auto  overflow-x-auto custom-scrollbar flex-1 min-h-0"
           >
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-gray-50 z-10">
@@ -698,7 +705,7 @@ export default function IncomeStatement() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {data.revenues?.map((item, i) => (
-                  <tr key={i} className="hover:bg-green-50/50 transition-colors">
+                  <tr key={i} className="hover:bg-red-100 hover:border-l-4 hover:border-red-600 hover:shadow-sm transition-colors">
                     <td className="py-3 px-5">
                       <p className="text-[10px] font-bold text-gray-400 uppercase">
                         {item['Account Code']}
@@ -740,7 +747,7 @@ export default function IncomeStatement() {
         </div>
 
         {/* EXPENSES TABLE */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col custom-scrollbar">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col  overflow-x-auto custom-scrollbar">
           <div className="flex items-center gap-2 px-5 py-3 bg-black flex-shrink-0">
             <TrendingDown size={14} className="text-red-500" />
             <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
@@ -748,7 +755,7 @@ export default function IncomeStatement() {
             </span>
           </div>
           <div
-            className="overflow-y-auto custom-scrollbar flex-1 min-h-0"
+            className="overflow-y-auto  overflow-x-auto custom-scrollbar flex-1 min-h-0"
           >
             <table className="w-full border-collapse">
               <thead className="sticky top-0 bg-gray-50 z-10">
@@ -766,7 +773,7 @@ export default function IncomeStatement() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {data.expenses?.map((item, i) => (
-                  <tr key={i} className="hover:bg-red-50/50 transition-colors">
+                  <tr key={i} className="hover:bg-red-100 hover:border-l-4 hover:border-red-600 hover:shadow-sm transition-colors">
                     <td className="py-3 px-5">
                       <p className="text-[10px] font-bold text-gray-400 uppercase">
                         {item['Account Code']}
@@ -811,32 +818,94 @@ export default function IncomeStatement() {
   )
 }
 
-function StatCard({
-  iconBg,
-  iconColor,
-  icon,
-  label,
-  value,
-  sub,
-  valueClass = 'text-black',
-}) {
+function SummaryTile({ label, value, subText, color, icon: Icon }) {
+  const theme = {
+    emerald: {
+      text: 'text-emerald-600 dark:text-emerald-400',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      bar: 'bg-emerald-500',
+      bg: 'bg-emerald-500',
+      textOnActive: 'text-white'
+    },
+    amber: {
+      text: 'text-amber-600 dark:text-amber-400',
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
+      bar: 'bg-amber-500',
+      bg: 'bg-amber-500',
+      textOnActive: 'text-white'
+    },
+    orange: {
+      text: 'text-orange-600 dark:text-orange-400',
+      badgeBg: 'bg-orange-50 text-orange-700 border-orange-200',
+      bar: 'bg-orange-500',
+      bg: 'bg-orange-500',
+      textOnActive: 'text-white'
+    },
+    rose: {
+      text: 'text-rose-600 dark:text-rose-400',
+      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
+      bar: 'bg-rose-500',
+      bg: 'bg-rose-500',
+      textOnActive: 'text-white'
+    },
+    blue: {
+      text: 'text-blue-600 dark:text-blue-400',
+      badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
+      bar: 'bg-blue-500',
+      bg: 'bg-blue-500',
+      textOnActive: 'text-white'
+    },
+    dark: {
+      text: 'text-emerald-400',
+      badgeBg: 'bg-emerald-950 text-emerald-300 border-emerald-800/50',
+      bar: 'bg-emerald-400',
+      bg: 'bg-emerald-400',
+      textOnActive: 'text-white'
+    },
+  }[color] || {
+    text: 'text-gray-700',
+    badgeBg: 'bg-gray-50 text-gray-700 border-gray-200',
+    bar: 'bg-gray-400',
+    bg: 'bg-gray-400',
+    textOnActive: 'text-white'
+  }
+
+  const bgClass = color === 'dark'
+    ? 'bg-slate-900 text-white border-slate-800'
+    : 'bg-white text-gray-900 border-gray-200/80 shadow-xs'
+
+  const activeBgClass = bgClass
+
+  const isClickable = false
+
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-      <div
-        className={`w-10 h-10 ${iconBg} ${iconColor} rounded-xl flex items-center justify-center shrink-0`}
-      >
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-          {label}
-        </p>
-        <h4
-          className={`font-black ${valueClass} leading-none truncate text-xl tracking-tight`}
-        >
-          {value}
-        </h4>
-        <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">{sub}</p>
+    <div
+      className={`${activeBgClass} p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between h-full hover:scale-105 hover:shadow-lg group transition-all duration-300`}
+    >
+      {/* Bottom Accent Indicator - Animates on hover (behind content) */}
+      <div className={`absolute bottom-0 left-0 right-0 h-1 ${theme.bar} group-hover:h-full transition-all duration-300 z-0`} />
+
+      {/* Content wrapper with higher z-index */}
+      <div className="relative z-10 flex flex-col justify-between h-full">
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${theme.badgeBg} group-hover:bg-white group-hover:text-gray-900 group-hover:border-white`}>
+            {label}
+          </span>
+          <span className={`text-xs font-medium text-gray-400 group-hover:text-white/80`}>
+            {subText}
+          </span>
+        </div>
+
+        {/* Value Row with Icon */}
+        <div className="flex items-center gap-2 my-1">
+          {Icon && (
+            <Icon size={20} className={`${color === 'dark' ? theme.text : 'text-gray-600'} group-hover:text-white transition-colors`} />
+          )}
+          <span className={`text-2xl font-bold font-mono tracking-tight ${color === 'dark' ? theme.text : 'text-black'} group-hover:text-white`}>
+            {value}
+          </span>
+        </div>
       </div>
     </div>
   )

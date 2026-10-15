@@ -243,10 +243,22 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* The sidebar builds links as `/${name.replace(/_/g, '-')}`, so the
-              canonical `withholding_tax` code resolves to /withholding-tax. The
-              historical `witholding_tax` path is kept alongside it so an old
-              bookmark or a stored redirect still lands somewhere real. */}
+          {/* Three spellings reach this page, from three different linkers.
+              The masters section of the sidebar links with the raw module code,
+              so `withholding_tax` resolves to /withholding_tax. Search links
+              with the dashed form, and an old bookmark may carry the historical
+              misspelling. /withholding_tax was the one that was missing, so the
+              sidebar item matched no route at all and React Router fell through
+              to "No routes matched location" - while the same page opened fine
+              from search, which uses a different spelling. */}
+          <Route
+            path="withholding_tax"
+            element={
+              <ProtectedRoute routeName="withholding_tax">
+                <WithholdingTax />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="withholding-tax"
             element={

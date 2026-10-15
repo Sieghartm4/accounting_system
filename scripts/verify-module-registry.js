@@ -183,5 +183,44 @@ if (tenantDb) {
   })
 }
 
+/* ---- the client's module label copy cannot drift ---- */
+{
+  // client/src/constants/modules.js duplicates REQUIRED_MODULES because the
+  // client cannot require() the subscription app at runtime. Duplication is only
+  // safe while something checks it: an unchecked copy silently diverges, and a
+  // plan card then mislabels its own modules.
+  const clientSrc = fs.readFileSync(
+    path.join(ROOT, 'client/src/constants/modules.js'),
+    'utf8',
+  )
+
+  // Parsed rather than imported: the file is ESM for the client's bundler and
+  // this script is CommonJS.
+  const listMatch = clientSrc.match(/REQUIRED_MODULES\s*=\s*\[([\s\S]*?)\]/)
+  const clientRequired = listMatch
+    ? [...listMatch[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
+    : []
+
+  ok(
+    'the client REQUIRED_MODULES copy matches the server catalog exactly',
+    clientRequired.length === catalog.REQUIRED_MODULES.length &&
+      catalog.REQUIRED_MODULES.every((c) => clientRequired.includes(c)),
+    { client: clientRequired.length, server: catalog.REQUIRED_MODULES.length },
+  )
+
+  const labelBlock = clientSrc.match(/LABELS\s*=\s*\{([\s\S]*?)\n\}/)
+  const labelled = labelBlock
+    ? [...labelBlock[1].matchAll(/^\s*([a-z_]+):/gm)].map((m) => m[1])
+    : []
+
+  const unlabelled = catalog.ALL_MODULES.filter((c) => !labelled.includes(c))
+  ok(
+    'every catalog module has a client label',
+    unlabelled.length === 0,
+    unlabelled,
+  )
+  ok('the client exposes moduleLabel', /export const moduleLabel/.test(clientSrc))
+}
+
 console.log(`\n${fail === 0 ? 'all module registry checks passed' : `${fail} check(s) failed`}`)
 process.exit(fail === 0 ? 0 : 1)

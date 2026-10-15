@@ -4,6 +4,7 @@ const { FORMS_BY_CODE, FORMS, getForm: getCatalogForm } = require('../catalog')
 const { collectTaxFacts } = require('../ledger.service')
 const { resolvePeriod, filingDeadline, monthsInPeriod, lastDayOfMonth } = require('../period.service')
 const vat = require('./vat')
+const percentageTax = require('./percentageTax')
 const withholding = require('./withholding')
 const income = require('./income')
 const certificate = require('./certificate')
@@ -26,6 +27,7 @@ const certificate = require('./certificate')
 const COMPUTATIONS = {
   VAT_2550M: vat.compute2550M,
   VAT_2550Q: vat.compute2550Q,
+  PCT_2551Q: percentageTax.compute2551Q,
   EWT_0619E: withholding.compute0619E,
   EWT_1601E: withholding.compute1601E,
   EWT_1601C: withholding.compute1601C,

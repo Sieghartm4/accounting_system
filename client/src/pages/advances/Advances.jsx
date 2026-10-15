@@ -7,12 +7,16 @@ import {
   RefreshCcw,
   Hash,
   Calendar,
-  FileText,
+  CheckCircle,
+  XCircle,
+  Wallet,
+  ClipboardList,
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
 import useAdvances from './useAdvances'
 import LoadingScreen from '../../components/LoadingScreen'
+import DynamicToast from '../../components/DynamicToast'
 
 const fmt = (value) =>
   new Intl.NumberFormat('en-PH', {
@@ -35,9 +39,13 @@ function AdvancesContent() {
   const [filterEndDate, setFilterEndDate] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [expandedGroup, setExpandedGroup] = useState(null) // Track which date/type group is expanded
+  const [expandedGroups, setExpandedGroups] = useState([]) // Group keys open in the detail table.
+  // This was a single key, so opening a second group replaced the first and the
+  // detail table only ever showed the last one clicked. It holds every open key
+  // so several groups stack in the table below.
   const [selectedAdvances, setSelectedAdvances] = useState([]) // Store selected advances for adjustment
   const [selectedGroups, setSelectedGroups] = useState([]) // Store selected groups for bulk adjustment
+  const [toast, setToast] = useState(null)
   const navigate = useNavigate()
   const {
     advances,
@@ -131,6 +139,17 @@ function AdvancesContent() {
     })
   }, [advances])
 
+  // Every advance belonging to every open group, in the order the groups are
+  // listed. Selecting two groups shows both sets of rows rather than the second
+  // replacing the first.
+  const expandedAdvances = useMemo(
+    () =>
+      groupedAdvances
+        .filter((group) => expandedGroups.includes(group.groupKey))
+        .flatMap((group) => group.advances),
+    [groupedAdvances, expandedGroups],
+  )
+
   const tableData = advances.map((entry) => ({
     ...entry,
     amount_raw: entry.amount,
@@ -200,139 +219,117 @@ function AdvancesContent() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-4 bg-[#F3F4F6] min-h-full custom-scrollbar">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-black rounded-xl shrink-0">
-            <ArrowRight size={22} className="text-red-500" />
-          </div>
+    <div className="h-full flex flex-col bg-transparent overflow-hidden">
+      {toast && (
+        <DynamicToast
+          type={toast.type}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
+      <div className="flex-shrink-0">
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } }}
+          className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-4"
+        >
           <div>
-            <h1 className="text-3xl font-black text-black tracking-tighter leading-none">
-              Advances <span className="text-red-600 italic">Journal Entries</span>
-            </h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[2px] mt-1">
-              Entries lacking linked source records
-            </p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
+                <ArrowRight size={24} />
+              </div>
+              <h1 className="text-4xl font-black text-black tracking-tighter">
+                Advances <span className="text-red-600 italic">Journal Entries</span>
+              </h1>
+            </div>
           </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2">
-            <label className="text-[10px] font-black uppercase tracking-[2px] text-gray-400">
-              From
-            </label>
-            <input
-              type="date"
-              value={filterStartDate}
-              onChange={(e) => setFilterStartDate(e.target.value)}
-              className="h-10 w-36 rounded-lg border border-gray-200 bg-white px-2 text-xs font-bold text-black outline-none focus:ring-2 focus:ring-red-500"
-            />
+
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
+            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2">
+              <label className="text-[10px] font-black uppercase tracking-[2px] text-gray-400">
+                From
+              </label>
+              <input
+                type="date"
+                value={filterStartDate}
+                onChange={(e) => setFilterStartDate(e.target.value)}
+                className="h-10 w-36 rounded-lg border border-gray-200 bg-white px-2 text-xs font-bold text-black outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2">
+              <label className="text-[10px] font-black uppercase tracking-[2px] text-gray-400">
+                To
+              </label>
+              <input
+                type="date"
+                value={filterEndDate}
+                onChange={(e) => setFilterEndDate(e.target.value)}
+                className="h-10 w-36 rounded-lg border border-gray-200 bg-white px-2 text-xs font-bold text-black outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <button
+              onClick={() => {
+                setStartDate(filterStartDate)
+                setEndDate(filterEndDate)
+              }}
+              className="h-10 px-4 bg-red-600 text-white font-black rounded-xl hover:bg-red-700 tracking-widest"
+            >
+              Submit
+            </button>
+            <button
+              onClick={() => {
+                setFilterStartDate('')
+                setFilterEndDate('')
+                setStartDate('')
+                setEndDate('')
+              }}
+              className="h-10 px-4 bg-white border border-gray-200 text-[11px] font-black text-black rounded-xl hover:bg-gray-50 uppercase tracking-widest"
+            >
+              Clear
+            </button>
+            <button
+              onClick={refreshAdvances}
+              className="w-10 h-10 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center justify-center transition-colors"
+            >
+              <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
+            </button>
           </div>
-          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2">
-            <label className="text-[10px] font-black uppercase tracking-[2px] text-gray-400">
-              To
-            </label>
-            <input
-              type="date"
-              value={filterEndDate}
-              onChange={(e) => setFilterEndDate(e.target.value)}
-              className="h-10 w-36 rounded-lg border border-gray-200 bg-white px-2 text-xs font-bold text-black outline-none focus:ring-2 focus:ring-red-500"
-            />
-          </div>
-          <button
-            onClick={() => {
-              setStartDate(filterStartDate)
-              setEndDate(filterEndDate)
-            }}
-            className="h-10 px-4 bg-red-600 text-white font-black rounded-xl hover:bg-red-700 tracking-widest"
-          >
-            Submit
-          </button>
-          <button
-            onClick={() => {
-              setFilterStartDate('')
-              setFilterEndDate('')
-              setStartDate('')
-              setEndDate('')
-            }}
-            className="h-10 px-4 bg-white border border-gray-200 text-[11px] font-black text-black rounded-xl hover:bg-gray-50 uppercase tracking-widest"
-          >
-            Clear
-          </button>
-          <button
-            onClick={refreshAdvances}
-            className="w-10 h-10 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center justify-center transition-colors"
-          >
-            <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
-        </div>
+        </motion.div>
+
+{/* ── SUMMARY TILES ──────────────────────────────────────────────────── */}
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <SummaryTile
+    label="Total Advances"
+    value={advances?.length || 0}
+    subText="Transactions"
+    color="emerald"
+    icon={ClipboardList}
+  />
+  <SummaryTile
+    label="Total Debit"
+    value={`₱ ${fmt(totalDebit)}`}
+    subText="Entries"
+    color="rose"
+    icon={XCircle}
+  />
+  <SummaryTile
+    label="Total Credit"
+    value={`₱ ${fmt(totalCredit)}`}
+    subText="Entries"
+    color="blue"
+    icon={CheckCircle}
+  />
+  <SummaryTile
+    label="Latest Fetch"
+    value={formatDate(new Date().toISOString())}
+    subText="Refreshed"
+    color="amber"
+    icon={Calendar}
+  />
+</div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-red-50 text-red-600 rounded-xl flex items-center justify-center shrink-0">
-            <FileText size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Total Advances
-            </p>
-            <h4 className="font-black text-black leading-none truncate text-xl">
-              {advances.length}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
-              Unlinked Transactions
-            </p>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-gray-100 text-black rounded-xl flex items-center justify-center shrink-0">
-            <Hash size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Total Debit
-            </p>
-            <h4 className="font-black text-black leading-none truncate text-xl">
-              ₱{fmt(totalDebit)}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
-              Debit
-            </p>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-red-50 text-red-600 rounded-xl flex items-center justify-center shrink-0">
-            <Hash size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Total Credit
-            </p>
-            <h4 className="font-black text-red-600 leading-none truncate text-xl">
-              ₱{fmt(totalCredit)}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
-              Credit
-            </p>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center shrink-0">
-            <Calendar size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Latest Fetch
-            </p>
-            <h4 className="font-black text-black leading-none truncate text-xl">
-              {formatDate(new Date().toISOString())}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
-              Refreshed
-            </p>
-          </div>
-        </div>
-      </div>
       {/* --- TABLE SECTION --- */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -356,8 +353,12 @@ function AdvancesContent() {
             isLoading={loading}
             returnColumn="groupKey"
             onRowClick={(groupKey, row) => {
-              const key = `${row.date}-${row.type}`
-              setExpandedGroup(expandedGroup === key ? null : key)
+              const key = row?.groupKey ?? groupKey
+              setExpandedGroups((current) =>
+                current.includes(key)
+                  ? current.filter((k) => k !== key)
+                  : [...current, key],
+              )
             }}
             checkboxColumn="groupKey"
             onCheckboxChange={(selectedIds) => {
@@ -394,7 +395,7 @@ function AdvancesContent() {
               },
             ]}
             hiddenColumns={new Set(['advances', 'groupKey'])}
-            highlightRow={{ column: 'groupKey', value: expandedGroup }}
+            highlightRow={{ column: 'groupKey', value: expandedGroups }}
           />
         </motion.div>
 
@@ -405,7 +406,7 @@ function AdvancesContent() {
           className="col-span-1 md:col-span-8 flex flex-col min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
         >
           <DynamicTable
-            data={expandedGroup ? groupedAdvances.find(g => `${g.date}-${g.type}` === expandedGroup)?.advances || [] : []}
+            data={expandedAdvances}
             title=""
             enableAddButton={false}
             enableCheckbox={true}
@@ -413,9 +414,12 @@ function AdvancesContent() {
             isLoading={loading}
             checkboxColumn="id"
             onCheckboxChange={(selectedIds) => {
-              const group = groupedAdvances.find(g => `${g.date}-${g.type}` === expandedGroup)
-              if (!group) return
-              const selectedRows = group.advances.filter(row => selectedIds.includes(row.id))
+              // Scoped to the rows actually on screen, so a tick only ever
+              // selects from the open groups - picking one group cannot pick an
+              // advance belonging to another.
+              const selectedRows = expandedAdvances.filter((row) =>
+                selectedIds.includes(row.id),
+              )
               setSelectedAdvances(selectedRows)
             }}
             checkboxActions={[
@@ -453,5 +457,101 @@ export default function Advances() {
     <RouteProtection routeName={['adjustments', 'advances']}>
       <AdvancesContent />
     </RouteProtection>
+  )
+}
+
+function SummaryTile({ label, value, subText, color, onClick, isActive, icon: Icon }) {
+  const theme = {
+    emerald: {
+      text: 'text-emerald-600 dark:text-emerald-400',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      bar: 'bg-emerald-500',
+      bg: 'bg-emerald-500',
+      textOnActive: 'text-white'
+    },
+    amber: {
+      text: 'text-amber-600 dark:text-amber-400',
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
+      bar: 'bg-amber-500',
+      bg: 'bg-amber-500',
+      textOnActive: 'text-white'
+    },
+    orange: {
+      text: 'text-orange-600 dark:text-orange-400',
+      badgeBg: 'bg-orange-50 text-orange-700 border-orange-200',
+      bar: 'bg-orange-500',
+      bg: 'bg-orange-500',
+      textOnActive: 'text-white'
+    },
+    rose: {
+      text: 'text-rose-600 dark:text-rose-400',
+      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
+      bar: 'bg-rose-500',
+      bg: 'bg-rose-500',
+      textOnActive: 'text-white'
+    },
+    blue: {
+      text: 'text-blue-600 dark:text-blue-400',
+      badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
+      bar: 'bg-blue-500',
+      bg: 'bg-blue-500',
+      textOnActive: 'text-white'
+    },
+    dark: {
+      text: 'text-emerald-400',
+      badgeBg: 'bg-emerald-950 text-emerald-300 border-emerald-800/50',
+      bar: 'bg-emerald-400',
+      bg: 'bg-emerald-400',
+      textOnActive: 'text-white'
+    },
+  }[color] || {
+    text: 'text-gray-700',
+    badgeBg: 'bg-gray-50 text-gray-700 border-gray-200',
+    bar: 'bg-gray-400',
+    bg: 'bg-gray-400',
+    textOnActive: 'text-white'
+  }
+
+  const bgClass = color === 'dark'
+    ? 'bg-slate-900 text-white border-slate-800'
+    : 'bg-white text-gray-900 border-gray-200/80 shadow-xs'
+
+  const activeBgClass = isActive
+    ? `${theme.bg} text-white border-transparent`
+    : bgClass
+
+  const isClickable = onClick !== undefined
+
+  return (
+    <div
+      onClick={isClickable ? onClick : undefined}
+      className={`${activeBgClass} p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between h-full cursor-pointer hover:scale-105 hover:shadow-lg group transition-all duration-300`}
+    >
+      {/* Bottom Accent Indicator - Animates on hover (behind content) */}
+      <div className={`absolute bottom-0 left-0 right-0 h-1 ${theme.bar} group-hover:h-full transition-all duration-300 z-0`} />
+
+      {/* Content wrapper with higher z-index */}
+      <div className="relative z-10 flex flex-col justify-between h-full">
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${isActive ? 'bg-white text-gray-900 border-white' : theme.badgeBg} group-hover:bg-white group-hover:text-gray-900 group-hover:border-white`}>
+            {label}
+          </span>
+          <span className={`text-xs font-medium ${isActive ? 'text-white/80' : 'text-gray-400'} group-hover:text-white/80`}>
+            {subText}
+          </span>
+        </div>
+
+        {/* Value Row with Icon */}
+        <div className="flex items-center gap-2 my-1">
+          {Icon && (
+            <Icon size={20} className={`${isActive ? 'text-white' : (color === 'dark' ? theme.text : 'text-gray-600')} group-hover:text-white transition-colors`} />
+          )}
+          <span className={`text-2xl font-bold font-mono tracking-tight ${isActive ? 'text-white' : (color === 'dark' ? theme.text : 'text-black')} group-hover:text-white`}>
+            {value}
+          </span>
+        </div>
+      </div>
+    </div>
   )
 }

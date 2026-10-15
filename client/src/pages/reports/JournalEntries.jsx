@@ -7,15 +7,111 @@ import {
   User,
   Calendar,
   Hash,
+  Wallet,
+  CheckCircle,
 } from 'lucide-react'
 import LoadingScreen from '../../components/LoadingScreen'
+import { currentReportPeriod } from '../../utils/reportPeriod'
+
+function SummaryTile({ label, value, subText, color, icon: Icon }) {
+  const theme = {
+    emerald: {
+      text: 'text-emerald-600 dark:text-emerald-400',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      bar: 'bg-emerald-500',
+      bg: 'bg-emerald-500',
+      textOnActive: 'text-white'
+    },
+    amber: {
+      text: 'text-amber-600 dark:text-amber-400',
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
+      bar: 'bg-amber-500',
+      bg: 'bg-amber-500',
+      textOnActive: 'text-white'
+    },
+    orange: {
+      text: 'text-orange-600 dark:text-orange-400',
+      badgeBg: 'bg-orange-50 text-orange-700 border-orange-200',
+      bar: 'bg-orange-500',
+      bg: 'bg-orange-500',
+      textOnActive: 'text-white'
+    },
+    rose: {
+      text: 'text-rose-600 dark:text-rose-400',
+      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
+      bar: 'bg-rose-500',
+      bg: 'bg-rose-500',
+      textOnActive: 'text-white'
+    },
+    blue: {
+      text: 'text-blue-600 dark:text-blue-400',
+      badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
+      bar: 'bg-blue-500',
+      bg: 'bg-blue-500',
+      textOnActive: 'text-white'
+    },
+    dark: {
+      text: 'text-emerald-400',
+      badgeBg: 'bg-emerald-950 text-emerald-300 border-emerald-800/50',
+      bar: 'bg-emerald-400',
+      bg: 'bg-emerald-400',
+      textOnActive: 'text-white'
+    },
+  }[color] || {
+    text: 'text-gray-700',
+    badgeBg: 'bg-gray-50 text-gray-700 border-gray-200',
+    bar: 'bg-gray-400',
+    bg: 'bg-gray-400',
+    textOnActive: 'text-white'
+  }
+
+  const bgClass = color === 'dark'
+    ? 'bg-slate-900 text-white border-slate-800'
+    : 'bg-white text-gray-900 border-gray-200/80 shadow-xs'
+
+  const activeBgClass = bgClass
+
+  const isClickable = false
+
+  return (
+    <div
+      className={`${activeBgClass} p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between h-full hover:scale-105 hover:shadow-lg group transition-all duration-300`}
+    >
+      {/* Bottom Accent Indicator - Animates on hover (behind content) */}
+      <div className={`absolute bottom-0 left-0 right-0 h-1 ${theme.bar} group-hover:h-full transition-all duration-300 z-0`} />
+
+      {/* Content wrapper with higher z-index */}
+      <div className="relative z-10 flex flex-col justify-between h-full">
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${theme.badgeBg} group-hover:bg-white group-hover:text-gray-900 group-hover:border-white`}>
+            {label}
+          </span>
+          <span className={`text-xs font-medium text-gray-400 group-hover:text-white/80`}>
+            {subText}
+          </span>
+        </div>
+
+        {/* Value Row with Icon */}
+        <div className="flex items-center gap-2 my-1">
+          {Icon && (
+            <Icon size={20} className={`${color === 'dark' ? theme.text : 'text-gray-600'} group-hover:text-white transition-colors`} />
+          )}
+          <span className={`text-2xl font-bold font-mono tracking-tight ${color === 'dark' ? theme.text : 'text-black'} group-hover:text-white`}>
+            {value}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function JournalEntries() {
   const [journalEntries, setJournalEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startDate, setStartDate] = useState(() => currentReportPeriod().start)
+  const [endDate, setEndDate] = useState(() => currentReportPeriod().end)
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
@@ -118,7 +214,7 @@ export default function JournalEntries() {
   )
 
   return (
-    <div className="flex flex-col gap-2 bg-[#F3F4F6] min-h-full custom-scrollbar">
+    <div className="flex flex-col gap-2 bg-[#F3F4F6] h-full custom-scrollbar">
       {/* HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
@@ -134,151 +230,85 @@ export default function JournalEntries() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-[11px] font-black text-black rounded-xl hover:bg-gray-50 uppercase tracking-widest">
-            <Download size={13} /> Export PDF
-          </button>
-          <button
-            onClick={fetchJournalEntries}
-            className="w-10 h-10 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center justify-center transition-colors"
-          >
-            <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
+        <div className="flex gap-2 items-center relative">
+          <div className="flex flex-col md:flex-row md:items-center gap-2 w-full md:w-auto rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-2 py-1.5 shadow-sm">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[2px]">From</span>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full md:w-auto bg-transparent px-1 py-1 md:py-0.5 text-[11px] font-bold text-slate-800 outline-none" />
+            <span className="hidden md:inline text-slate-300 text-[11px] leading-none">→</span>
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[2px]">To</span>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full md:w-auto bg-transparent px-1 py-1 md:py-0.5 text-[11px] font-bold text-slate-800 outline-none" />
+            <span className="hidden md:block mx-1 h-5 w-px bg-slate-200" />
+            <button
+              onClick={() => {
+              setStartDate('')
+              setEndDate('')
+              setSearchTerm('')
+            }}
+              className="w-full md:w-auto px-2.5 py-2 md:py-1 rounded-lg border border-slate-300 bg-white text-[9px] font-black text-slate-700 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-colors cursor-pointer"
+            >
+              Reset
+            </button>
+            <button
+              onClick={() => {
+              const t = new Date().toISOString().split('T')[0]
+              setStartDate(t)
+              setEndDate(t)
+            }}
+              className="w-full md:w-auto px-2.5 py-2 md:py-1 rounded-lg bg-slate-900 text-[9px] font-black text-white uppercase tracking-widest hover:bg-red-600 transition-colors cursor-pointer"
+            >
+              Today
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-[11px] font-black text-black rounded-xl hover:bg-gray-50 uppercase tracking-widest">
+              <Download size={13} /> Export PDF
+            </button>
+            <button
+              onClick={fetchJournalEntries}
+              className="w-10 h-10 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center justify-center transition-colors"
+            >
+              <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* STAT CARDS */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-red-50 text-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
-            <FileText size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Total Entries
-            </p>
-            <h4 className="font-black text-black leading-none truncate text-xl">
-              {filteredEntries.length}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
-              Journal Entries
-            </p>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-gray-100 text-black rounded-xl flex items-center justify-center flex-shrink-0">
-            <Hash size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Total Debit
-            </p>
-            <h4 className="font-black text-black leading-none truncate text-xl">
-              ₱{fmt(totalDebit)}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">PHP</p>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-red-50 text-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Hash size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Total Credit
-            </p>
-            <h4 className="font-black text-red-600 leading-none truncate text-xl">
-              ₱{fmt(totalCredit)}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">PHP</p>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Calendar size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Balance
-            </p>
-            <h4 className="font-black text-green-600 leading-none truncate text-xl">
-              ₱{fmt(Math.abs(totalDebit - totalCredit))}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
-              {totalDebit > totalCredit ? 'DR' : 'CR'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* TOOLBAR */}
-      <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap shadow-sm">
-        {/* Search */}
-        <div className="flex-1 min-w-[200px] flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 h-8 focus-within:border-red-500 focus-within:bg-white transition-all">
-          <Search size={14} className="text-gray-300 flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search journal entries..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none text-[12px] font-bold text-black placeholder:text-gray-300 placeholder:font-semibold"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="text-gray-300 hover:text-red-500 text-lg leading-none transition-colors"
-            >
-              ×
-            </button>
-          )}
-        </div>
-        <div className="hidden md:block w-px h-7 bg-gray-100" />
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-            From
-          </span>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
-          />
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-            To
-          </span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
-          />
-        </div>
-        <button
-          onClick={() => {
-            setStartDate('')
-            setEndDate('')
-            setSearchTerm('')
-          }}
-          className="px-4 py-2 border border-gray-900 rounded-xl text-[10px] font-black text-gray-900 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-all bg-white cursor-pointer"
-        >
-          Reset
-        </button>
-        <button
-          onClick={() => {
-            const t = new Date().toISOString().split('T')[0]
-            setStartDate(t)
-            setEndDate(t)
-          }}
-          className="px-4 py-2 bg-black rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-red-600 transition-all cursor-pointer"
-        >
-          Today
-        </button>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <SummaryTile
+          label="Total Entries"
+          value={filteredEntries.length}
+          subText="Journal Entries"
+          color="emerald"
+          icon={FileText}
+        />
+        <SummaryTile
+          label="Total Debit"
+          value={`₱${fmt(totalDebit)}`}
+          subText="PHP"
+          color="blue"
+          icon={Wallet}
+        />
+        <SummaryTile
+          label="Total Credit"
+          value={`₱${fmt(totalCredit)}`}
+          subText="PHP"
+          color="orange"
+          icon={Wallet}
+        />
+        <SummaryTile
+          label="Balance"
+          value={`₱${fmt(Math.abs(totalDebit - totalCredit))}`}
+          subText={totalDebit > totalCredit ? 'DR' : 'CR'}
+          color="emerald"
+          icon={CheckCircle}
+        />
       </div>
 
       {/* TABLE CARD */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col custom-scrollbar">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col flex-1 overflow-hidden min-h-0 custom-scrollbar">
         {/* Table header bar */}
-        <div className="flex items-center gap-2 px-5 py-3 bg-black flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-2 px-4 sm:px-5 py-3 bg-black flex-shrink-0">
           <FileText size={14} className="text-gray-500" />
           <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
             Journal Entries
@@ -286,12 +316,32 @@ export default function JournalEntries() {
           <span className="text-[10px] font-bold text-gray-600 ml-1">
             {filteredEntries.length} records
           </span>
+            {/* Search lives on the table header, not in a separate card above it:
+                the control that filters the table belongs on the table. Colours
+                are for the black bar - grey-on-grey was unreadable against it. */}
+            <div className="ml-auto w-full sm:w-auto flex items-center gap-2 bg-white rounded-lg px-2.5 h-9 sm:h-7 shadow-sm">
+              <Search size={13} className="text-gray-400 flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="flex-1 sm:flex-none w-full sm:w-44 bg-transparent border-none outline-none text-[11px] font-bold text-gray-900 placeholder:text-gray-400 placeholder:font-semibold"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="text-gray-400 hover:text-gray-900 text-sm leading-none transition-colors"
+                >
+                  ×
+                </button>
+              )}
+            </div>
         </div>
 
         {/* Scrollable body */}
         <div
-          className="overflow-y-auto overflow-x-auto custom-scrollbar"
-          style={{ maxHeight: '550px' }}
+          className="overflow-y-auto overflow-x-auto custom-scrollbar flex-1 min-h-0"
         >
           <table
             className="w-full border-collapse"
@@ -345,7 +395,7 @@ export default function JournalEntries() {
                 filteredEntries.map((entry, index) => (
                   <tr
                     key={entry.id || index}
-                    className="hover:bg-red-50 transition-colors"
+                    className="hover:bg-red-100 hover:border-l-4 hover:border-red-600 hover:shadow-sm transition-colors"
                   >
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">

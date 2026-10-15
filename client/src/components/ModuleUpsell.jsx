@@ -127,7 +127,43 @@ const ModuleUpsell = ({
 
   const goToPlans = () => {
     if (typeof onUpgrade === 'function') return onUpgrade()
-    // The plan picker is where the existing subscribe flow already lives.
+
+    // The plan step only opens at step 2 when it can identify whose account is
+    // being subscribed, and it reads that from sessionStorage rather than from
+    // the session. Without this the redirect landed on the step-1 account form,
+    // asking someone who is already signed in to register again.
+    //
+    // The whole record is carried across, not just the username: the plan step
+    // uses tenantDb to show whose company the plan is for, and passes the
+    // username to the subscribe call that decides which company's entitlement
+    // row is updated. Written only when no pendingUser exists, so a user
+    // arriving from a blocked login keeps the value set there.
+    try {
+      if (!sessionStorage.getItem('pendingUser')) {
+        const authUser = JSON.parse(sessionStorage.getItem('auth_user') || 'null')
+        if (authUser?.username) {
+          sessionStorage.setItem(
+            'pendingUser',
+            JSON.stringify({
+              username: authUser.username,
+              // Carried for display and for the subscribe call. No password is
+              // included, and none is needed: the account already exists.
+              tenantDb: authUser.tenantDb || null,
+              email: authUser.email || null,
+              fullname: authUser.fullname || null,
+              role: authUser.role || null,
+              // Distinguishes "upgrade an existing account" from "finish
+              // registering", which the plan step words very differently.
+              existingAccount: true,
+            }),
+          )
+        }
+      }
+    } catch {
+      // Storage unavailable: the plan step will ask for the account rather than
+      // silently subscribing the wrong one.
+    }
+
     return navigate('/register?step=plan')
   }
 
@@ -165,17 +201,17 @@ const ModuleUpsell = ({
     <div className={wrapper}>
       <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-[0_24px_70px_-20px_rgba(15,23,42,0.28)] border border-slate-200 overflow-hidden">
         {/* Accent band */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900" />
+        <div className="h-1.5 w-full bg-gradient-to-r from-red-600 via-red-700 to-red-800" />
 
         <div className="p-8 sm:p-10">
           {/* Icon */}
           <div className="flex items-start gap-5">
-            <div className="shrink-0 w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-slate-900/20">
+            <div className="shrink-0 w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-600/20">
               <Lock size={26} />
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[2px] text-amber-600">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[2px] text-red-600">
                 <span>Not in your plan</span>
               </div>
               <h1 className="mt-1.5 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
@@ -190,19 +226,19 @@ const ModuleUpsell = ({
           </div>
 
           {/* Current plan context */}
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <LayoutGrid size={16} className="text-slate-500 shrink-0" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                <LayoutGrid size={16} className="text-red-500 shrink-0" />
+                <span className="text-xs font-bold uppercase tracking-wider text-red-500">
                   Current plan
                 </span>
-                <span className="text-sm font-black text-slate-900 truncate">
+                <span className="text-sm font-black text-red-900 truncate">
                   {planName || 'No active plan'}
                 </span>
               </div>
               {statusNote && (
-                <span className="shrink-0 text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
+                <span className="shrink-0 text-xs font-semibold text-red-700 bg-red-100 px-2.5 py-1 rounded-full">
                   {statusNote}
                 </span>
               )}
@@ -241,7 +277,7 @@ const ModuleUpsell = ({
             <button
               type="button"
               onClick={goToPlans}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-black text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-900/20"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-600/20"
             >
               See plans and upgrade
               <ArrowRight size={16} />

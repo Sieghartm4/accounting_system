@@ -14,6 +14,10 @@ const {
 const { Master } = require('../database/model/Master')
 const { Accounting } = require('../database/model/Accounting')
 const { SQLQueryBuilder } = require('../util/helper.util')
+// Used to narrow /search to the modules the tenant's plan actually includes.
+const {
+  resolveEntitlement,
+} = require('../services/entitlement/entitlement.service')
 const { getTenantPool } = require('../database/util/tenantConnection.util')
 const sql = new SQLQueryBuilder()
 
@@ -1000,9 +1004,49 @@ const getSearch = async (req, res, next) => {
     'adjustments',
   ]
 
+  // The requested scope is a suggestion, never the decision.
+  //
+  // This parameter arrives in the query string, so before it was intersected with
+  // the tenant's plan a user could ask for any module by name - including
+  // withholding_tax, tax_compliance or bank_reconciliation - and read data for a
+  // module their company had not bought. The nav and the route gate both stop
+  // that in the browser; nothing stopped a direct request.
+  const requestedRoutes =
+    allowedRoutes.length > 0 ? allowedRoutes : defaultSearchRoutes
+
+  let entitledModules = null
+  let entitlementError = null
+  try {
+    const tenantDb =
+      req?.session?.tenantDb || req?.context?.dbName || req?.session?.user?.dbName || null
+    if (tenantDb) {
+      const entitlement = await resolveEntitlement(tenantDb)
+      entitledModules = entitlement.subscribed ? entitlement.modules : []
+    }
+  } catch (error) {
+    // Fail closed. If the plan cannot be read, searching nothing is the safe
+    // answer; searching everything is the unsafe one.
+    entitlementError = error
+    entitledModules = []
+  }
+
   const allowedSearchRoutes = new Set(
-    allowedRoutes.length > 0 ? allowedRoutes : defaultSearchRoutes,
+    entitledModules === null
+      ? // No tenant on the request (unit test, internal call). Keep the
+        // requested scope rather than silently returning nothing.
+        requestedRoutes
+      : requestedRoutes.filter((route) => entitledModules.includes(route)),
   )
+
+  if (entitledModules !== null && allowedSearchRoutes.size === 0) {
+    return res.status(402).json({
+      success: false,
+      code: 'NO_SEARCHABLE_MODULES',
+      message:
+        'No modules available to search are included in your plan. Upgrade to search across your transactions.',
+      requiresUpgrade: true,
+    })
+  }
 
   // Treat empty strings as undefined for date filtering
   const effectiveStartDate = startDate && startDate.trim() !== '' ? startDate : null
@@ -1471,11 +1515,11 @@ const getStatementOfComprehensiveIncome = async (req, res, next) => {
                           THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
         END AS Current
       FROM ${Master.charts_of_accounts.tablename}
-      LEFT JOIN ${Accounting.journal_entries.tablename}
-        ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
-           ${dateFilter.replace(' AND ', '')}
-      WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
-        AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
+LEFT JOIN ${Accounting.journal_entries.tablename}
+          ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+             ${dateFilter}
+        WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
+          AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
         ${approvalFilter}
       GROUP BY
         ${Master.charts_of_accounts.selectOptionColumns.id},
@@ -1528,11 +1572,11 @@ const getStatementOfComprehensiveIncome = async (req, res, next) => {
         - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
                   THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS Current
       FROM ${Master.charts_of_accounts.tablename}
-      LEFT JOIN ${Accounting.journal_entries.tablename}
-        ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
-           ${dateFilter.replace(' AND ', '')}
-      WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
-        AND (${Master.charts_of_accounts.selectOptionColumns.name} LIKE '%OCI%'
+LEFT JOIN ${Accounting.journal_entries.tablename}
+          ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+             ${dateFilter}
+        WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
+          AND (${Master.charts_of_accounts.selectOptionColumns.name} LIKE '%OCI%'
              OR ${Master.charts_of_accounts.selectOptionColumns.name} LIKE '%Revaluation%'
              OR ${Master.charts_of_accounts.selectOptionColumns.name} LIKE '%Unrealized%'
              OR ${Master.charts_of_accounts.selectOptionColumns.code} LIKE '35%')

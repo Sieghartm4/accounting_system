@@ -63,6 +63,10 @@ const PERIOD_BASIS = {
 
 const CATEGORY = {
   VAT: 'VAT',
+  // Percentage tax under NIRC Sec. 237, for taxpayers not registered as
+  // VAT-registered. It is a separate filing from VAT, not a flavour of it, so
+  // it gets its own category rather than being filed under VAT.
+  PERCENTAGE_TAX: 'Percentage Tax',
   WITHHOLDING: 'Withholding',
   INCOME_TAX: 'Income Tax',
   CERTIFICATE: 'Certificate',
@@ -275,6 +279,87 @@ const VAT_2550Q = {
     { key: 'vat_payable_this_period', line: 26, section: 'III', label: 'TOTAL AMOUNT PAYABLE', kind: 'computed', source: 'vat.total_payable', gap_key: 'vat.total_payable', columns: ['month_1', 'month_2', 'month_3', 'total'] },
     { key: 'amount_paid', line: 27, section: 'III', label: 'Less: Amount Paid', kind: 'input', source: 'filings.amount_paid', columns: ['month_1', 'month_2', 'month_3', 'total'] },
     { key: 'amount_still_due', line: 28, section: 'III', label: 'Amount Still Due', kind: 'subtotal', formula: { op: 'subtract', args: ['vat_payable_this_period', 'amount_paid'] }, emphasis: true, columns: ['month_1', 'month_2', 'month_3', 'total'] },
+  ],
+}
+
+// ===========================================================================
+// PERCENTAGE TAX
+// ===========================================================================
+
+/**
+ * NIRC Sec. 237 percentage tax, quarterly return 2551-Q.
+ *
+ * ## Statutory basis and what still needs verifying
+ *
+ * Sec. 237 imposes 1% on "gross sales, receipts or revenues" of persons who are
+ * NOT registered as VAT-registered taxpayers - i.e. those covered by RA 10963.
+ * The return is filed quarterly, within 10 days of the close of the quarter
+ * (Sec. 237(D)). 2551-Q replaced the old paper 2551/2551-Q series.
+ *
+ * VERIFICATION REQUIRED BEFORE FILING. The rate, the 10-day deadline, the
+ * 1,500-peso monthly / 20,000-peso quarterly de minimis and the definition of
+ * "gross receipts" are all statutory and all changeable. They are stated here
+ * from the general rule rather than from a BIR publication, so:
+ *
+ *   - confirm the de minimis thresholds before relying on them
+ *   - confirm whether receipts are "exclusive of VAT" for a partially
+ *     registered taxpayer
+ *   - the computation lives in computation/percentageTax.js; the rate there and
+ *     the rate used by this form's formulas must agree
+ *
+ * Applicability deliberately excludes VAT-registered taxpayers: a taxpayer who
+ * files 2550-Q does not also file 2551-Q, and offering both would produce a
+ * double filing of the same gross receipts.
+ */
+const notVatRegistered = {
+  fact: 'vat_registered',
+  equals: false,
+  why: 'the taxpayer is not registered as VAT-registered, so percentage tax applies instead of VAT',
+}
+
+const PCT_2551Q = {
+  form_code: '2551Q',
+  category: CATEGORY.PERCENTAGE_TAX,
+  title: 'Quarterly Percentage Tax Return',
+  short_title: 'Quarterly Percentage Tax Return',
+  form_revision: 'BIR Form 2551-Q (RA 10963, s. 237)',
+  frequency: FREQUENCY.QUARTERLY,
+  period_basis: PERIOD_BASIS.CALENDAR_QUARTER,
+  computation_key: 'PCT_2551Q',
+  is_declaration: true,
+  prerequisite_forms: [],
+  export_profiles: ['efps_dat', 'efps_xml', 'pdf_a4'],
+  // Within 10 days of the close of the quarter.
+  deadline: { day: 10, grace_weekend_to: null, offset_months: 1 },
+  applicability: {
+    // Only the registration test is a rule here.
+    //
+    // A "has receipts" test was removed deliberately: the applicability engine
+    // compares with Number(fact) > Number(rule), and a fact it does not collect
+    // reads as NaN, which fails every comparison. The rule would therefore have
+    // been silently false forever and 2551-Q would never have been offered to
+    // anyone. Whether the quarter actually has receipts is a data question, and
+    // is reported as an error gap by computation/percentageTax.js instead.
+    all: [notVatRegistered],
+  },
+  notes:
+    'VERIFICATION REQUIRED BEFORE FILING. Percentage tax is 1% of gross sales, receipts or revenues for a taxpayer NOT registered as VAT-registered (NIRC Sec. 237). It does not apply alongside 2550-Q - a VAT-registered taxpayer files 2550-Q and owes no percentage tax, and this return raises an error for one. The rate, the de minimis thresholds and the filing deadline are statutory and changeable; confirm all three against current BIR guidance before filing. See the catalog source for the specific items to check.',
+  header_fields: [
+    { key: 'tin', label: 'TIN', width: 22 },
+    { key: 'rdo_code', label: 'RDO Code', width: 10 },
+    { key: 'registered_name', label: 'Registered Name', width: 40 },
+    { key: 'registered_address', label: 'Registered Address', width: 40 },
+  ],
+  line_schema: [
+    { key: 'gross_receipts', line: 1, section: 'I', label: 'Total Gross Sales, Receipts and/or Revenues', kind: 'computed', source: 'pct.gross_receipts', gap_key: 'pct.gross_receipts' },
+    { key: 'exempt_receipts', line: 2, section: 'I', label: 'Less: Receipts Not Subject to Percentage Tax', kind: 'input', source: 'input.exempt_receipts' },
+    { key: 'taxable_receipts', line: 3, section: 'I', label: 'Taxable Gross Receipts', kind: 'subtotal', formula: { op: 'subtract', args: ['gross_receipts', 'exempt_receipts'] }, emphasis: true },
+    { key: 'percentage_rate', line: 4, section: 'II', label: 'Percentage Tax Rate (1%)', kind: 'computed', formula: { op: 'rate', args: [], rate: 0.01 } },
+    { key: 'percentage_tax_due', line: 5, section: 'II', label: 'Percentage Tax Due for the Quarter', kind: 'computed', formula: { op: 'percentOf', args: ['taxable_receipts'], rate: 0.01 }, emphasis: true },
+    { key: 'prior_quarter_credit', line: 6, section: 'II', label: 'Less: Prior Quarter Percentage Tax / Overpayment', kind: 'input', source: 'input.prior_quarter_credit' },
+    { key: 'percentage_tax_balance', line: 7, section: 'II', label: 'PERCENTAGE TAX BALANCE DUE / (Overpayment)', kind: 'computed', source: 'pct.balance_due', emphasis: true },
+    { key: 'amount_paid', line: 8, section: 'II', label: 'Less: Amount Paid', kind: 'input', source: 'filings.amount_paid' },
+    { key: 'amount_still_due', line: 9, section: 'II', label: 'TOTAL AMOUNT STILL DUE', kind: 'computed', source: 'pct.amount_still_due', emphasis: true },
   ],
 }
 
@@ -1035,6 +1120,7 @@ const SCHEDULES = [
 const FORMS = [
   VAT_2550M,
   VAT_2550Q,
+  PCT_2551Q,
   EWT_0619E,
   EWT_1601E,
   EWT_1601C,

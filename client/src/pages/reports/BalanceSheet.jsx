@@ -6,6 +6,8 @@ import {
   RefreshCcw,
   ShieldCheck,
   ShieldAlert,
+  Equal,
+  Plus,
   PieChart,
   Layers,
   Briefcase,
@@ -15,14 +17,15 @@ import * as XLSX from 'xlsx'
 import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 import LoadingScreen from '../../components/LoadingScreen'
+import { currentReportPeriod } from '../../utils/reportPeriod'
 
 export default function BalanceSheet() {
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startDate, setStartDate] = useState(() => currentReportPeriod().start)
+  const [endDate, setEndDate] = useState(() => currentReportPeriod().end)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const { company } = useCompany()
 
@@ -307,83 +310,76 @@ export default function BalanceSheet() {
     setExportMenuOpen(false)
   }
 
-  const handleExportPDF = async () => {
+const handleExportPDF = async () => {
     try {
       const { jsPDF } = await import('jspdf')
       const { default: autoTable } = await import('jspdf-autotable')
 
       const doc = new jsPDF({
-        orientation: 'landscape',
+        orientation: 'portrait', // Corrected to portrait
         unit: 'pt',
         format: 'letter',
       })
       const W = doc.internal.pageSize.getWidth()
+      const H = doc.internal.pageSize.getHeight()
       const M = 36
       let y = renderPDFCompanyHeader(doc, company, W, M)
 
-      const BLK = [17, 24, 39]
-      const BLUE = [3, 105, 161]
-      const ORANGE = [234, 88, 12]
-      const GRN = [5, 150, 105]
-      const GRY = [107, 114, 128]
-      const LGT = [229, 231, 235]
+      const BLK = [17, 24, 39]      // Slate 900
+      const GRY = [100, 116, 139]   // Slate 500
+      const LGT = [226, 232, 240]   // Slate 200
       const WHT = [255, 255, 255]
+      const BG_ALT = [248, 250, 252]// Slate 50
 
-      doc.setFillColor(...BLK)
-      doc.rect(M, y - 14, W - M * 2, 32, 'F')
-      doc
-        .setFont('helvetica', 'bold')
-        .setFontSize(13)
-        .setTextColor(...WHT)
-      doc.text('BALANCE SHEET', M + 8, y + 6)
-      doc.setFontSize(8).setTextColor(...GRY)
-      doc.text('Statement of Financial Position', W - M - 8, y + 6, {
-        align: 'right',
-      })
-      y += 32
+      // Document Title Section
+      doc.setDrawColor(...LGT)
+      doc.setLineWidth(1)
+      doc.line(M, y, W - M, y)
+      y += 14
 
-      doc.setFillColor(...BLK)
-      doc.rect(M, y - 2, W - M * 2, 18, 'F')
-      doc
-        .setFont('helvetica', 'normal')
-        .setFontSize(8)
-        .setTextColor(...GRY)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.setTextColor(...BLK)
+      doc.text('BALANCE SHEET', M, y)
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(...GRY)
+      doc.text('Statement of Financial Position', W - M, y, { align: 'right' })
+
+      y += 12
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(...GRY)
       doc.text(
         `Period: ${formatDate(startDate) || 'All Dates'} — ${formatDate(endDate) || 'All Dates'}`,
-        M + 8,
-        y + 10,
+        M,
+        y,
       )
       doc.text(
         `Generated: ${new Date().toLocaleDateString('en-PH')}`,
-        W - M - 8,
-        y + 10,
+        W - M,
+        y,
         { align: 'right' },
       )
-      y += 22
+      y += 16
 
-      const absAssets = Math.abs(data.totalAssets)
-      const absLiabilities = Math.abs(data.totalLiabilities)
-      const absEquity = Math.abs(data.totalEquity)
+      // Clean currency formatter without encoding glitches
+      const cleanFmt = (val) => {
+        const formatted = fmt(parseFloat(val || 0))
+        return formatted.replace('₱', 'Php ')
+      }
 
+      const absAssets = Math.abs(data.totalAssets || 0)
+      const absLiabilities = Math.abs(data.totalLiabilities || 0)
+      const absEquity = Math.abs(data.totalEquity || 0)
+
+      // ── 1. ASSETS TABLE ──────────────────────────────────────────────────
       const assetBody =
         data.assets?.map((row) => [
-          row['Account Code'],
-          row['Account Name'],
-          fmt(Math.abs(parseFloat(row.Current || 0))),
-        ]) || []
-
-      const liabilityBody =
-        data.liabilities?.map((row) => [
-          row['Account Code'],
-          row['Account Name'],
-          fmt(Math.abs(parseFloat(row.Current || 0))),
-        ]) || []
-
-      const equityBody =
-        data.equity?.map((row) => [
-          row['Account Code'],
-          row['Account Name'],
-          fmt(Math.abs(parseFloat(row.Current || 0))),
+          row['Account Code'] || '',
+          row['Account Name'] || '',
+          cleanFmt(Math.abs(parseFloat(row.Current || 0))),
         ]) || []
 
       autoTable(doc, {
@@ -391,11 +387,13 @@ export default function BalanceSheet() {
         margin: { left: M, right: M },
         tableWidth: W - M * 2,
         head: [
-          [{ content: 'ASSETS', colSpan: 3, styles: { halign: 'left' } }],
+          [
+            { content: 'ASSETS', colSpan: 3, styles: { fillColor: BLK, textColor: WHT, fontStyle: 'bold', fontSize: 9 } }
+          ],
           [
             { content: 'CODE', styles: { halign: 'left' } },
             { content: 'ACCOUNT NAME', styles: { halign: 'left' } },
-            { content: 'BALANCE (₱)', styles: { halign: 'right' } },
+            { content: 'BALANCE (Php)', styles: { halign: 'right' } },
           ],
         ],
         body: assetBody,
@@ -407,57 +405,67 @@ export default function BalanceSheet() {
               styles: { halign: 'left', fontStyle: 'bold' },
             },
             {
-              content: fmt(absAssets),
-              styles: { halign: 'right', fontStyle: 'bold' },
+              content: cleanFmt(absAssets),
+              styles: { halign: 'right', fontStyle: 'bold', textColor: BLK },
             },
           ],
         ],
         theme: 'plain',
         headStyles: {
-          fillColor: BLUE,
+          fillColor: [51, 65, 85], // Slate 700 for subheaders
           textColor: WHT,
           fontStyle: 'bold',
-          fontSize: 9,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: [55, 65, 81],
+          fontSize: 8.5,
+          cellPadding: { top: 6, bottom: 6, left: 8, right: 8 },
+        },
+        alternateRowStyles: { fillColor: BG_ALT },
+        styles: {
+          fontSize: 8.5,
+          font: 'helvetica',
+          cellPadding: { top: 5, bottom: 5, left: 8, right: 8 },
+          textColor: [30, 41, 59],
+          lineColor: LGT,
           lineWidth: 0.5,
+          valign: 'middle',
         },
         footStyles: {
-          fillColor: [55, 65, 81],
-          textColor: WHT,
+          fillColor: [241, 245, 249],
+          textColor: BLK,
           fontStyle: 'bold',
-          fontSize: 10,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: BLUE,
-          lineWidth: { top: 2, bottom: 0, left: 0, right: 0 },
-        },
-        styles: {
           fontSize: 9,
-          cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
-          textColor: [55, 65, 81],
-          lineColor: LGT,
-          lineWidth: 0.3,
-          valign: 'top',
+          cellPadding: { top: 7, bottom: 7, left: 8, right: 8 },
+          lineColor: [203, 213, 225],
+          lineWidth: { top: 1, bottom: 1, left: 0, right: 0 },
         },
         columnStyles: {
-          0: { cellWidth: 45, halign: 'left' },
+          0: { cellWidth: 90, halign: 'left', fontStyle: 'bold' },
           1: { cellWidth: 'auto', halign: 'left' },
-          2: { cellWidth: 50, halign: 'right', fontStyle: 'bold', textColor: BLUE },
+          2: { cellWidth: 110, halign: 'right', fontStyle: 'bold' },
         },
       })
 
-      y = doc.lastAutoTable.finalY + 10
+      y = doc.lastAutoTable.finalY + 14
+
+      // ── 2. LIABILITIES TABLE ─────────────────────────────────────────────
+      const liabilityBody =
+        data.liabilities?.map((row) => [
+          row['Account Code'] || '',
+          row['Account Name'] || '',
+          cleanFmt(Math.abs(parseFloat(row.Current || 0))),
+        ]) || []
 
       autoTable(doc, {
         startY: y,
         margin: { left: M, right: M },
         tableWidth: W - M * 2,
         head: [
-          [{ content: 'LIABILITIES', colSpan: 3, styles: { halign: 'left' } }],
+          [
+            { content: 'LIABILITIES', colSpan: 3, styles: { fillColor: BLK, textColor: WHT, fontStyle: 'bold', fontSize: 9 } }
+          ],
           [
             { content: 'CODE', styles: { halign: 'left' } },
             { content: 'ACCOUNT NAME', styles: { halign: 'left' } },
-            { content: 'BALANCE (₱)', styles: { halign: 'right' } },
+            { content: 'BALANCE (Php)', styles: { halign: 'right' } },
           ],
         ],
         body: liabilityBody,
@@ -469,62 +477,67 @@ export default function BalanceSheet() {
               styles: { halign: 'left', fontStyle: 'bold' },
             },
             {
-              content: fmt(absLiabilities),
-              styles: { halign: 'right', fontStyle: 'bold' },
+              content: cleanFmt(absLiabilities),
+              styles: { halign: 'right', fontStyle: 'bold', textColor: BLK },
             },
           ],
         ],
         theme: 'plain',
         headStyles: {
-          fillColor: ORANGE,
+          fillColor: [51, 65, 85],
           textColor: WHT,
           fontStyle: 'bold',
-          fontSize: 9,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: [55, 65, 81],
+          fontSize: 8.5,
+          cellPadding: { top: 6, bottom: 6, left: 8, right: 8 },
+        },
+        alternateRowStyles: { fillColor: BG_ALT },
+        styles: {
+          fontSize: 8.5,
+          font: 'helvetica',
+          cellPadding: { top: 5, bottom: 5, left: 8, right: 8 },
+          textColor: [30, 41, 59],
+          lineColor: LGT,
           lineWidth: 0.5,
+          valign: 'middle',
         },
         footStyles: {
-          fillColor: [55, 65, 81],
-          textColor: WHT,
+          fillColor: [241, 245, 249],
+          textColor: BLK,
           fontStyle: 'bold',
-          fontSize: 10,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: ORANGE,
-          lineWidth: { top: 2, bottom: 0, left: 0, right: 0 },
-        },
-        styles: {
           fontSize: 9,
-          cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
-          textColor: [55, 65, 81],
-          lineColor: LGT,
-          lineWidth: 0.3,
-          valign: 'top',
+          cellPadding: { top: 7, bottom: 7, left: 8, right: 8 },
+          lineColor: [203, 213, 225],
+          lineWidth: { top: 1, bottom: 1, left: 0, right: 0 },
         },
         columnStyles: {
-          0: { cellWidth: 45, halign: 'left' },
+          0: { cellWidth: 90, halign: 'left', fontStyle: 'bold' },
           1: { cellWidth: 'auto', halign: 'left' },
-          2: {
-            cellWidth: 50,
-            halign: 'right',
-            fontStyle: 'bold',
-            textColor: ORANGE,
-          },
+          2: { cellWidth: 110, halign: 'right', fontStyle: 'bold' },
         },
       })
 
-      y = doc.lastAutoTable.finalY + 10
+      y = doc.lastAutoTable.finalY + 14
+
+      // ── 3. EQUITY TABLE ──────────────────────────────────────────────────
+      const equityBody =
+        data.equity?.map((row) => [
+          row['Account Code'] || '',
+          row['Account Name'] || '',
+          cleanFmt(Math.abs(parseFloat(row.Current || 0))),
+        ]) || []
 
       autoTable(doc, {
         startY: y,
         margin: { left: M, right: M },
         tableWidth: W - M * 2,
         head: [
-          [{ content: 'EQUITY', colSpan: 3, styles: { halign: 'left' } }],
+          [
+            { content: 'EQUITY', colSpan: 3, styles: { fillColor: BLK, textColor: WHT, fontStyle: 'bold', fontSize: 9 } }
+          ],
           [
             { content: 'CODE', styles: { halign: 'left' } },
             { content: 'ACCOUNT NAME', styles: { halign: 'left' } },
-            { content: 'BALANCE (₱)', styles: { halign: 'right' } },
+            { content: 'BALANCE (Php)', styles: { halign: 'right' } },
           ],
         ],
         body: equityBody,
@@ -536,44 +549,55 @@ export default function BalanceSheet() {
               styles: { halign: 'left', fontStyle: 'bold' },
             },
             {
-              content: fmt(absEquity),
-              styles: { halign: 'right', fontStyle: 'bold' },
+              content: cleanFmt(absEquity),
+              styles: { halign: 'right', fontStyle: 'bold', textColor: BLK },
             },
           ],
         ],
         theme: 'plain',
         headStyles: {
-          fillColor: GRN,
+          fillColor: [51, 65, 85],
           textColor: WHT,
           fontStyle: 'bold',
-          fontSize: 9,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: [55, 65, 81],
+          fontSize: 8.5,
+          cellPadding: { top: 6, bottom: 6, left: 8, right: 8 },
+        },
+        alternateRowStyles: { fillColor: BG_ALT },
+        styles: {
+          fontSize: 8.5,
+          font: 'helvetica',
+          cellPadding: { top: 5, bottom: 5, left: 8, right: 8 },
+          textColor: [30, 41, 59],
+          lineColor: LGT,
           lineWidth: 0.5,
+          valign: 'middle',
         },
         footStyles: {
-          fillColor: [55, 65, 81],
-          textColor: WHT,
+          fillColor: [241, 245, 249],
+          textColor: BLK,
           fontStyle: 'bold',
-          fontSize: 10,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: GRN,
-          lineWidth: { top: 2, bottom: 0, left: 0, right: 0 },
-        },
-        styles: {
           fontSize: 9,
-          cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
-          textColor: [55, 65, 81],
-          lineColor: LGT,
-          lineWidth: 0.3,
-          valign: 'top',
+          cellPadding: { top: 7, bottom: 7, left: 8, right: 8 },
+          lineColor: [203, 213, 225],
+          lineWidth: { top: 1, bottom: 1, left: 0, right: 0 },
         },
         columnStyles: {
-          0: { cellWidth: 45, halign: 'left' },
+          0: { cellWidth: 90, halign: 'left', fontStyle: 'bold' },
           1: { cellWidth: 'auto', halign: 'left' },
-          2: { cellWidth: 50, halign: 'right', fontStyle: 'bold', textColor: GRN },
+          2: { cellWidth: 110, halign: 'right', fontStyle: 'bold' },
         },
       })
+
+      // Page Footers (Page X of Y) across all pages
+      const totalPages = doc.internal.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.setTextColor(...GRY)
+        doc.text(`Page ${i} of ${totalPages}`, W - M, H - 20, { align: 'right' })
+        doc.text('Confidential — For Internal Financial Reporting Only', M, H - 20)
+      }
 
       doc.save(`balance-sheet-${new Date().toISOString().split('T')[0]}.pdf`)
       setExportMenuOpen(false)
@@ -624,11 +648,12 @@ export default function BalanceSheet() {
     total,
     totalLabel,
     netIncome,
-    onAccountNameClick,
-    onBalanceClick,
-    onNetIncomeClick,
-  }) => (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full custom-scrollbar">
+      onAccountNameClick,
+      onBalanceClick,
+      onNetIncomeClick,
+      className = '',
+    }) => (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full min-h-0 overflow-x-auto custom-scrollbar ${className}">
       <div className="flex items-center gap-2 px-5 py-3 bg-black">
         <Icon size={14} className={color} />
         <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
@@ -637,8 +662,7 @@ export default function BalanceSheet() {
       </div>
 
       <div
-        className="overflow-y-auto custom-scrollbar"
-        style={{ maxHeight: '480px' }}
+        className="overflow-y-auto overflow-x-auto custom-scrollbar flex-1 min-h-0"
       >
         <table className="w-full border-collapse">
           <thead className="sticky top-0 bg-gray-50 z-10">
@@ -656,7 +680,7 @@ export default function BalanceSheet() {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {items?.map((item, i) => (
-              <tr key={i} className="hover:bg-gray-50/80 transition-colors">
+              <tr key={i} className="hover:bg-red-100 hover:border-l-4 hover:border-red-600 hover:shadow-sm transition-colors">
                 <td className="py-3 px-5">
                   <p className="text-[10px] font-bold text-gray-400 uppercase">
                     {item['Account Code']}
@@ -671,7 +695,7 @@ export default function BalanceSheet() {
                       } else {
                         onAccountNameClick(item['Account Code'])
                       }
-                    }}
+                  }}
                     className="group flex items-center gap-1.5 text-[13px] font-bold text-black hover:text-orange-600 hover:bg-orange-50 hover:underline cursor-pointer transition-all rounded px-2 py-1 text-left"
                     title={item['Account Name']?.toLowerCase().includes('net income') ? 'View in Income Statement' : 'View in General Ledger'}
                   >
@@ -688,7 +712,7 @@ export default function BalanceSheet() {
                       } else {
                         onBalanceClick(item['Account Code'])
                       }
-                    }}
+                  }}
                     className="group flex items-center justify-end gap-1.5 hover:text-orange-600 hover:bg-orange-50 hover:underline cursor-pointer transition-all rounded px-2 py-1"
                     title={item['Account Name']?.toLowerCase().includes('net income') ? 'View in Income Statement' : 'View in General Ledger'}
                   >
@@ -715,7 +739,7 @@ export default function BalanceSheet() {
   )
 
   return (
-    <div className="flex flex-col gap-5 bg-[#F3F4F6] min-h-full custom-scrollbar">
+    <div className="flex flex-col gap-5 bg-[#F3F4F6] h-full overflow-x-auto custom-scrollbar">
       {/* HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
@@ -732,6 +756,33 @@ export default function BalanceSheet() {
           </div>
         </div>
         <div className="flex gap-2 items-center relative">
+          <div className="flex flex-col md:flex-row md:items-center gap-2 w-full md:w-auto rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-2 py-1.5 shadow-sm">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[2px]">From</span>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full md:w-auto bg-transparent px-1 py-1 md:py-0.5 text-[11px] font-bold text-slate-800 outline-none" />
+            <span className="hidden md:inline text-slate-300 text-[11px] leading-none">→</span>
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[2px]">To</span>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full md:w-auto bg-transparent px-1 py-1 md:py-0.5 text-[11px] font-bold text-slate-800 outline-none" />
+            <span className="hidden md:block mx-1 h-5 w-px bg-slate-200" />
+            <button
+              onClick={() => {
+              setStartDate('')
+              setEndDate('')
+            }}
+              className="w-full md:w-auto px-2.5 py-2 md:py-1 rounded-lg border border-slate-300 bg-white text-[9px] font-black text-slate-700 uppercase tracking-widest hover:border-orange-500 hover:text-orange-600 transition-colors cursor-pointer"
+            >
+              Reset
+            </button>
+            <button
+              onClick={() => {
+              const t = new Date().toISOString().split('T')[0]
+              setStartDate(t)
+              setEndDate(t)
+            }}
+              className="w-full md:w-auto px-2.5 py-2 md:py-1 rounded-lg bg-slate-900 text-[9px] font-black text-white uppercase tracking-widest hover:bg-orange-600 transition-colors cursor-pointer"
+            >
+              Today
+            </button>
+          </div>
           <div className="relative">
             <button
               onClick={() => setExportMenuOpen((p) => !p)}
@@ -767,184 +818,159 @@ export default function BalanceSheet() {
         </div>
       </div>
 
-      {/* TOOLBAR */}
-      <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap shadow-sm">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-            From
+<div className="flex flex-col flex-1 min-h-0 gap-4 overflow-hidden">
+  
+  {/* ── THREE-COLUMN FINANCIALS (Stretches to fill available screen height) ── */}
+  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+    <Section
+      title="Assets"
+      icon={Briefcase}
+      color="text-blue-500"
+      items={data.assets}
+      total={data.totalAssets}
+      totalLabel="Sum of Assets"
+      onAccountNameClick={handleAccountNameClick}
+      onBalanceClick={handleBalanceClick}
+      className="min-h-0"
+    />
+    <Section
+      title="Liabilities"
+      icon={Layers}
+      color="text-orange-500"
+      items={data.liabilities}
+      total={data.totalLiabilities}
+      totalLabel="Sum of Liabilities"
+      onAccountNameClick={handleAccountNameClick}
+      onBalanceClick={handleBalanceClick}
+      className="min-h-0"
+    />
+    <Section
+      title="Equity"
+      icon={PieChart}
+      color="text-green-500"
+      items={data.equity}
+      total={data.totalEquity}
+      totalLabel="Sum of Equity"
+      onAccountNameClick={handleAccountNameClick}
+      onBalanceClick={handleBalanceClick}
+      onNetIncomeClick={handleNetIncomeClick}
+      className="min-h-0"
+    />
+  </div>
+
+{/* ── ROBUST BALANCE VERIFICATION CARD ── */}
+  <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-shrink-0">
+    <div className="flex items-center justify-between px-5 py-3 bg-slate-900 text-white">
+      <div className="flex items-center gap-2.5">
+        <BarChart3 size={16} className="text-orange-400" />
+        <span className="text-[11px] font-black uppercase tracking-[2px]">
+          Balance Verification Summary
+        </span>
+        <span className="text-[10px] font-medium text-slate-400 font-mono ml-auto">
+          Assets = Liabilities + Equity
+        </span>
+      </div>
+    </div>
+
+    {/* The accounting equation, written out.
+        The previous card listed four totals side by side: three of them were
+        just the column footers above repeated, and "Liab. + Equity" appeared
+        with no indication of where it came from. Laid out as
+        Assets = Liabilities + Equity the check explains itself, and the residual
+        line names the subtraction it is reporting. */}
+    <div className="px-5 py-4 bg-slate-50/70 border-t border-slate-200">
+      <div className="flex flex-col lg:flex-row items-stretch gap-2 lg:gap-3">
+        {/* LEFT SIDE */}
+        <div className="flex-1 flex flex-col justify-center rounded-lg border border-blue-200 bg-blue-50/70 px-4 py-3">
+          <span className="text-[10px] font-black uppercase tracking-[2px] text-blue-700">
+            Total Assets
           </span>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-orange-500 focus:bg-white transition-all"
-          />
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-            To
+          <span className="font-mono font-black text-blue-700 text-xl tabular-nums">
+            ₱ {fmt(absAssets)}
           </span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-orange-500 focus:bg-white transition-all"
-          />
         </div>
 
-        <div className="hidden md:block w-px h-7 bg-gray-100" />
-
-        <button
-          onClick={() => {
-            setStartDate('')
-            setEndDate('')
-          }}
-          className="px-4 py-2 border border-gray-900 rounded-xl text-[10px] font-black text-gray-900 uppercase tracking-widest hover:border-orange-500 hover:text-orange-600 transition-all bg-white cursor-pointer"
-        >
-          Reset
-        </button>
-        <button
-          onClick={() => {
-            const t = new Date().toISOString().split('T')[0]
-            setStartDate(t)
-            setEndDate(t)
-          }}
-          className="px-4 py-2 bg-black rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-orange-600 cursor-pointer"
-        >
-          Today
-        </button>
-      </div>
-
-      {/* THREE-COLUMN FINANCIALS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        <Section
-          title="Assets"
-          icon={Briefcase}
-          color="text-blue-500"
-          items={data.assets}
-          total={data.totalAssets}
-          totalLabel="Sum of Assets"
-          onAccountNameClick={handleAccountNameClick}
-          onBalanceClick={handleBalanceClick}
-        />
-        <Section
-          title="Liabilities"
-          icon={Layers}
-          color="text-orange-500"
-          items={data.liabilities}
-          total={data.totalLiabilities}
-          totalLabel="Sum of Liabilities"
-          onAccountNameClick={handleAccountNameClick}
-          onBalanceClick={handleBalanceClick}
-        />
-        <Section
-          title="Equity"
-          icon={PieChart}
-          color="text-green-500"
-          items={data.equity}
-          total={data.totalEquity}
-          totalLabel="Sum of Equity"
-          onAccountNameClick={handleAccountNameClick}
-          onBalanceClick={handleBalanceClick}
-          onNetIncomeClick={handleNetIncomeClick}
-        />
-      </div>
-
-      {/* BALANCE VERIFICATION */}
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex items-center gap-2 px-5 py-3 bg-black">
-          <BarChart3 size={14} className="text-orange-500" />
-          <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
-            Balance Verification
+        {/* THE OPERATOR */}
+        <div className="flex items-center justify-center px-1">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white">
+            <Equal size={14} strokeWidth={3} />
           </span>
         </div>
-        <div className="p-6">
-          <div className="space-y-4">
-            {/* FIX: all values now show absolute amounts with ₱ symbol */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-600">
-                Total Assets:
-              </span>
-              <span className="text-lg font-semibold text-blue-600">
-                ₱ {fmt(absAssets)}
-              </span>
-            </div>
 
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-600">
-                Total Liabilities:
-              </span>
-              <span className="text-lg font-semibold text-orange-600">
-                ₱ {fmt(absLiabilities)}
-              </span>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-600">
-                Total Equity:
-              </span>
-              <span className="text-lg font-semibold text-green-600">
-                ₱ {fmt(absEquity)}
-              </span>
-            </div>
-
-            <div className="border-t border-gray-200 pt-4">
-              <div className="flex justify-between items-center">
-                <span className="text-base font-semibold text-gray-900">
-                  Liabilities + Equity:
-                </span>
-                <span className="text-xl font-bold text-gray-900">
-                  ₱ {fmt(absLiabEquity)}
-                </span>
-              </div>
-            </div>
-
-            {data.netIncome !== undefined && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-600">
-                  Current Period Net Income:
-                </span>
-                <button
-                  onClick={handleNetIncomeClick}
-                  className={`text-lg font-semibold ${data.netIncome >= 0 ? 'text-green-600' : 'text-red-600'} hover:underline cursor-pointer transition-colors`}
-                  title="View in Income Statement"
-                >
-                  ₱ {fmt(data.netIncome)}
-                </button>
-              </div>
-            )}
-
-            {/* FIX: isBalanced now correctly compares Assets vs |Liabilities| + |Equity| */}
-            <div
-              className={`mt-4 p-4 rounded-lg ${
-                isBalanced
-                  ? 'bg-green-50 border border-green-200'
-                  : 'bg-red-50 border border-red-200'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                {isBalanced ? (
-                  <ShieldCheck size={20} className="text-green-700" />
-                ) : (
-                  <ShieldAlert size={20} className="text-red-700" />
-                )}
-                <span
-                  className={`text-lg font-bold ${
-                    isBalanced ? 'text-green-800' : 'text-red-800'
-                  }`}
-                >
-                  {isBalanced ? '✓ BALANCED' : '✗ OUT OF BALANCE'}
-                </span>
-                <span
-                  className={`text-sm ${
-                    isBalanced ? 'text-green-700' : 'text-red-700'
-                  }`}
-                >
-                  Difference: ₱ {fmt(balanceDiff)}
-                </span>
-              </div>
-            </div>
+        {/* RIGHT SIDE */}
+        {/* Flex, not a grid: the operator is a fixed-width glyph and the three figures
+            must stay on one line. A two-column grid broke the four children into
+            two rows, which put Equity under Liabilities. */}
+        <div className="flex-[2] flex items-stretch rounded-lg border border-slate-200 bg-white">
+          <div className="flex-1 flex flex-col justify-center px-4 py-3 border-r border-slate-200">
+            <span className="text-[10px] font-black uppercase tracking-[2px] text-orange-700">
+              Total Liabilities
+            </span>
+            <span className="font-mono font-black text-orange-700 text-xl tabular-nums">
+              ₱ {fmt(absLiabilities)}
+            </span>
+          </div>
+          <div className="flex items-center justify-center px-2 shrink-0">
+            <Plus size={14} className="text-slate-400" strokeWidth={3} />
+          </div>
+          <div className="flex-1 flex flex-col justify-center px-4 py-3 border-r border-slate-200">
+            <span className="text-[10px] font-black uppercase tracking-[2px] text-emerald-700">
+              Total Equity
+            </span>
+            <span className="font-mono font-black text-emerald-700 text-xl tabular-nums">
+              ₱ {fmt(absEquity)}
+            </span>
+          </div>
+          <div className="flex-1 flex flex-col justify-center px-4 py-3 bg-slate-50/70">
+            <span className="text-[10px] font-black uppercase tracking-[2px] text-slate-500">
+              Right side
+            </span>
+            <span className="font-mono font-black text-slate-900 text-xl tabular-nums">
+              ₱ {fmt(absLiabEquity)}
+            </span>
           </div>
         </div>
       </div>
+
+      {/* RESIDUAL */}
+      <div
+        className={`mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-2.5 ${
+          isBalanced
+            ? 'border-emerald-200 bg-emerald-50'
+            : 'border-red-200 bg-red-50'
+        }`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white ${
+              isBalanced ? 'bg-emerald-600' : 'bg-red-600'
+            }`}
+          >
+            {isBalanced ? <ShieldCheck size={13} /> : <ShieldAlert size={13} />}
+          </span>
+          <span
+            className={`text-[11px] font-black uppercase tracking-[2px] ${
+              isBalanced ? 'text-emerald-800' : 'text-red-800'
+            }`}
+          >
+            {isBalanced ? 'Balanced' : 'Out of Balance'}
+          </span>
+          <span className="text-[11px] font-medium text-slate-500 font-mono truncate">
+            Assets − (Liabilities + Equity)
+          </span>
+        </div>
+        <span
+          className={`font-mono font-black text-lg tabular-nums ${
+            isBalanced ? 'text-emerald-700' : 'text-red-700'
+          }`}
+        >
+          ₱ {fmt(balanceDiff)}
+        </span>
+      </div>
+    </div>
+  </div>
+
+</div>
     </div>
   )
 }

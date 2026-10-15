@@ -21,18 +21,34 @@
 /*
  * The registry renders long returns inside nested scroll areas, and the default
  * scrollbar eats a visible strip of a column that is already narrow.
+ *
+ * The thumb is the brand red rather than a neutral grey. It was #cbd5e1, which
+ * is very close to the white column behind it - at 6px wide it read as a faint
+ * smudge rather than a scrollbar, so the registry looked like it simply ended
+ * instead of continuing. Matching the accent the page already uses for the
+ * active form and the section bars makes the overflow visible at a glance and
+ * ties the scrollbar to the same affordance.
  */
+.tax-scroll {
+  /* Standard properties, which Firefox honours. The ::-webkit rules below do
+     nothing there, so without these the registry scrollbar would stay grey in
+     Firefox while being red in Chrome. Same two colours, declared once each. */
+  scrollbar-width: thin;
+  scrollbar-color: #dc2626 transparent;
+}
 .tax-scroll::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 .tax-scroll::-webkit-scrollbar-track {
+  /* Transparent rather than a light grey: the column is white, and a track
+     behind a red thumb only muddies it. */
   background: transparent;
 }
 .tax-scroll::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #dc2626;
   border-radius: 9999px;
 }
 .tax-scroll::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #b91c1c;
 }

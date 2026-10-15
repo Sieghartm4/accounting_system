@@ -5,30 +5,7 @@ import { Clock3, TrendingDown, Download, RefreshCw, Printer, FileText, X, Eye, D
 import RouteProtection from '../../components/RouteProtection'
 import useAgeingPayables from './useAgeingPayables'
 import LoadingScreen from '../../components/LoadingScreen'
-
-const formatDate = (value) => {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-  })
-}
-
-const decimalFormat = (value) => {
-  const number = Number(value)
-  if (Number.isNaN(number)) return '0.00'
-  return number.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
-
-const formatCurrency = (value) => {
-  return `₱ ${decimalFormat(value)}`
-}
+import { formatDate, decimalFormat, formatCurrency, handlePrint, handleExportCSV } from './utils'
 
 export default function AgeingPayables() {
   return (
@@ -204,6 +181,10 @@ function AgeingPayablesContent() {
     navigate(`/purchase?id=${item.id}`)
   }
 
+  const onPrint = () => handlePrint(filteredPurchases, stats, asOfDate)
+
+  const onExportCSV = () => handleExportCSV(filteredPurchases, stats, asOfDate)
+
   if (loading) return <LoadingScreen label="Loading Aging Payables..." />
 
   if (error) {
@@ -249,13 +230,16 @@ function AgeingPayablesContent() {
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => window.print()}
+              onClick={onPrint}
               className="flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl shadow-sm transition"
             >
               <Printer size={14} />
               <span>Print</span>
             </button>
-            <button className="flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl shadow-sm transition">
+            <button
+              onClick={onExportCSV}
+              className="flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl shadow-sm transition"
+            >
               <FileText size={14} />
               <span>Export CSV</span>
             </button>
@@ -319,7 +303,7 @@ function AgeingPayablesContent() {
       </div>
 
       {/* --- FILTER TOOLBAR & TABLE --- */}
-      <div className="flex-1 min-h-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="flex-1 min-h-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden aging-table-container">
         <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-gray-600">
             <button

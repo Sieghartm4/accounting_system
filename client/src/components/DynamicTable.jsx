@@ -32,7 +32,9 @@ const DynamicTable = ({
   // --- BADGE PROPS ---
   badgeColumns = [], // array of { column: 'status', values: { 'PAID': 'green', 'UNPAID': 'red' } } for dynamic badges
   // --- HIGHLIGHT PROPS ---
-  highlightRow = null, // { column: 'id', value: 123 } - highlight row where column matches value
+  highlightRow = null, // { column: 'id', value: 123 } - highlight where column matches.
+                       // `value` may also be an array, to highlight several rows at
+                       // once - the Advances page opens more than one group.
   // --- INFINITE SCROLL PROPS ---
   enableInfiniteScroll = false, // if true, enables infinite scroll
   hasMore = false, // if true, more rows can be loaded
@@ -106,6 +108,13 @@ const DynamicTable = ({
   const shouldHighlightRow = (row) => {
     if (!highlightRow || !highlightRow.column || !highlightRow.value) return false
     const rowValue = String(row[highlightRow.column])
+    // A single value is the original contract. An array means several rows stay
+    // highlighted at once, which is what a page holding more than one expanded
+    // group needs.
+    if (Array.isArray(highlightRow.value)) {
+      if (highlightRow.value.length === 0) return false
+      return highlightRow.value.some((v) => String(v) === rowValue)
+    }
     const highlightValue = String(highlightRow.value)
     return rowValue === highlightValue
   }
@@ -120,7 +129,9 @@ const DynamicTable = ({
       .replace(/^\//, '')
       .split('/')[0]
       .replace(/-/g, '_')
-    const effectiveRouteName = routeName || inferredRouteName
+    // Fix legacy typo for withholding_tax
+    const correctedRouteName = inferredRouteName === 'witholding_tax' ? 'withholding_tax' : inferredRouteName
+    const effectiveRouteName = routeName || correctedRouteName
     const accessLevel = getAccessLevel(effectiveRouteName, user)
 
     return actionButtons.filter((button) => {

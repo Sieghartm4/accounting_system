@@ -96,7 +96,8 @@ const ROUTE_PATH_MAP = {
   product_service: 'product_service',
   vat: 'vat',
   responsibility_center: 'responsibility_center',
-  withholding_tax: 'witholding_tax', // Note: typo in original route
+  withholding_tax: 'withholding-tax',
+  witholding_tax: 'withholding-tax', // Legacy alias for backward compatibility
   tax_compliance: 'tax-compliance',
   customer_transactions: 'customer-transactions',
   vendor_transactions: 'vendor-transactions',
@@ -156,6 +157,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
   const [searchEndDate, setSearchEndDate] = useState('')
   const [showSearchModal, setShowSearchModal] = useState(false)
   const searchRef = useRef(null)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
 
   // Remove unused company-related state since we removed the company selector
 
@@ -185,6 +187,13 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     setSearchStartDate('')
     setSearchEndDate('')
   }, [])
+
+  // Reset selection when search modal closes or search query changes
+  useEffect(() => {
+    if (!showSearchModal) {
+      setSelectedIndex(-1)
+    }
+  }, [showSearchModal])
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -273,12 +282,19 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
       if (itemName.includes(term) || itemLabel.includes(term)) {
         // Use ROUTE_PATH_MAP to get the correct route path
         const routePath = ROUTE_PATH_MAP[config.name] || config.name.replace(/_/g, '-')
-        matches.push({
-          type: 'page',
-          route: `/${routePath}`,
-          label: config.label || config.name,
-          icon: config.icon,
-        })
+        // Ensure witholding_tax maps to withholding-tax
+        const finalRoutePath = routePath === 'witholding-tax' ? 'withholding-tax' : routePath
+        const label = config.label || config.name
+
+        // Deduplicate by label to prevent duplicate entries
+        if (!matches.some((match) => match.label === label)) {
+          matches.push({
+            type: 'page',
+            route: `/${finalRoutePath}`,
+            label: label,
+            icon: config.icon,
+          })
+        }
       }
     }
 
@@ -549,15 +565,15 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
           <Menu size={20} />
         </button>
 
-        <div className="flex-1 flex justify-center">
+<div className="flex-1 flex justify-center px-4">
           <div
-            className="hidden md:flex items-center relative max-w-md w-full"
+            className="hidden md:flex items-center relative max-w-xl w-full"
             ref={searchRef}
           >
             <button
               type="button"
               onClick={() => searchQuery.trim().length > 0 && handleSearch()}
-              className="bg-black border border-r-0 border-black rounded-l-xl px-3 h-9 flex items-center justify-center"
+              className="bg-black border border-r-0 border-black rounded-l-xl px-3 h-9 flex items-center justify-center shrink-0 cursor-pointer"
             >
               <Search className="text-white" size={16} />
             </button>
@@ -566,174 +582,262 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
               placeholder="Search pages, ledgers, invoices..."
               type="text"
               value={searchQuery}
-              onChange={handleSearchInputChange}
-              onKeyDown={handleSearchInputKeyDown}
-              onFocus={() => searchQuery.trim().length > 2 && setShowSearchModal(true)}
+              onChange={(e) => {
+                handleSearchInputChange(e);
+                setSelectedIndex(-1);
+              }}
+              onKeyDown={(e) => {
+                const pageMatches = searchQuery.trim().length >= 2 ? getPageMatches(searchQuery) : [];
+                const docResults = showSearchResults ? searchResults : [];
+                const totalItems = pageMatches.length + docResults.length;
+
+                if (showSearchModal && totalItems > 0) {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setSelectedIndex((prev) => (prev < totalItems - 1 ? prev + 1 : 0));
+                    return;
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setSelectedIndex((prev) => (prev > 0 ? prev - 1 : totalItems - 1));
+                    return;
+                  }
+                  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    setSelectedIndex((prev) => (prev < pageMatches.length ? pageMatches.length : 0));
+                    return;
+                  }
+                  if (e.key === 'Enter') {
+                    if (selectedIndex >= 0 && selectedIndex < totalItems) {
+                      e.preventDefault();
+                      if (selectedIndex < pageMatches.length) {
+                        const match = pageMatches[selectedIndex];
+                        navigate(match.route);
+                        setShowSearchModal(false);
+                        setSearchQuery('');
+                      } else {
+                        const docIndex = selectedIndex - pageMatches.length;
+                        const result = docResults[docIndex];
+                        handleSearchResultClick(result);
+                      }
+                      return;
+                    }
+                  }
+                }
+                handleSearchInputKeyDown(e);
+              }}
+              onFocus={() => {
+                if (searchQuery.trim().length > 2) {
+                  setShowSearchModal(true);
+                  setSelectedIndex(-1);
+                }
+              }}
             />
 
             {/* Search Modal */}
             <AnimatePresence>
-              {showSearchModal && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-2xl border border-gray-100 p-4 z-50 w-96"
-                >
-                  <div className="space-y-3">
-                    {/* Page Matches */}
-                    {searchQuery.trim().length >= 2 && (() => {
-                      const pageMatches = getPageMatches(searchQuery)
-                      return (
-                        <div>
-                          <h4 className="text-xs font-semibold text-gray-700 mb-2">Pages</h4>
-                          <div className="space-y-1">
-                            {pageMatches.length > 0 ? (
-                              pageMatches.map((match, index) => {
-                                const IconComponent = ICON_MAP[match.icon] || FileText
-                                return (
-                                  <button
-                                    key={index}
-                                    type="button"
-                                    onClick={() => {
-                                      navigate(match.route)
-                                      setShowSearchModal(false)
-                                      setSearchQuery('')
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-left rounded-lg hover:bg-red-50 hover:border-red-200 border border-transparent transition-all group cursor-pointer"
-                                  >
-                                    <IconComponent size={14} className="text-red-600 shrink-0 group-hover:text-red-700" />
-                                    <span className="text-xs font-medium text-gray-700 group-hover:text-red-900">{match.label}</span>
-                                  </button>
-                                )
-                              })
-                            ) : (
-                              <p className="text-xs text-gray-500 text-center py-2">No matching pages</p>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })()}
+              {showSearchModal && (() => {
+                const pageMatches = searchQuery.trim().length >= 2 ? getPageMatches(searchQuery) : [];
+                const hasPageData = pageMatches.length > 0;
+                const hasDocData = showSearchResults && searchResults.length > 0;
 
-                    {/* Document Search */}
-                    <div className="border-t border-gray-100 pt-3">
-                      <h4 className="text-xs font-semibold text-gray-700 mb-2">Documents</h4>
-                      <form onSubmit={handleSearchSubmit} className="space-y-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Date Range
-                          </label>
-                          <div className="flex gap-2">
-                            <div className="flex-1">
-                              <input
-                                type="date"
-                                value={searchStartDate}
-                                onChange={(e) => setSearchStartDate(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none"
-                              />
+                const hidePages = showSearchResults && !hasPageData && hasDocData;
+                const hideDocuments = hasPageData && showSearchResults && !hasDocData;
+
+                return (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl p-5 z-50 w-full overflow-hidden"
+                  >
+                    <div className={`grid grid-cols-1 ${hidePages || hideDocuments ? 'grid-cols-1' : 'md:grid-cols-12'} gap-5`}>
+                      
+                      {/* Column 1: Page Matches */}
+                      {!hidePages && (
+                        <div className={`${hideDocuments ? 'col-span-12 flex flex-col items-center text-center' : 'md:col-span-5 flex flex-col'}`}>
+                          <div className={`flex items-center gap-1.5 mb-2.5 pb-1.5 border-b border-gray-100 ${hideDocuments ? 'w-full justify-center' : ''}`}>
+                            <FileText size={13} className="text-red-600" />
+                            <h4 className="text-xs font-bold text-gray-800 tracking-wide uppercase">Pages</h4>
+                          </div>
+                          {searchQuery.trim().length >= 2 ? (
+                            <div className={`space-y-1.5 flex-1 ${hideDocuments ? 'w-full max-w-md mx-auto' : ''}`}>
+                              {hasPageData ? (
+                                pageMatches.map((match, index) => {
+                                  const IconComponent = ICON_MAP[match.icon] || FileText;
+                                  const isSelected = selectedIndex === index;
+                                  return (
+                                    <button
+                                      key={index}
+                                      type="button"
+                                      onClick={() => {
+                                        navigate(match.route);
+                                        setShowSearchModal(false);
+                                        setSearchQuery('');
+                                      }}
+                                      className={`w-full flex items-center ${hideDocuments ? 'justify-center' : ''} gap-2.5 px-3 py-2.5 text-left rounded-xl transition-all group cursor-pointer ${
+                                        isSelected ? 'bg-red-100 border-red-300' : 'bg-gray-50/50 hover:bg-red-50/80 hover:border-red-200 border border-transparent'
+                                      }`}
+                                    >
+                                      <IconComponent size={14} className="text-red-600 shrink-0 group-hover:text-red-700" />
+                                      <span className="text-xs font-medium text-gray-700 group-hover:text-red-900 truncate">{match.label}</span>
+                                    </button>
+                                  );
+                                })
+                              ) : (
+                                <p className="text-xs text-gray-400 text-center py-4 bg-gray-50/50 rounded-xl">No matching pages</p>
+                              )}
                             </div>
-                            <div className="flex-1">
-                              <input
-                                type="date"
-                                value={searchEndDate}
-                                onChange={(e) => setSearchEndDate(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          type="submit"
-                          disabled={isSearching || !searchQuery.trim()}
-                        className="w-full bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                      >
-                        {isSearching ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Searching...
-                          </>
-                        ) : (
-                          <>
-                            <Search size={16} />
-                            Search Documents
-                          </>
-                        )}
-                      </button>
-                      {showSearchResults && (
-                        <div className="mt-4 border-t border-gray-100 pt-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-xs font-semibold text-gray-700">
-                              Results ({searchResults.length})
-                            </h4>
-                            <button
-                              type="button"
-                              onClick={() => setShowSearchModal(false)}
-                              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                              <X size={14} className="text-gray-400" />
-                            </button>
-                          </div>
-                          <div className="max-h-60 overflow-y-auto space-y-2">
-                            {searchResults.length > 0 ? (
-                              searchResults.map((result, index) => (
-                                <div
-                                  key={index}
-                                  className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                                  onClick={() => handleSearchResultClick(result)}
-                                >
-                                  <div className="flex items-start gap-2">
-                                    <FileText
-                                      size={14}
-                                      className="text-red-600 mt-0.5 shrink-0"
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs font-semibold text-gray-900">
-                                          {result.document_type}
-                                        </span>
-                                        <span className="text-xs text-gray-500">
-                                          {result.document_date}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-xs text-gray-700 font-medium truncate">
-                                            {result.id}
-                                          </p>
-                                          <p className="text-xs text-gray-500 truncate">
-                                            {result.customer_name || result.vendor_name}
-                                          </p>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                          {result.amount && (
-                                            <p className="text-xs font-semibold text-red-600">
-                                              ₱
-                                              {parseFloat(result.amount).toLocaleString(
-                                                'en-PH',
-                                                { minimumFractionDigits: 2 },
-                                              )}
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-xs text-gray-500 text-center py-4">
-                                No results found for "{searchQuery}"
-                              </p>
-                            )}
-                          </div>
+                          ) : (
+                            <p className="text-xs text-gray-400 italic py-4 text-center bg-gray-50/50 rounded-xl w-full">Type at least 2 characters...</p>
+                          )}
                         </div>
                       )}
-                    </form>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+
+                      {/* Column 2: Document Search */}
+                      {!hideDocuments && (
+                        <div className={`${hidePages ? 'col-span-12' : 'md:col-span-7 border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-5'} flex flex-col`}>
+                          <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-gray-100">
+                            <div className="flex items-center gap-1.5">
+                              <Search size={13} className="text-red-600" />
+                              <h4 className="text-xs font-bold text-gray-800 tracking-wide uppercase">Documents</h4>
+                            </div>
+                            {showSearchResults && (
+                              <button
+                                type="button"
+                                onClick={() => setShowSearchModal(false)}
+                                className="p-1 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <X size={14} className="text-gray-400" />
+                              </button>
+                            )}
+                          </div>
+                          
+                          <form onSubmit={handleSearchSubmit} className="space-y-3 flex-1 flex flex-col">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                                Date Range
+                              </label>
+                              <div className="flex gap-2">
+                                <div className="flex-1">
+                                  <input
+                                    type="date"
+                                    value={searchStartDate}
+                                    onChange={(e) => setSearchStartDate(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-gray-50/50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none transition-all"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <input
+                                    type="date"
+                                    value={searchEndDate}
+                                    onChange={(e) => setSearchEndDate(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-gray-50/50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-red-600/10 focus:border-red-600 outline-none transition-all"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="submit"
+                              disabled={isSearching || !searchQuery.trim()}
+                              className="w-full bg-red-600 text-white py-2 px-4 rounded-xl text-xs font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-sm shadow-red-600/20 cursor-pointer"
+                            >
+                              {isSearching ? (
+                                <>
+                                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                  Searching...
+                                </>
+                              ) : (
+                                <>
+                                  <Search size={14} />
+                                  Search Documents
+                                </>
+                              )}
+                            </button>
+
+                            {showSearchResults && (
+                              <div className="mt-2 border-t border-gray-100 pt-3 flex-1">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wide">
+                                    Results ({searchResults.length})
+                                  </span>
+                                </div>
+                                <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                                  {searchResults.length > 0 ? (
+                                    searchResults.map((result, index) => {
+                                      const globalIndex = pageMatches.length + index;
+                                      const isSelected = selectedIndex === globalIndex;
+                                      return (
+                                        <div
+                                          key={index}
+                                          ref={(el) => {
+                                            if (isSelected && el) {
+                                              el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                                            }
+                                          }}
+                                          className={`p-2.5 rounded-xl transition-all cursor-pointer group ${
+                                            isSelected ? 'bg-red-100 border-red-300' : 'bg-gray-50/80 hover:bg-red-50/50 hover:border-red-200 border border-transparent'
+                                          }`}
+                                          onClick={() => handleSearchResultClick(result)}
+                                        >
+                                          <div className="flex items-start gap-2.5">
+                                            <FileText
+                                              size={14}
+                                              className="text-red-600 mt-0.5 shrink-0 group-hover:text-red-700"
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-center justify-between mb-0.5">
+                                                <span className="text-[11px] font-semibold text-gray-900 truncate group-hover:text-red-900">
+                                                  {result.document_type}
+                                                </span>
+                                                <span className="text-[10px] text-gray-500 shrink-0">
+                                                  {result.document_date}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center justify-between gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                  <p className="text-[11px] text-gray-700 font-medium truncate">
+                                                    {result.id}
+                                                  </p>
+                                                  <p className="text-[10px] text-gray-500 truncate">
+                                                    {result.customer_name || result.vendor_name}
+                                                  </p>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                  {result.amount && (
+                                                    <p className="text-[11px] font-bold text-red-600">
+                                                      ₱
+                                                      {parseFloat(result.amount).toLocaleString(
+                                                        'en-PH',
+                                                        { minimumFractionDigits: 2 },
+                                                      )}
+                                                    </p>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })
+                                  ) : (
+                                    <p className="text-xs text-gray-500 text-center py-4 bg-gray-50/50 rounded-xl">
+                                      No results found
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </form>
+                        </div>
+                      )}
+
+                    </div>
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
           </div>
         </div>
 

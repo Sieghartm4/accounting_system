@@ -12,6 +12,11 @@ import {
   X,
   Trash2,
   Check,
+  CheckCircle,
+  XCircle,
+  ShieldCheck,
+  Wallet,
+  ClipboardList,
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
@@ -58,6 +63,7 @@ function PurchaseOrderContent() {
   const [approvalTargetRows, setApprovalTargetRows] = useState([])
   const [approvalLoading, setApprovalLoading] = useState(false)
   const [approvalError, setApprovalError] = useState(null)
+  const [activeFilter, setActiveFilter] = useState(null)
   const navigate = useNavigate()
 
   const resetItemForm = () => {
@@ -334,7 +340,44 @@ function PurchaseOrderContent() {
     }
   }, [purchaseOrders])
 
-  const tableData = purchaseOrders.map((po) => ({
+  // Filter purchase orders based on active card filter
+  const getFilteredPurchaseOrders = () => {
+    if (!activeFilter) return purchaseOrders
+
+    switch (activeFilter) {
+      case 'PENDING':
+        return purchaseOrders?.filter((po) => po.status === 'PENDING') || []
+      case 'APPROVED':
+        return purchaseOrders?.filter((po) => po.status === 'APPROVED') || []
+      case 'REJECTED':
+        return purchaseOrders?.filter((po) => po.status === 'REJECTED') || []
+      default:
+        return purchaseOrders
+    }
+  }
+
+  const filteredPurchaseOrders = getFilteredPurchaseOrders()
+
+  // Calculate totals based on filtered data
+  const getFilteredTotalValue = () => {
+    return filteredPurchaseOrders?.reduce((sum, po) => sum + Number(po.price * po.quantity || 0), 0) || 0
+  }
+
+  // Calculate stats based on filtered data
+  const filteredStats = useMemo(() => {
+    return {
+      total: filteredPurchaseOrders.length,
+      pending: filteredPurchaseOrders.filter((po) => po.status === 'PENDING').length,
+      approved: filteredPurchaseOrders.filter((po) => po.status === 'APPROVED').length,
+      rejected: filteredPurchaseOrders.filter((po) => po.status === 'REJECTED').length,
+      totalValue: filteredPurchaseOrders.reduce(
+        (sum, po) => sum + Number(po.price * po.quantity || 0),
+        0,
+      ),
+    }
+  }, [filteredPurchaseOrders])
+
+  const tableData = filteredPurchaseOrders.map((po) => ({
     ...po,
     product: po.product_name || po.product,
     procurement_id: po.procurement_id || null,
@@ -683,87 +726,65 @@ function PurchaseOrderContent() {
         </div>
       </RightSideModal>
 
-      <div className="grid grid-cols-5 gap-3">
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
-            <Package size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Total POs
-            </p>
-            <h4 className="font-black text-black leading-none truncate text-xl">
-              {stats.total}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
-              All Orders
-            </p>
-          </div>
-        </div>
-        <div className="bg-white border border-yellow-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-yellow-50 text-yellow-600 rounded-xl flex items-center justify-center shrink-0">
-            <AlertCircle size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Pending
-            </p>
-            <h4 className="font-black text-yellow-600 leading-none truncate text-xl">
-              {stats.pending}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
-              Awaiting Approval
-            </p>
-          </div>
-        </div>
-        <div className="bg-white border border-green-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center shrink-0">
-            <Hash size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Approved
-            </p>
-            <h4 className="font-black text-green-600 leading-none truncate text-xl">
-              {stats.approved}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
-              Approved Orders
-            </p>
-          </div>
-        </div>
-        <div className="bg-white border border-red-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-red-50 text-red-600 rounded-xl flex items-center justify-center shrink-0">
-            <AlertCircle size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Rejected
-            </p>
-            <h4 className="font-black text-red-600 leading-none truncate text-xl">
-              {stats.rejected}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
-              Rejected Orders
-            </p>
-          </div>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-          <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center shrink-0">
-            <DollarSign size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-              Total Value
-            </p>
-            <h4 className="font-black text-purple-600 leading-none truncate text-xl">
-              ₱{fmt(stats.totalValue)}
-            </h4>
-            <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">
-              All Orders
-            </p>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <SummaryTile
+          label="Total POs"
+          value={activeFilter ? filteredPurchaseOrders?.length || 0 : purchaseOrders?.length || 0}
+          subText="Fetched"
+          color="emerald"
+          onClick={() => setActiveFilter(null)}
+          isActive={activeFilter === null}
+          icon={ShoppingCart}
+        />
+        <SummaryTile
+          label="Pending"
+          value={
+            activeFilter === 'PENDING'
+              ? filteredPurchaseOrders?.length || 0
+              : purchaseOrders?.filter((po) => po.status === 'PENDING').length || 0
+          }
+          subText="Transactions"
+          color="amber"
+          onClick={() => setActiveFilter('PENDING')}
+          isActive={activeFilter === 'PENDING'}
+          icon={ClipboardList}
+        />
+        <SummaryTile
+          label="Approved"
+          value={
+            activeFilter === 'APPROVED'
+              ? filteredPurchaseOrders?.length || 0
+              : purchaseOrders?.filter((po) => po.status === 'APPROVED').length || 0
+          }
+          subText="Transactions"
+          color="emerald"
+          onClick={() => setActiveFilter('APPROVED')}
+          isActive={activeFilter === 'APPROVED'}
+          icon={ShieldCheck}
+        />
+        <SummaryTile
+          label="Rejected"
+          value={
+            activeFilter === 'REJECTED'
+              ? filteredPurchaseOrders?.length || 0
+              : purchaseOrders?.filter((po) => po.status === 'REJECTED').length || 0
+          }
+          subText="Transactions"
+          color="rose"
+          onClick={() => setActiveFilter('REJECTED')}
+          isActive={activeFilter === 'REJECTED'}
+          icon={XCircle}
+        />
+        <SummaryTile
+          label="Total Value"
+          value={`₱ ${getFilteredTotalValue().toLocaleString('en-PH', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }) || '0.00'}`}
+          subText="PHP"
+          color="dark"
+          icon={Wallet}
+        />
       </div>
 
       {/* --- TABLE SECTION --- */}
@@ -816,5 +837,107 @@ export default function PurchaseOrder() {
     <RouteProtection routeName="purchase_order">
       <PurchaseOrderContent />
     </RouteProtection>
+  )
+}
+
+function SummaryTile({ label, value, subText, color, onClick, isActive, icon: Icon }) {
+  const theme = {
+    emerald: {
+      text: 'text-emerald-600 dark:text-emerald-400',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      bar: 'bg-emerald-500',
+      bg: 'bg-emerald-500',
+      textOnActive: 'text-white'
+    },
+    amber: {
+      text: 'text-amber-600 dark:text-amber-400',
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
+      bar: 'bg-amber-500',
+      bg: 'bg-amber-500',
+      textOnActive: 'text-white'
+    },
+    orange: {
+      text: 'text-orange-600 dark:text-orange-400',
+      badgeBg: 'bg-orange-50 text-orange-700 border-orange-200',
+      bar: 'bg-orange-500',
+      bg: 'bg-orange-500',
+      textOnActive: 'text-white'
+    },
+    rose: {
+      text: 'text-rose-600 dark:text-rose-400',
+      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
+      bar: 'bg-rose-500',
+      bg: 'bg-rose-500',
+      textOnActive: 'text-white'
+    },
+    blue: {
+      text: 'text-blue-600 dark:text-blue-400',
+      badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
+      bar: 'bg-blue-500',
+      bg: 'bg-blue-500',
+      textOnActive: 'text-white'
+    },
+    dark: {
+      text: 'text-emerald-400',
+      badgeBg: 'bg-emerald-950 text-emerald-300 border-emerald-800/50',
+      bar: 'bg-emerald-400',
+      bg: 'bg-emerald-400',
+      textOnActive: 'text-white'
+    },
+  }[color] || {
+    text: 'text-gray-700',
+    badgeBg: 'bg-gray-50 text-gray-700 border-gray-200',
+    bar: 'bg-gray-400',
+    bg: 'bg-gray-400',
+    textOnActive: 'text-white'
+  }
+
+  const bgClass = color === 'dark'
+    ? 'bg-slate-900 text-white border-slate-800'
+    : 'bg-white text-gray-900 border-gray-200/80 shadow-xs'
+
+  const activeBgClass = isActive
+    ? `${theme.bg} text-white border-transparent`
+    : bgClass
+
+  const isClickable = label !== 'Total Value'
+
+  return (
+    <div
+      onClick={isClickable ? onClick : undefined}
+      className={`${activeBgClass} p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between h-full ${isClickable ? 'cursor-pointer hover:scale-105 hover:shadow-lg group' : ''} transition-all duration-300`}
+    >
+      {/* Bottom Accent Indicator - Animates on hover (behind content) */}
+      <div className={`absolute bottom-0 left-0 right-0 h-1 ${theme.bar} ${isClickable ? 'group-hover:h-full' : ''} transition-all duration-300 z-0`} />
+
+      {/* Content wrapper with higher z-index */}
+      <div className="relative z-10 flex flex-col justify-between h-full">
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          {label === 'Total Value' ? (
+            <span className={`text-xs font-semibold tracking-wide uppercase text-white`}>
+              {label}
+            </span>
+          ) : (
+            <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${isActive ? 'bg-white text-gray-900 border-white' : theme.badgeBg} ${isClickable ? 'group-hover:bg-white group-hover:text-gray-900 group-hover:border-white' : ''}`}>
+              {label}
+            </span>
+          )}
+          <span className={`text-xs font-medium ${isActive ? 'text-white/80' : 'text-gray-400'} ${isClickable ? 'group-hover:text-white/80' : ''}`}>
+            {subText}
+          </span>
+        </div>
+
+        {/* Value Row with Icon */}
+        <div className="flex items-center gap-2 my-1">
+          {Icon && (
+            <Icon size={20} className={`${isActive ? 'text-white' : (label === 'Total Value' ? theme.text : 'text-gray-600')} ${isClickable ? 'group-hover:text-white' : ''} transition-colors`} />
+          )}
+          <span className={`text-2xl font-bold font-mono tracking-tight ${isActive ? 'text-white' : (label === 'Total Value' ? theme.text : 'text-black')} ${isClickable ? 'group-hover:text-white' : ''}`}>
+            {value}
+          </span>
+        </div>
+      </div>
+    </div>
   )
 }

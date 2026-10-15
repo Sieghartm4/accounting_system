@@ -14,6 +14,7 @@ const {
 } = require('../util/helper.util')
 const { Master } = require('../database/model/Master')
 const { resolveEntitlement } = require('../services/entitlement.service')
+const { assignCompanyPlan } = require('../services/companySubscription.service')
 const { CheckPassword, Encrypter, Decrypter } = require('../util/cryptography.util')
 const jwt = require('jsonwebtoken')
 const { SQLQueryBuilder } = require('../util/helper.util')
@@ -198,6 +199,27 @@ const register = async (req, res, next) => {
           message: 'Failed to create tenant database',
         })
       }
+
+      // Record the entitlement row that authorisation actually reads.
+      // master_user.subscription_id alone grants nothing: the accounting server
+      // resolves modules from master_company_subscription, so without this a new
+      // company resolves as NO_SUBSCRIPTION_ROW and every sellable module is
+      // locked no matter which plan was chosen.
+      try {
+        await assignCompanyPlan({
+          planId: subscription_id || null,
+          dbName: dbNameWithPrefix,
+          currentUsers: 1,
+        })
+      } catch (planError) {
+        // Not fatal to the signup: the tenant exists and can be reached. It is
+        // logged loudly because the company will see locked modules until an
+        // admin attaches a plan, which is a support call otherwise.
+        console.error(
+          `Failed to record company subscription for ${dbNameWithPrefix}:`,
+          planError.message,
+        )
+      }
     } else {
       console.log(
         `Database ${dbNameWithPrefix} already exists, skipping database creation`,
@@ -369,6 +391,26 @@ const registerWithProgress = async (req, res) => {
         res.end()
         return
       }
+
+      // Same entitlement row the non-streaming path records. Without it a newly
+      // created company has nothing to authorise against.
+      try {
+        await assignCompanyPlan({
+          planId: subscription_id || null,
+          dbName: dbNameWithPrefix,
+          currentUsers: 1,
+        })
+      } catch (planError) {
+        console.error(
+          `Failed to record company subscription for ${dbNameWithPrefix}:`,
+          planError.message,
+        )
+        sendProgress({
+          step: 'plan_warning',
+          message: 'Company created, but the plan could not be recorded.',
+          progress: 98,
+        })
+      }
     } else {
       console.log(
         `Database ${dbNameWithPrefix} already exists, skipping database creation`,
@@ -416,6 +458,29 @@ const updateSubscription = async (req, res, next) => {
     payment_method,
   })
   try {
+    // Resolve the company's tenant database from the username BEFORE writing.
+    //
+    // The entitlement row is keyed on db_name, and this is the only place that
+    // knows which company a given username belongs to. Reading it first means a
+    // bad username fails before anything is written rather than half-applying a
+    // subscription to a user that does not exist.
+    const dbLookup = sql
+      .select([{ col: Master.master_user.selectOptionColumns.db_name, as: 'db_name' }])
+      .from(Master.master_user.tablename)
+      .where(Master.master_user.selectOptionColumns.username)
+      .build()
+
+    const userRows = await Query(dbLookup, [username], [Master.master_user.prefix_])
+
+    if (!userRows || userRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `No account found for username "${username}"`,
+      })
+    }
+
+    const tenantDb = userRows[0].db_name
+
     const updateQuery = `UPDATE ${Master.master_user.tablename} SET subscription_id = ? WHERE mu_username = ?`
 
     await Query(
@@ -423,6 +488,34 @@ const updateSubscription = async (req, res, next) => {
       [subscription_id, username],
       [Master.master_user.prefix_],
     )
+
+    // The write that actually grants modules. master_user.subscription_id is the
+    // legacy per-user pointer and is not read by the entitlement resolver, so
+    // updating only it left the company on its previous modules - which is why
+    // paying for a plan changed nothing.
+    try {
+      const result = await assignCompanyPlan({
+        planId: subscription_id || null,
+        dbName: tenantDb,
+        currentUsers: 1,
+      })
+      console.log(
+        `Company subscription recorded for ${tenantDb}:`,
+        JSON.stringify(result),
+      )
+    } catch (planError) {
+      // Reported rather than swallowed: the payment went through, so the company
+      // must not be left silently locked out of the modules it just paid for.
+      console.error(
+        `Payment recorded for ${username} but the plan could not be assigned to ${tenantDb}:`,
+        planError.message,
+      )
+      return res.status(500).json({
+        success: false,
+        message:
+          'Your payment was recorded but the plan could not be assigned. Please contact support so we can enable it.',
+      })
+    }
 
     // Save subscription history after updating subscription
     try {

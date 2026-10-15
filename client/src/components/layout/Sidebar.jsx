@@ -86,6 +86,9 @@ export default function Sidebar({ isCollapsed }) {
       setUser(userData)
 
       if (userData) {
+        // Permission only. A module the tenant has not bought is still listed;
+        // opening it shows the upgrade screen. Filtering here would hide the
+        // upsell along with the feature, which is not what is wanted.
         const items = getSidebarItems(userData)
 
         setSidebarItems(items)

@@ -40,16 +40,20 @@ const requirePermissionAdmin = async (req, res, next) => {
 
   let rows
   try {
-    rows = await Query(
-      `SELECT mu.${Master.master_user.selectOptionColumns.access} AS access_name
+    const sql = `SELECT ma.${Master.master_access.selectOptionColumns.access_name} AS access_name
          FROM ${Master.master_user.tablename} mu
-        WHERE mu.${Master.master_user.selectOptionColumns.id} = ?
-        LIMIT 1`,
-      [req?.context?.userId],
-      [Master.master_user.prefix_],
+         JOIN ${Master.master_access.tablename} ma ON mu.${Master.master_user.selectOptionColumns.access_id} = ma.${Master.master_access.selectOptionColumns.access_id}
+        WHERE mu.${Master.master_user.selectOptionColumns.username} = ?
+        LIMIT 1`
+    console.log('[permissions] SQL:', sql, 'params:', [req?.context?.username], 'dbName:', dbName)
+    rows = await Query(
+      sql,
+      [req?.context?.username],
+      [Master.master_user.prefix_, Master.master_access.prefix_],
       null,
       dbName,
     )
+    console.log('[permissions] Query result:', rows)
   } catch (error) {
     console.error('[permissions] could not read caller access level:', error.message)
     return res.status(500).json({
@@ -59,6 +63,7 @@ const requirePermissionAdmin = async (req, res, next) => {
   }
 
   const accessName = rows && rows[0] ? String(rows[0].access_name || '') : ''
+  console.log('[permissions] userId:', req?.context?.userId, 'accessName:', accessName, 'rows:', rows)
   if (!/^admin$/i.test(accessName)) {
     return res.status(403).json({
       success: false,

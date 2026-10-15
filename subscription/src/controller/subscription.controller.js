@@ -75,7 +75,54 @@ const Subscription = {
   },
 }
 
+/**
+ * Modules a plan grants, from the normalised plan_modules table.
+ *
+ * This is the authoritative list. The legacy `subscription_plan_items` rows of
+ * type MODULES were never populated by the seeder, so anything reading modules
+ * from there finds nothing and reports a plan as including none - which is why
+ * modules an operator had checked in the plan editor stopped appearing on the
+ * plan list and on the customer's own plan page.
+ *
+ * Required modules are added here rather than trusted from the table, so a plan
+ * whose rows were edited by hand still cannot withhold the modules a tenant
+ * needs to reach its own dashboard and users.
+ *
+ * @param {import('mysql2/promise').PoolConnection} connection
+ * @param {number} planId
+ * @returns {Promise<string[]>}
+ */
+const readPlanModules = async (connection, planId) => {
+  const [rows] = await connection.execute(
+    'SELECT pm_module FROM plan_modules WHERE pm_plan_id = ? ORDER BY pm_module',
+    [planId],
+  )
+  const granted = rows.map((r) => r.pm_module).filter(Boolean)
+  return [...new Set([...catalog.REQUIRED_MODULES, ...granted])]
+}
+
+/** Module lists for many plans in one round trip rather than N+1 queries. */
+const readPlanModulesForPlans = async (connection, planIds) => {
+  if (!planIds.length) return new Map()
+  const placeholders = planIds.map(() => '?').join(',')
+  const [rows] = await connection.execute(
+    `SELECT pm_plan_id, pm_module FROM plan_modules
+      WHERE pm_plan_id IN (${placeholders}) ORDER BY pm_module`,
+    planIds,
+  )
+  const byPlan = new Map(planIds.map((id) => [id, []]))
+  for (const row of rows) {
+    byPlan.get(row.pm_plan_id)?.push(row.pm_module)
+  }
+  // Required modules are always granted, whatever the table says.
+  for (const [id, list] of byPlan) {
+    byPlan.set(id, [...new Set([...catalog.REQUIRED_MODULES, ...list.filter(Boolean)])])
+  }
+  return byPlan
+}
+
 const getSubscriptionPlans = async (req, res, next) => {
+  let connection
   try {
     const query = sql
       .select(Subscription.subscription_plans.selectColumns)
@@ -84,11 +131,29 @@ const getSubscriptionPlans = async (req, res, next) => {
 
     const plans = await Query(query, [])
 
+    // Attach each plan's real module list. Without this the plan list showed no
+    // modules at all, so an operator who had ticked modules in the editor saw
+    // them vanish from the list and could not tell a plan apart from another.
+    let byPlan = new Map()
+    try {
+      connection = await adminPool.getConnection()
+      byPlan = await readPlanModulesForPlans(
+        connection,
+        plans.map((p) => p.sp_id),
+      )
+    } finally {
+      if (connection) await connection.release()
+    }
+    const withModules = plans.map((p) => ({
+      ...p,
+      modules: byPlan.get(p.sp_id) || [...catalog.REQUIRED_MODULES],
+    }))
+
     res.status(200).json({
       success: true,
       message: 'Subscription plans retrieved successfully',
-      data: plans,
-      count: plans.length,
+      data: withModules,
+      count: withModules.length,
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
@@ -116,7 +181,8 @@ const getPublicSubscriptionPlans = async (req, res, next) => {
     console.log('Connected to database')
 
     const query = `
-      SELECT sp_id, sp_code, sp_name, sp_description, sp_status
+      SELECT sp_id, sp_code, sp_name, sp_description, sp_status,
+             sp_max_users, sp_trial_days, sp_billing_days, sp_price_minor, sp_is_trial
       FROM subscription_plans
       WHERE sp_status = 'PUBLIC'
       ORDER BY sp_id ASC
@@ -124,7 +190,14 @@ const getPublicSubscriptionPlans = async (req, res, next) => {
 
     const [plans] = await connection.execute(query)
     console.log('Fetched plans:', plans.length)
-    
+
+    // Every plan's modules in one query, so the customer's plan page shows what
+    // the operator actually granted rather than the generic FEATURES strings.
+    const byPlanModules = await readPlanModulesForPlans(
+      connection,
+      plans.map((p) => p.sp_id),
+    )
+
     // Fetch subscription plan items for each plan
     const plansWithItems = await Promise.all(
       plans.map(async (plan) => {
@@ -136,15 +209,21 @@ const getPublicSubscriptionPlans = async (req, res, next) => {
         `
         const [items] = await connection.execute(itemsQuery, [plan.sp_id])
         console.log(`Plan ${plan.sp_id} items:`, items)
-        
-        // Calculate price from PRICE type items
+
+        // Price and seat cap come from the plan's own columns. The legacy PRICE
+        // and USERS items are only a fallback, because a limit edited in the plan
+        // builder is written to the columns and would otherwise be ignored here.
         const priceItem = items.find(item => item.spi_type === 'PRICE')
-        const price = priceItem ? parseFloat(priceItem.spi_details) : 0
-        console.log(`Plan ${plan.sp_id} price:`, price)
-        
+        const price = plan.sp_price_minor !== null && plan.sp_price_minor !== undefined
+          ? Number(plan.sp_price_minor) / 100
+          : (priceItem ? parseFloat(priceItem.spi_details) : 0)
+
         return {
           ...plan,
           sp_price: price,
+          // The module list the plan really grants. Legacy MODULES items are
+          // never seeded, so they are not consulted at all.
+          modules: byPlanModules.get(plan.sp_id) || [...catalog.REQUIRED_MODULES],
           items: items
         }
       })

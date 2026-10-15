@@ -11,6 +11,10 @@ import {
   Download,
   FileText,
   Building,
+  CheckCircle,
+  XCircle,
+  ClipboardList,
+  Wallet,
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import DynamicToast from '../../components/DynamicToast'
@@ -66,6 +70,7 @@ function PurchaseContent() {
     title: '',
     message: '',
   })
+  const [activeFilter, setActiveFilter] = useState(null)
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -163,6 +168,31 @@ function PurchaseContent() {
     accessLevel === 'Full Access'
 
   const checkboxCondition = null // Always show checkboxes (match other pages)
+
+  // Filter purchases based on active card filter
+  const getFilteredPurchases = () => {
+    if (!activeFilter) return purchases
+
+    switch (activeFilter) {
+      case 'PREPARED':
+        return purchases?.filter((p) => p.state === 'PREPARED') || []
+      case 'CHECKED':
+        return purchases?.filter((p) => p.state === 'CHECKED') || []
+      case 'CANCELLED':
+        return purchases?.filter((p) => p.state === 'CANCELLED') || []
+      case 'APPROVED':
+        return purchases?.filter((p) => p.state === 'APPROVED') || []
+      default:
+        return purchases
+    }
+  }
+
+  const filteredPurchases = getFilteredPurchases()
+
+  // Calculate totals based on filtered data
+  const getFilteredTotalAmount = () => {
+    return filteredPurchases?.reduce((sum, p) => sum + (parseFloat(p.amount_due) || 0), 0) || 0
+  }
 
   // ─── Helper: fetch full purchase data then download as PDF ─────────────────
   const fetchAndDownloadPDF = async (selectedRows, copyType) => {
@@ -549,42 +579,77 @@ function PurchaseContent() {
         </motion.div>
 
         {/* --- SUMMARY TILES --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard
-            icon={<ShoppingCart className="text-red-600" size={20} />}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+          <SummaryTile
             label="Total Purchases"
-            value={purchases?.length || 0}
+            value={activeFilter ? filteredPurchases?.length || 0 : purchases?.length || 0}
             subText="Fetched"
-            borderColor="border-gray-200"
-            valueColor="text-black"
-            iconBgColor="bg-red-100"
+            color="emerald"
+            onClick={() => setActiveFilter(null)}
+            isActive={activeFilter === null}
+            icon={ShoppingCart}
           />
-          <SummaryCard
-            icon={<TrendingDown className="text-black" size={20} />}
-            label="Pending Approval"
+          <SummaryTile
+            label="Prepared"
             value={
-              purchases?.filter(
-                (p) => p.state !== 'APPROVED' && p.state !== 'CANCELLED'
-              ).length || 0
+              activeFilter === 'PREPARED'
+                ? filteredPurchases?.length || 0
+                : purchases?.filter((p) => p.state === 'PREPARED').length || 0
             }
             subText="Transactions"
-            borderColor="border-gray-200"
-            valueColor="text-black"
-            iconBgColor="bg-orange-100"
+            color="rose"
+            onClick={() => setActiveFilter('PREPARED')}
+            isActive={activeFilter === 'PREPARED'}
+            icon={ClipboardList}
           />
-          <SummaryCard
-            icon={<ShieldCheck className="text-gray-400" size={20} />}
-            label="Total Amount Due"
+          <SummaryTile
+            label="Checked"
             value={
-              purchases?.reduce((sum, p) => sum + (parseFloat(p.amount_due) || 0), 0).toLocaleString('en-PH', {
+              activeFilter === 'CHECKED'
+                ? filteredPurchases?.length || 0
+                : purchases?.filter((p) => p.state === 'CHECKED').length || 0
+            }
+            subText="Transactions"
+            color="blue"
+            onClick={() => setActiveFilter('CHECKED')}
+            isActive={activeFilter === 'CHECKED'}
+            icon={CheckCircle}
+          />
+          <SummaryTile
+            label="Cancelled"
+            value={
+              activeFilter === 'CANCELLED'
+                ? filteredPurchases?.length || 0
+                : purchases?.filter((p) => p.state === 'CANCELLED').length || 0
+            }
+            subText="Transactions"
+            color="orange"
+            onClick={() => setActiveFilter('CANCELLED')}
+            isActive={activeFilter === 'CANCELLED'}
+            icon={XCircle}
+          />
+          <SummaryTile
+            label="Approved"
+            value={
+              activeFilter === 'APPROVED'
+                ? filteredPurchases?.length || 0
+                : purchases?.filter((p) => p.state === 'APPROVED').length || 0
+            }
+            subText="Transactions"
+            color="emerald"
+            onClick={() => setActiveFilter('APPROVED')}
+            isActive={activeFilter === 'APPROVED'}
+            icon={ShieldCheck}
+          />
+          <SummaryTile
+            label="Total Amount Due"
+            value={`₱ ${getFilteredTotalAmount().toLocaleString('en-PH', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
-              }) || '0.00'
-            }
+              }) || '0.00'}`}
             subText="PHP"
-            borderColor="border-gray-200"
-            valueColor="text-green-600"
-            iconBgColor="bg-green-100"
+            color="dark"
+            icon={Wallet}
           />
         </div>
       </div>
@@ -598,7 +663,7 @@ function PurchaseContent() {
       >
         {console.log('About to render DynamicTable with data:', purchases)}
         <DynamicTable
-          data={purchases}
+          data={filteredPurchases}
           title="Purchase Ledger"
           enableDateFilter={true}
           dateFrom={pendingDateFrom}
@@ -783,21 +848,101 @@ function PurchaseContent() {
   )
 }
 
-{
-  /* --- HELPER COMPONENT (Fixed: This was likely missing) --- */
-}
-function SummaryCard({ icon, label, value, subText, borderColor, valueColor, iconBgColor }) {
+function SummaryTile({ label, value, subText, color, onClick, isActive, icon: Icon }) {
+  const theme = {
+    emerald: {
+      text: 'text-emerald-600 dark:text-emerald-400',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      bar: 'bg-emerald-500',
+      bg: 'bg-emerald-500',
+      textOnActive: 'text-white'
+    },
+    amber: {
+      text: 'text-amber-600 dark:text-amber-400',
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
+      bar: 'bg-amber-500',
+      bg: 'bg-amber-500',
+      textOnActive: 'text-white'
+    },
+    orange: {
+      text: 'text-orange-600 dark:text-orange-400',
+      badgeBg: 'bg-orange-50 text-orange-700 border-orange-200',
+      bar: 'bg-orange-500',
+      bg: 'bg-orange-500',
+      textOnActive: 'text-white'
+    },
+    rose: {
+      text: 'text-rose-600 dark:text-rose-400',
+      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
+      bar: 'bg-rose-500',
+      bg: 'bg-rose-500',
+      textOnActive: 'text-white'
+    },
+    blue: {
+      text: 'text-blue-600 dark:text-blue-400',
+      badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
+      bar: 'bg-blue-500',
+      bg: 'bg-blue-500',
+      textOnActive: 'text-white'
+    },
+    dark: {
+      text: 'text-emerald-400',
+      badgeBg: 'bg-emerald-950 text-emerald-300 border-emerald-800/50',
+      bar: 'bg-emerald-400',
+      bg: 'bg-emerald-400',
+      textOnActive: 'text-white'
+    },
+  }[color] || {
+    text: 'text-gray-700',
+    badgeBg: 'bg-gray-50 text-gray-700 border-gray-200',
+    bar: 'bg-gray-400',
+    bg: 'bg-gray-400',
+    textOnActive: 'text-white'
+  }
+
+  const bgClass = color === 'dark'
+    ? 'bg-slate-900 text-white border-slate-800'
+    : 'bg-white text-gray-900 border-gray-200/80 shadow-xs'
+
+  const activeBgClass = isActive
+    ? `${theme.bg} text-white border-transparent`
+    : bgClass
+
+  const isClickable = label !== 'Total Amount Due'
+
   return (
-    <div className={`bg-white p-4 rounded-xl border-2 ${borderColor} flex items-center gap-4 shadow-sm`}>
-      <div className={`p-3 ${iconBgColor} rounded-xl`}>{icon}</div>
-      <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-700 leading-none mb-1">
-          {label}
-        </p>
-        <div className="flex items-baseline gap-2">
-          <h4 className={`text-xl font-black ${valueColor}`}>{value}</h4>
-          <span className="text-[9px] font-bold text-gray-500 uppercase">
+    <div
+      onClick={isClickable ? onClick : undefined}
+      className={`${activeBgClass} p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between h-full ${isClickable ? 'cursor-pointer hover:scale-105 hover:shadow-lg group' : ''} transition-all duration-300`}
+    >
+      {/* Bottom Accent Indicator - Animates on hover (behind content) */}
+      <div className={`absolute bottom-0 left-0 right-0 h-1 ${theme.bar} ${isClickable ? 'group-hover:h-full' : ''} transition-all duration-300 z-0`} />
+
+      {/* Content wrapper with higher z-index */}
+      <div className="relative z-10 flex flex-col justify-between h-full">
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          {label === 'Total Amount Due' ? (
+            <span className={`text-xs font-semibold tracking-wide uppercase text-white`}>
+              {label}
+            </span>
+          ) : (
+            <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${isActive ? 'bg-white text-gray-900 border-white' : theme.badgeBg} ${isClickable ? 'group-hover:bg-white group-hover:text-gray-900 group-hover:border-white' : ''}`}>
+              {label}
+            </span>
+          )}
+          <span className={`text-xs font-medium ${isActive ? 'text-white/80' : 'text-gray-400'} ${isClickable ? 'group-hover:text-white/80' : ''}`}>
             {subText}
+          </span>
+        </div>
+
+        {/* Value Row with Icon */}
+        <div className="flex items-center gap-2 my-1">
+          {Icon && (
+            <Icon size={20} className={`${isActive ? 'text-white' : (label === 'Total Amount Due' ? theme.text : color === 'dark' ? theme.text : 'text-gray-600')} ${isClickable ? 'group-hover:text-white' : ''} transition-colors`} />
+          )}
+          <span className={`text-2xl font-bold font-mono tracking-tight ${isActive ? 'text-white' : (label === 'Total Amount Due' ? theme.text : 'text-black')} ${isClickable ? 'group-hover:text-white' : ''}`}>
+            {value}
           </span>
         </div>
       </div>

@@ -9,19 +9,22 @@ import {
   Search,
   RefreshCcw,
   ArrowUpRight,
+  CheckCircle,
+  Wallet,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 import LoadingScreen from '../../components/LoadingScreen'
+import { currentReportPeriod } from '../../utils/reportPeriod'
 
 export default function TrialBalance() {
   const navigate = useNavigate()
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startDate, setStartDate] = useState(() => currentReportPeriod().start)
+  const [endDate, setEndDate] = useState(() => currentReportPeriod().end)
   const [searchTerm, setSearchTerm] = useState('')
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const { company } = useCompany()
@@ -248,143 +251,174 @@ export default function TrialBalance() {
     setExportMenuOpen(false)
   }
 
-  const handleExportPDF = async () => {
-    try {
-      const { jsPDF } = await import('jspdf')
-      const { default: autoTable } = await import('jspdf-autotable')
+const handleExportPDF = async () => {
+  try {
+    const { jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
 
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'pt',
-        format: 'letter',
-      })
-      const W = doc.internal.pageSize.getWidth()
-      const M = 36
-      let y = renderPDFCompanyHeader(doc, company, W, M)
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'pt',
+      format: 'letter',
+    })
 
-      const BLK = [17, 24, 39]
-      const RED = [220, 38, 38]
-      const GRY = [107, 114, 128]
-      const LGT = [229, 231, 235]
-      const WHT = [255, 255, 255]
-      const GRN = [74, 222, 128]
-      const LGRY = [249, 250, 251]
+    const W = doc.internal.pageSize.getWidth()
+    const H = doc.internal.pageSize.getHeight()
+    const M = 36 // 0.5 inch margins
 
-      doc.setFillColor(...BLK)
-      doc.rect(M, y - 14, W - M * 2, 32, 'F')
-      doc
-        .setFont('helvetica', 'bold')
-        .setFontSize(13)
-        .setTextColor(...WHT)
-      doc.text('TRIAL BALANCE', M + 8, y + 6)
-      doc.setFontSize(8).setTextColor(...(isBalanced ? GRN : RED))
-      doc.text(isBalanced ? 'BALANCED' : 'UNBALANCED', W - M - 8, y + 6, {
-        align: 'right',
-      })
-      y += 32
+    // Palette: Modern corporate slate/navy theme
+    const BRAND = [15, 23, 42]     // Slate 900
+    const TEXT_MAIN = [30, 41, 59] // Slate 800
+    const MUTED = [100, 116, 139]  // Slate 500
+    const BORDER = [226, 232, 240] // Slate 200
+    const BG_ALT = [248, 250, 252] // Slate 50
+    const SUCCESS = [16, 185, 129] // Emerald 500
+    const DANGER = [239, 68, 68]   // Red 500
 
-      doc.setFillColor(...BLK)
-      doc.rect(M, y - 2, W - M * 2, 18, 'F')
-      doc
-        .setFont('helvetica', 'normal')
-        .setFontSize(8)
-        .setTextColor(...GRY)
-      doc.text(
-        `Period: ${formatDate(startDate) || 'All Dates'} — ${formatDate(endDate) || 'All Dates'}`,
-        M + 8,
-        y + 10,
-      )
-      doc.text(
-        `Generated: ${new Date().toLocaleDateString('en-PH')}   ${filtered.length} accounts`,
-        W - M - 8,
-        y + 10,
-        { align: 'right' },
-      )
-      y += 22
+    // 1. Render Company Header
+    let y = renderPDFCompanyHeader(doc, company, W, M)
 
-      const body = filtered.map((row) => [
-        row['Account Code'],
-        row['Account Name'],
-        fmt(parseFloat(row.DEBIT || 0)),
-        fmt(parseFloat(row.CREDIT || 0)),
-      ])
+    // 2. Document Title Section (Clean, subtle border without heavy black bars)
+    doc.setDrawColor(...BORDER)
+    doc.setLineWidth(1)
+    doc.line(M, y, W - M, y)
+    y += 14
 
-      autoTable(doc, {
-        startY: y,
-        margin: { left: M, right: M },
-        tableWidth: W - M * 2,
-        didDrawPage: (data) => {},
-        head: [
-          [
-            { content: 'ACCOUNT CODE', styles: { halign: 'left' } },
-            { content: 'ACCOUNT NAME', styles: { halign: 'left' } },
-            { content: 'DEBIT (₱)', styles: { halign: 'right' } },
-            { content: 'CREDIT (₱)', styles: { halign: 'right' } },
-          ],
-        ],
-        body: body,
-        foot: [
-          [
-            {
-              content: 'TOTAL',
-              colSpan: 2,
-              styles: { halign: 'left', fontStyle: 'bold' },
-            },
-            {
-              content: fmt(totalDebit),
-              styles: { halign: 'right', fontStyle: 'bold' },
-            },
-            {
-              content: fmt(totalCredit),
-              styles: {
-                halign: 'right',
-                fontStyle: 'bold',
-                textColor: [252, 165, 165],
-              },
-            },
-          ],
-        ],
-        theme: 'plain',
-        headStyles: {
-          fillColor: BLK,
-          textColor: WHT,
-          fontStyle: 'bold',
-          fontSize: 9,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: [55, 65, 81],
-          lineWidth: 0.5,
-        },
-        footStyles: {
-          fillColor: BLK,
-          textColor: WHT,
-          fontStyle: 'bold',
-          fontSize: 10,
-          cellPadding: { top: 6, bottom: 6, left: 6, right: 6 },
-          lineColor: RED,
-          lineWidth: { top: 3, bottom: 0, left: 0, right: 0 },
-        },
-        styles: {
-          fontSize: 9,
-          cellPadding: { top: 5, bottom: 5, left: 6, right: 6 },
-          textColor: [55, 65, 81],
-          lineColor: LGT,
-          lineWidth: 0.3,
-          valign: 'top',
-        },
-        columnStyles: {
-          0: { cellWidth: 45, halign: 'left' },
-          1: { cellWidth: 'auto', halign: 'left' },
-          2: { cellWidth: 50, halign: 'right', fontStyle: 'bold' },
-          3: { cellWidth: 50, halign: 'right', fontStyle: 'bold' },
-        },
-      })
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(14)
+    doc.setTextColor(...BRAND)
+    doc.text('TRIAL BALANCE', M, y)
 
-      doc.save(`trial-balance-${new Date().toISOString().split('T')[0]}.pdf`)
-      setExportMenuOpen(false)
-    } catch (err) {
-      console.error('PDF export error:', err)
+    // Status Pill Badge (Balanced / Unbalanced)
+    const statusText = isBalanced ? 'BALANCED' : 'UNBALANCED'
+    const statusColor = isBalanced ? SUCCESS : DANGER
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(...statusColor)
+    doc.text(statusText, W - M, y, { align: 'right' })
+
+    y += 12
+
+    // Meta details subtext
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...MUTED)
+    const periodStr = `Period: ${formatDate(startDate) || 'All Dates'} — ${formatDate(endDate) || 'All Dates'}`
+    const genStr = `Generated: ${new Date().toLocaleDateString('en-PH')}  |  ${filtered.length} accounts`
+    doc.text(periodStr, M, y)
+    doc.text(genStr, W - M, y, { align: 'right' })
+
+    y += 12
+
+    // 3. Format Data (Use 'PHP' or 'Php' instead of '₱' to prevent encoding box glitches)
+    const cleanFmt = (val) => {
+      const formatted = fmt(parseFloat(val || 0))
+      return formatted.replace('₱', 'Php ')
     }
+
+    const body = filtered.map((row) => [
+      row['Account Code'] || '',
+      row['Account Name'] || '',
+      cleanFmt(row.DEBIT),
+      cleanFmt(row.CREDIT),
+    ])
+
+    // 4. Generate AutoTable with proportional widths
+    autoTable(doc, {
+      startY: y,
+      margin: { left: M, right: M, top: 50, bottom: 40 },
+      tableWidth: W - M * 2,
+      head: [
+        [
+          { content: 'ACCOUNT CODE', styles: { halign: 'left' } },
+          { content: 'ACCOUNT NAME', styles: { halign: 'left' } },
+          { content: 'DEBIT (Php)', styles: { halign: 'right' } },
+          { content: 'CREDIT (Php)', styles: { halign: 'right' } },
+        ],
+      ],
+      body: body,
+      foot: [
+        [
+          {
+            content: 'TOTAL',
+            colSpan: 2,
+            styles: { halign: 'left', fontStyle: 'bold' },
+          },
+          {
+            content: cleanFmt(totalDebit),
+            styles: { halign: 'right', fontStyle: 'bold' },
+          },
+          {
+            content: cleanFmt(totalCredit),
+            styles: { halign: 'right', fontStyle: 'bold' },
+          },
+        ],
+      ],
+      theme: 'plain',
+      headStyles: {
+        fillColor: BRAND,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 8.5,
+        cellPadding: { top: 7, bottom: 7, left: 8, right: 8 },
+      },
+      styles: {
+        fontSize: 8.5,
+        font: 'helvetica',
+        cellPadding: { top: 6, bottom: 6, left: 8, right: 8 },
+        textColor: TEXT_MAIN,
+        lineColor: BORDER,
+        lineWidth: 0.5,
+        valign: 'middle',
+      },
+      alternateRowStyles: {
+        fillColor: BG_ALT,
+      },
+      footStyles: {
+        fillColor: [241, 245, 249], // Soft gray highlight for footer summary
+        textColor: BRAND,
+        fontStyle: 'bold',
+        fontSize: 9,
+        cellPadding: { top: 8, bottom: 8, left: 8, right: 8 },
+        lineColor: BRAND,
+        lineWidth: { top: 1.5, bottom: 1.5, left: 0, right: 0 },
+      },
+      columnStyles: {
+        0: { cellWidth: 90, halign: 'left', fontStyle: 'bold' }, // Expanded to fit full codes comfortably
+        1: { cellWidth: 'auto', halign: 'left' },               // Flexible space for full account names
+        2: { cellWidth: 105, halign: 'right', fontStyle: 'bold' }, // Adequate room for currency amounts
+        3: { cellWidth: 105, halign: 'right', fontStyle: 'bold' }, // Adequate room for currency amounts
+      },
+      didDrawPage: (data) => {
+        // Dynamic Page Footer (Page X of Y)
+        const totalPages = doc.internal.getNumberOfPages()
+        const currentPage = data.pageNumber
+
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.setTextColor(...MUTED)
+        doc.text(
+          `Page ${currentPage} of ${totalPages}`,
+          W - M,
+          H - 20,
+          { align: 'right' }
+        )
+        doc.text(
+          'Confidential — For Internal Financial Reporting Only',
+          M,
+          H - 20
+        )
+      },
+    })
+
+    doc.save(`trial-balance-${new Date().toISOString().split('T')[0]}.pdf`)
+    if (typeof setExportMenuOpen === 'function') {
+      setExportMenuOpen(false)
+    }
+  } catch (err) {
+    console.error('PDF export error:', err)
   }
+}
 
   if (loading)
     return <LoadingScreen label="Loading Trial Balance..." />
@@ -406,7 +440,7 @@ export default function TrialBalance() {
     )
 
   return (
-    <div className="flex flex-col gap-2 bg-[#F3F4F6] min-h-full custom-scrollbar">
+    <div className="flex flex-col gap-2 bg-[#F3F4F6] h-full custom-scrollbar">
       {/* HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
@@ -423,6 +457,42 @@ export default function TrialBalance() {
           </div>
         </div>
         <div className="flex gap-2 items-center relative">
+          {/* Date range, restyled as one grouped control.
+
+              This was two separate white boxes on a white header, so it read as
+              two blank inputs rather than a single "from here to here" filter.
+              One bordered, tinted container reads as a single unit, and the
+              inputs inside it drop their own borders so there is a single edge
+              around the pair rather than four. The state, values and handlers
+              are untouched - this is presentation only. */}
+          <div className="flex flex-col md:flex-row md:items-center gap-2 w-full md:w-auto rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-2 py-1.5 shadow-sm">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[2px]">From</span>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full md:w-auto bg-transparent px-1 py-1 md:py-0.5 text-[11px] font-bold text-slate-800 outline-none" />
+            <span className="hidden md:inline text-slate-300 text-[11px] leading-none">→</span>
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[2px]">To</span>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full md:w-auto bg-transparent px-1 py-1 md:py-0.5 text-[11px] font-bold text-slate-800 outline-none" />
+            <span className="hidden md:block mx-1 h-5 w-px bg-slate-200" />
+            <button
+              onClick={() => {
+              setStartDate('')
+              setEndDate('')
+              setSearchTerm('')
+            }}
+              className="w-full md:w-auto px-2.5 py-2 md:py-1 rounded-lg border border-slate-300 bg-white text-[9px] font-black text-slate-700 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-colors cursor-pointer"
+            >
+              Reset
+            </button>
+            <button
+              onClick={() => {
+              const t = new Date().toISOString().split('T')[0]
+              setStartDate(t)
+              setEndDate(t)
+            }}
+              className="w-full md:w-auto px-2.5 py-2 md:py-1 rounded-lg bg-slate-900 text-[9px] font-black text-white uppercase tracking-widest hover:bg-red-600 transition-colors cursor-pointer"
+            >
+              Today
+            </button>
+          </div>
           <div className="relative">
             <button
               onClick={() => setExportMenuOpen((p) => !p)}
@@ -459,117 +529,41 @@ export default function TrialBalance() {
       </div>
 
       {/* STAT CARDS — all 4 in one row */}
-      <div className="grid grid-cols-4 gap-3">
-        <StatCard
-          iconBg="bg-red-50"
-          iconColor="text-red-600"
-          icon={<Table2 size={18} />}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <SummaryTile
           label="Total Accounts"
           value={filtered.length}
-          sub="Active Records"
+          subText="Active Records"
+          color="emerald"
+          icon={Table2}
         />
-        <StatCard
-          iconBg="bg-gray-100"
-          iconColor="text-black"
-          icon={<DollarSign size={18} />}
+        <SummaryTile
           label="Total Debit"
           value={`₱${fmt(totalDebit)}`}
-          sub="PHP"
-          small
+          subText="PHP"
+          color="blue"
+          icon={Wallet}
         />
-        <StatCard
-          iconBg="bg-red-50"
-          iconColor="text-red-600"
-          icon={<DollarSign size={18} />}
+        <SummaryTile
           label="Total Credit"
           value={`₱${fmt(totalCredit)}`}
-          sub="PHP"
-          small
-          valueClass="text-red-600"
+          subText="PHP"
+          color="orange"
+          icon={Wallet}
         />
-        <StatCard
-          iconBg={isBalanced ? 'bg-green-50' : 'bg-red-50'}
-          iconColor={isBalanced ? 'text-green-600' : 'text-red-600'}
-          icon={<ShieldCheck size={18} />}
+        <SummaryTile
           label="Audit Status"
           value={isBalanced ? 'Verified' : 'Discrepancy'}
-          sub="Balance Check"
-          valueClass={isBalanced ? 'text-green-600' : 'text-red-600'}
+          subText="Balance Check"
+          color={isBalanced ? 'emerald' : 'rose'}
+          icon={CheckCircle}
         />
-      </div>
-
-      {/* TOOLBAR */}
-      <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap shadow-sm">
-        {/* Search */}
-        <div className="flex-1 min-w-[200px] flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 h-8 focus-within:border-red-500 focus-within:bg-white transition-all">
-          <Search size={14} className="text-gray-300 flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search by account name or code..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none text-[12px] font-bold text-black placeholder:text-gray-300 placeholder:font-semibold"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="text-gray-300 hover:text-red-500 text-lg leading-none transition-colors"
-            >
-              ×
-            </button>
-          )}
-        </div>
-
-        <div className="hidden md:block w-px h-7 bg-gray-100" />
-
-        {/* Date filters */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-            From
-          </span>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
-          />
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-            To
-          </span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-red-500 focus:bg-white transition-all"
-          />
-        </div>
-
-        <button
-          onClick={() => {
-            setStartDate('')
-            setEndDate('')
-            setSearchTerm('')
-          }}
-          className="px-4 py-2 border border-gray-900 rounded-xl text-[10px] font-black text-gray-900 uppercase tracking-widest hover:border-red-500 hover:text-red-600 transition-all bg-white cursor-pointer"
-        >
-          Reset
-        </button>
-        <button
-          onClick={() => {
-            const t = new Date().toISOString().split('T')[0]
-            setStartDate(t)
-            setEndDate(t)
-          }}
-          className="px-4 py-2 bg-black rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-red-600 transition-all cursor-pointer"
-        >
-          Today
-        </button>
       </div>
 
       {/* TABLE CARD */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col custom-scrollbar">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col flex-1 overflow-hidden min-h-0 custom-scrollbar">
         {/* Table header bar */}
-        <div className="flex items-center gap-2 px-5 py-3 bg-black flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-2 px-4 sm:px-5 py-3 bg-black flex-shrink-0">
           <Table2 size={14} className="text-gray-500" />
           <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
             Account Ledger
@@ -577,7 +571,29 @@ export default function TrialBalance() {
           <span className="text-[10px] font-bold text-gray-600 ml-1">
             {filtered.length} records
           </span>
-          <div className="ml-auto">
+            {/* Search sits in the table header rather than in a separate white
+                card above it: the control that filters the table belongs on the
+                table. Colours are for the black bar - the old grey-on-grey
+                placeholder and clear button were invisible against it. */}
+            <div className="ml-auto w-full sm:w-auto flex items-center gap-2 bg-white rounded-lg px-2.5 h-9 sm:h-7 shadow-sm">
+              <Search size={13} className="text-gray-400 flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Search by account name or code..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="flex-1 sm:flex-none w-full sm:w-44 bg-transparent border-none outline-none text-[11px] font-bold text-gray-900 placeholder:text-gray-400 placeholder:font-semibold"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="text-gray-400 hover:text-gray-900 text-sm leading-none transition-colors"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <div>
             {isBalanced ? (
               <span className="px-2.5 py-1 bg-green-100 text-green-800 text-[9px] font-black uppercase rounded-md tracking-widest">
                 Balanced
@@ -592,8 +608,7 @@ export default function TrialBalance() {
 
         {/* Scrollable body */}
         <div
-          className="overflow-y-auto overflow-x-auto custom-scrollbar"
-          style={{ maxHeight: '570px' }}
+          className="overflow-y-auto overflow-x-auto custom-scrollbar flex-1 min-h-0"
         >
           <table
             className="w-full border-collapse"
@@ -629,7 +644,7 @@ export default function TrialBalance() {
                 </tr>
               ) : (
                 filtered.map((row, i) => (
-                  <tr key={i} className="hover:bg-red-50 transition-colors">
+                  <tr key={i} className="hover:bg-red-100 hover:border-l-4 hover:border-red-600 hover:shadow-sm transition-colors">
                     <td className="py-3 px-4 text-[11px] font-bold text-gray-400">
                       {row['Account Code']}
                     </td>
@@ -713,33 +728,94 @@ export default function TrialBalance() {
   )
 }
 
-function StatCard({
-  iconBg,
-  iconColor,
-  icon,
-  label,
-  value,
-  sub,
-  small = false,
-  valueClass = 'text-black',
-}) {
+function SummaryTile({ label, value, subText, color, icon: Icon }) {
+  const theme = {
+    emerald: {
+      text: 'text-emerald-600 dark:text-emerald-400',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      bar: 'bg-emerald-500',
+      bg: 'bg-emerald-500',
+      textOnActive: 'text-white'
+    },
+    amber: {
+      text: 'text-amber-600 dark:text-amber-400',
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
+      bar: 'bg-amber-500',
+      bg: 'bg-amber-500',
+      textOnActive: 'text-white'
+    },
+    orange: {
+      text: 'text-orange-600 dark:text-orange-400',
+      badgeBg: 'bg-orange-50 text-orange-700 border-orange-200',
+      bar: 'bg-orange-500',
+      bg: 'bg-orange-500',
+      textOnActive: 'text-white'
+    },
+    rose: {
+      text: 'text-rose-600 dark:text-rose-400',
+      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
+      bar: 'bg-rose-500',
+      bg: 'bg-rose-500',
+      textOnActive: 'text-white'
+    },
+    blue: {
+      text: 'text-blue-600 dark:text-blue-400',
+      badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
+      bar: 'bg-blue-500',
+      bg: 'bg-blue-500',
+      textOnActive: 'text-white'
+    },
+    dark: {
+      text: 'text-emerald-400',
+      badgeBg: 'bg-emerald-950 text-emerald-300 border-emerald-800/50',
+      bar: 'bg-emerald-400',
+      bg: 'bg-emerald-400',
+      textOnActive: 'text-white'
+    },
+  }[color] || {
+    text: 'text-gray-700',
+    badgeBg: 'bg-gray-50 text-gray-700 border-gray-200',
+    bar: 'bg-gray-400',
+    bg: 'bg-gray-400',
+    textOnActive: 'text-white'
+  }
+
+  const bgClass = color === 'dark'
+    ? 'bg-slate-900 text-white border-slate-800'
+    : 'bg-white text-gray-900 border-gray-200/80 shadow-xs'
+
+  const activeBgClass = bgClass
+
+  const isClickable = false
+
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-      <div
-        className={`w-10 h-10 ${iconBg} ${iconColor} rounded-xl flex items-center justify-center flex-shrink-0`}
-      >
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-[9px] font-black uppercase tracking-[3px] text-gray-400 mb-1 whitespace-nowrap">
-          {label}
-        </p>
-        <h4
-          className={`font-black ${valueClass} leading-none truncate ${small ? 'text-[13px]' : 'text-xl'}`}
-        >
-          {value}
-        </h4>
-        <p className="text-[9px] font-bold text-gray-300 uppercase mt-1">{sub}</p>
+    <div
+      className={`${activeBgClass} p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between h-full hover:scale-105 hover:shadow-lg group transition-all duration-300`}
+    >
+      {/* Bottom Accent Indicator - Animates on hover (behind content) */}
+      <div className={`absolute bottom-0 left-0 right-0 h-1 ${theme.bar} group-hover:h-full transition-all duration-300 z-0`} />
+
+      {/* Content wrapper with higher z-index */}
+      <div className="relative z-10 flex flex-col justify-between h-full">
+        {/* Top Header Row */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${theme.badgeBg} group-hover:bg-white group-hover:text-gray-900 group-hover:border-white`}>
+            {label}
+          </span>
+          <span className={`text-xs font-medium text-gray-400 group-hover:text-white/80`}>
+            {subText}
+          </span>
+        </div>
+
+        {/* Value Row with Icon */}
+        <div className="flex items-center gap-2 my-1">
+          {Icon && (
+            <Icon size={20} className={`${color === 'dark' ? theme.text : 'text-gray-600'} group-hover:text-white transition-colors`} />
+          )}
+          <span className={`text-2xl font-bold font-mono tracking-tight ${color === 'dark' ? theme.text : 'text-black'} group-hover:text-white`}>
+            {value}
+          </span>
+        </div>
       </div>
     </div>
   )

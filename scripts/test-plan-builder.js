@@ -75,11 +75,8 @@ const cleanup = async () => {
 const main = async () => {
   await cleanup()
 
-  const [planRows] = await pool.query(
-    'SELECT sp_id, sp_code, sp_max_users FROM subscription_plans WHERE sp_code = ?',
-    ['PRO'],
-  )
-  const proPlanId = planRows[0].sp_id
+  // No lookup of a real seeded plan. Every plan this test touches is created
+  // here under SCRATCH_CODE, so it cannot delete or depend on production data.
 
   /* ---------------- create with a seat cap and modules ---------------- */
   section('creating a plan with limits and modules')
@@ -210,13 +207,32 @@ const main = async () => {
   /* ---------------- deleting a plan in use ---------------- */
   section('deleting a plan')
 
+  // The plan placed "in use" is a scratch plan with a scratch company attached,
+// never a real seeded plan.
+  //
+  // This previously deleted the real PRO plan from the live database. It
+  // asserted a 409 against whatever plan PRO happened to be, so when no company
+  // was on it the controller correctly answered 200 and removed it. A test that
+  // reaches for production data to make an assertion is a test that can delete
+  // production data - and the plan had to be restored by hand afterwards.
+  await pool.query(
+    `INSERT INTO master_company_subscription
+       (mcs_db_name, mcs_plan_id, mcs_status, mcs_max_users, mcs_current_users)
+     VALUES (?, ?, 'active', 1, 1)`,
+    [SCRATCH_DB, planId],
+  )
   const inUseDelete = await call(controller.deleteSubscriptionPlan, {
     method: 'DELETE',
-    params: { id: proPlanId },
+    params: { id: planId },
   })
   ok('a plan with companies on it cannot be deleted', inUseDelete.status === 409, inUseDelete.status)
   ok('the refusal says why', inUseDelete.payload?.code === 'PLAN_IN_USE', inUseDelete.payload)
+  const [survived] = await pool.query('SELECT COUNT(*) AS n FROM subscription_plans WHERE sp_id = ?', [planId])
+  ok('the refused delete left the plan in place', Number(survived[0].n) === 1, survived[0])
 
+  // Detach the company so the same scratch plan can now be deleted, proving the
+  // refusal was about the attachment and not about the plan itself.
+  await pool.query('DELETE FROM master_company_subscription WHERE mcs_db_name = ?', [SCRATCH_DB])
   const unusedDelete = await call(controller.deleteSubscriptionPlan, {
     method: 'DELETE',
     params: { id: planId },

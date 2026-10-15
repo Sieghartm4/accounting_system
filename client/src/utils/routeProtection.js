@@ -57,6 +57,12 @@ export const hasRouteAccess = (routeName, user) => {
     'add access',
   ])
 
+  // Handle legacy alias for withholding_tax
+  const routeNamesToCheck = [normalizedRouteName]
+  if (normalizedRouteName === 'withholding_tax') {
+    routeNamesToCheck.push('witholding_tax') // Legacy typo
+  }
+
   return user.route_access.some((route) => {
     if (!route || typeof route !== 'object') {
       console.warn('Invalid route object:', route)
@@ -71,7 +77,7 @@ export const hasRouteAccess = (routeName, user) => {
         ? route.status.toLowerCase().trim()
         : ''
     return (
-      route.name.toLowerCase().trim() === normalizedRouteName &&
+      routeNamesToCheck.includes(route.name.toLowerCase().trim()) &&
       truthyStatuses.has(status)
     )
   })
@@ -138,6 +144,12 @@ export const hasFullAccess = (routeName, user) => {
   }
 
   const normalizedRouteName = normalizeRouteName(routeName)
+  // Handle legacy alias for withholding_tax
+  const routeNamesToCheck = [normalizedRouteName]
+  if (normalizedRouteName === 'withholding_tax') {
+    routeNamesToCheck.push('witholding_tax') // Legacy typo
+  }
+
   return user.route_access.some((route) => {
     if (!route || typeof route !== 'object') {
       console.warn('Invalid route object:', route)
@@ -148,7 +160,7 @@ export const hasFullAccess = (routeName, user) => {
       return false
     }
     return (
-      normalizeRouteName(route.name) === normalizedRouteName &&
+      routeNamesToCheck.includes(normalizeRouteName(route.name)) &&
       hasRouteStatus(route, 'full access')
     )
   })
@@ -222,6 +234,12 @@ export const hasEditAccess = (routeName, user) => {
   }
 
   const normalizedRouteName = normalizeRouteName(routeName)
+  // Handle legacy alias for withholding_tax
+  const routeNamesToCheck = [normalizedRouteName]
+  if (normalizedRouteName === 'withholding_tax') {
+    routeNamesToCheck.push('witholding_tax') // Legacy typo
+  }
+
   return user.route_access.some((route) => {
     if (!route || typeof route !== 'object') {
       console.warn('Invalid route object:', route)
@@ -232,7 +250,7 @@ export const hasEditAccess = (routeName, user) => {
       return false
     }
     return (
-      normalizeRouteName(route.name) === normalizedRouteName &&
+      routeNamesToCheck.includes(normalizeRouteName(route.name)) &&
       hasRouteStatus(route, 'edit access')
     )
   })
@@ -247,6 +265,12 @@ export const hasAddAccess = (routeName, user) => {
   }
 
   const normalizedRouteName = normalizeRouteName(routeName)
+  // Handle legacy alias for withholding_tax
+  const routeNamesToCheck = [normalizedRouteName]
+  if (normalizedRouteName === 'withholding_tax') {
+    routeNamesToCheck.push('witholding_tax') // Legacy typo
+  }
+
   return user.route_access.some((route) => {
     if (!route || typeof route !== 'object') {
       console.warn('Invalid route object:', route)
@@ -257,7 +281,7 @@ export const hasAddAccess = (routeName, user) => {
       return false
     }
     return (
-      normalizeRouteName(route.name) === normalizedRouteName &&
+      routeNamesToCheck.includes(normalizeRouteName(route.name)) &&
       hasRouteStatus(route, 'add access')
     )
   })
@@ -299,10 +323,16 @@ export const hasViewAccess = (routeName, user) => {
  */
 export const canCreateEdit = (routeName, user) => {
   // Allow create when user has Full, Edit, or Add access. Edit requires Edit or Full.
-  return (
-    hasFullAccess(routeName, user) ||
-    hasEditAccess(routeName, user) ||
-    hasAddAccess(routeName, user)
+  // Handle legacy alias for withholding_tax
+  const routeNamesToCheck = [routeName]
+  if (routeName === 'withholding_tax') {
+    routeNamesToCheck.push('witholding_tax') // Legacy typo
+  }
+
+  return routeNamesToCheck.some((name) =>
+    hasFullAccess(name, user) ||
+    hasEditAccess(name, user) ||
+    hasAddAccess(name, user)
   )
 }
 
@@ -318,12 +348,18 @@ export const getAccessLevel = (routeName, user) => {
   }
 
   const normalizedRouteName = normalizeRouteName(routeName)
+  // Handle legacy alias for withholding_tax
+  const routeNamesToCheck = [normalizedRouteName]
+  if (normalizedRouteName === 'withholding_tax') {
+    routeNamesToCheck.push('witholding_tax') // Legacy typo
+  }
+
   const route = user.route_access.find(
     (route) =>
       route &&
       route.name &&
       typeof route.name === 'string' &&
-      normalizeRouteName(route.name) === normalizedRouteName,
+      routeNamesToCheck.includes(normalizeRouteName(route.name)),
   )
   return route ? titleCaseStatus(route.status) : null
 }
@@ -400,7 +436,7 @@ export const ROUTE_CONFIG = {
   // migrated away. Kept so an older master_route_access row still resolves
   // instead of hiding the nav entry for that tenant.
   witholding_tax: {
-    name: 'witholding_tax',
+    name: 'withholding_tax', // Correct spelling to ensure proper routing
     label: 'Withholding Tax',
     icon: 'Receipt',
   },
@@ -491,6 +527,20 @@ export const ROUTE_CONFIG = {
 
 /**
  * Get sidebar items based on user access
+ *
+ * ## The sidebar is NOT filtered by the plan, deliberately
+ *
+ * A module the tenant has not bought still appears here. The route gate decides
+ * what happens when it is opened: `ModuleGate` renders the upgrade screen instead
+ * of the page.
+ *
+ * Hiding it was tried and reverted. The nav entry is how a user discovers that a
+ * module exists and is available to them on a higher plan - removing it turns an
+ * upsell into a mystery, because the page simply is not there and nothing
+ * explains why. Showing a link that opens an honest "not in your plan, upgrade"
+ * screen is the intended behaviour, and it is also the behaviour the sidebar
+ * already had before this function gained a second parameter.
+ *
  * @param {Object} user - User object with route_access array
  * @returns {Object} - Grouped sidebar items
  */
@@ -528,6 +578,7 @@ export const getSidebarItems = (user) => {
     // while this registry defined 'withholding_tax', so ROUTE_CONFIG lookup
     // returned undefined and the nav entry silently disappeared.
     'withholding_tax',
+    'witholding_tax', // Legacy alias for backward compatibility
   ]
 
   const partnerRoutes = [
@@ -538,7 +589,11 @@ export const getSidebarItems = (user) => {
   ]
   masterRoutes.forEach((route) => {
     if (hasRouteAccess(route, user)) {
-      items.masters.push(ROUTE_CONFIG[route])
+      const config = ROUTE_CONFIG[route]
+      // Deduplicate by checking if an item with the same label already exists
+      if (config && !items.masters.some((item) => item.label === config.label)) {
+        items.masters.push(config)
+      }
     }
   })
 

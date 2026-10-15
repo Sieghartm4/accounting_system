@@ -14,13 +14,14 @@ import {
   ChevronRight
 } from 'lucide-react'
 import LoadingScreen from '../../components/LoadingScreen'
+import { currentReportPeriod } from '../../utils/reportPeriod'
 
 export default function StatementOfComprehensiveIncome() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [startDate, setStartDate] = useState(() => currentReportPeriod().start)
+  const [endDate, setEndDate] = useState(() => currentReportPeriod().end)
   
   // Track collapsed states
   const [expanded, setExpanded] = useState({
@@ -93,7 +94,7 @@ export default function StatementOfComprehensiveIncome() {
     )
 
   return (
-    <div className="flex flex-col gap-3 bg-[#F3F4F6] min-h-full custom-scrollbar p-4">
+    <div className="flex flex-col gap-3 bg-[#F3F4F6] min-h-full  overflow-x-auto custom-scrollbar p-4">
       {/* HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
@@ -109,16 +110,45 @@ export default function StatementOfComprehensiveIncome() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-[11px] font-black text-black rounded-xl hover:bg-gray-50 uppercase tracking-widest shadow-sm">
-            <Download size={13} /> Export PDF
-          </button>
-          <button
-            onClick={fetchSCI}
-            className="w-10 h-10 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center justify-center transition-colors shadow-lg shadow-purple-200"
-          >
-            <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
+        <div className="flex gap-2 items-center relative">
+          <div className="flex flex-col md:flex-row md:items-center gap-2 w-full md:w-auto rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-2 py-1.5 shadow-sm">
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[2px]">From</span>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full md:w-auto bg-transparent px-1 py-1 md:py-0.5 text-[11px] font-bold text-slate-800 outline-none" />
+            <span className="hidden md:inline text-slate-300 text-[11px] leading-none">→</span>
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[2px]">To</span>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full md:w-auto bg-transparent px-1 py-1 md:py-0.5 text-[11px] font-bold text-slate-800 outline-none" />
+            <span className="hidden md:block mx-1 h-5 w-px bg-slate-200" />
+            <button
+              onClick={() => {
+              setStartDate('')
+              setEndDate('')
+            }}
+              className="w-full md:w-auto px-2.5 py-2 md:py-1 rounded-lg border border-slate-300 bg-white text-[9px] font-black text-slate-700 uppercase tracking-widest hover:border-purple-500 hover:text-purple-600 transition-colors cursor-pointer"
+            >
+              Reset
+            </button>
+            <button
+              onClick={() => {
+              const t = new Date().toISOString().split('T')[0]
+              setStartDate(t)
+              setEndDate(t)
+            }}
+              className="w-full md:w-auto px-2.5 py-2 md:py-1 rounded-lg bg-slate-900 text-[9px] font-black text-white uppercase tracking-widest hover:bg-purple-600 transition-colors cursor-pointer"
+            >
+              Today
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-[11px] font-black text-black rounded-xl hover:bg-gray-50 uppercase tracking-widest shadow-sm">
+              <Download size={13} /> Export PDF
+            </button>
+            <button
+              onClick={fetchSCI}
+              className="w-10 h-10 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center justify-center transition-colors shadow-lg shadow-purple-200"
+            >
+              <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -164,56 +194,8 @@ export default function StatementOfComprehensiveIncome() {
         />
       </div>
 
-      {/* TOOLBAR */}
-      <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-4 flex-wrap shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-purple-100 rounded-lg text-purple-600">
-            <Calendar size={14} />
-          </div>
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
-            Period Filter
-          </span>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-purple-500 focus:bg-white transition-all"
-          />
-          <span className="text-gray-300">to</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="px-3 py-2 border border-gray-100 rounded-xl bg-gray-50 text-[11px] font-bold text-black outline-none focus:border-purple-500 focus:bg-white transition-all"
-          />
-        </div>
-        <div className="ml-auto flex gap-2">
-          <button
-            onClick={() => {
-              setStartDate('')
-              setEndDate('')
-            }}
-            className="px-4 py-2 border border-gray-900 rounded-xl text-[10px] font-black text-gray-900 uppercase tracking-widest hover:border-purple-500 hover:text-purple-600 transition-all bg-white cursor-pointer"
-          >
-            Reset
-          </button>
-          <button
-            onClick={() => {
-              const t = new Date().toISOString().split('T')[0]
-              setStartDate(t)
-              setEndDate(t)
-            }}
-            className="px-4 py-2 bg-black rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-purple-600 cursor-pointer"
-          >
-            Today
-          </button>
-        </div>
-      </div>
-
       {/* MAIN CONTENT */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col custom-scrollbar">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col  overflow-x-auto custom-scrollbar">
         
         {/* A. REVENUE SECTION - Collapsible */}
         <div className="border-b border-gray-100">
@@ -240,7 +222,7 @@ export default function StatementOfComprehensiveIncome() {
                   <table className="w-full">
                     <tbody className="text-sm">
                       {data?.revenues.filter(r => !r['Account Name'].toLowerCase().includes('discount')).map((item, i) => (
-                        <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                        <tr key={i} className="border-b border-gray-50 hover:bg-red-100 hover:border-l-4 hover:border-red-600 hover:shadow-sm transition-colors">
                           <td className="py-2 px-3 text-[11px] font-bold text-gray-600">{item['Account Code']}</td>
                           <td className="py-2 px-3 text-[12px] font-bold text-black">{item['Account Name']}</td>
                           <td className="py-2 px-3 text-right text-[12px] font-bold text-gray-900">₱{fmt(item.Current)}</td>
@@ -284,7 +266,7 @@ export default function StatementOfComprehensiveIncome() {
                   <table className="w-full">
                     <tbody className="text-sm">
                       {data?.revenues.filter(r => r['Account Name'].toLowerCase().includes('cost')).map((item, i) => (
-                        <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                        <tr key={i} className="border-b border-gray-50 hover:bg-red-100 hover:border-l-4 hover:border-red-600 hover:shadow-sm transition-colors">
                           <td className="py-2 px-3 text-[11px] font-bold text-gray-600">{item['Account Code']}</td>
                           <td className="py-2 px-3 text-[12px] font-bold text-black">{item['Account Name']}</td>
                           <td className="py-2 px-3 text-right text-[12px] font-bold text-gray-900">₱{fmt(item.Current)}</td>
@@ -336,7 +318,7 @@ export default function StatementOfComprehensiveIncome() {
                   <table className="w-full">
                     <tbody className="text-sm">
                       {data?.operatingExpenses.map((item, i) => (
-                        <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                        <tr key={i} className="border-b border-gray-50 hover:bg-red-100 hover:border-l-4 hover:border-red-600 hover:shadow-sm transition-colors">
                           <td className="py-2 px-3 text-[11px] font-bold text-gray-600">{item['Account Code']}</td>
                           <td className="py-2 px-3 text-[12px] font-bold text-black">{item['Account Name']}</td>
                           <td className="py-2 px-3 text-right text-[12px] font-bold text-gray-900">₱{fmt(item.Current)}</td>
@@ -397,7 +379,7 @@ export default function StatementOfComprehensiveIncome() {
                       <table className="w-full">
                         <tbody className="text-sm">
                           {data.otherComprehensiveIncome.map((item, i) => (
-                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                            <tr key={i} className="border-b border-gray-50 hover:bg-red-100 hover:border-l-4 hover:border-red-600 hover:shadow-sm transition-colors">
                               <td className="py-2 px-3 text-[11px] font-bold text-gray-600">{item['Account Code']}</td>
                               <td className="py-2 px-3 text-[12px] font-bold text-black">{item['Account Name']}</td>
                               <td className="py-2 px-3 text-right text-[12px] font-bold text-gray-900">₱{fmt(item.Current)}</td>

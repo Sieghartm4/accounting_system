@@ -1,5 +1,7 @@
 // API utility with automatic 401/token expired handling
 
+import { reportModuleLockout } from './moduleLockout'
+
 // Global fetch interceptor for auto-logout on token expiration
 const originalFetch = window.fetch
 window.fetch = async function (...args) {
@@ -34,6 +36,30 @@ window.fetch = async function (...args) {
 
   const response = await originalFetch.apply(this, args)
 
+  // Handle 402 MODULE_NOT_IN_PLAN here, alongside the 401 handling below, rather
+  // than in a second wrapper or in each page.
+  //
+  // The route gate decides from a cached entitlement that can be up to a minute
+  // behind the server, so in that window a page mounts and its first request is
+  // the one that discovers the module is withheld. Catching it here means the
+  // gate can swap in the upgrade screen. Doing it per page is not possible: each
+  // page formats its own error and most throw away the status and code, keeping
+  // only the message text - which is how the raw server wording ended up in a
+  // red "System Error" toast.
+  if (response.status === 402) {
+    response
+      .clone()
+      .json()
+      .then((body) => {
+        if (body && body.code === 'MODULE_NOT_IN_PLAN' && body.module) {
+          reportModuleLockout(body.module)
+        }
+      })
+      .catch(() => {
+        // Not JSON, or the clone failed. The page handles it as it sees fit.
+      })
+  }
+
   // Handle 401 responses globally
   if (response.status === 401) {
     // Clone response to read body without consuming original
@@ -67,10 +93,16 @@ window.fetch = async function (...args) {
 // requests is what made the old gate invisible - the page just stopped working
 // with no explanation.
 //
-// Routed to the plan picker rather than to /login, because the credentials are
-// still valid and the tenant's data is untouched; only the plan needs choosing.
-// The 403 variant raised at login is handled in useLogin.js, which must not
-// store a password, so it is deliberately not handled here.
+// The module case is handled in the fetch wrapper at the top of this file, which
+// sees the status and code before the page discards them. By the time a page
+// throws, it has usually kept only the message text, which is why the raw server
+// wording used to reach a red "System Error" toast instead of the upgrade screen.
+//
+// The remaining case here is a lapsed subscription: routed to the plan picker
+// rather than to /login, because the credentials are still valid and the tenant's
+// data is untouched; only the plan needs choosing. The 403 variant raised at
+// login is handled in useLogin.js, which must not store a password, so it is
+// deliberately not handled here.
 if (typeof window !== 'undefined' && !window.__subscriptionGateInstalled) {
   window.__subscriptionGateInstalled = true
 
@@ -93,19 +125,30 @@ if (typeof window !== 'undefined' && !window.__subscriptionGateInstalled) {
     // Already on the plan page: re-announcing would fight the user's clicks.
     if (window.location.pathname.startsWith('/register')) return
 
-    // Remember who they are so the plan step can prefill, exactly as the login
-    // 403 path does. The password is never stored.
-    const username =
-      (payload && payload.username) ||
-      (() => {
-        try {
-          return JSON.parse(sessionStorage.getItem('auth_user') || '{}').username
-        } catch (e) {
-          return null
-        }
-      })()
+    // Remember who they are so the plan step can prefill and name them, exactly
+    // as the login 403 path does. existingAccount stops the plan step from
+    // implying they still need to register. The password is never stored, and is
+    // not needed: authentication is the session cookie.
+    const authUser = (() => {
+      try {
+        return JSON.parse(sessionStorage.getItem('auth_user') || 'null')
+      } catch {
+        return null
+      }
+    })()
+    const username = (payload && payload.username) || (authUser && authUser.username)
+
     if (username) {
-      sessionStorage.setItem('pendingUser', JSON.stringify({ username }))
+      sessionStorage.setItem(
+        'pendingUser',
+        JSON.stringify({
+          username,
+          tenantDb: (authUser && authUser.tenantDb) || null,
+          email: (authUser && authUser.email) || null,
+          fullname: (authUser && authUser.fullname) || null,
+          existingAccount: true,
+        }),
+      )
     }
     window.location.href = '/register?step=plan'
   })
@@ -175,6 +218,16 @@ function handleLogout() {
   // Clear all auth data
   localStorage.removeItem('token')
   localStorage.removeItem('user')
+
+  // The cached entitlement is per-tab and survives logout, so without this the
+  // next login as a different company renders navigation from the previous
+  // company's plan until the cache expires.
+  try {
+    sessionStorage.removeItem('auth_entitlement')
+    sessionStorage.removeItem('auth_module_catalog')
+  } catch {
+    // Storage unavailable; the hook simply refetches.
+  }
 
   // Redirect to login page
   window.location.href = '/login'

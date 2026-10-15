@@ -1,5 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { fetchWithAuth } from '../../utils/api'
+// Draws the professional letterhead on exported PDFs. Without this import the
+// name was an undeclared global, so exporting a return failed at runtime with
+// "renderPDFCompanyHeader is not defined" rather than at build time.
+import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 
 /**
  * Data layer for the registry-driven tax page.
@@ -119,6 +123,13 @@ const currentMonthEnd = () => {
 const useTaxRegistry = () => {
   const [companyId, setCompanyId] = useState(null)
   const [companyName, setCompanyName] = useState('')
+  // The full company row, kept for the PDF letterhead.
+  //
+  // Only the name and id were retained, so the header had nothing to draw: TIN,
+  // address, phone, email, website and logo all live on the same row that
+  // /company already returned and was being discarded. `companyName` is still
+  // there for the UI; this is the record, not a summary of it.
+  const [companyRecord, setCompanyRecord] = useState(null)
 
   const [registry, setRegistry] = useState(null)
   const [applicability, setApplicability] = useState(null)
@@ -133,6 +144,13 @@ const useTaxRegistry = () => {
   const [endDate, setEndDate] = useState(currentMonthEnd())
   const [inputs, setInputs] = useState({})
   const [preview, setPreview] = useState(null)
+  // Which form the preview on screen belongs to. Opening a form computes it
+  // immediately, and the effect that loads the form's metadata used to clear the
+  // preview unconditionally - so the figures arrived and were then wiped, and
+  // the user had to click the form a second time to see them. Comparing the form
+  // code is what tells "stale preview from the form I just left" apart from
+  // "preview for the form I just opened".
+  const previewFormRef = useRef(null)
 
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -189,6 +207,7 @@ const useTaxRegistry = () => {
         
         setCompanyId(id)
         setCompanyName(firstCompany.company_name || firstCompany.name || `Company ${id}`)
+        setCompanyRecord(firstCompany)
       } catch (err) {
         if (live) {
           fail(err)
@@ -258,10 +277,12 @@ const useTaxRegistry = () => {
       try {
         const detail = await tax(`/forms/${activeForm}`)
         if (live) {
-          setFormDetail(detail)
-          setInputs({})
-          setPreview(null)
-          setFilingDetail(null)
+setFormDetail(detail)
+            setInputs({})
+            // Only discard a preview that belongs to a different form. A preview
+            // for this form was just computed on open and must survive.
+            if (previewFormRef.current !== activeForm) setPreview(null)
+            setFilingDetail(null)
         }
       } catch (err) {
         if (live) fail(err)
@@ -345,6 +366,7 @@ const useTaxRegistry = () => {
         method: 'POST',
         body: { formCode: activeForm, startDate, endDate, inputs, save: false },
       })
+      previewFormRef.current = activeForm
       setPreview(data)
     } catch (err) {
       fail(err)
@@ -352,6 +374,37 @@ const useTaxRegistry = () => {
       setBusy(false)
     }
   }, [companyId, activeForm, startDate, endDate, inputs, fail])
+
+  // Opening a form from the registry shows that form's figures straight away,
+  // for the current month. Passing the code and the dates in rather than reading
+  // them from state matters: setActiveForm has not taken effect yet at this
+  // point, so a plain runPreview() would compute the form the user just left.
+  // Compute remains the button for a period the user has picked by hand.
+  const openForm = useCallback(async (code) => {
+    const start = currentMonthStart()
+    const end = currentMonthEnd()
+    setActiveForm(code)
+    setStartDate(start)
+    setEndDate(end)
+    // Inputs belong to the form that was open. Carrying them over would show
+    // one form's figures against another's overrides.
+    setInputs({})
+    if (!companyId || !code) return
+    setBusy(true)
+    setError(null)
+    try {
+      const data = await tax(`/compute?companyId=${companyId}`, {
+        method: 'POST',
+        body: { formCode: code, startDate: start, endDate: end, inputs: {}, save: false },
+      })
+      previewFormRef.current = code
+      setPreview(data)
+    } catch (err) {
+      fail(err)
+    } finally {
+      setBusy(false)
+    }
+  }, [companyId, fail])
 
   const saveFiling = useCallback(async () => {
     if (!companyId || !activeForm) return
@@ -362,6 +415,7 @@ const useTaxRegistry = () => {
         method: 'POST',
         body: { formCode: activeForm, startDate, endDate, inputs, save: true },
       })
+      previewFormRef.current = activeForm
       setPreview(data)
       // The compute response names the row `filing.filing_id`; there is no
       // `id` on it and no top-level `filing_id`, so reading either of those
@@ -455,7 +509,7 @@ const useTaxRegistry = () => {
   // Legacy export. The catalogue knows which profiles exist (efps_dat,
   // efps_xml, pdf_a4) but /tax has no export route yet, so the PDF button
   // still posts to the old endpoint with the same body shape it always had.
-  const exportPdf = useCallback(async () => {
+const exportPdf = useCallback(async () => {
     if (!activeForm) return
     setBusy(true)
     setError(null)
@@ -464,38 +518,140 @@ const useTaxRegistry = () => {
       const lines = (preview?.result?.lines ?? {}) || {}
       const period = preview?.period
 
-      const res = await fetchWithAuth('/tax-compliance/export-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          formType: activeForm,
-          dateRange: period
-            ? { start: period.start, end: period.end }
-            : { start: startDate, end: endDate },
-          formRows: (detail.line_schema ?? []).map((l) => [
-            l.label,
-            String(lines[l.key] ?? 0),
-            '',
-          ]),
-        }),
+      const { jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: 'letter',
       })
-      if (!res.ok) throw new Error(`Export failed (${res.status})`)
-      const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `BIR_Form_${activeForm}_${preview?.period?.start || startDate}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+
+      const W = doc.internal.pageSize.getWidth()
+      const H = doc.internal.pageSize.getHeight()
+      const M = 36 // 0.5 inch margin
+
+      // 1. Render standard professional company header
+      let y = renderPDFCompanyHeader(doc, companyRecord || {}, W, M)
+
+      // Palette matching your corporate slate/navy theme
+      const BLK = [17, 24, 39]      // Slate 900
+      const GRY = [100, 116, 139]   // Slate 500
+      const LGT = [226, 232, 240]   // Slate 200
+      const WHT = [255, 255, 255]
+      const BG_ALT = [248, 250, 252]// Slate 50
+
+      // 2. Document Title Section
+      doc.setDrawColor(...LGT)
+      doc.setLineWidth(1)
+      doc.line(M, y, W - M, y)
+      y += 14
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.setTextColor(...BLK)
+      doc.text(`BIR FORM ${activeForm.toUpperCase()}`, M, y)
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(...GRY)
+      doc.text('Tax Compliance & Declaration', W - M, y, { align: 'right' })
+
+      y += 12
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(...GRY)
+      const dateRange = period ? `${period.start} — ${period.end}` : `${startDate} — ${endDate}`
+      doc.text(`Period: ${dateRange}`, M, y)
+      doc.text(`Generated: ${new Date().toLocaleDateString('en-PH')}`, W - M, y, { align: 'right' })
+      y += 16
+
+      // 3. Format tax form rows cleanly (Using clean human-readable labels without raw keys)
+      const schema = detail.line_schema ?? []
+      const body = schema.map((l) => {
+        const rawVal = lines[l.key] ?? 0
+        const formattedVal = typeof rawVal === 'number' 
+          ? rawVal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
+          : String(rawVal)
+        return [
+          l.label || l.key, // Clean label presentation
+          formattedVal,
+        ]
+      })
+
+      // 4. Render Table using autoTable
+      autoTable(doc, {
+        startY: y,
+        margin: { left: M, right: M },
+        tableWidth: W - M * 2,
+        head: [
+          [
+            { content: 'LINE ITEM DESCRIPTION', styles: { halign: 'left' } },
+            { content: 'AMOUNT (Php)', styles: { halign: 'right' } },
+          ],
+        ],
+        body: body,
+        theme: 'plain',
+        headStyles: {
+          fillColor: BLK,
+          textColor: WHT,
+          fontStyle: 'bold',
+          fontSize: 8.5,
+          cellPadding: { top: 7, bottom: 7, left: 8, right: 8 },
+        },
+        alternateRowStyles: { fillColor: BG_ALT },
+        styles: {
+          fontSize: 8.5,
+          font: 'helvetica',
+          cellPadding: { top: 6, bottom: 6, left: 8, right: 8 },
+          textColor: [30, 41, 59],
+          lineColor: LGT,
+          lineWidth: 0.5,
+          valign: 'middle',
+        },
+        columnStyles: {
+          0: { cellWidth: 'auto', halign: 'left' },
+          1: { cellWidth: 120, halign: 'right', fontStyle: 'bold' },
+        },
+      })
+
+      y = doc.lastAutoTable.finalY + 30
+
+      // 5. Professional Signature Block
+      if (y > H - 100) {
+        doc.addPage()
+        y = 50
+      }
+
+      doc.setDrawColor(...GRY)
+      doc.setLineWidth(0.75)
+      doc.line(W - M - 200, y, W - M, y)
+      
+      y += 12
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(...GRY)
+      doc.text('Authorized Officer / Representative Signature', W - M - 100, y, { align: 'center' })
+
+      // 6. Page Footers (Page X of Y) across all pages
+      const totalPages = doc.internal.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.setTextColor(...GRY)
+        doc.text(`Page ${i} of ${totalPages}`, W - M, H - 20, { align: 'right' })
+        doc.text('Confidential — BIR Tax Compliance Report', M, H - 20)
+      }
+
+      doc.save(`BIR_Form_${activeForm}_${period?.start || startDate}.pdf`)
       say('PDF exported.')
     } catch (err) {
       fail(err)
     } finally {
       setBusy(false)
     }
-  }, [activeForm, startDate, endDate, preview, fail, say])
+  }, [activeForm, startDate, endDate, preview, companyRecord, fail, say])
 
   return {
     companyId,
@@ -527,6 +683,7 @@ const useTaxRegistry = () => {
     toast,
     setToast,
     runPreview,
+    openForm,
     saveFiling,
     refreshFiling,
     acknowledge,

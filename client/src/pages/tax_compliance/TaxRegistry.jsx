@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   ArrowUpRight,
   BadgePercent,
-  Building2,
   CalendarClock,
   Calculator,
   CheckCircle2,
@@ -61,10 +60,10 @@ class Boundary extends React.Component {
               <AlertCircle size={16} />
               Tax page could not render
             </h2>
-            <p className="text-[13px] font-medium text-gray-600 mt-2">{this.state.message}</p>
+            <p className="text-sm font-medium text-gray-600 mt-2">{this.state.message}</p>
             <button
               onClick={() => this.setState({ message: null })}
-              className="mt-4 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg bg-black text-white hover:bg-red-600 transition-colors"
+              className="mt-4 text-[11px] font-black uppercase tracking-widest px-3 py-2 rounded-lg bg-black text-white hover:bg-red-600 transition-colors"
             >
               Try again
             </button>
@@ -94,6 +93,7 @@ const FILING_STATUS_STYLE = {
 
 const CATEGORY_ORDER = [
   'VAT',
+  'Percentage Tax',
   'Withholding',
   'Income Tax',
   'Certificate',
@@ -103,6 +103,7 @@ const CATEGORY_ORDER = [
 /** Category glyphs, so each sidebar group is recognisable without reading it. */
 const CATEGORY_ICON = {
   VAT: Percent,
+  'Percentage Tax': Calculator,
   Withholding: Wallet,
   'Income Tax': ReceiptText,
   Certificate: BadgePercent,
@@ -137,10 +138,10 @@ const RegistrySidebar = ({ byCategory, totalForms, activeForm, onSelect, resultB
     <aside className="w-72 shrink-0 flex flex-col overflow-hidden bg-white border-r border-slate-200">
       <div className="p-3 border-b border-slate-200 bg-slate-50">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          <h2 className="text-[13px] font-bold uppercase tracking-wider text-slate-500">
             Tax Form Registry
           </h2>
-          <span className="text-[10px] bg-zinc-200 text-zinc-700 px-2 py-0.5 rounded font-mono font-medium">
+          <span className="text-[11px] bg-zinc-200 text-zinc-700 px-2 py-0.5 rounded font-mono font-medium">
             {totalForms} Forms
           </span>
         </div>
@@ -149,25 +150,25 @@ const RegistrySidebar = ({ byCategory, totalForms, activeForm, onSelect, resultB
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter by code or title..."
-          className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
+          className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-[13px] text-slate-800 focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red"
         />
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3 space-y-4 tax-scroll">
         {groups.length === 0 && (
-          <p className="text-xs text-slate-400 px-2 py-4 text-center">No form matches “{filter}”.</p>
+          <p className="text-[13px] text-slate-400 px-2 py-4 text-center">No form matches “{filter}”.</p>
         )}
 
         {groups.map(({ cat, forms }) => {
           const Icon = CATEGORY_ICON[cat] || ListChecks
           return (
             <div key={cat}>
-              <div className="flex items-center justify-between px-2 py-1 bg-zinc-900 text-white rounded text-[11px] font-bold tracking-wider uppercase border-l-4 border-brand-red">
-                <span className="flex items-center gap-1.5">
-                  <Icon size={11} className="text-brand-red" />
-                  {cat}
+              <div className="flex items-center justify-between gap-2 px-2 py-1 bg-zinc-900 text-white rounded text-xs font-bold tracking-wider uppercase border-l-4 border-brand-red">
+                <span className="flex items-center gap-1.5 min-w-0 break-words">
+                  <Icon size={11} className="text-brand-red shrink-0" />
+                  <span className="min-w-0">{cat}</span>
                 </span>
-                <span className="text-[10px] opacity-70 font-normal">
+                <span className="text-[11px] opacity-70 font-normal shrink-0">
                   {forms.length} {forms.length === 1 ? 'item' : 'items'}
                 </span>
               </div>
@@ -181,13 +182,24 @@ const RegistrySidebar = ({ byCategory, totalForms, activeForm, onSelect, resultB
                       key={f.form_code}
                       onClick={() => onSelect(f.form_code)}
                       title={f.short_title}
-                      className={`w-full text-left px-3 py-2 rounded text-xs flex items-center justify-between transition ${
+                      className={`w-full text-left px-3 py-2 rounded text-[13px] flex items-start justify-between gap-2 transition ${
                         isActive
                           ? 'bg-brand-red text-white shadow-md font-medium'
                           : 'hover:bg-slate-100 text-slate-600'
                       }`}
                     >
-                      <span className="truncate pr-1">
+                      {/* Wraps onto further lines instead of being cut off.
+                          `truncate` was applied here, which is overflow:hidden +
+                          white-space:nowrap + text-overflow:ellipsis - so a long
+                          form title such as "Quarterly Remittance Return of
+                          Creditable Income Taxes Withheld at Source" was reduced
+                          to a few words and an ellipsis. A registry entry that
+                          reads "Monthly EWT Return (Individ…" cannot be told apart
+                          from another, and the full title is what distinguishes
+                          the returns an accountant is choosing between.
+                          min-w-0 lets this shrink inside the flex row, which it
+                          must for wrapping to kick in at all. */}
+                      <span className="min-w-0 break-words whitespace-normal leading-snug pr-1">
                         <span
                           className={`font-mono font-bold mr-2 ${
                             isActive ? 'text-white' : 'text-brand-red'
@@ -198,7 +210,7 @@ const RegistrySidebar = ({ byCategory, totalForms, activeForm, onSelect, resultB
                         <span className={isActive ? 'text-white' : ''}>{f.short_title}</span>
                       </span>
                       <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0 ${
+                        className={`text-[11px] px-1.5 py-0.5 rounded font-mono shrink-0 mt-px ${
                           isActive
                             ? 'bg-black/30 text-white uppercase'
                             : 'bg-slate-100 text-slate-400'
@@ -264,12 +276,12 @@ const StatusBanner = ({ formDetail, status, reason, conflict, preview, gapCount 
           <Icon size={16} />
         </div>
         <div>
-          <h3 className="text-xs font-bold text-white tracking-wide uppercase">Form Status Notice</h3>
-          <p className="text-xs text-zinc-300 mt-0.5">{message}</p>
+          <h3 className="text-[13px] font-bold text-white tracking-wide uppercase">Form Status Notice</h3>
+          <p className="text-[13px] text-zinc-300 mt-0.5">{message}</p>
         </div>
       </div>
       <span
-        className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border shrink-0 ${pillTone}`}
+        className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${pillTone}`}
       >
         <span
           className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
@@ -298,10 +310,10 @@ const ProfilePrompt = ({ missing, onOpen }) => {
       <div className="flex items-start gap-2.5 min-w-0">
         <AlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-600" />
         <div className="min-w-0">
-          <p className="text-[12px] font-black text-amber-900">
+          <p className="text-[13px] font-black text-amber-900">
             Finish the taxpayer profile to see which returns apply
           </p>
-          <p className="text-[12px] font-medium text-amber-800 mt-0.5">
+          <p className="text-[13px] font-medium text-amber-800 mt-0.5">
             Still unknown: <strong>{missing.join(', ')}</strong>. Until these are
             confirmed, every form reads “not applicable” — nothing here says you
             have no obligations, it says nobody has told the system what you are.
@@ -311,7 +323,7 @@ const ProfilePrompt = ({ missing, onOpen }) => {
       <button
         type="button"
         onClick={onOpen}
-        className="shrink-0 self-start sm:self-auto text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors"
+        className="shrink-0 self-start sm:self-auto text-[11px] font-black uppercase tracking-widest px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors"
       >
         Complete profile
       </button>
@@ -340,9 +352,9 @@ const CollapsiblePanel = ({ title, icon, summary, defaultOpen = false, children 
         className="w-full flex items-center gap-2 px-5 py-2 bg-black border-l-4 border-red-600 text-left hover:bg-gray-900 transition-colors"
       >
         {React.createElement(icon, { size: 13, className: 'text-red-600 shrink-0' })}
-        <span className="text-[10px] font-black uppercase tracking-[3px] text-white">{title}</span>
+        <span className="text-[11px] font-black uppercase tracking-[3px] text-white">{title}</span>
         {!open && summary && (
-          <span className="text-[10px] font-bold text-gray-500 truncate ml-1">{summary}</span>
+          <span className="text-[11px] font-bold text-gray-500 truncate ml-1">{summary}</span>
         )}
         <ChevronDown
           size={15}
@@ -369,7 +381,7 @@ const ProfilePanel = ({ profile, applicability, onSave, busy, defaultOpen = fals
           <button
             onClick={() => onSave(draft || profile)}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-black disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-black disabled:opacity-50 transition-colors"
           >
             <Save size={13} />
             Save profile
@@ -379,7 +391,7 @@ const ProfilePanel = ({ profile, applicability, onSave, busy, defaultOpen = fals
 
       <div className="space-y-4">
         {missing.length > 0 && (
-          <p className="text-[12px] font-medium bg-amber-50 text-amber-900 border-l-4 border-amber-500 rounded-r-lg px-3 py-2">
+          <p className="text-[13px] font-medium bg-amber-50 text-amber-900 border-l-4 border-amber-500 rounded-r-lg px-3 py-2">
             Still unknown: <strong>{missing.join(', ')}</strong>. Forms that depend on these stay
             unclassified until you confirm them.
           </p>
@@ -394,7 +406,7 @@ const ProfilePanel = ({ profile, applicability, onSave, busy, defaultOpen = fals
           ['registered_address', 'Registered address', 'text'],
         ].map(([key, label, type]) => (
           <label key={key} className="block">
-            <span className="text-[9px] font-black uppercase tracking-[2px] text-gray-400">
+            <span className="text-[10px] font-black uppercase tracking-[2px] text-gray-400">
               {label}
             </span>
             <input
@@ -402,7 +414,7 @@ const ProfilePanel = ({ profile, applicability, onSave, busy, defaultOpen = fals
               value={p[key] ?? ''}
               onChange={set(key)}
               placeholder="not set"
-              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] font-bold text-black focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20"
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-black focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20"
             />
           </label>
         ))}
@@ -412,7 +424,7 @@ const ProfilePanel = ({ profile, applicability, onSave, busy, defaultOpen = fals
           ['subject_to_income_tax', 'Subject to income tax'],
           ['ewt_remitter', 'EWT remitter'],
         ].map(([key, label]) => (
-          <label key={key} className="flex items-center gap-2 text-[13px] font-bold text-gray-800">
+          <label key={key} className="flex items-center gap-2 text-sm font-bold text-gray-800">
             <input
               type="checkbox"
               checked={p[key] === true}
@@ -429,7 +441,7 @@ const ProfilePanel = ({ profile, applicability, onSave, busy, defaultOpen = fals
             {applicability.conflicts.map((c) => (
               <p
                 key={c.id}
-                className="text-[12px] font-medium bg-amber-50 text-amber-900 border-l-4 border-amber-500 rounded-r-lg px-3 py-2 flex gap-2"
+                className="text-[13px] font-medium bg-amber-50 text-amber-900 border-l-4 border-amber-500 rounded-r-lg px-3 py-2 flex gap-2"
               >
                 <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-600" />
                 <span>{c.message}</span>
@@ -455,7 +467,7 @@ const DeadlinesPanel = ({ deadlines, defaultOpen = false }) => {
 
   return (
     <CollapsiblePanel title="Filing deadlines" icon={CalendarClock} summary={summary} defaultOpen={defaultOpen}>
-      <p className="text-[10px] font-black uppercase tracking-[2px] text-gray-400 mb-2">
+      <p className="text-[11px] font-black uppercase tracking-[2px] text-gray-400 mb-2">
         for {deadlines?.year}
         {deadlines?.month ? `, month ${deadlines.month}` : ''}
       </p>
@@ -466,16 +478,16 @@ const DeadlinesPanel = ({ deadlines, defaultOpen = false }) => {
             className="flex items-center justify-between py-1.5 px-2 -mx-2 rounded border-b border-gray-100 last:border-0 hover:bg-red-50 transition-colors"
           >
             <div className="flex items-baseline gap-1.5 min-w-0">
-              <span className="font-mono text-[11px] font-bold text-gray-400">
+              <span className="font-mono text-xs font-bold text-gray-400">
                 {d.form_code}
               </span>
-              <span className="text-[12px] font-bold text-black truncate">{d.short_title}</span>
-              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+              <span className="text-[13px] font-bold text-black truncate">{d.short_title}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                 {d.period_label}
               </span>
             </div>
             <div className="text-right shrink-0">
-              <div className="text-[12px] font-black text-red-600 leading-tight">
+              <div className="text-[13px] font-black text-red-600 leading-tight">
                 {d.deadline.due_label}
               </div>
               {(() => {
@@ -490,19 +502,19 @@ const DeadlinesPanel = ({ deadlines, defaultOpen = false }) => {
                 const days = Math.round((due - today) / 86400000)
                 if (days > 0) {
                   return (
-                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                       in {days} day{days === 1 ? '' : 's'}
                     </div>
                   )
                 }
                 return (
-                  <div className="text-[9px] font-black uppercase tracking-widest text-red-700">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-red-700">
                     {days === 0 ? 'due today' : `${Math.abs(days)} days overdue`}
                   </div>
                 )
               })()}
               {d.deadline.grace_applied && (
-                <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                   grace rule applied
                 </div>
               )}
@@ -579,15 +591,15 @@ const FormViewer = ({
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-2 bg-black border-b border-gray-100">
         <FileCheck2 size={13} className="text-red-600" />
-        <span className="font-mono text-[11px] font-black text-white">{formDetail.form_code}</span>
-        <span className="text-[11px] font-black uppercase tracking-[3px] text-white truncate">
+        <span className="font-mono text-xs font-black text-white">{formDetail.form_code}</span>
+        <span className="text-xs font-black uppercase tracking-[3px] text-white truncate">
           {formDetail.short_title || formDetail.title}
         </span>
-        <span className="text-[10px] font-bold text-gray-500 ml-1 hidden sm:inline">
+        <span className="text-[11px] font-bold text-gray-500 ml-1 hidden sm:inline">
           {String(formDetail.frequency || '').toLowerCase()} · rev {formDetail.form_revision}
         </span>
         {preview?.period && (
-          <span className="ml-auto text-[10px] font-black uppercase tracking-widest px-2 py-0.5 bg-red-600 text-white rounded-md whitespace-nowrap">
+          <span className="ml-auto text-[11px] font-black uppercase tracking-widest px-2 py-0.5 bg-red-600 text-white rounded-md whitespace-nowrap">
             {preview.period.label} · {preview.period.start} → {preview.period.end}
           </span>
         )}
@@ -598,10 +610,10 @@ const FormViewer = ({
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-1.5">
             {layout.headerFields.map((f) => (
               <div key={f.key} className="flex items-baseline gap-1.5 min-w-0">
-                <span className="text-[9px] font-black uppercase tracking-[1.5px] text-gray-400 whitespace-nowrap">
+                <span className="text-[10px] font-black uppercase tracking-[1.5px] text-gray-400 whitespace-nowrap">
                   {f.label}
                 </span>
-                <span className="text-[12px] font-bold text-black truncate">
+                <span className="text-[13px] font-bold text-black truncate">
                   {formDetail[f.key] ?? formDetail.header_values?.[f.key] ?? '—'}
                 </span>
               </div>
@@ -614,7 +626,7 @@ const FormViewer = ({
         {layout.sections.map((section) => (
           <div key={section.name}>
             <div className="flex items-center gap-2 px-5 py-1.5 bg-black border-l-4 border-red-600">
-              <span className="text-[10px] font-black uppercase tracking-[3px] text-white">
+              <span className="text-[11px] font-black uppercase tracking-[3px] text-white">
                 Section {section.name}
               </span>
             </div>
@@ -640,7 +652,7 @@ const FormViewer = ({
                 >
                   <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
                     <span
-                      className={`text-[12px] font-bold ${line.emphasis ? 'text-black' : 'text-gray-800'}`}
+                      className={`text-[13px] font-bold ${line.emphasis ? 'text-black' : 'text-gray-800'}`}
                     >
                       {line.label}
                     </span>
@@ -651,7 +663,7 @@ const FormViewer = ({
                             key={account.code}
                             href={ledgerHref(account.code)}
                             title={`View ${account.code} ${account.name} in the general ledger`}
-                            className="inline-flex items-center gap-0.5 rounded-sm border border-gray-200 bg-white px-1 py-px font-mono text-[9px] font-bold text-gray-400 no-underline leading-tight hover:border-red-600 hover:text-red-600"
+                            className="inline-flex items-center gap-0.5 rounded-sm border border-gray-200 bg-white px-1 py-px font-mono text-[10px] font-bold text-gray-400 no-underline leading-tight hover:border-red-600 hover:text-red-600"
                           >
                             {account.code}
                             <ArrowUpRight size={8} className="text-gray-300" />
@@ -660,7 +672,7 @@ const FormViewer = ({
                       </span>
                     )}
                     {line.gap_key && gapKeys.has(line.gap_key) && (
-                      <span className="inline-block px-1.5 py-px bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-widest rounded">
+                      <span className="inline-block px-1.5 py-px bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest rounded">
                         needs a fact
                       </span>
                     )}
@@ -678,13 +690,13 @@ const FormViewer = ({
                             [line.key]: e.target.value === '' ? '' : Number(e.target.value),
                           })
                         }
-                        className="w-full rounded-md border border-gray-200 px-1.5 py-1 text-right font-mono text-[13px] font-black text-black focus:outline-none focus:ring-2 focus:ring-red-600/30 focus:border-red-600"
+                        className="w-full rounded-md border border-gray-200 px-1.5 py-1 text-right font-mono text-sm font-black text-black focus:outline-none focus:ring-2 focus:ring-red-600/30 focus:border-red-600"
                       />
                     ) : linkable ? (
                       <a
                         href={figureHref(accounts)}
                         title={figureTitle(accounts)}
-                        className={`group inline-flex items-center justify-end gap-1 rounded px-1.5 py-0.5 font-mono text-[13px] font-black no-underline leading-tight hover:bg-red-50 hover:text-red-600 hover:underline transition-colors ${
+                        className={`group inline-flex items-center justify-end gap-1 rounded px-1.5 py-0.5 font-mono text-sm font-black no-underline leading-tight hover:bg-red-50 hover:text-red-600 hover:underline transition-colors ${
                           line.emphasis ? 'text-red-600' : 'text-black'
                         }`}
                       >
@@ -696,7 +708,7 @@ const FormViewer = ({
                       </a>
                     ) : (
                       <span
-                        className={`font-mono text-[13px] font-black leading-tight ${
+                        className={`font-mono text-sm font-black leading-tight ${
                           hasValue
                             ? line.emphasis
                               ? 'text-red-600'
@@ -719,10 +731,10 @@ const FormViewer = ({
         <div className="border-t-4 border-red-600 bg-black px-5 py-2.5 flex flex-wrap gap-x-8 gap-y-1">
           {Object.entries(preview.result.totals).map(([k, v]) => (
             <div key={k} className="flex items-baseline gap-2">
-              <span className="text-[9px] font-black uppercase tracking-[2px] text-gray-500">
+              <span className="text-[10px] font-black uppercase tracking-[2px] text-gray-500">
                 {k.replace(/_/g, ' ')}
               </span>
-              <span className="font-mono text-[15px] font-black text-white leading-tight">
+              <span className="font-mono text-base font-black text-white leading-tight">
                 {formatPHP(v)}
               </span>
             </div>
@@ -732,11 +744,11 @@ const FormViewer = ({
 
       {preview?.result?.gaps?.length > 0 && (
         <div className="px-5 py-2.5 bg-gray-50 border-t border-gray-100 space-y-1.5">
-          <h4 className="text-[10px] font-black uppercase tracking-[3px] text-gray-400">Open items</h4>
+          <h4 className="text-[11px] font-black uppercase tracking-[3px] text-gray-400">Open items</h4>
           {preview.result.gaps.map((g) => (
             <p
               key={g.key}
-              className={`text-[11px] font-medium rounded px-2.5 py-1.5 border-l-4 ${
+              className={`text-xs font-medium rounded px-2.5 py-1.5 border-l-4 ${
                 g.severity === 'info'
                   ? 'bg-white text-gray-600 border-gray-300'
                   : 'bg-amber-50 text-amber-900 border-amber-500'
@@ -749,7 +761,7 @@ const FormViewer = ({
       )}
 
       {layout.notes && (
-        <p className="px-5 py-2 bg-gray-50 border-t border-gray-100 text-[11px font-medium text-gray-500 flex gap-2">
+        <p className="px-5 py-2 bg-gray-50 border-t border-gray-100 text-[11px] font-medium text-gray-500 flex gap-2">
           <Info size={13} className="shrink-0 mt-0.5 text-red-600" />
           <span>{layout.notes}</span>
         </p>
@@ -773,15 +785,15 @@ const FilingsPanel = ({
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-2 bg-black border-l-4 border-red-600">
         <FileCheck2 size={14} className="text-red-600" />
-        <span className="text-[11px] font-black uppercase tracking-[3px] text-white truncate">
+        <span className="text-xs font-black uppercase tracking-[3px] text-white truncate">
           Filings for {formCodeOf(filingsActive)}
         </span>
-        <span className="text-[10px] font-bold text-gray-500 ml-1">{filings.length} on record</span>
+        <span className="text-[11px] font-bold text-gray-500 ml-1">{filings.length} on record</span>
       </div>
 
       <div className="p-5">
         {filings.length === 0 ? (
-          <p className="text-[12px] font-bold text-gray-300">No filings yet for this form.</p>
+          <p className="text-[13px] font-bold text-gray-300">No filings yet for this form.</p>
         ) : (
           <div>
             {filings.map((f) => (
@@ -790,17 +802,17 @@ const FilingsPanel = ({
                 className="py-1.5 flex items-center justify-between gap-3 border-b border-gray-100 hover:bg-red-50 transition-colors"
               >
                 <div className="min-w-0">
-                  <div className="text-[13px] font-black text-black">{f.period_label}</div>
-                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                  <div className="text-sm font-black text-black">{f.period_label}</div>
+                  <div className="text-[11px] font-black uppercase tracking-widest text-gray-400">
                     {monthDay(f.period_start)} – {monthDay(f.period_end)}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[15px] font-black text-red-600">
+                  <span className="font-mono text-base font-black text-red-600">
                     {formatPHP(f.amount_still_due)}
                   </span>
                   <span
-                    className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
+                    className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
                       FILING_STATUS_STYLE[f.status] || FILING_STATUS_STYLE.draft
                     }`}
                   >
@@ -814,13 +826,13 @@ const FilingsPanel = ({
 
       {filingsActive && (
         <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-          <div className="text-[12px] font-medium text-gray-600">
+          <div className="text-[13px] font-medium text-gray-600">
             Filing <strong className="font-black text-black">#{filingsActive.id}</strong> —{' '}
             <span className="font-black uppercase tracking-widest text-gray-800">
               {filingsActive.status.replace(/_/g, ' ')}
             </span>
             {filingsActive.acknowledgement_note && (
-              <span className="block text-[11px] text-gray-400 mt-1">
+              <span className="block text-xs text-gray-400 mt-1">
                 note: {filingsActive.acknowledgement_note}
               </span>
             )}
@@ -833,12 +845,12 @@ const FilingsPanel = ({
                 onChange={(e) => setNote(e.target.value)}
                 rows={2}
                 placeholder="Why is this acceptable? Acknowledging records your name and note."
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-[13px] focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
               />
               <button
                 onClick={() => onAcknowledge(filingsActive.id, note)}
                 disabled={busy || !note.trim()}
-                className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg bg-amber-500 text-white hover:bg-black disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest px-3 py-2 rounded-lg bg-amber-500 text-white hover:bg-black disabled:opacity-50 transition-colors"
               >
                 <CheckCircle2 size={13} />
                 Acknowledge open items
@@ -851,7 +863,7 @@ const FilingsPanel = ({
               <button
                 onClick={() => onMarkFiled(filingsActive.id)}
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg bg-black text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest px-3 py-2 rounded-lg bg-black text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
               >
                 <FileCheck2 size={13} />
                 Mark as filed with BIR
@@ -859,7 +871,7 @@ const FilingsPanel = ({
             )}
 
           {['filed', 'filed_with_bir'].includes(filingsActive.status) && (
-            <p className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5">
+            <p className="text-xs font-medium text-gray-400 flex items-center gap-1.5">
               <ShieldCheck size={13} className="text-red-600" />
               Filed {monthDay(filingsActive.filed_at)}. A filed return is immutable and cannot be
               recomputed.
@@ -880,8 +892,6 @@ const formCodeOf = (filing) => formCodeLabel(filing && filing.form_code)
 function TaxRegistryContent() {
   const t = useTaxRegistry()
   const {
-    companyId,
-    companyName,
     registry,
     applicability,
     profile,
@@ -905,6 +915,7 @@ function TaxRegistryContent() {
     toast,
     setToast,
     runPreview,
+      openForm,
     saveFiling,
     refreshFiling,
     acknowledge,
@@ -931,6 +942,15 @@ function TaxRegistryContent() {
   const activeCategory =
     byCategory.find((g) => g.forms.some((f) => f.form_code === activeForm))?.cat ?? 'registry'
 
+  // Switching forms changes every panel below; leaving the user on the deadlines
+  // tab would show one form's figures against another's dates. openForm resets
+  // the period to the current month and computes, so the figures on screen
+  // belong to the form that was just clicked.
+  const handleOpenForm = (code) => {
+    setTab('computation')
+    openForm(code)
+  }
+
   return (
       <>
         {toast && (
@@ -945,12 +965,7 @@ function TaxRegistryContent() {
           byCategory={byCategory}
           totalForms={forms.length}
           activeForm={activeForm}
-          onSelect={(code) => {
-            setActiveForm(code)
-            // Switching forms changes every panel below; leaving the user on the
-            // deadlines tab would show one form's figures against another's dates.
-            setTab('computation')
-          }}
+          onSelect={handleOpenForm}
           resultByForm={resultByForm}
         />
 
@@ -959,7 +974,7 @@ function TaxRegistryContent() {
           <div className="bg-white border-b border-slate-200 p-4 shadow-sm">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+                <div className="flex items-center gap-2 text-[13px] text-slate-500 mb-1">
                   <span>Tax Registry</span>
                   <ChevronDown size={10} className="-rotate-90" />
                   <span className="uppercase font-semibold text-brand-red">{activeCategory}</span>
@@ -967,9 +982,9 @@ function TaxRegistryContent() {
                   <span className="font-mono font-bold text-slate-700">{activeForm}</span>
                 </div>
                 <h1 className="text-xl lg:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2 flex-wrap">
-                  <span className="truncate">{formDetail?.short_title || formDetail?.title || '—'}</span>
+                  <span className="min-w-0 break-words">{formDetail?.short_title || formDetail?.title || '—'}</span>
                   {formDetail && (
-                    <span className="text-xs font-normal bg-zinc-900 text-white px-2 py-0.5 rounded font-mono">
+                    <span className="text-[13px] font-normal bg-zinc-900 text-white px-2 py-0.5 rounded font-mono">
                       BIR FORM {formDetail.form_code}
                     </span>
                   )}
@@ -977,37 +992,60 @@ function TaxRegistryContent() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5">
-                  <Building2 size={12} className="text-brand-red shrink-0" />
-                  <span className="text-xs font-semibold text-slate-500 uppercase">Company</span>
-                  <span className="text-xs font-semibold text-slate-800">
-                    {companyName || `Company ${companyId}`}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5">
-                  <CalendarClock size={12} className="text-brand-red" />
-                  <span className="text-xs font-semibold text-slate-500 uppercase">Period</span>
+                {/* The company chip that used to sit here was removed. The page
+                    is already scoped to one company - the session resolves it and
+                    every request is made against that tenant database - so
+                    repeating the name beside the period a user is choosing adds
+                    nothing they can act on, and it pushed the period control and
+                    the run button towards the edge of the toolbar. */}
+                <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 min-w-0 shrink">
+                  <CalendarClock size={12} className="text-brand-red shrink-0" />
+                  <span className="text-[13px] font-semibold text-slate-500 uppercase shrink-0">Period</span>
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="bg-transparent text-xs font-mono font-semibold text-slate-800 focus:outline-none cursor-pointer"
+                    className="bg-transparent text-[13px] font-mono font-semibold text-slate-800 focus:outline-none cursor-pointer w-[118px] shrink-0"
                   />
-                  <span className="text-xs font-semibold text-slate-400">to</span>
+                  <span className="text-[13px] font-semibold text-slate-400 shrink-0">to</span>
                   <input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="bg-transparent text-xs font-mono font-semibold text-slate-800 focus:outline-none cursor-pointer"
+                    className="bg-transparent text-[13px] font-mono font-semibold text-slate-800 focus:outline-none cursor-pointer w-[118px] shrink-0"
                   />
+                  {/* The filing picker belongs on the period line: it is a period
+                      selector like the two dates, and it is what the user reaches
+                      for instead of recomputing. Sitting apart from them it read
+                      as an unrelated control.
+
+                      It is also the widest thing on the line, so it is given a
+                      fixed width and the dates are sized to match. Left to its
+                      own content width it pushed Export PDF onto a second row,
+                      which broke the toolbar into two ragged lines. A fixed width
+                      costs nothing here: the dropdown still shows the full
+                      "#12 Jul 2026 (filed)" text when it is opened. */}
+                  {filingsForForm.length > 0 && (
+                    <select
+                      value={filingsActive?.id ?? ''}
+                      onChange={(e) => refreshFiling(Number(e.target.value))}
+                      className="ml-1 w-[132px] shrink-0 text-[12px] font-semibold rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-slate-700 focus:outline-none focus:border-brand-red truncate"
+                    >
+                      <option value="">View a saved filing…</option>
+                      {filingsForForm.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          #{f.id} {f.period_label} ({f.status})
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <button
                   onClick={runPreview}
                   disabled={busy}
                   title="Recompute this form from the ledger for the chosen period"
-                  className="bg-brand-red hover:bg-brand-red-hover text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-md flex items-center gap-2 transition active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+                  className="bg-brand-red hover:bg-brand-red-hover text-white px-4 py-2 rounded-lg text-[13px] font-semibold shadow-md flex items-center gap-2 transition active:scale-95 disabled:opacity-50 disabled:active:scale-100"
                 >
                   {busy ? <Loader2 size={12} className="animate-spin" /> : <Calculator size={12} />}
                   <span>{busy ? 'Computing' : 'Compute'}</span>
@@ -1017,7 +1055,7 @@ function TaxRegistryContent() {
                   <button
                     onClick={saveFiling}
                     disabled={busy}
-                    className="bg-zinc-900 hover:bg-black text-white px-4 py-2 rounded-lg text-xs font-semibold shadow flex items-center gap-2 transition border border-zinc-800 disabled:opacity-50"
+                    className="bg-zinc-900 hover:bg-black text-white px-4 py-2 rounded-lg text-[13px] font-semibold shadow flex items-center gap-2 transition border border-zinc-800 disabled:opacity-50"
                   >
                     <Save size={12} />
                     <span>Save as draft</span>
@@ -1027,27 +1065,12 @@ function TaxRegistryContent() {
                 <button
                   onClick={exportPdf}
                   disabled={busy}
-                  className="bg-white text-slate-700 hover:bg-slate-100 px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-300 flex items-center gap-2 transition disabled:opacity-50"
+                  className="bg-white text-slate-700 hover:bg-slate-100 px-3.5 py-2 rounded-lg text-[13px] font-semibold border border-slate-300 flex items-center gap-2 transition disabled:opacity-50"
                 >
                   <Download size={12} className="text-brand-red" />
                   <span>Export PDF</span>
-                </button>
-
-                {filingsForForm.length > 0 && (
-                  <select
-                    value={filingsActive?.id ?? ''}
-                    onChange={(e) => refreshFiling(Number(e.target.value))}
-                    className="text-xs font-semibold rounded-lg border border-slate-300 bg-white px-2 py-2 text-slate-700 focus:outline-none focus:border-brand-red"
-                  >
-                    <option value="">View a saved filing…</option>
-                    {filingsForForm.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        #{f.id} {f.period_label} ({f.status})
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
+</button>
+            </div>
             </div>
           </div>
 
@@ -1077,7 +1100,7 @@ function TaxRegistryContent() {
                   key={id}
                   onClick={() => setTab(id)}
                   aria-current={tab === id}
-                  className={`px-4 py-2.5 text-xs font-bold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+                  className={`px-4 py-2.5 text-[13px] font-bold border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
                     tab === id
                       ? 'border-brand-red text-brand-red'
                       : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -1103,10 +1126,10 @@ function TaxRegistryContent() {
                   />
                 ) : (
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
-                    <p className="text-[10px] font-black uppercase tracking-[3px] text-red-600 mb-1">
+                    <p className="text-[11px] font-black uppercase tracking-[3px] text-red-600 mb-1">
                       No computation yet
                     </p>
-                    <p className="text-[13px] font-bold text-gray-400">
+                    <p className="text-sm font-bold text-gray-400">
                       Choose a period and press <strong className="text-black">Compute</strong> to fill
                       this form. Computing does not save anything.
                     </p>
@@ -1114,10 +1137,10 @@ function TaxRegistryContent() {
                 )
               ) : (
                 <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-brand-red mb-1">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-brand-red mb-1">
                     Pick a form
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-[13px] text-slate-500">
                     Choose a BIR return from the registry to begin.
                   </p>
                 </div>
@@ -1155,7 +1178,7 @@ function TaxRegistryContent() {
                         }`}
                       >
                         <span
-                          className={`text-[12px] ${
+                          className={`text-[13px] ${
                             line.emphasis ? 'font-black text-black' : 'font-bold text-gray-700'
                           }`}
                         >
@@ -1164,8 +1187,8 @@ function TaxRegistryContent() {
                         <span
                           className={`font-mono ${
                             line.emphasis
-                              ? 'text-[13px] font-black text-red-600'
-                              : 'text-[13px] font-black text-black'
+                              ? 'text-sm font-black text-red-600'
+                              : 'text-sm font-black text-black'
                           }`}
                         >
                           {t.formatPHP(line.value)}
@@ -1174,7 +1197,7 @@ function TaxRegistryContent() {
                     ))}
                   </div>
                   {filingsActive.is_override && (
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mt-2">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-amber-600 mt-2">
                       Includes at least one manual override
                     </p>
                   )}

@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
 import { hasRouteAccess, getAccessibleRoutes } from '../utils/routeProtection'
 import ModuleUpsell from './ModuleUpsell'
 import useEntitlement from '../hooks/useEntitlement'
+import { useModuleLockout } from '../utils/moduleLockout'
 
 /**
  * Gate for a module page.
@@ -75,7 +76,24 @@ const ProtectedRoute = ({ children, routeName, moduleCode }) => {
  * already cached, which it is for all but the first page of a session.
  */
 const ModuleGate = ({ moduleCode, children }) => {
-  const { entitlement, loading, hasModule } = useEntitlement()
+  const { entitlement, loading, hasModule, validated, invalidate } = useEntitlement()
+  const lockedOut = useModuleLockout(moduleCode)
+
+  // The server refused this module on a request the page made. That is
+  // authoritative and beats the cached entitlement, which said the opposite -
+  // otherwise the page keeps rendering and its own error toast shows the raw
+  // server text ("accounting_periods is not included in your plan") in a red
+  // "System Error" instead of the upgrade screen.
+  //
+  // The cached entitlement is dropped at the same time so the next navigation
+  // starts from the server's answer rather than the one just proven wrong.
+  useEffect(() => {
+    if (lockedOut) invalidate()
+  }, [lockedOut, invalidate])
+
+  if (lockedOut) {
+    return <ModuleUpsell moduleCode={moduleCode} entitlement={entitlement} />
+  }
 
   if (!entitlement) {
     if (loading) return null
@@ -85,6 +103,14 @@ const ModuleGate = ({ moduleCode, children }) => {
   }
 
   if (!hasModule(moduleCode)) {
+    // Never deny on an answer that has not been checked with the server.
+    //
+    // The cached entitlement can be older than a plan change - an operator
+    // adding a module to a plan reaches a user who was already signed in. Saying
+    // "not in your plan" on a stale cache showed the correct plan name and the
+    // wrong module list, which reads as a server fault. Waiting one revalidation
+    // is cheaper than wrongly turning away a paying customer.
+    if (!validated) return null
     return <ModuleUpsell moduleCode={moduleCode} entitlement={entitlement} />
   }
 

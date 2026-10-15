@@ -22,29 +22,68 @@ const getUsers = async (req, res, next) => {
   try {
     connection = await pool.getConnection()
 
+    // The effective plan is the COMPANY's, not the per-user pointer.
+    //
+    // `master_user.subscription_id` is the legacy column and is not what
+    // authorisation reads: the accounting server resolves modules from
+    // master_company_subscription, keyed by db_name. Showing the legacy value
+    // here could display a plan the company is not actually on - or "No
+    // Subscription" for a company whose modules are fully enabled.
+    //
+    // The legacy value is still returned, under its own key, so the admin can
+    // see when the two disagree instead of one silently overwriting the other.
     const query = `
-      SELECT 
+      SELECT
         mu.mu_id as id,
         mu.mu_username as username,
         mu.db_name as db_name,
         mu.mu_email as email,
         mu.mu_status as status,
         mu.mu_role as role,
-        mu.subscription_id as subscription_id,
+        mu.subscription_id as legacy_subscription_id,
+        mcs.mcs_plan_id as plan_id,
         sp.sp_name as subscription_plan_name,
-        sp.sp_status as subscription_plan_status
+        sp.sp_code as subscription_plan_code,
+        sp.sp_status as subscription_plan_status,
+        mcs.mcs_status as company_subscription_status,
+        mcs.mcs_max_users as max_users
       FROM master_user mu
-      LEFT JOIN subscription_plans sp ON mu.subscription_id = sp.sp_id
+      LEFT JOIN master_company_subscription mcs ON mcs.mcs_db_name = mu.db_name
+      LEFT JOIN subscription_plans sp ON sp.sp_id = mcs.mcs_plan_id
       ORDER BY mu.mu_id ASC
     `
 
     const [users] = await connection.execute(query)
 
+    // Modules per distinct plan, in one query, so the admin can see what each
+    // company actually has rather than inferring it from the plan name.
+    const planIds = [...new Set(users.map((u) => u.plan_id).filter((id) => id !== null && id !== undefined))]
+    const modulesByPlan = new Map()
+    if (planIds.length) {
+      const placeholders = planIds.map(() => '?').join(',')
+      const [moduleRows] = await connection.execute(
+        `SELECT pm_plan_id, pm_module FROM plan_modules
+          WHERE pm_plan_id IN (${placeholders}) ORDER BY pm_module`,
+        planIds,
+      )
+      for (const row of moduleRows) {
+        if (!modulesByPlan.has(row.pm_plan_id)) modulesByPlan.set(row.pm_plan_id, [])
+        modulesByPlan.get(row.pm_plan_id).push(row.pm_module)
+      }
+    }
+
+    const withModules = users.map((u) => ({
+      ...u,
+      // Kept for the existing UI which reads subscription_id.
+      subscription_id: u.plan_id ?? null,
+      modules: u.plan_id ? modulesByPlan.get(u.plan_id) || [] : [],
+    }))
+
     res.status(200).json({
       success: true,
       message: 'Users retrieved successfully',
-      data: users,
-      count: users.length,
+      data: withModules,
+      count: withModules.length,
       timestamp: new Date().toISOString()
     })
 
