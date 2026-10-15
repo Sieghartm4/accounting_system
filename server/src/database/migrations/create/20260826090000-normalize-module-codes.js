@@ -71,6 +71,13 @@ const RENAMES = {
 
 module.exports = {
   async up(queryInterface) {
+    // This migration belongs to the admin database only. Check if we're in admin DB.
+    const databaseName = queryInterface.sequelize.config.database
+    if (!databaseName || !databaseName.toLowerCase().includes('admin')) {
+      console.log('Skipping migration: not in admin database')
+      return
+    }
+
     const [tables] = await queryInterface.sequelize.query(
       `SELECT TABLE_NAME FROM information_schema.TABLES
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'master_route_access'`,
@@ -149,6 +156,13 @@ module.exports = {
   },
 
   async down(queryInterface) {
+    // This migration belongs to the admin database only. Check if we're in admin DB.
+    const databaseName = queryInterface.sequelize.config.database
+    if (!databaseName || !databaseName.toLowerCase().includes('admin')) {
+      console.log('Skipping migration: not in admin database')
+      return
+    }
+
     const [tables] = await queryInterface.sequelize.query(
       `SELECT TABLE_NAME FROM information_schema.TABLES
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'master_route_access'`,
