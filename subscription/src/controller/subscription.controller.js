@@ -180,9 +180,27 @@ const getPublicSubscriptionPlans = async (req, res, next) => {
     connection = await adminPool.getConnection()
     console.log('Connected to database')
 
+    // First, check which columns exist in the table
+    const [columns] = await connection.execute(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'subscription_plans'`
+    )
+    const columnNames = columns.map(c => c.COLUMN_NAME)
+    console.log('Available columns:', columnNames)
+
+    // Build a dynamic query based on available columns
+    const selectColumns = [
+      'sp_id', 'sp_code', 'sp_name', 'sp_description', 'sp_status'
+    ]
+    const optionalColumns = ['sp_max_users', 'sp_trial_days', 'sp_billing_days', 'sp_price_minor', 'sp_is_trial']
+    optionalColumns.forEach(col => {
+      if (columnNames.includes(col)) {
+        selectColumns.push(col)
+      }
+    })
+
     const query = `
-      SELECT sp_id, sp_code, sp_name, sp_description, sp_status,
-             sp_max_users, sp_trial_days, sp_billing_days, sp_price_minor, sp_is_trial
+      SELECT ${selectColumns.join(', ')}
       FROM subscription_plans
       WHERE sp_status = 'PUBLIC'
       ORDER BY sp_id ASC
@@ -197,6 +215,7 @@ const getPublicSubscriptionPlans = async (req, res, next) => {
       connection,
       plans.map((p) => p.sp_id),
     )
+    console.log('Fetched modules for plans')
 
     // Fetch subscription plan items for each plan
     const plansWithItems = await Promise.all(
@@ -218,9 +237,19 @@ const getPublicSubscriptionPlans = async (req, res, next) => {
           ? Number(plan.sp_price_minor) / 100
           : (priceItem ? parseFloat(priceItem.spi_details) : 0)
 
+        // Handle missing columns by providing defaults
+        const maxUsers = plan.sp_max_users !== undefined ? plan.sp_max_users : 1
+        const trialDays = plan.sp_trial_days !== undefined ? plan.sp_trial_days : null
+        const billingDays = plan.sp_billing_days !== undefined ? plan.sp_billing_days : 30
+        const isTrial = plan.sp_is_trial !== undefined ? plan.sp_is_trial : false
+
         return {
           ...plan,
           sp_price: price,
+          sp_max_users: maxUsers,
+          sp_trial_days: trialDays,
+          sp_billing_days: billingDays,
+          sp_is_trial: isTrial,
           // The module list the plan really grants. Legacy MODULES items are
           // never seeded, so they are not consulted at all.
           modules: byPlanModules.get(plan.sp_id) || [...catalog.REQUIRED_MODULES],
@@ -243,6 +272,7 @@ const getPublicSubscriptionPlans = async (req, res, next) => {
     })
   } catch (error) {
     console.error('Error fetching public subscription plans:', error)
+    console.error('Error stack:', error.stack)
     if (connection) connection.release()
     return res.status(500).json({
       success: false,
