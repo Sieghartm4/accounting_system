@@ -155,7 +155,7 @@ module.exports = {
     )
     if (tables.length === 0) return
 
-    for (const [canonical, legacy] of Object.entries(RENAMES)) {
+    for (const [legacy, canonical] of Object.entries(RENAMES)) {
       const [existing] = await queryInterface.sequelize.query(
         `SELECT COUNT(*) AS n FROM master_route_access WHERE mra_name = ?`,
         { replacements: [canonical] },
