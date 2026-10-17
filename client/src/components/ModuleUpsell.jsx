@@ -283,13 +283,13 @@ const ModuleUpsell = ({
               <ArrowRight size={16} />
             </button>
 
-            <button
+            {/* <button
               type="button"
               onClick={() => navigate(-1)}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-200"
             >
               Go back
-            </button>
+            </button> */}
           </div>
         </div>
       </div>

@@ -372,26 +372,35 @@ const updateTemplateProgress = async (
   ])
 }
 
-const broadcastGeneratedAdjustments = (generated) => {
-  for (const g of generated) {
-    broadcastUpdates(
-      {
-        adjustment: {
-          id: g.id,
-          document_reference: g.reference || null,
-          posting_date: g.occurrenceDate,
-          total_amount: g.totalAmount,
-          prepared_by: g.actor,
-          status: 'PREPARED',
+// scope carries the tenant these documents belong to. This function runs from
+  // a scheduler as well as from a request, so there is no req to read it from -
+  // the caller passes it in rather than leaving it to be guessed, because a
+  // broadcast with no tenant cannot be proven safe to send.
+  const broadcastGeneratedAdjustments = (generated, scope) => {
+    for (const g of generated) {
+      broadcastUpdates(
+        {
+          adjustment: {
+            id: g.id,
+            document_reference: g.reference || null,
+            posting_date: g.occurrenceDate,
+            total_amount: g.totalAmount,
+            prepared_by: g.actor,
+            status: 'PREPARED',
+          },
         },
-      },
-      'adjustment_created',
-    )
+        'adjustment_created',
+        scope,
+      )
+    }
+    if (generated.length > 0) {
+      broadcastUpdates(
+        { count: generated.length },
+        'recurring_journal_generated',
+        scope,
+      )
+    }
   }
-  if (generated.length > 0) {
-    broadcastUpdates({ count: generated.length }, 'recurring_journal_generated')
-  }
-}
 
 /**
  * Generate all due occurrences for a single template. Runs inside the caller's
@@ -493,7 +502,11 @@ const generateDueRecurringJournalEntries = async (connection, template, actor = 
  * Run due-generations for every active template in a tenant database.
  * Opens its own connection + transaction; commits all templates atomically.
  */
-const generateDueForTenant = async (tenantDb = null, actor = 'SYSTEM (Recurring)') => {
+const generateDueForTenant = async (
+  tenantDb = null,
+  actor = 'SYSTEM (Recurring)',
+  broadcastScope = null,
+) => {
   const pool = getTenantPool(tenantDb)
   const connection = await pool.getConnection()
   let allGenerated = []
@@ -530,7 +543,7 @@ const generateDueForTenant = async (tenantDb = null, actor = 'SYSTEM (Recurring)
     if (connection) connection.release()
   }
 
-  broadcastGeneratedAdjustments(allGenerated)
+  broadcastGeneratedAdjustments(allGenerated, broadcastScope)
   return allGenerated
 }
 
@@ -597,7 +610,9 @@ const runRecurringSchedulerTick = async () => {
     console.log(`⏰ Recurring scheduler tick: processing ${dbs.length} tenant DB(s)`)
     for (const db of dbs) {
       try {
-        const generated = await generateDueForTenant(db, 'SYSTEM (Recurring)')
+        const generated = await generateDueForTenant(db, 'SYSTEM (Recurring)', {
+          dbName: db,
+        })
         totalGenerated += generated.length
         if (generated.length > 0) {
           console.log(

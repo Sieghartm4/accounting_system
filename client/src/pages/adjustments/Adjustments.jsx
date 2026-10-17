@@ -30,6 +30,7 @@ import AdjustmentsForm from './AdjustmentsForm'
 import { getAccessLevel } from '../../utils/routeProtection'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
+import connectRealtime from '../../utils/realtimeSocket'
 
 export default function Adjustments() {
   return (
@@ -145,41 +146,16 @@ function AdjustmentsContent() {
   }, [location.state, navigate, location.pathname])
 
   useEffect(() => {
-    const serverLink = import.meta.env.VITE_SERVER_LINK
-    if (!serverLink) return
-
-    const pageIsSecure = window.location.protocol === 'https:'
-    let socketUrl = serverLink
-    if (pageIsSecure) {
-      socketUrl = serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
-    } else {
-      socketUrl = serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
-    }
-    const socket = new WebSocket(socketUrl)
-
-    socket.addEventListener('message', (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        // Listen for adjustment creation
-        if (payload?.type === 'adjustment_created' && payload?.data?.adjustment) {
-          prependAdjustment(payload.data.adjustment)
+    const close = connectRealtime({
+      onMessage: (type, data) => {
+        if (type === 'adjustment_created' && data?.adjustment) {
+          prependAdjustment(data.adjustment)
         }
-        // 🟢 ADDED: Also listen for journal entries creation to refresh if needed
-        if (payload?.type === 'journal_entries_created') {
-          refetchAdjustments()
-        }
-      } catch (err) {
-        console.error('Adjustments WebSocket message parse error', err)
-      }
+      },
+      onError: (err) => console.error('Adjustment realtime error', err),
     })
 
-    socket.addEventListener('error', (err) => {
-      console.error('Adjustments WebSocket error', err)
-    })
-
-    return () => {
-      socket.close()
-    }
+    return close
   }, [prependAdjustment, refetchAdjustments])
 
   // Check if user has access to enable checkboxes
@@ -319,12 +295,6 @@ function AdjustmentsContent() {
     setInitialJournalEntries([])
   }
 
-  const handleSuccess = (toastMessage) => {
-    setToast(toastMessage)
-    handleBack()
-    refetchAdjustments()
-  }
-
   if (isAdding)
     return (
       <RouteProtection routeName="adjustments">
@@ -337,6 +307,7 @@ function AdjustmentsContent() {
           onSuccess={async (nextToast) => {
             if (nextToast) setToast(nextToast)
             await refetchAdjustments()
+            handleBack()
           }}
         />
       </RouteProtection>

@@ -72,6 +72,8 @@ const {
   getPeriodKeyForDate,
 } = require('../util/accountingPeriod.util')
 
+const { notifyFromController } = require('../services/notification/notifyFromController')
+
 const sql = new SQLQueryBuilder()
 
 
@@ -1987,7 +1989,16 @@ const createPurchase = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
-
+      notifyFromController(req, {
+        type: 'DOCUMENT_CREATED',
+        module: 'purchase',
+        severity: 'info',
+        title: `Purchase ${purchaseId} created`,
+        body: `Purchase ${purchaseId} was created and is awaiting checking.`,
+        link: '/purchase',
+        entityType: 'purchase',
+        entityId: purchaseId,
+      })
 
       res.status(201).json({
 
@@ -2109,7 +2120,9 @@ const createPurchase = async (req, res, next) => {
 
           if (createdPurchase) {
 
-            broadcastUpdates({ purchase: createdPurchase }, 'purchase_created')
+            broadcastUpdates({ purchase: createdPurchase }, 'purchase_created', {
+                 dbName: req.context?.dbName,
+               })
 
           }
 
@@ -2410,7 +2423,27 @@ const updatePurchaseState = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
-
+      for (let index = 0; index < results.length; index++) {
+        // `results` are raw mysql2 execute results, so they carry no `id`;
+        // `updates.find(u => u.id === result.id)` therefore matched nothing, the title
+        // rendered the literal word "undefined" and entity_id was written null. The
+        // row each result belongs to comes from `updates` by position instead -
+        // updatePromises is built by mapping over `updates`, so the orders match.
+        const requested = updates[index]
+        const from = requested?.currentState ?? null
+        const nextState = from === 'PREPARED' ? 'CHECKED' : 'APPROVED'
+        notifyFromController(req, {
+          type: 'STATUS_CHANGED',
+          module: 'purchase',
+          severity: 'info',
+          title: `Purchase ${requested?.id} ${from || 'status'} → ${nextState}`,
+          body: `The status moved to ${nextState}.`,
+          link: '/purchase',
+          entityType: 'purchase',
+          entityId: requested?.id,
+          changes: [{ field: 'state', from, to: nextState }],
+        })
+      }
 
       res.status(200).json({
 
@@ -2692,7 +2725,19 @@ const cancelPurchaseState = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
-
+      for (const u of validUpdates) {
+        notifyFromController(req, {
+          type: 'CANCELLED',
+          module: 'purchase',
+          severity: 'warning',
+          title: `Purchase ${u.id} cancelled`,
+          body: `Purchase ${u.id} was cancelled.`,
+          link: '/purchase',
+          entityType: 'purchase',
+          entityId: u.id,
+          changes: [{ field: 'state', from: u.currentState, to: 'CANCELLED' }],
+        })
+      }
 
       res.status(200).json({
 
@@ -5300,7 +5345,20 @@ const updatePurchase = async (req, res, next) => {
 
       }
 
-
+      notifyFromController(req, {
+        type: 'DOCUMENT_UPDATED',
+        module: 'purchase',
+        severity: 'info',
+        title: `Purchase ${purchaseId} updated`,
+        body:
+          auditChanges && auditChanges.length > 0
+            ? auditChanges.join('; ')
+            : `Purchase ${purchaseId} was updated.`,
+        link: '/purchase',
+        entityType: 'purchase',
+        entityId: purchaseId,
+        changes: auditChanges || [],
+      })
 
 res.status(200).json({
 

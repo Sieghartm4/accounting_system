@@ -41,6 +41,8 @@ const {
   getPeriodKeyForDate,
 } = require('../util/accountingPeriod.util')
 
+const { notifyFromController } = require('../services/notification/notifyFromController')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -868,6 +870,17 @@ const createCashDisbursement = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
+      notifyFromController(req, {
+        type: 'DOCUMENT_CREATED',
+        module: 'disbursement',
+        severity: 'info',
+        title: `Cash Disbursement ${cashDisbursementId} created`,
+        body: `Cash Disbursement ${cashDisbursementId} was created and is awaiting checking.`,
+        link: '/disbursement',
+        entityType: 'disbursement',
+        entityId: cashDisbursementId,
+      })
+
       res.status(201).json({
         success: true,
 
@@ -885,6 +898,7 @@ const createCashDisbursement = async (req, res, next) => {
             broadcastUpdates(
               { disbursement: createdDisbursement },
               'disbursement_created',
+              { dbName: req.context?.dbName },
             )
           }
         } catch (err) {
@@ -2099,6 +2113,21 @@ const updateCashDisbursement = async (req, res, next) => {
         await Transaction(auditQueries)
       }
 
+      notifyFromController(req, {
+        type: 'DOCUMENT_UPDATED',
+        module: 'disbursement',
+        severity: 'info',
+        title: `Cash Disbursement ${cashDisbursementId} updated`,
+        body:
+          auditChanges && auditChanges.length > 0
+            ? auditChanges.join('; ')
+            : `Cash Disbursement ${cashDisbursementId} was updated.`,
+        link: '/disbursement',
+        entityType: 'disbursement',
+        entityId: cashDisbursementId,
+        changes: auditChanges || [],
+      })
+
       res.status(200).json({
         success: true,
 
@@ -2261,6 +2290,28 @@ const updateDisbursementState = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
+      for (let index = 0; index < results.length; index++) {
+        // `results` are raw mysql2 execute results, so they carry no `id`;
+        // `updates.find(u => u.id === result.id)` therefore matched nothing, the title
+        // rendered the literal word "undefined" and entity_id was written null. The
+        // row each result belongs to comes from `updates` by position instead -
+        // updatePromises is built by mapping over `updates`, so the orders match.
+        const requested = updates[index]
+        const from = requested?.currentState ?? null
+        const nextState = from === 'PREPARED' ? 'CHECKED' : 'APPROVED'
+        notifyFromController(req, {
+          type: 'STATUS_CHANGED',
+          module: 'disbursement',
+          severity: 'info',
+          title: `Cash Disbursement ${requested?.id} ${from || 'status'} → ${nextState}`,
+          body: `The status moved to ${nextState}.`,
+          link: '/disbursement',
+          entityType: 'disbursement',
+          entityId: requested?.id,
+          changes: [{ field: 'state', from, to: nextState }],
+        })
+      }
+
       res.status(200).json({
         success: true,
 
@@ -2399,6 +2450,20 @@ const cancelDisbursementState = async (req, res, next) => {
       })
 
       await Transaction(auditQueries)
+
+      for (const u of validUpdates) {
+        notifyFromController(req, {
+          type: 'CANCELLED',
+          module: 'disbursement',
+          severity: 'warning',
+          title: `Cash Disbursement ${u.id} cancelled`,
+          body: `Cash Disbursement ${u.id} was cancelled.`,
+          link: '/disbursement',
+          entityType: 'disbursement',
+          entityId: u.id,
+          changes: [{ field: 'state', from: u.currentState, to: 'CANCELLED' }],
+        })
+      }
 
       res.status(200).json({
         success: true,

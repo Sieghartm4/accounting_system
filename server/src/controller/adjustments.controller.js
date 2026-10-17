@@ -34,6 +34,7 @@ const {
 } = require('../util/accountingPeriod.util')
 
 const { broadcastUpdates } = require('../startup/socket.startup')
+const { notifyFromController } = require('../services/notification/notifyFromController')
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -494,6 +495,17 @@ const createAdjustment = async (req, res, next) => {
       })
       await Transaction(auditQueries)
 
+      notifyFromController(req, {
+        type: 'DOCUMENT_CREATED',
+        module: 'adjustments',
+        severity: 'info',
+        title: `Adjustment ${adjustmentId} created`,
+        body: `Adjustment ${adjustmentId} was created and is awaiting checking.`,
+        link: '/adjustments',
+        entityType: 'adjustment',
+        entityId: adjustmentId,
+      })
+
       res.status(201).json({
         success: true,
         message: 'Adjustment created successfully',
@@ -541,7 +553,11 @@ const createAdjustment = async (req, res, next) => {
             : createdAdjustmentRows
 
           if (createdAdjustment) {
-            broadcastUpdates({ adjustment: createdAdjustment }, 'adjustment_created')
+            broadcastUpdates(
+                 { adjustment: createdAdjustment },
+                 'adjustment_created',
+                 { dbName: req.context?.dbName },
+               )
           }
         } catch (err) {
           console.error('Error broadcasting adjustment creation:', err)
@@ -683,6 +699,29 @@ const updateAdjustment = async (req, res, next) => {
       })
 
       await Transaction(auditQueries)
+
+      for (let index = 0; index < results.length; index++) {
+        // `results` are raw mysql2 execute results, so they carry no `id`;
+        // `updates.find(u => u.id === result.id)` therefore matched nothing, the title
+        // rendered the literal word "undefined" and entity_id was written null. The
+        // row each result belongs to comes from `updates` by position instead -
+        // updatePromises is built by mapping over `updates`, so the orders match.
+        const requested = updates[index]
+        const from = requested?.currentState ?? null
+        const nextState = from === 'PREPARED' ? 'CHECKED' : 'APPROVED'
+        notifyFromController(req, {
+          type: 'STATUS_CHANGED',
+          module: 'adjustments',
+          severity: 'info',
+          title: `Adjustment ${requested?.id} ${from || 'status'} → ${nextState}`,
+          body: `The status moved to ${nextState}.`,
+          link: '/adjustments',
+          entityType: 'adjustment',
+          entityId: requested?.id,
+          changes: [{ field: 'state', from, to: nextState }],
+        })
+      }
+
       res.status(200).json({
         success: true,
         message: `${results.length} adjustment(s) updated successfully`,
@@ -813,6 +852,20 @@ const cancelAdjustmentState = async (req, res, next) => {
       })
 
       await Transaction(auditQueries)
+
+      for (const u of validUpdates) {
+        notifyFromController(req, {
+          type: 'CANCELLED',
+          module: 'adjustments',
+          severity: 'warning',
+          title: `Adjustment ${u.id} cancelled`,
+          body: `Adjustment ${u.id} was cancelled.`,
+          link: '/adjustments',
+          entityType: 'adjustment',
+          entityId: u.id,
+          changes: [{ field: 'state', from: u.currentState, to: 'CANCELLED' }],
+        })
+      }
 
       res.status(200).json({
         success: true,
@@ -1394,6 +1447,21 @@ const updateAdjustmentData = async (req, res, next) => {
 
         await Transaction(auditQueries)
       }
+
+      notifyFromController(req, {
+        type: 'DOCUMENT_UPDATED',
+        module: 'adjustments',
+        severity: 'info',
+        title: `Adjustment ${adjustmentId} updated`,
+        body:
+          auditChanges && auditChanges.length > 0
+            ? auditChanges.join('; ')
+            : `Adjustment ${adjustmentId} was updated.`,
+        link: '/adjustments',
+        entityType: 'adjustment',
+        entityId: adjustmentId,
+        changes: auditChanges || [],
+      })
 
       res.status(200).json({
         success: true,

@@ -2547,8 +2547,6 @@ export default function CollectionsForm({
 
         if (onSuccess) await onSuccess(nextToast)
 
-        onBack()
-
       } else {
 
         const action = isEditMode ? 'update' : 'post'

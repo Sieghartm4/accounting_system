@@ -674,7 +674,11 @@ const generateNow = async (req, res, next) => {
 const generateAllNow = async (req, res, next) => {
   try {
     const actor = req.context?.username || 'Unknown User'
-    const generated = await generateDueForTenant(null, actor)
+    const generated = await generateDueForTenant(null, actor, {
+      // The tenant for the broadcast comes from the verified request, not from
+      // the pool argument. Passing null there is intentional and unchanged.
+      dbName: req.context?.dbName,
+    })
 
     res.status(200).json({
       success: true,

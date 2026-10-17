@@ -1533,7 +1533,6 @@ export default function PaymentsForm({
         }
         setToast(nextToast)
         if (onSuccess) await onSuccess(nextToast)
-        onBack()
       } else {
         const action = isEditMode ? 'update' : 'post'
         setToast({

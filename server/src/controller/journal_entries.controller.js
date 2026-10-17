@@ -620,6 +620,7 @@ const createJournalEntries = async (req, res, next) => {
       broadcastUpdates(
         { journal_entries: results, count: results.length },
         'journal_entries_created',
+        { dbName: req.context?.dbName },
       )
     }
 
@@ -862,6 +863,7 @@ const reverseJournalEntries = async (req, res, next) => {
             total_amount: totalAmount,
           },
           'reversal_created',
+          { dbName: req.context?.dbName },
         )
       } catch (err) {
         console.error('Error broadcasting reversal creation:', err)

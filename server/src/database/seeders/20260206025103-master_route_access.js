@@ -12,6 +12,10 @@ module.exports = {
       'dashboard', 'access', 'users', 'customers', 'vendors', 'charts',
       'proforma_entries', 'product_service', 'company', 'receipts',
       'disbursement', 'sales', 'collections', 'purchase', 'payments', 'adjustments', 'vat', 'withholding_tax', 'trial_balance', 'income_statement', 'general_ledger', 'balance_sheet', 'journal_entries', 'statement_of_comprehensive_income', 'bank_reconciliation', 'audit_trail', 'aging_receivables', 'customer_transactions', 'vendor_transactions', 'advances', 'purchase_order', 'responsibility_center', 'aging_payables', 'tax_compliance', 'recurring_journals', 'accounting_periods',
+      // 'notifications' used to be seeded here for a standalone page. There is no
+      // page any more: notifications are a count on each module's nav entry and
+      // the bell in the header, so a route_access row would grant access to
+      // nothing.
       // Present in existing tenants but never listed here, so a fresh tenant
       // would have been missing them entirely. Also seeded so the client
       // registry has something to resolve.

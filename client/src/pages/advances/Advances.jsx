@@ -17,6 +17,7 @@ import RouteProtection from '../../components/RouteProtection'
 import useAdvances from './useAdvances'
 import LoadingScreen from '../../components/LoadingScreen'
 import DynamicToast from '../../components/DynamicToast'
+import connectRealtime from '../../utils/realtimeSocket'
 
 const fmt = (value) =>
   new Intl.NumberFormat('en-PH', {
@@ -59,39 +60,16 @@ function AdvancesContent() {
 
   // 🟢 ADDED: Socket listener for journal entries creation (use WSS when page is secure)
   useEffect(() => {
-    const serverLink = import.meta.env.VITE_SERVER_LINK
-    if (!serverLink) return
-
-    // Build robust socket URL: if the page is served over HTTPS prefer wss, otherwise match server scheme
-    const pageIsSecure = window.location.protocol === 'https:'
-    let socketUrl = serverLink
-    if (pageIsSecure) {
-      // ensure WSS endpoint
-      socketUrl = serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
-    } else {
-      socketUrl = serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
-    }
-    const socket = new WebSocket(socketUrl)
-
-    socket.addEventListener('message', (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        if (payload?.type === 'journal_entries_created') {
-          // Refresh advances to show newly created entries
+    const close = connectRealtime({
+      onMessage: (type) => {
+        if (type === 'journal_entries_created') {
           refreshAdvances()
         }
-      } catch (err) {
-        console.error('Advances WebSocket message parse error', err)
-      }
+      },
+      onError: (err) => console.error('Advances realtime error', err),
     })
 
-    socket.addEventListener('error', (err) => {
-      console.error('Advances WebSocket error', err)
-    })
-
-    return () => {
-      socket.close()
-    }
+    return close
   }, [refreshAdvances])
 
   const totalDebit = advances.reduce(

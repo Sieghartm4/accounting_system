@@ -52,13 +52,27 @@ const getCompany = async (req, res, next) => {
         .selectAll(Master.master_company.tablename)
         .from(Master.master_company.tablename)
         .build() + ' LIMIT 1'
-    const companies = await Query(statement, [], Master.master_company.prefix_)
+    // The tenant is taken from the verified token rather than left to fall back
+    // to the process-global default: the recurring-journal scheduler walks
+    // several tenant databases in the background, and a company read that landed
+    // mid-tick could otherwise return another company's row.
+    const companies = await Query(
+      statement,
+      [],
+      Master.master_company.prefix_,
+      null,
+      req.context?.dbName,
+    )
 
     const company = companies.length > 0 ? companies[0] : null
 
     res.status(200).json({
       success: true,
       message: 'Company retrieved successfully',
+      // An object, not an array. This is a single-resource endpoint, and it was
+      // returning `[company]`, which every consumer except the notification
+      // hook read as `data.company_name` - so it silently got undefined and the
+      // company name, logo and profile fields rendered blank.
       data: company,
       timestamp: new Date().toISOString(),
     })

@@ -41,6 +41,8 @@ const {
   getPeriodKeyForDate,
 } = require('../util/accountingPeriod.util')
 
+const { notifyFromController } = require('../services/notification/notifyFromController')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -1158,6 +1160,17 @@ const createCollection = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
+      notifyFromController(req, {
+        type: 'DOCUMENT_CREATED',
+        module: 'collection',
+        severity: 'info',
+        title: `Collection ${collectionId} created`,
+        body: `Collection ${collectionId} was created and is awaiting checking.`,
+        link: '/collections',
+        entityType: 'collection',
+        entityId: collectionId,
+      })
+
       res.status(201).json({
         success: true,
 
@@ -1227,7 +1240,11 @@ const createCollection = async (req, res, next) => {
             : createdCollectionRows
 
           if (createdCollection) {
-            broadcastUpdates({ collection: createdCollection }, 'collection_created')
+            broadcastUpdates(
+                 { collection: createdCollection },
+                 'collection_created',
+                 { dbName: req.context?.dbName },
+               )
           }
         } catch (err) {
           console.error('Error broadcasting collection creation:', err)
@@ -1482,6 +1499,28 @@ const updateCollectionState = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
+      for (let index = 0; index < results.length; index++) {
+        // `results` are raw mysql2 execute results, so they carry no `id`;
+        // `updates.find(u => u.id === result.id)` therefore matched nothing, the title
+        // rendered the literal word "undefined" and entity_id was written null. The
+        // row each result belongs to comes from `updates` by position instead -
+        // updatePromises is built by mapping over `updates`, so the orders match.
+        const requested = updates[index]
+        const from = requested?.currentState ?? null
+        const nextState = from === 'PREPARED' ? 'CHECKED' : 'APPROVED'
+        notifyFromController(req, {
+          type: 'STATUS_CHANGED',
+          module: 'collection',
+          severity: 'info',
+          title: `Collection ${requested?.id} ${from || 'status'} → ${nextState}`,
+          body: `The status moved to ${nextState}.`,
+          link: '/collections',
+          entityType: 'collection',
+          entityId: requested?.id,
+          changes: [{ field: 'state', from, to: nextState }],
+        })
+      }
+
       res.status(200).json({
         success: true,
 
@@ -1620,6 +1659,20 @@ const cancelCollectionState = async (req, res, next) => {
       })
 
       await Transaction(auditQueries)
+
+      for (const u of validUpdates) {
+        notifyFromController(req, {
+          type: 'CANCELLED',
+          module: 'collection',
+          severity: 'warning',
+          title: `Collection ${u.id} cancelled`,
+          body: `Collection ${u.id} was cancelled.`,
+          link: '/collections',
+          entityType: 'collection',
+          entityId: u.id,
+          changes: [{ field: 'state', from: u.currentState, to: 'CANCELLED' }],
+        })
+      }
 
       res.status(200).json({
         success: true,
@@ -3132,6 +3185,21 @@ const updateCollection = async (req, res, next) => {
 
         await Transaction(auditQueries)
       }
+
+      notifyFromController(req, {
+        type: 'DOCUMENT_UPDATED',
+        module: 'collection',
+        severity: 'info',
+        title: `Collection ${collectionId} updated`,
+        body:
+          auditChanges && auditChanges.length > 0
+            ? auditChanges.join('; ')
+            : `Collection ${collectionId} was updated.`,
+        link: '/collections',
+        entityType: 'collection',
+        entityId: collectionId,
+        changes: auditChanges || [],
+      })
 
       res.status(200).json({
         success: true,

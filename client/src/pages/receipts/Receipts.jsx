@@ -28,6 +28,8 @@ import { hasRouteAccess, getAccessLevel } from '../../utils/routeProtection'
 import { generateReceiptPDF } from '../../utils/generateReceiptPDF' // <-- import PDF util
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
+import connectRealtime from '../../utils/realtimeSocket'
+import SummaryTile from '../../components/SummaryTile'
 
 export default function Receipts() {
   return (
@@ -129,33 +131,16 @@ function ReceiptsContent() {
   }, [searchParams, setSearchParams])
 
   useEffect(() => {
-    const serverLink = import.meta.env.VITE_SERVER_LINK
-    if (!serverLink) return
-
-    const pageIsSecure = window.location.protocol === 'https:'
-    const socketUrl = pageIsSecure
-      ? serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
-      : serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
-    const socket = new WebSocket(socketUrl)
-
-    socket.addEventListener('message', (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        if (payload?.type === 'receipt_created' && payload?.data?.receipt) {
-          prependReceipt(payload.data.receipt)
+    const close = connectRealtime({
+      onMessage: (type, data) => {
+        if (type === 'receipt_created' && data?.receipt) {
+          prependReceipt(data.receipt)
         }
-      } catch (err) {
-        console.error('Receipt WebSocket message parse error', err)
-      }
+      },
+      onError: (err) => console.error('Receipt realtime error', err),
     })
 
-    socket.addEventListener('error', (err) => {
-      console.error('Receipt WebSocket error', err)
-    })
-
-    return () => {
-      socket.close()
-    }
+    return close
   }, [prependReceipt])
 
   const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
@@ -418,6 +403,7 @@ function ReceiptsContent() {
           onSuccess={async (nextToast) => {
             if (nextToast) setToast(nextToast)
             await refetchReceipts()
+            setIsAdding(false)
           }}
         />
       </RouteProtection>
@@ -439,6 +425,9 @@ function ReceiptsContent() {
           onSuccess={async (nextToast) => {
             if (nextToast) setToast(nextToast)
             await refetchReceipts()
+            setViewingReceipt(null)
+            setIsEditMode(false)
+            setIsPostedEdit(false)
           }}
         />
       </RouteProtection>
@@ -751,108 +740,6 @@ function ReceiptsContent() {
           checkboxActionsFilter={getFilteredCheckboxActions}
         />
       </motion.div>
-    </div>
-  )
-}
-
-function SummaryTile({ label, value, count, subText, color, onClick, isActive, icon: Icon }) {
-  const theme = {
-    emerald: {
-      text: 'text-emerald-600 dark:text-emerald-400',
-      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      bar: 'bg-emerald-500',
-      bg: 'bg-emerald-500',
-      textOnActive: 'text-white'
-    },
-    amber: {
-      text: 'text-amber-600 dark:text-amber-400',
-      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
-      bar: 'bg-amber-500',
-      bg: 'bg-amber-500',
-      textOnActive: 'text-white'
-    },
-    orange: {
-      text: 'text-orange-600 dark:text-orange-400',
-      badgeBg: 'bg-orange-50 text-orange-700 border-orange-200',
-      bar: 'bg-orange-500',
-      bg: 'bg-orange-500',
-      textOnActive: 'text-white'
-    },
-    rose: {
-      text: 'text-rose-600 dark:text-rose-400',
-      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
-      bar: 'bg-rose-500',
-      bg: 'bg-rose-500',
-      textOnActive: 'text-white'
-    },
-    blue: {
-      text: 'text-blue-600 dark:text-blue-400',
-      badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
-      bar: 'bg-blue-500',
-      bg: 'bg-blue-500',
-      textOnActive: 'text-white'
-    },
-    dark: {
-      text: 'text-emerald-400',
-      badgeBg: 'bg-emerald-950 text-emerald-300 border-emerald-800/50',
-      bar: 'bg-emerald-400',
-      bg: 'bg-emerald-400',
-      textOnActive: 'text-white'
-    },
-  }[color] || {
-    text: 'text-gray-700',
-    badgeBg: 'bg-gray-50 text-gray-700 border-gray-200',
-    bar: 'bg-gray-400',
-    bg: 'bg-gray-400',
-    textOnActive: 'text-white'
-  }
-
-  const bgClass = color === 'dark'
-    ? 'bg-slate-900 text-white border-slate-800'
-    : 'bg-white text-gray-900 border-gray-200/80 shadow-xs'
-
-  const activeBgClass = isActive
-    ? `${theme.bg} text-white border-transparent`
-    : bgClass
-
-  const isClickable = label !== 'Total Amount Due'
-
-  return (
-    <div
-      onClick={isClickable ? onClick : undefined}
-      className={`${activeBgClass} p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between h-full ${isClickable ? 'cursor-pointer hover:scale-105 hover:shadow-lg group' : ''} transition-all duration-300`}
-    >
-      {/* Bottom Accent Indicator - Animates on hover (behind content) */}
-      <div className={`absolute bottom-0 left-0 right-0 h-1 ${theme.bar} ${isClickable ? 'group-hover:h-full' : ''} transition-all duration-300 z-0`} />
-
-      {/* Content wrapper with higher z-index */}
-      <div className="relative z-10 flex flex-col justify-between h-full">
-        {/* Top Header Row */}
-        <div className="flex items-center justify-between gap-2 mb-2">
-          {label === 'Total Amount Due' ? (
-            <span className={`text-xs font-semibold tracking-wide uppercase text-white`}>
-              {label}
-            </span>
-          ) : (
-            <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${isActive ? 'bg-white text-gray-900 border-white' : theme.badgeBg} ${isClickable ? 'group-hover:bg-white group-hover:text-gray-900 group-hover:border-white' : ''}`}>
-              {label}
-            </span>
-          )}
-          <span className={`text-xs font-medium ${isActive ? 'text-white/80' : 'text-gray-400'} ${isClickable ? 'group-hover:text-white/80' : ''}`}>
-            {subText}
-          </span>
-        </div>
-
-        {/* Value Row with Icon */}
-        <div className="flex items-center gap-2 my-1">
-          {Icon && (
-            <Icon size={20} className={`${isActive ? 'text-white' : (label === 'Total Amount Due' ? theme.text : color === 'dark' ? theme.text : 'text-gray-600')} ${isClickable ? 'group-hover:text-white' : ''} transition-colors`} />
-          )}
-          <span className={`text-2xl font-bold font-mono tracking-tight ${isActive ? 'text-white' : (label === 'Total Amount Due' ? theme.text : 'text-black')} ${isClickable ? 'group-hover:text-white' : ''}`}>
-            {value}
-          </span>
-        </div>
-      </div>
     </div>
   )
 }

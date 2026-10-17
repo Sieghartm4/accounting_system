@@ -19,6 +19,7 @@ import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
 import LoadingScreen from '../../components/LoadingScreen'
 import useCustomer from './useCustomer'
+import SummaryTile from '../../components/SummaryTile'
 
 function CustomerContent() {
   const { customers, loading, error, createCustomer, updateCustomer, importCustomers } = useCustomer()
@@ -371,23 +372,29 @@ function CustomerContent() {
 
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard
-            icon={<Users className="text-red-600" size={20} />}
+          <SummaryTile
             label="Total Entities"
             value={customers?.length || 0}
             subText="Accounts"
+            color="rose"
+            icon={Users}
+            hoverable
           />
-          <SummaryCard
-            icon={<ShieldCheck className="text-black" size={20} />}
+          <SummaryTile
             label="Verified"
             value={Math.floor((customers?.length || 0) * 0.9)}
             subText="Compliance"
+            color="blue"
+            icon={ShieldCheck}
+            hoverable
           />
-          <SummaryCard
-            icon={<Search className="text-gray-400" size={20} />}
+          <SummaryTile
             label="Pending"
-            value="3"
+            value={"3"}
             subText="Queue"
+            color="amber"
+            icon={Search}
+            hoverable
           />
         </div>
       </div>
@@ -607,25 +614,6 @@ function CustomerContent() {
           duration={4000}
         />
       )}
-    </div>
-  )
-}
-
-function SummaryCard({ icon, label, value, subText }) {
-  return (
-    <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm">
-      <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
-      <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
-          {label}
-        </p>
-        <div className="flex items-baseline gap-2">
-          <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">
-            {subText}
-          </span>
-        </div>
-      </div>
     </div>
   )
 }

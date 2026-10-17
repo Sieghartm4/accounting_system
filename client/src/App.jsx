@@ -65,13 +65,21 @@ function App() {
         />
         <Route path="/" element={<Layout />}>
           <Route
-            path="dashboard"
-            element={
-              <ProtectedRoute routeName="dashboard">
-                <DashboardNew />
-              </ProtectedRoute>
-            }
-          />
+path="dashboard"
+              element={
+                <ProtectedRoute routeName="dashboard">
+                  <DashboardNew />
+                </ProtectedRoute>
+              }
+            />
+            {/* There is no notifications page.
+
+                Notifications live where the work happens: a red count on the
+                Receipts nav entry, and the bell in the header for triage. A
+                separate page listing everything added a third place to look and
+                a second way to be unsure whether you had seen something, so it
+                was removed. The header dropdown and the per-nav badges are the
+                whole surface. */}
           <Route
             path="company"
             element={

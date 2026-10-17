@@ -18,6 +18,7 @@ import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
 import LoadingScreen from '../../components/LoadingScreen'
 import useVendors from './useVendors'
+import SummaryTile from '../../components/SummaryTile'
 
 function VendorsContent() {
   const { vendors, loading, error, createVendor, updateVendor, importVendors } = useVendors()
@@ -373,23 +374,29 @@ function VendorsContent() {
 
         {/* --- SUMMARY TILES --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard
-            icon={<Truck className="text-red-600" size={20} />}
+          <SummaryTile
             label="Total Suppliers"
             value={vendors?.length || 0}
             subText="Active Partners"
+            color="rose"
+            icon={Truck}
+            hoverable
           />
-          <SummaryCard
-            icon={<ShieldCheck className="text-black" size={20} />}
+          <SummaryTile
             label="KYC Verified"
             value={vendors?.length > 0 ? Math.floor(vendors.length * 0.85) : 0}
             subText="Compliance"
+            color="blue"
+            icon={ShieldCheck}
+            hoverable
           />
-          <SummaryCard
-            icon={<Search className="text-gray-400" size={20} />}
+          <SummaryTile
             label="Review Req."
-            value="2"
+            value={"2"}
             subText="In Progress"
+            color="amber"
+            icon={Search}
+            hoverable
           />
         </div>
       </div>
@@ -609,25 +616,6 @@ function VendorsContent() {
           duration={4000}
         />
       )}
-    </div>
-  )
-}
-
-function SummaryCard({ icon, label, value, subText }) {
-  return (
-    <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
-      <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
-      <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
-          {label}
-        </p>
-        <div className="flex items-baseline gap-2">
-          <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">
-            {subText}
-          </span>
-        </div>
-      </div>
     </div>
   )
 }

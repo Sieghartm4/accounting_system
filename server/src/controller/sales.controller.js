@@ -36,6 +36,8 @@ const {
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
 
+const { notifyFromController } = require('../services/notification/notifyFromController')
+
 const {
   findPeriodForDateKey,
   assertPeriodIsOpen,
@@ -1131,6 +1133,17 @@ const createSales = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
+      notifyFromController(req, {
+        type: 'DOCUMENT_CREATED',
+        module: 'sales',
+        severity: 'info',
+        title: `Sales ${salesId} created`,
+        body: `Sales ${salesId} was created and is awaiting checking.`,
+        link: '/sales',
+        entityType: 'sale',
+        entityId: salesId,
+      })
+
       res.status(201).json({
         success: true,
 
@@ -1145,7 +1158,9 @@ const createSales = async (req, res, next) => {
       setImmediate(() => {
         try {
           if (createdSales) {
-            broadcastUpdates({ sale: createdSales }, 'sales_created')
+            broadcastUpdates({ sale: createdSales }, 'sales_created', {
+                 dbName: req.context?.dbName,
+               })
           }
         } catch (err) {
           console.error('Error broadcasting sales creation:', err)
@@ -1329,6 +1344,28 @@ const updateSalesState = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
+        // `results` are raw mysql2 execute results ([ResultSetHeader, fields]),
+        // so they carry no `id`. The id of the row each one updated comes from
+        // validUpdates by position - updatePromises is built by mapping over it,
+        // so the orders match. Reading result.id produced titles like
+        // "Sales undefined status -> APPROVED" and left entity_id null.
+        results.forEach((_result, index) => {
+          const requested = validUpdates[index]
+          const from = requested?.currentState ?? null
+          const nextState = from === 'PREPARED' ? 'CHECKED' : 'APPROVED'
+          notifyFromController(req, {
+            type: 'STATUS_CHANGED',
+            module: 'sales',
+            severity: 'info',
+            title: `Sales ${requested?.id} ${from || 'status'} → ${nextState}`,
+            body: `The status moved to ${nextState}.`,
+            link: '/sales',
+            entityType: 'sale',
+            entityId: requested?.id,
+            changes: [{ field: 'state', from, to: nextState }],
+          })
+        })
+
       res.status(200).json({
         success: true,
         message: `${validUpdates.length} sale(s) updated successfully`,
@@ -1448,6 +1485,20 @@ const cancelSalesState = async (req, res, next) => {
       })
 
       await Transaction(auditQueries)
+
+      for (const u of validUpdates) {
+        notifyFromController(req, {
+          type: 'CANCELLED',
+          module: 'sales',
+          severity: 'warning',
+          title: `Sales ${u.id} cancelled`,
+          body: `Sales ${u.id} was cancelled.`,
+          link: '/sales',
+          entityType: 'sale',
+          entityId: u.id,
+          changes: [{ field: 'state', from: u.currentState, to: 'CANCELLED' }],
+        })
+      }
 
       res.status(200).json({
         success: true,
@@ -2865,6 +2916,21 @@ const updateSale = async (req, res, next) => {
 
         await Transaction(auditQueries)
       }
+
+      notifyFromController(req, {
+        type: 'DOCUMENT_UPDATED',
+        module: 'sales',
+        severity: 'info',
+        title: `Sales ${salesId} updated`,
+        body:
+          auditChanges && auditChanges.length > 0
+            ? auditChanges.join('; ')
+            : `Sales ${salesId} was updated.`,
+        link: '/sales',
+        entityType: 'sale',
+        entityId: salesId,
+        changes: auditChanges || [],
+      })
 
       res.status(200).json({
         success: true,

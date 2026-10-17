@@ -24,6 +24,17 @@
 
 const { Query } = require('../database/util/queries.util')
 const catalog = require('../constants/moduleCatalog')
+const mysql = require('mysql2/promise')
+const CONFIG = require('../database/config/config')
+
+// Admin pool for checking table existence
+const adminPool = mysql.createPool({
+  host: CONFIG[process.env.NODE_ENV].host,
+  user: CONFIG[process.env.NODE_ENV].username,
+  password: CONFIG[process.env.NODE_ENV].password,
+  database: CONFIG[process.env.NODE_ENV].database,
+  multipleStatements: true,
+})
 
 /** Statuses that mean the company may use the tenant right now. */
 const isActiveStatus = (status) =>
@@ -51,6 +62,57 @@ const resolveEntitlement = async (dbName) => {
 
   if (!dbName || typeof dbName !== 'string') return denied('NO_TENANT')
 
+  // Check if master_company_subscription table exists
+  let tableExists = false
+  try {
+    const connection = await adminPool.getConnection()
+    try {
+      const [tables] = await connection.execute(
+        `SELECT TABLE_NAME FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'master_company_subscription'`
+      )
+      tableExists = tables.length > 0
+    } finally {
+      connection.release()
+    }
+  } catch (error) {
+    console.error(`[entitlement] table check failed for ${dbName}:`, error.message)
+  }
+
+  if (!tableExists) {
+    console.log(`[entitlement] master_company_subscription table does not exist, using legacy check`)
+    // Fallback: check if user has any subscription_id in master_user
+    try {
+      const userRows = await Query(
+        'SELECT subscription_id FROM master_user WHERE db_name = ? LIMIT 1',
+        [dbName],
+      )
+      if (userRows && userRows[0] && userRows[0].subscription_id) {
+        // User has a subscription_id, but the new table doesn't exist yet
+        // Grant access with required modules
+        return {
+          subscribed: true,
+          status: 'active',
+          reason: null,
+          planId: null,
+          planCode: null,
+          planName: 'Legacy Subscription',
+          maxUsers: 5,
+          trialDays: null,
+          billingDays: 30,
+          priceMinor: 0,
+          isTrial: false,
+          trialEndsAt: null,
+          periodEndsAt: null,
+          modules: [...catalog.REQUIRED_MODULES],
+        }
+      }
+    } catch (error) {
+      console.error(`[entitlement] legacy check failed for ${dbName}:`, error.message)
+    }
+    return denied('NO_SUBSCRIPTION_TABLE')
+  }
+
   let rows
   try {
     rows = await Query(
@@ -71,38 +133,7 @@ const resolveEntitlement = async (dbName) => {
   }
 
   const row = rows && rows[0]
-  if (!row) {
-    // Fallback: check master_user.subscription_id for backward compatibility
-    // in case the migration hasn't been run yet
-    try {
-      const userRows = await Query(
-        `SELECT mu.subscription_id, mu.db_name
-           FROM master_user mu
-          WHERE mu.db_name = ?
-          LIMIT 1`,
-        [dbName],
-      )
-      if (userRows && userRows.length > 0 && userRows[0].subscription_id) {
-        // User has a subscription_id in master_user, treat as having a subscription
-        // The actual plan details will be fetched separately
-        return {
-          subscribed: true,
-          status: 'active',
-          reason: null,
-          planId: Number(userRows[0].subscription_id),
-          planCode: null,
-          planName: null,
-          maxUsers: 1,
-          trialEndsAt: null,
-          periodEndsAt: null,
-          modules: [...catalog.REQUIRED_MODULES],
-        }
-      }
-    } catch (fallbackError) {
-      console.error(`[entitlement] fallback check failed for ${dbName}:`, fallbackError.message)
-    }
-    return denied('NO_SUBSCRIPTION_ROW')
-  }
+  if (!row) return denied('NO_SUBSCRIPTION_ROW')
 
   // A row with no plan is a company that has never subscribed. It is not the
   // same as a lapsed one, and the client shows a different message for each.

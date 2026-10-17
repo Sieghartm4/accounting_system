@@ -61,6 +61,20 @@ const initSession = (app) => {
   app.use(session(options))
 }
 
+/**
+ * The live store and cookie name.
+ *
+ * Exported for the WebSocket handshake, which cannot go through express-session
+ * because an upgrade request never reaches the middleware chain. Without the
+ * store it would have to trust a client-supplied identity, and an unauthenticated
+ * socket receiving every tenant's financial events is exactly the leak this
+ * exists to close.
+ */
+const getSessionStore = () => options.store
+const getSessionCookieName = () => options.name
+
 module.exports = {
   initSession,
+  getSessionStore,
+  getSessionCookieName,
 }

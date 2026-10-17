@@ -41,6 +41,8 @@ const {
   getPeriodKeyForDate,
 } = require('../util/accountingPeriod.util')
 
+const { notifyFromController } = require('../services/notification/notifyFromController')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -1103,6 +1105,17 @@ const createPayment = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
+      notifyFromController(req, {
+        type: 'DOCUMENT_CREATED',
+        module: 'payments',
+        severity: 'info',
+        title: `Payment ${paymentId} created`,
+        body: `Payment ${paymentId} was created and is awaiting checking.`,
+        link: '/payments',
+        entityType: 'payment',
+        entityId: paymentId,
+      })
+
       res.status(201).json({
         success: true,
 
@@ -1161,7 +1174,9 @@ const createPayment = async (req, res, next) => {
             : createdPaymentRows
 
           if (createdPayment) {
-            broadcastUpdates({ payment: createdPayment }, 'payment_created')
+            broadcastUpdates({ payment: createdPayment }, 'payment_created', {
+                   dbName: req.context?.dbName,
+                 })
           }
         } catch (err) {
           console.error('Error broadcasting payment creation:', err)
@@ -1436,6 +1451,28 @@ const updatePaymentState = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
+      for (let index = 0; index < results.length; index++) {
+        // `results` are raw mysql2 execute results, so they carry no `id`;
+        // `updates.find(u => u.id === result.id)` therefore matched nothing, the title
+        // rendered the literal word "undefined" and entity_id was written null. The
+        // row each result belongs to comes from `updates` by position instead -
+        // updatePromises is built by mapping over `updates`, so the orders match.
+        const requested = updates[index]
+        const from = requested?.currentState ?? null
+        const nextState = from === 'PREPARED' ? 'CHECKED' : 'APPROVED'
+        notifyFromController(req, {
+          type: 'STATUS_CHANGED',
+          module: 'payments',
+          severity: 'info',
+          title: `Payment ${requested?.id} ${from || 'status'} → ${nextState}`,
+          body: `The status moved to ${nextState}.`,
+          link: '/payments',
+          entityType: 'payment',
+          entityId: requested?.id,
+          changes: [{ field: 'state', from, to: nextState }],
+        })
+      }
+
       res.status(200).json({
         success: true,
 
@@ -1574,6 +1611,20 @@ const cancelPaymentState = async (req, res, next) => {
       })
 
       await Transaction(auditQueries)
+
+      for (const u of validUpdates) {
+        notifyFromController(req, {
+          type: 'CANCELLED',
+          module: 'payments',
+          severity: 'warning',
+          title: `Payment ${u.id} cancelled`,
+          body: `Payment ${u.id} was cancelled.`,
+          link: '/payments',
+          entityType: 'payment',
+          entityId: u.id,
+          changes: [{ field: 'state', from: u.currentState, to: 'CANCELLED' }],
+        })
+      }
 
       res.status(200).json({
         success: true,
@@ -3288,6 +3339,21 @@ const updatePayment = async (req, res, next) => {
 
         await Transaction(auditQueries)
       }
+
+      notifyFromController(req, {
+        type: 'DOCUMENT_UPDATED',
+        module: 'payments',
+        severity: 'info',
+        title: `Payment ${paymentId} updated`,
+        body:
+          auditChanges && auditChanges.length > 0
+            ? auditChanges.join('; ')
+            : `Payment ${paymentId} was updated.`,
+        link: '/payments',
+        entityType: 'payment',
+        entityId: paymentId,
+        changes: auditChanges || [],
+      })
 
       res.status(200).json({
         success: true,

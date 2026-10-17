@@ -7,6 +7,8 @@ const {
 const { healthRouter } = require('../routes/health.routes')
 const { developerRouter } = require('../routes/developer.routes')
 const { entitlementRouter } = require('../routes/entitlement.routes')
+const { realtimeTicketRouter } = require('../routes/realtimeTicket.routes')
+const { notificationRouter } = require('../routes/notification.routes')
 const { usersRouter } = require('../routes/users.routes')
 const { credentialsRouter } = require('../routes/credentials.routes')
 const { accessRouter } = require('../routes/access.routes')
@@ -142,6 +144,17 @@ const initRoutes = (app) => {
   // able to read its own plan in order to choose a new one. The endpoint is
   // read-only and returns no tenant data, so it is safe to serve unconditionally.
   app.use('/entitlement', entitlementRouter)
+
+  // Above requireSubscription for the same reason: an expired tenant still needs
+  // a realtime ticket so the bell can tell them their plan lapsed. Authenticated
+  // (app.use(auth) above) and returns no tenant data.
+  app.use('/realtime', realtimeTicketRouter)
+
+  // Notifications are cross-cutting - a receipt being approved is news for a
+  // tenant whose plan excludes receipts - so this is mounted here, above the
+  // per-module gates, rather than in ROUTE_MODULES. Above requireSubscription
+  // too: a lapsed tenant still needs to be told their plan lapsed.
+  app.use('/notifications', notificationRouter)
 
   // A tenant with no live subscription is refused before any business route runs.
   // Login already refuses them, so this is defence in depth for a session that

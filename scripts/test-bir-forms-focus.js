@@ -97,10 +97,31 @@ const run = () => {
   {
     // The filing picker is the widest control on the period line. Left on its
     // own width it pushed Export PDF onto a second row.
-    const sel = page.match(/<select[\s\S]{0,400}?View a saved filing/);
-    ok('the filing picker has a fixed width', !!sel && /w-\[\d+px\]/.test(sel[0]));
+// Located by walking back from the label to its own <select> rather than
+      // by a fixed character window. A window silently stops matching the moment
+      // the formatter spreads the attributes over more lines, which reads as the
+      // styling being missing when it is present.
+      const labelAt = page.indexOf('View a saved filing')
+      const openAt = page.lastIndexOf('<select', labelAt)
+      // Read the className out of the tag rather than slicing to the first ">":
+      // an arrow function in onChange contains one, so slicing there stops in
+      // the middle of the attributes and misses the width entirely.
+      const clsAt = openAt === -1 ? -1 : page.indexOf('className="', openAt)
+      const selCls =
+        clsAt === -1 ? '' : page.slice(clsAt + 12, page.indexOf('"', clsAt + 12))
+      ok('the filing picker has a fixed width', /w-\[\d+px\]/.test(selCls), selCls.slice(0, 80));
     ok('the filing picker does not grow past that width', !/max-w-\[\d+px\]/.test(page));
-    ok('the date inputs are sized so the row holds together', (page.match(/type="date"[\s\S]{0,300}?w-\[\d+px\]/g) || []).length >= 2);
+    // Same reasoning as the filing picker: read each date input's className
+      // directly. A fixed window breaks as soon as the attributes wrap.
+      const dateInputs = [...page.matchAll(/type="date"/g)].map((m) => {
+        const at = page.indexOf('className="', m.index)
+        return at === -1 ? '' : page.slice(at + 12, page.indexOf('"', at + 12))
+      })
+      ok(
+        'the date inputs are sized so the row holds together',
+        dateInputs.length >= 2 && dateInputs.every((c) => /w-\[\d+px\]/.test(c)),
+        dateInputs.length + ' date input(s)',
+      )
   }
 
   section('the saved-filing picker sits on the period line')

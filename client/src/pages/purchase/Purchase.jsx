@@ -27,6 +27,7 @@ import { getAccessLevel } from '../../utils/routeProtection'
 import { generatePurchasePDF } from '../../utils/generatePurchasePDF'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
+import connectRealtime from '../../utils/realtimeSocket'
 
 export default function Purchase() {
   return (
@@ -129,33 +130,16 @@ function PurchaseContent() {
   }, [searchParams, setSearchParams])
 
   useEffect(() => {
-    const serverLink = import.meta.env.VITE_SERVER_LINK
-    if (!serverLink) return
-
-    const pageIsSecure = window.location.protocol === 'https:'
-    const socketUrl = pageIsSecure
-      ? serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
-      : serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
-    const socket = new WebSocket(socketUrl)
-
-    socket.addEventListener('message', (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        if (payload?.type === 'purchase_created' && payload?.data?.purchase) {
-          prependPurchase(payload.data.purchase)
+    const close = connectRealtime({
+      onMessage: (type, data) => {
+        if (type === 'purchase_created' && data?.purchase) {
+          prependPurchase(data.purchase)
         }
-      } catch (err) {
-        console.error('Purchase WebSocket message parse error', err)
-      }
+      },
+      onError: (err) => console.error('Purchase realtime error', err),
     })
 
-    socket.addEventListener('error', (err) => {
-      console.error('Purchase WebSocket error', err)
-    })
-
-    return () => {
-      socket.close()
-    }
+    return close
   }, [prependPurchase])
 
   // Check if user has access to enable checkboxes
@@ -452,6 +436,7 @@ function PurchaseContent() {
             if (nextToast) setToast(nextToast)
             setPrefillPurchaseData(null)
             await refetchPurchases()
+            setIsAdding(false)
           }}
         />
       </RouteProtection>

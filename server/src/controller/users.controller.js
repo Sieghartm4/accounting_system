@@ -77,7 +77,7 @@ const getUsers = async (req, res, next) => {
 
 const createUser = async (req, res, next) => {
   try {
-    const { fullname, username, password, access_id } = req.body
+    const { fullname, username, email, password, access_id } = req.body
 
     if (!fullname || !username || !password || !access_id) {
       return res.status(400).json({
@@ -155,6 +155,12 @@ const createUser = async (req, res, next) => {
       throw new Error('Failed to encrypt password')
     }
 
+    // Get the company subscription ID to associate with the user
+    const subscriptionId = await adminExecute(
+      'SELECT mcs_id FROM master_company_subscription WHERE mcs_db_name = ?',
+      [currentTenantDb],
+    ).then((rows) => rows?.[0]?.mcs_id || null)
+
     const queries = []
     queries.push({
       sql: sql
@@ -187,13 +193,15 @@ const createUser = async (req, res, next) => {
     })
 
     try {
-      const adminInsertSql = `INSERT INTO ${SubscriptionMaster.master_user.tablename} (${SubscriptionMaster.master_user.insertColumns.join(', ')}) VALUES (?, ?, ?, ?, ?)`
+      const adminInsertSql = `INSERT INTO ${SubscriptionMaster.master_user.tablename} (${SubscriptionMaster.master_user.insertColumns.join(', ')}) VALUES (?, ?, ?, ?, ?, ?, ?)`
       const adminValues = [
         normalizedUsername || null,
         encryptedPassword || null,
         currentTenantDb || null,
         email || null,
         'ACTIVE',
+        'USER',
+        subscriptionId || null,
       ]
 
       await adminPool.execute(adminInsertSql, adminValues)

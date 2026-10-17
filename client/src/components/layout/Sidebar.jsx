@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 
 import { Link, useLocation } from 'react-router-dom'
+import { useNotificationsState } from './NotificationContext'
+import { NAV_TO_MODULE } from '../../hooks/useNotifications'
 
 import {
   LayoutDashboard,
@@ -32,12 +34,38 @@ import {
   ArrowRight,
   Repeat,
   CalendarRange,
+  Bell,
 } from 'lucide-react'
 
 import { getSidebarItems } from '../../utils/routeProtection'
 
 export default function Sidebar({ isCollapsed }) {
-  const [isMastersOpen, setIsMastersOpen] = useState(false)
+    // Same source as the header bell, so the two badges always agree.
+    const { unreadCount, unreadByModule } = useNotificationsState()
+
+    // Which notification modules roll up into each collapsible group. The names
+    // are the route names the children navigate to, which is also what the
+    // server groups notifications by, so the two never need a translation table.
+    const RECEIPTS_GROUP = ['receipts', 'disbursement']
+    const SALES_GROUP = ['sales', 'collections']
+    const PURCHASE_GROUP = ['purchase', 'payments', 'purchase_order']
+    const ADJUSTMENTS_GROUP = ['adjustments']
+
+    /**
+     * Unread total for a whole collapsed group.
+     *
+     * Without this a collapsed group is invisible: its children are not
+     * rendered, so its badge is not rendered either, and a red count on
+     * Receipts is exactly the thing someone who is not looking at the sidebar
+     * would miss.
+     */
+    const groupUnread = (names) =>
+      names.reduce(
+        (total, name) => total + (unreadByModule[NAV_TO_MODULE[name] || name] || 0),
+        0,
+      )
+
+    const [isMastersOpen, setIsMastersOpen] = useState(false)
 
   const [isReceiptsOpen, setIsReceiptsOpen] = useState(false)
 
@@ -253,27 +281,61 @@ export default function Sidebar({ isCollapsed }) {
     }))
   }
 
-  const NavLink = ({ to, icon: Icon, children }) => {
-    const isActive = location.pathname === to
-
-    return (
-      <Link
-        to={to}
-        className={`flex items-center gap-3 px-3 py-3 rounded-xl font-semibold transition-all duration-200 group ${
-          isActive
-            ? 'bg-red-600 text-white shadow-lg shadow-red-900/20'
-            : 'text-gray-400 hover:bg-white/5 hover:text-white'
-        }`}
+/**
+ * Red count on a nav row.
+ *
+ * Sits beside the label while expanded and becomes a bare dot when the sidebar
+ * is collapsed, where there is no room for a number but there is still room to
+ * signal "look here".
+ */
+const UnreadPill = ({ count }) => {
+  if (!count || count <= 0) return null
+  return (
+    <span className="ml-auto flex items-center gap-1">
+      <span
+        className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center tabular-nums"
+        title={`${count} unread notification${count === 1 ? '' : 's'}`}
       >
-        <Icon
-          size={20}
-          className={isActive ? 'text-white' : 'group-hover:text-red-500'}
-        />
+        {count > 99 ? '99+' : count}
+      </span>
+    </span>
+  )
+}
 
-        {!isCollapsed && <span className="text-sm">{children}</span>}
-      </Link>
-    )
-  }
+const NavLink = ({ to, icon: Icon, children, badge }) => {
+      const isActive = location.pathname === to
+
+      return (
+        <Link
+          to={to}
+          className={`flex items-center gap-3 px-3 py-3 rounded-xl font-semibold transition-all durati
+            isActive
+              ? 'bg-red-600 text-white shadow-lg shadow-red-900/20'
+              : 'text-gray-400 hover:bg-white/5 hover:text-white'
+            }`}
+        >
+          <span className="relative shrink-0">
+            <Icon
+              size={20}
+              className={isActive ? 'text-white' : 'group-hover:text-red-500'}
+            />
+            {/* Unread count. Suppressed while collapsed, where there is no room
+                and a bare number beside the icon is unreadable; the header bell
+                still carries it. */}
+            {badge > 0 && !isCollapsed && (
+              <span className="absolute -top-1 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center tabular-nums">
+                {badge > 99 ? '99+' : badge}
+              </span>
+            )}
+            {badge > 0 && isCollapsed && (
+              <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500" />
+            )}
+          </span>
+
+          {!isCollapsed && <span className="text-sm">{children}</span>}
+        </Link>
+      )
+    }
 
   return (
     <aside
@@ -315,26 +377,33 @@ export default function Sidebar({ isCollapsed }) {
 
       {/* Branding Area */}
 
-      <div className="flex items-center h-16 px-6 border-b-2 border-red-600 bg-black">
-        {company?.logo ? (
-          <img
-            src={company.logo}
-            alt={company.company_name || 'Company Logo'}
-            className="w-12 h-12 rounded-lg object-contain bg-white/5 p-1 shadow-inner"
-          />
-        ) : (
-          <div className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-black text-2xl shadow-inner">
-            &nbsp;
-          </div>
-        )}
+        {/* min-h-16 rather than h-16, and the name wraps instead of truncating.
+            A company name is the one string here that cannot be abbreviated
+            without becoming a different company - "5lsolutio..." tells you
+            nothing, and it was the wordmark. So it wraps onto further lines and
+            the header grows to fit; text-lg rather than text-2xl because the
+            expanded sidebar leaves about 180px beside the logo, where 24px bold
+            turned a real name into four lines. */}
+        <div className="flex items-center min-h-16 px-6 py-3 border-b-2 border-red-600 bg-black">
+          {company?.logo ? (
+            <img
+              src={company.logo}
+              alt={company.company_name || 'Company Logo'}
+              className="w-12 h-12 rounded-lg object-contain bg-white/5 p-1 shadow-inner shrink-0"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-black text-2xl shadow-inner shrink-0">
+              &nbsp;
+            </div>
+          )}
 
-        {!isCollapsed && (
-          <div className="ml-3 min-w-0">
-            <span className="font-bold tracking-tight text-white text-2xl block truncate">
-              {company?.company_name || '\u00A0'}
-            </span>
-            <span className="text-[11px] text-red-600 font-bold tracking-[0.2em] block truncate">
-              {company?.email || '\u00A0'}
+          {!isCollapsed && (
+            <div className="ml-3 min-w-0 flex-1">
+              <span className="font-bold tracking-tight text-white text-lg leading-tight block break-words">
+                {company?.company_name || '\u00A0'}
+              </span>
+              <span className="text-[11px] text-red-600 font-bold tracking-[0.2em] block break-words mt-0.5">
+                {company?.email || '\u00A0'}
             </span>
           </div>
         )}
@@ -343,18 +412,21 @@ export default function Sidebar({ isCollapsed }) {
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-sidebar-scrollbar">
         {/* Main Navigation */}
 
-        {sidebarItems.main?.map((item, index) => {
+        {sidebarItems.main?.filter(item => item?.name !== 'notifications').map((item, index) => {
           if (!item || !item.name) return null
 
-          return (
-            <NavLink
-              key={item.name || index}
-              to={`/${item.name}`}
-              icon={LayoutDashboard}
-            >
-              {item.label || item.name}
-            </NavLink>
-          )
+          const moduleBadge = unreadByModule[NAV_TO_MODULE[item.name] || item.name] || 0
+
+return (
+              <NavLink
+                key={item.name || index}
+                to={`/${item.name}`}
+                icon={LayoutDashboard}
+                badge={moduleBadge}
+              >
+                {item.label || item.name}
+              </NavLink>
+            )
         })}
 
         {/* Masters Section */}
@@ -524,6 +596,8 @@ export default function Sidebar({ isCollapsed }) {
                 {!isCollapsed && (
                   <span className="text-sm">Receipts & Disbursements</span>
                 )}
+
+                <UnreadPill count={groupUnread(RECEIPTS_GROUP)} />
               </div>
 
               {!isCollapsed && (
@@ -546,6 +620,7 @@ export default function Sidebar({ isCollapsed }) {
                   }
 
                   const Icon = iconMap[item.name] || Settings
+                  const moduleBadge = unreadByModule[NAV_TO_MODULE[item.name] || item.name] || 0
 
                   return (
                     <Link
@@ -554,6 +629,11 @@ export default function Sidebar({ isCollapsed }) {
                       className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
+                      {moduleBadge > 0 && (
+                        <span className="ml-auto bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                          {moduleBadge > 9 ? '9+' : moduleBadge}
+                        </span>
+                      )}
                     </Link>
                   )
                 })}
@@ -587,6 +667,8 @@ export default function Sidebar({ isCollapsed }) {
                 {!isCollapsed && (
                   <span className="text-sm">Sales & Collections</span>
                 )}
+
+                <UnreadPill count={groupUnread(SALES_GROUP)} />
               </div>
 
               {!isCollapsed && (
@@ -611,6 +693,7 @@ export default function Sidebar({ isCollapsed }) {
                   }
 
                   const Icon = iconMap[item.name] || Settings
+                  const moduleBadge = unreadByModule[NAV_TO_MODULE[item.name] || item.name] || 0
 
                   return (
                     <Link
@@ -619,6 +702,11 @@ export default function Sidebar({ isCollapsed }) {
                       className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
+                      {moduleBadge > 0 && (
+                        <span className="ml-auto bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                          {moduleBadge > 9 ? '9+' : moduleBadge}
+                        </span>
+                      )}
                     </Link>
                   )
                 })}
@@ -652,6 +740,8 @@ export default function Sidebar({ isCollapsed }) {
                 {!isCollapsed && (
                   <span className="text-sm">Purchase & Payments</span>
                 )}
+
+                <UnreadPill count={groupUnread(PURCHASE_GROUP)} />
               </div>
 
               {!isCollapsed && (
@@ -675,6 +765,7 @@ export default function Sidebar({ isCollapsed }) {
                   }
 
                   const Icon = iconMap[item.name] || Settings
+                  const moduleBadge = unreadByModule[NAV_TO_MODULE[item.name] || item.name] || 0
 
                   return (
                     <Link
@@ -683,6 +774,11 @@ export default function Sidebar({ isCollapsed }) {
                       className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
+                      {moduleBadge > 0 && (
+                        <span className="ml-auto bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                          {moduleBadge > 9 ? '9+' : moduleBadge}
+                        </span>
+                      )}
                     </Link>
                   )
                 })}
@@ -691,6 +787,11 @@ export default function Sidebar({ isCollapsed }) {
                   className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === '/purchase_order' ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                 >
                   <Package size={14} /> Purchase Orders
+                  {(unreadByModule['purchase_order'] || 0) > 0 && (
+                    <span className="ml-auto bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                      {unreadByModule['purchase_order'] > 9 ? '9+' : unreadByModule['purchase_order']}
+                    </span>
+                  )}
                 </Link>
                 {!sidebarItems.purchase?.some(
                   (item) => item?.name === 'aging_payables',
@@ -700,6 +801,11 @@ export default function Sidebar({ isCollapsed }) {
                     className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === '/aging_payables' ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                   >
                     <Clock3 size={14} /> Aging Payables
+                    {(unreadByModule['aging_payables'] || 0) > 0 && (
+                      <span className="ml-auto bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadByModule['aging_payables'] > 9 ? '9+' : unreadByModule['aging_payables']}
+                      </span>
+                    )}
                   </Link>
                 )}
               </div>
@@ -734,6 +840,8 @@ export default function Sidebar({ isCollapsed }) {
                 />
 
                 {!isCollapsed && <span className="text-sm">Adjustments</span>}
+
+                <UnreadPill count={groupUnread(ADJUSTMENTS_GROUP)} />
               </div>
 
               {!isCollapsed && (
@@ -757,6 +865,7 @@ export default function Sidebar({ isCollapsed }) {
                   }
 
                   const Icon = iconMap[item.name] || Settings
+                  const moduleBadge = unreadByModule[NAV_TO_MODULE[item.name] || item.name] || 0
 
                   return (
                     <Link
@@ -765,6 +874,11 @@ export default function Sidebar({ isCollapsed }) {
                       className={`flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${location.pathname === `/${item.name.replace(/_/g, '-')}` ? 'bg-red-600 text-white font-semibold' : 'text-gray-400 hover:bg-red-600/50 hover:text-red-500'}`}
                     >
                       <Icon size={14} /> {item.label || item.name}
+                      {moduleBadge > 0 && (
+                        <span className="ml-auto bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                          {moduleBadge > 9 ? '9+' : moduleBadge}
+                        </span>
+                      )}
                     </Link>
                   )
                 })}

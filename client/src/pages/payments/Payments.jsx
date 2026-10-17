@@ -26,6 +26,7 @@ import { getAccessLevel } from '../../utils/routeProtection'
 import { generatePaymentPDF } from '../../utils/generatePaymentPDF'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
+import connectRealtime from '../../utils/realtimeSocket'
 
 export default function Payments() {
   return (
@@ -224,49 +225,16 @@ function PaymentsContent() {
 
   // WebSocket subscription for live payment updates
   useEffect(() => {
-    const serverLink = import.meta.env.VITE_SERVER_LINK
-    const pageIsSecure = window.location.protocol === 'https:'
-    const wsUrl = pageIsSecure
-      ? serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
-      : serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
-
-    let ws
-
-    try {
-      ws = new WebSocket(wsUrl)
-
-      ws.onopen = () => {
-        console.log('WebSocket connected for payments')
-      }
-
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data)
-          if (message.type === 'payment_created' && message.data?.payment) {
-            console.log('New payment received:', message.data.payment)
-            prependPayment(message.data.payment)
-          }
-        } catch (err) {
-          console.error('Error parsing WebSocket message:', err)
+    const close = connectRealtime({
+      onMessage: (type, data) => {
+        if (type === 'payment_created' && data?.payment) {
+          prependPayment(data.payment)
         }
-      }
+      },
+      onError: (err) => console.error('Payment realtime error', err),
+    })
 
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error)
-      }
-
-      ws.onclose = () => {
-        console.log('WebSocket disconnected for payments')
-      }
-    } catch (err) {
-      console.error('Error creating WebSocket connection:', err)
-    }
-
-    return () => {
-      if (ws) {
-        ws.close()
-      }
-    }
+    return close
   }, [prependPayment])
 
   useEffect(() => {
@@ -599,6 +567,13 @@ function PaymentsContent() {
             if (activeTab === 'toBePaid') {
               await fetchToBePaid()
             }
+            setIsAdding(false)
+            setIsEditing(false)
+            setIsViewing(false)
+            setIsPostedEdit(false)
+            setViewingPayment(null)
+            setSelectedPurchases([])
+            setSelectedPurchaseItems([])
           }}
         />
       </RouteProtection>

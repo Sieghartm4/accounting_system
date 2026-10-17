@@ -8,7 +8,9 @@ const Master = {
       "mu_password",
       "db_name",
       "mu_email",
-      "mu_status"
+      "mu_status",
+      "mu_role",
+      "subscription_id"
     ],
   selectColumns: [
       "mu_id",
@@ -16,15 +18,19 @@ const Master = {
       "mu_password",
       "db_name",
       "mu_email",
-      "mu_status"
-  ],
+      "mu_status",
+      "mu_role",
+      "subscription_id"
+    ],
   selectOptionColumns: {
     id: "mu_id",
     username: "mu_username",
     password: "mu_password",
     db_name: "db_name",
     email: "mu_email",
-    status: "mu_status"
+    status: "mu_status",
+    role: "mu_role",
+    subscription_id: "subscription_id"
   },
   updateOptionColumns: {
     id: "id",
@@ -32,7 +38,9 @@ const Master = {
     password: "password",
     db_name: "db_name",
     email: "email",
-    status: "status"
+    status: "status",
+    role: "role",
+    subscription_id: "subscription_id"
   },
   selectDateFormatColumns: {
 
@@ -46,7 +54,9 @@ const Master = {
     password: "TEXT",
     db_name: "STRING",
     email: "STRING",
-    status: "ENUM"
+    status: "ENUM",
+    role: "ENUM",
+    subscription_id: "INTEGER"
   }
 }
 };

@@ -32,6 +32,7 @@ import useRecurringJournals from './useRecurringJournals'
 import RecurringJournalsForm from './RecurringJournalsForm'
 import { getAccessLevel } from '../../utils/routeProtection'
 import LoadingScreen from '../../components/LoadingScreen'
+import connectRealtime from '../../utils/realtimeSocket'
 
 export default function RecurringJournals() {
   return (
@@ -73,40 +74,18 @@ function RecurringJournalsContent() {
   })
 
   useEffect(() => {
-    const serverLink = import.meta.env.VITE_SERVER_LINK
-    if (!serverLink) return
-
-    const pageIsSecure = window.location.protocol === 'https:'
-    let socketUrl = serverLink
-    if (pageIsSecure) {
-      socketUrl = serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
-    } else {
-      socketUrl = serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
-    }
-    const socket = new WebSocket(socketUrl)
-
-    socket.addEventListener('message', (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        // Listen for adjustment creation (recurring journals generate adjustments)
-        if (payload?.type === 'adjustment_created' && payload?.data?.adjustment) {
+    const close = connectRealtime({
+      onMessage: (type) => {
+        // Recurring journals generate adjustments, and the scheduler reports
+        // both, so either event means the template list is stale.
+        if (type === 'adjustment_created' || type === 'recurring_journal_generated') {
           refetchTemplates()
         }
-        if (payload?.type === 'recurring_journal_generated') {
-          refetchTemplates()
-        }
-      } catch (err) {
-        console.error('Recurring Journals WebSocket message parse error', err)
-      }
+      },
+      onError: (err) => console.error('Recurring journal realtime error', err),
     })
 
-    socket.addEventListener('error', (err) => {
-      console.error('Recurring Journals WebSocket error', err)
-    })
-
-    return () => {
-      socket.close()
-    }
+    return close
   }, [refetchTemplates])
 
   // Check if user has access to enable checkboxes

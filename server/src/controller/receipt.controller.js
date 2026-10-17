@@ -33,6 +33,7 @@ const {
   assertPostedSafeEdit,
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
+const { notifyFromController } = require('../services/notification/notifyFromController')
 
 const {
   findPeriodForDateKey,
@@ -1324,6 +1325,17 @@ const createReceipts = async (req, res, next) => {
 
       await Transaction(auditQueries)
 
+      notifyFromController(req, {
+        type: 'DOCUMENT_CREATED',
+        module: 'receipts',
+        severity: 'info',
+        title: `Receipt ${receiptId} created`,
+        body: `Receipt ${receiptId} was created and is awaiting checking.`,
+        link: '/receipts',
+        entityType: 'receipt',
+        entityId: receiptId,
+      })
+
       res.status(201).json({
         success: true,
 
@@ -1338,7 +1350,9 @@ const createReceipts = async (req, res, next) => {
       setImmediate(() => {
         try {
           if (createdReceipt) {
-            broadcastUpdates({ receipt: createdReceipt }, 'receipt_created')
+            broadcastUpdates({ receipt: createdReceipt }, 'receipt_created', {
+                 dbName: req.context?.dbName,
+               })
           }
         } catch (err) {
           console.error('Error broadcasting receipt creation:', err)
@@ -1455,6 +1469,21 @@ const updateReceipt = async (req, res, next) => {
           req.context?.username || null,
         )
         await connection.commit()
+
+        notifyFromController(req, {
+          type: 'DOCUMENT_UPDATED',
+          module: 'receipts',
+          severity: 'info',
+          title: `Receipt ${receiptId} edited`,
+          body: `Only safe fields were changed on a ${postedSafeEdit.doc.state} receipt. The journal entries were left untouched.`,
+          link: '/receipts',
+          entityType: 'receipt',
+          entityId: receiptId,
+          // changedSafe is already the list of fields that actually differ, so
+          // it is the diff rather than a re-read of the submitted body.
+          changes: postedSafeEdit.changedSafe,
+        })
+
         return res.status(200).json({
           success: true,
           message: `Updated SAFE fields only (${postedSafeEdit.changedSafe.join(', ') || 'attachments'}) on ${postedSafeEdit.doc.state} Receipt ${receiptId}. Journal entries were left unchanged.`,
@@ -2345,6 +2374,24 @@ const updateReceipt = async (req, res, next) => {
         await Transaction(auditQueries)
       }
 
+      // Fires even when auditChanges is empty: an edit that changed nothing
+      // auditable still happened, and a silent notification would be worse than
+      // an empty change list.
+      notifyFromController(req, {
+        type: 'DOCUMENT_UPDATED',
+        module: 'receipts',
+        severity: 'info',
+        title: `Receipt ${receiptId} edited`,
+        body:
+          auditChanges.length > 0
+            ? `${auditChanges.length} change(s) were made to this receipt.`
+            : 'This receipt was edited with no tracked field changes.',
+        link: '/receipts',
+        entityType: 'receipt',
+        entityId: receiptId,
+        changes: auditChanges,
+      })
+
       res.status(200).json({
         success: true,
 
@@ -2657,16 +2704,47 @@ const updateReceiptState = async (req, res, next) => {
         await Transaction(auditQueries)
       }
 
+      // One call can move many receipts, so this is one notification per
+      // document rather than one per request - otherwise approving five receipts
+      // would produce a single notification naming one of them.
+      for (const result of results) {
+        // Unlike the other modules, this handler's promise resolves to
+        // `{ id, nextState, auditChanges }` rather than the raw mysql2 execute
+        // result, so `result` carries everything the notification needs. Reading
+        // from `updates` by position here would lose the audit changes, and a
+        // `nextState` reference outside this loop's scope is a ReferenceError.
+        const from = updates.find((u) => u.id === result.id)?.currentState ?? null
+        notifyFromController(req, {
+          type: 'STATUS_CHANGED',
+          module: 'receipts',
+          severity: 'info',
+          title: `Receipt ${result.id} ${from || 'status'} → ${result.nextState}`,
+          body:
+            result.auditChanges && result.auditChanges.length > 0
+              ? result.auditChanges.join('; ')
+              : `The status moved to ${result.nextState}.`,
+          link: '/receipts',
+          entityType: 'receipt',
+          entityId: result.id,
+          changes: result.auditChanges || [
+            { field: 'state', from, to: result.nextState },
+          ],
+        })
+      }
+
       res.status(200).json({
         success: true,
         message: `${results.length} receipt(s) updated successfully`,
-        data: {
-          updatedCount: results.length,
-          updates: results.map((result) => ({
-            id: result.id,
-            nextState: result.nextState,
-          })),
-        },
+          data: {
+            updatedCount: results.length,
+            // This handler's promise resolves to { id, nextState, auditChanges },
+            // so `result` has both. Reporting the requested state here is what the
+            // client needs to move its row to the new state without a refetch.
+            updates: results.map((result) => ({
+              id: result.id,
+              nextState: result.nextState,
+            })),
+          },
         timestamp: new Date().toISOString(),
       })
     } catch (error) {
@@ -2791,10 +2869,29 @@ const cancelReceiptState = async (req, res, next) => {
         })
       })
 
-      await Transaction(auditQueries)
+await Transaction(auditQueries)
+
+      // Only the receipts that actually moved. invalidUpdates were skipped, and a
+      // notification for one would be a lie.
+      for (const u of validUpdates) {
+        notifyFromController(req, {
+          type: 'CANCELLED',
+          module: 'receipts',
+          severity: 'warning',
+          title: `Receipt ${u.id} cancelled`,
+          body: `Receipt ${u.id} was cancelled by ${req.context?.username || 'another user'}.`,
+          link: '/receipts',
+          entityType: 'receipt',
+          entityId: u.id,
+          changes: [
+            { field: 'state', from: u.currentState ?? null, to: 'CANCELLED' },
+          ],
+        })
+      }
 
       res.status(200).json({
         success: true,
+
         message: `${validUpdates.length} receipt(s) cancelled successfully`,
         updated: validUpdates.map((u) => u.id),
         ignored: invalidUpdates.map((u) => ({

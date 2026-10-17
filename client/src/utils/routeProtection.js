@@ -559,10 +559,21 @@ export const getSidebarItems = (user) => {
     settings: [],
   }
 
-  // Main navigation
-  if (hasRouteAccess('dashboard', user)) {
-    items.main.push(ROUTE_CONFIG.dashboard)
-  }
+// Main navigation
+    if (hasRouteAccess('dashboard', user)) {
+      items.main.push(ROUTE_CONFIG.dashboard)
+    }
+
+    // Notifications deliberately has NO nav entry of its own.
+    //
+    // A notification about a receipt is a fact *about the Receipts screen*, so
+    // parking the alerts in a separate "Notifications" tab asked the user to
+    // hold two ideas at once: what needs my attention, and which screen it
+    // belongs to. The unread count rides on the screen that owns it instead, and
+    // the page itself stays reachable from the header bell.
+    //
+    // The route and its master_route_access row still exist so the deep link
+    // and the bell's "View all" both resolve; they are just not pushed into nav.
 
   // Masters section
   const masterRoutes = [

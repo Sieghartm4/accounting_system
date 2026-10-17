@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Users, ShieldCheck, Search, Download } from 'lucide-react'
+import { Users, Download, ShieldCheck, Wallet } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import RouteProtection from '../../components/RouteProtection'
 import LoadingScreen from '../../components/LoadingScreen'
 import useCustomerTransactions from './useCustomerTransactions'
 import CustomerTransactionDetail from './CustomerTransactionDetail'
+import SummaryTile from '../../components/SummaryTile'
 
 const formatCurrency = (value) =>
   Number(value || 0).toLocaleString('en-PH', {
@@ -79,23 +80,30 @@ function CustomerTransactionsContent() {
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SummaryCard
-            icon={<Users className="text-red-600" size={20} />}
+          <SummaryTile
             label="Customer Accounts"
             value={summary.customers || 0}
             subText="Active profiles"
+            color="rose"
+            icon={Users}
+            hoverable
           />
-          <SummaryCard
-            icon={<ShieldCheck className="text-black" size={20} />}
+          <SummaryTile
             label="Approved Transactions"
             value={summary.approvedReceipts + summary.approvedSales}
             subText="Total records"
+            color="emerald"
+            icon={ShieldCheck}
+            hoverable
           />
-          <SummaryCard
-            icon={<Search className="text-gray-400" size={20} />}
+          <SummaryTile
             label="Total Amount Due"
             value={`₱ ${formatCurrency(summary.totalAmountDue)}`}
             subText="Open balance"
+            color="dark"
+            icon={Wallet}
+            plainLabel
+            hoverable
           />
         </div>
       </div>
@@ -131,25 +139,6 @@ function CustomerTransactionsContent() {
           ]}
         />
       </motion.div>
-    </div>
-  )
-}
-
-function SummaryCard({ icon, label, value, subText }) {
-  return (
-    <div className="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
-      <div className="p-3 bg-gray-50 rounded-xl">{icon}</div>
-      <div>
-        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">
-          {label}
-        </p>
-        <div className="flex items-baseline gap-2">
-          <h4 className="text-xl font-black text-black">{value}</h4>
-          <span className="text-[9px] font-bold text-gray-400 uppercase">
-            {subText}
-          </span>
-        </div>
-      </div>
     </div>
   )
 }

@@ -106,8 +106,16 @@ const run = async () => {
         '/credentials': 'login and logout only; no company data',
         '/health': 'liveness only',
         '/developer': 'platform diagnostics, role-gated inside the router',
-        '/entitlement': 'reads the caller own plan; no company data',
-        '/reports': 'per-route gates inside the router',
+'/entitlement': 'reads the caller own plan; no company data',
+          // Issues a one-time WebSocket handshake ticket. Authenticated, mounted
+          // above requireSubscription so a lapsed tenant can still be told their
+          // plan expired, and it returns a random string only - no company data.
+          '/realtime': 'issues a one-time socket ticket; returns no company data',
+          // Cross-cutting: a receipt being approved is news for a tenant whose
+          // plan excludes receipts. Every handler still resolves the caller's
+          // company and user from the verified session.
+          '/notifications': 'cross-cutting; per-session company and user resolved inside',
+          '/reports': 'per-route gates inside the router',
       }
       ok(`${mount.path} has a documented reason for being ungated`, Boolean(reasons[mount.path]), mount.path)
     }

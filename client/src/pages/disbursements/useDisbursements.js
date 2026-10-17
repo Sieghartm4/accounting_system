@@ -1262,7 +1262,6 @@ export function useDisbursementForm({
         }
         setToast(nextToast)
         if (onSuccess) await onSuccess(nextToast)
-        onBack()
       } else {
         const action = isEditMode ? 'update' : 'create'
         setToast({

@@ -27,6 +27,7 @@ import { getAccessLevel } from '../../utils/routeProtection'
 import { generateSalesPDF } from '../../utils/generateSalesPDF'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
+import connectRealtime from '../../utils/realtimeSocket'
 
 export default function Sales() {
   return (
@@ -114,33 +115,16 @@ function SalesContent() {
   }, [searchParams, setSearchParams])
 
   useEffect(() => {
-    const serverLink = import.meta.env.VITE_SERVER_LINK
-    if (!serverLink) return
-
-    const pageIsSecure = window.location.protocol === 'https:'
-    const socketUrl = pageIsSecure
-      ? serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
-      : serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
-    const socket = new WebSocket(socketUrl)
-
-    socket.addEventListener('message', (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        if (payload?.type === 'sales_created' && payload?.data?.sale) {
-          prependSales(payload.data.sale)
+    const close = connectRealtime({
+      onMessage: (type, data) => {
+        if (type === 'sales_created' && data?.sale) {
+          prependSales(data.sale)
         }
-      } catch (err) {
-        console.error('Sales WebSocket message parse error', err)
-      }
+      },
+      onError: (err) => console.error('Sales realtime error', err),
     })
 
-    socket.addEventListener('error', (err) => {
-      console.error('Sales WebSocket error', err)
-    })
-
-    return () => {
-      socket.close()
-    }
+    return close
   }, [prependSales])
 
   // Check if user has access to enable checkboxes
@@ -429,6 +413,7 @@ function SalesContent() {
           onSuccess={async (nextToast) => {
             if (nextToast) setToast(nextToast)
             await refetchSales()
+            setIsAdding(false)
           }}
         />
       </RouteProtection>

@@ -26,6 +26,7 @@ import { getAccessLevel } from '../../utils/routeProtection'
 import { generateCollectionPDF } from '../../utils/generateCollectionPDF'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
+import connectRealtime from '../../utils/realtimeSocket'
 
 export default function Collections() {
   return (
@@ -251,33 +252,16 @@ function CollectionsContent() {
   }, [searchParams, setSearchParams])
 
   useEffect(() => {
-    const serverLink = import.meta.env.VITE_SERVER_LINK
-    if (!serverLink) return
-
-    const pageIsSecure = window.location.protocol === 'https:'
-    const socketUrl = pageIsSecure
-      ? serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
-      : serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
-    const socket = new WebSocket(socketUrl)
-
-    socket.addEventListener('message', (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        if (payload?.type === 'collection_created' && payload?.data?.collection) {
-          prependCollection(payload.data.collection)
+    const close = connectRealtime({
+      onMessage: (type, data) => {
+        if (type === 'collection_created' && data?.collection) {
+          prependCollection(data.collection)
         }
-      } catch (err) {
-        console.error('Collections WebSocket message parse error', err)
-      }
+      },
+      onError: (err) => console.error('Collection realtime error', err),
     })
 
-    socket.addEventListener('error', (err) => {
-      console.error('Collections WebSocket error', err)
-    })
-
-    return () => {
-      socket.close()
-    }
+    return close
   }, [prependCollection])
 
   // Check if user has access to enable checkboxes
@@ -593,6 +577,7 @@ function CollectionsContent() {
             setSelectedSales([])
             setSelectedSalesItems([])
             await fetchToBeCollected()
+            setIsAdding(false)
           }}
           preSelectedSales={selectedSales}
           preSelectedSalesItems={selectedSalesItems}

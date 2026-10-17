@@ -491,7 +491,7 @@ const DynamicTable = ({
     return selectedRows.reduce((sum, row) => {
       const v = row.amount_raw ?? row.amount ?? 0
       return sum + toNumber(v)
-    }, 0)
+    }, 0) 
   }, [selectedRows])
 
   const selectedTotalFormatted = useMemo(() => {
@@ -499,7 +499,7 @@ const DynamicTable = ({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(selectedTotal || 0)
-  }, [selectedTotal])
+  }, [selectedTotal]) 
 
   return (
     <div className="h-full flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">

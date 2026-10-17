@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useNotificationsState } from './NotificationContext'
+import { NotificationList } from '../NotificationList'
 import {
   Menu,
   Search,
@@ -147,6 +149,19 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const dropdownRef = useRef(null)
+  const bellRef = useRef(null)
+  const [showBell, setShowBell] = useState(false)
+  // Read from the shell's provider rather than calling the hook here, so the
+  // header bell and the sidebar badge cannot hold different counts.
+  const {
+    items: notifications,
+    unreadCount,
+    loading: notificationsLoading,
+    error: notificationsError,
+    refresh: refreshNotifications,
+    markRead,
+    markAllRead,
+  } = useNotificationsState()
 
   // Search states
   const [searchQuery, setSearchQuery] = useState('')
@@ -173,6 +188,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target))
         setShowDropdown(false)
+      if (bellRef.current && !bellRef.current.contains(e.target)) setShowBell(false)
       if (searchRef.current && !searchRef.current.contains(e.target)) {
         setShowSearchResults(false)
         setShowSearchModal(false)
@@ -842,10 +858,56 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
         </div>
 
         <div className="flex items-center gap-3 ml-auto">
-          <button className="p-2 rounded-full hover:bg-gray-100 text-gray-500 relative transition-all">
-            <Bell size={20} />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-red-600 rounded-full border-2 border-white"></span>
-          </button>
+          <div className="relative" ref={bellRef}>
+            <button
+              onClick={() => setShowBell((open) => !open)}
+              aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+              className={`p-2 rounded-full transition-colors relative ${
+                showBell ? 'bg-gray-100 text-gray-800' : 'hover:bg-gray-100 text-gray-500'
+              }`}
+            >
+              <Bell size={20} />
+              {/* The count comes from the server. A dot was hard-coded here
+                  before notifications existed, so it showed on every account
+                  regardless of whether there was anything to read. */}
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center border-2 border-white tabular-nums">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {showBell && (
+              <div className="absolute right-0 mt-2 w-[380px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl shadow-black/10 border border-gray-100 overflow-hidden z-50">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
+                  <span className="text-[11px] font-black uppercase tracking-[2px] text-slate-700">
+                    Notifications
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={refreshNotifications}
+                      className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-700 transition-colors"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-[420px] overflow-y-auto custom-scrollbar">
+                  <NotificationList
+                    compact
+                    items={notifications.slice(0, 12)}
+                    unreadCount={unreadCount}
+                    loading={notificationsLoading}
+                    error={notificationsError}
+                    onRefresh={refreshNotifications}
+                    onMarkRead={markRead}
+                    onMarkAllRead={markAllRead}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="h-8 w-px bg-gray-200 mx-1"></div>
 

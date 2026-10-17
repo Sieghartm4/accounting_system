@@ -28,6 +28,7 @@ import { getAccessLevel } from '../../utils/routeProtection'
 import { generateDisbursementPDF } from '../../utils/generateDisbursementPDF'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
+import connectRealtime from '../../utils/realtimeSocket'
 
 export default function Disbursements() {
   return (
@@ -140,36 +141,16 @@ function DisbursementsContent() {
   }, [searchParams, setSearchParams])
 
   useEffect(() => {
-    const serverLink = import.meta.env.VITE_SERVER_LINK
-    if (!serverLink) return
-
-    const pageIsSecure = window.location.protocol === 'https:'
-    const socketUrl = pageIsSecure
-      ? serverLink.replace(/^http:/i, 'wss:').replace(/^https:/i, 'wss:')
-      : serverLink.replace(/^http:/i, 'ws:').replace(/^https:/i, 'ws:')
-    const socket = new WebSocket(socketUrl)
-
-    socket.addEventListener('message', (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        if (
-          payload?.type === 'disbursement_created' &&
-          payload?.data?.disbursement
-        ) {
-          prependDisbursement(payload.data.disbursement)
+    const close = connectRealtime({
+      onMessage: (type, data) => {
+        if (type === 'disbursement_created' && data?.disbursement) {
+          prependDisbursement(data.disbursement)
         }
-      } catch (err) {
-        console.error('Disbursement WebSocket message parse error', err)
-      }
+      },
+      onError: (err) => console.error('Disbursement realtime error', err),
     })
 
-    socket.addEventListener('error', (err) => {
-      console.error('Disbursement WebSocket error', err)
-    })
-
-    return () => {
-      socket.close()
-    }
+    return close
   }, [prependDisbursement])
 
   // Check if user has access to enable checkboxes
@@ -456,6 +437,7 @@ function DisbursementsContent() {
             if (nextToast) setToast(nextToast)
             setPrefillDisbursementData(null)
             await refetchDisbursements()
+            setIsAdding(false)
           }}
         />
       </RouteProtection>
@@ -477,6 +459,9 @@ function DisbursementsContent() {
           onSuccess={async (nextToast) => {
             if (nextToast) setToast(nextToast)
             await refetchDisbursements()
+            setViewingDisbursement(null)
+            setIsEditMode(false)
+            setIsPostedEdit(false)
           }}
         />
       </RouteProtection>

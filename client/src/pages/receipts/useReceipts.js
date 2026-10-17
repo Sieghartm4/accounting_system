@@ -1159,7 +1159,6 @@ export function useReceiptsForm({
         }
         setToast(nextToast)
         if (onSuccess) await onSuccess(nextToast)
-        onBack()
       } else {
         setToast({
           type: 'error',

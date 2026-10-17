@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { NotificationProvider } from './NotificationContext';
 
 export default function Layout() {
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -47,7 +48,10 @@ export default function Layout() {
                     background: #b91c1c; /* red-700 */
                 }
             `}} />
-            <div className="min-h-screen bg-gray-100">
+<div className="min-h-screen bg-gray-100">
+                {/* Wraps the shell so the header bell and the sidebar badge read
+                    one notification state and one socket. */}
+                <NotificationProvider>
                 <div className="flex h-screen w-full overflow-hidden">
                 <Sidebar isCollapsed={isCollapsed} />
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -60,7 +64,8 @@ export default function Layout() {
                     </main>
                 </div>
             </div>
-        </div>
+                </NotificationProvider>
+            </div>
         </>
     );
 }
