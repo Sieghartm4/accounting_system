@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react'
+import { API } from '../api/endpoints'
 
 export const SecureAuthContext = createContext()
 
@@ -11,7 +12,7 @@ export function SecureAuthProvider({ children }) {
   useEffect(() => {
     const loadUserSession = async () => {
       try {
-        const response = await fetch('/api/auth/session', {
+        const response = await fetch(API.secureAuthSession(), {
           credentials: 'include', // ✅ Include cookies from httpOnly
         })
         if (response.ok) {
@@ -42,7 +43,7 @@ export function SecureAuthProvider({ children }) {
     const refreshInterval = setInterval(
       async () => {
         try {
-          const response = await fetch('/api/auth/refresh', {
+          const response = await fetch(API.secureAuthRefresh(), {
             method: 'POST',
             credentials: 'include',
           })
@@ -63,7 +64,7 @@ export function SecureAuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     try {
-      await fetch('/api/credentials/logout', {
+      await fetch(API.secureAuthLogout(), {
         method: 'POST',
         credentials: 'include',
         headers: {

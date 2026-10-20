@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { SUBSCRIPTION_API } from '../../api/endpoints'
 
 const useLogin = () => {
   const [loading, setLoading] = useState(false)
@@ -11,11 +12,7 @@ const useLogin = () => {
       setLoading(true)
       setError(null)
 
-      const subscriptionUrl =
-        import.meta.env.VITE_SUBSCRIPTION_LINK ||
-        `http://${import.meta.env.VITE_SUBSCRIPTION_URL || 'localhost'}:${import.meta.env.VITE_SUBSCRIPTION_PORT || '5051'}`
-
-      const response = await fetch(`${subscriptionUrl}/credentials/login`, {
+      const response = await fetch(SUBSCRIPTION_API.credentialsLogin(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,11 +59,8 @@ const useLogin = () => {
 
         // Redirect ADMIN users to subscription admin page on subscription server
         if (result.data.role === 'ADMIN') {
-          const subscriptionUrl =
-            import.meta.env.VITE_SUBSCRIPTION_LINK ||
-            `http://${import.meta.env.VITE_SUBSCRIPTION_URL || 'localhost'}:${import.meta.env.VITE_SUBSCRIPTION_PORT || '5051'}`
           // ✅ DO NOT pass token or user data via URL
-          window.location.href = `${subscriptionUrl}/admin`
+          window.location.href = SUBSCRIPTION_API.admin()
         } else {
           navigate('/dashboard')
         }

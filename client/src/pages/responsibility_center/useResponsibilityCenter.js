@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 const useResponsibilityCenter = () => {
   const [responsibilityCenters, setResponsibilityCenters] = useState([])
@@ -15,7 +16,7 @@ const useResponsibilityCenter = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/responsibility_center`,
+        API.responsibilityCenter(),
         {
           method: 'GET',
           headers: {
@@ -49,7 +50,7 @@ const useResponsibilityCenter = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/responsibility_center`,
+        API.responsibilityCenter(),
         {
           method: 'POST',
           headers: {
@@ -84,7 +85,7 @@ const useResponsibilityCenter = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/responsibility_center/${id}`,
+        API.responsibilityCenterById(id),
         {
           method: 'PUT',
           headers: {
@@ -119,7 +120,7 @@ const useResponsibilityCenter = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/responsibility_center/import`,
+        API.responsibilityCenterImport(),
         {
           method: 'POST',
           headers: {

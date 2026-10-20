@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { API } from '../../api/endpoints'
 
 const usePurchase = () => {
   const [purchases, setPurchases] = useState([])
@@ -48,7 +49,7 @@ const usePurchase = () => {
       if (queryDateTo) params.append('dateTo', queryDateTo)
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/purchase?${params.toString()}`,
+        `${API.purchase()}?${params.toString()}`,
         {
           method: 'GET',
           headers: {

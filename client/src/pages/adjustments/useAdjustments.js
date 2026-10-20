@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { API } from '../../api/endpoints'
 
 const useAdjustments = () => {
   const [adjustments, setAdjustments] = useState([])
@@ -47,7 +48,7 @@ const useAdjustments = () => {
       if (queryDateTo) params.append('dateTo', queryDateTo)
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/adjustments?${params.toString()}`,
+        `${API.adjustments()}?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -96,7 +97,7 @@ const useAdjustments = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/adjustments/${adjustmentId}`,
+        API.adjustmentsById(adjustmentId),
         {
           headers: {
             Authorization: `Bearer ${token}`,

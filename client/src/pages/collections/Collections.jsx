@@ -27,6 +27,7 @@ import { generateCollectionPDF } from '../../utils/generateCollectionPDF'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
+import { API } from '../../api/endpoints'
 
 export default function Collections() {
   return (
@@ -85,7 +86,7 @@ function CollectionsContent() {
 
       console.log('Fetching sales items for IDs:', salesIds)
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/collections/sales-items-collection?${queryParams.toString()}`,
+        `${API.collectionsSalesItemsCollection()}?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -129,7 +130,7 @@ function CollectionsContent() {
       if (filters.dateTo) queryParams.append('dateTo', filters.dateTo)
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/sales?${queryParams.toString()}`,
+        `${API.sales()}?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -216,7 +217,7 @@ function CollectionsContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/collections/${encodeURIComponent(id)}`,
+          `${API.collectionsById(encodeURIComponent(id))}`,
           {
             method: 'GET',
             headers: {
@@ -343,7 +344,7 @@ function CollectionsContent() {
         .join(',')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/collections/print/${collectionIds}?copyType=${copyType}`,
+        `${API.collectionsPrint(collectionIds)}?copyType=${copyType}`,
         {
           method: 'GET',
           headers: {
@@ -409,7 +410,7 @@ function CollectionsContent() {
                 }))
 
                 const response = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/collections/collection-state`,
+                  `${API.collectionsState()}`,
                   {
                     method: 'PUT',
                     headers: {
@@ -483,7 +484,7 @@ function CollectionsContent() {
                 }))
 
                 const response = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/collections/cancel-state`,
+                  `${API.collectionsCancelState()}`,
                   {
                     method: 'PUT',
                     headers: {
@@ -961,7 +962,7 @@ function CollectionsContent() {
                     }
 
                     const response = await fetch(
-                      `${import.meta.env.VITE_SERVER_LINK}/collections/${row.id}`,
+                      API.collectionsById(row.id),
                       {
                         method: 'GET',
                         headers: {
@@ -1005,7 +1006,7 @@ function CollectionsContent() {
                     }
 
                     const response = await fetch(
-                      `${import.meta.env.VITE_SERVER_LINK}/collections/${row.id}`,
+                      API.collectionsById(row.id),
                       {
                         method: 'GET',
                         headers: {

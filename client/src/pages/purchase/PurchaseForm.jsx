@@ -23,6 +23,7 @@ import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDefaults'
+import { API } from '../../api/endpoints'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drag to Scroll Hook
@@ -771,7 +772,7 @@ export default function PurchaseForm({
       setVendorLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
+      const res = await fetch(API.vendors(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -794,7 +795,7 @@ export default function PurchaseForm({
       setCustomerLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
+      const res = await fetch(API.customer(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -818,7 +819,7 @@ export default function PurchaseForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
+        API.chartsOfAccounts(),
         {
           method: 'GET',
           headers: {
@@ -844,7 +845,7 @@ export default function PurchaseForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
+        API.productService(),
         {
           method: 'GET',
           headers: {
@@ -877,7 +878,7 @@ export default function PurchaseForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
+        API.productService(),
         {
           method: 'POST',
           headers: {
@@ -915,7 +916,7 @@ export default function PurchaseForm({
       setVatLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat`, {
+      const res = await fetch(API.vat(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -949,7 +950,7 @@ export default function PurchaseForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/withholding_tax`,
+        API.withholdingTax(),
         {
           method: 'GET',
           headers: {
@@ -1007,7 +1008,7 @@ export default function PurchaseForm({
       setVendorCreateLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
+      const res = await fetch(API.vendors(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1973,8 +1974,8 @@ export default function PurchaseForm({
 
       const url =
         isEditMode && purchaseData?.data?.[0]?.id
-          ? `${import.meta.env.VITE_SERVER_LINK}/purchase/${purchaseData.data[0].id}`
-          : `${import.meta.env.VITE_SERVER_LINK}/purchase`
+          ? API.purchaseById(purchaseData.data[0].id)
+          : API.purchase()
 
       const method = isEditMode && purchaseData?.data?.[0]?.id ? 'PUT' : 'POST'
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { API } from '../../api/endpoints'
 
 const useRecurringJournals = () => {
   const [templates, setTemplates] = useState([])
@@ -33,7 +34,7 @@ const useRecurringJournals = () => {
       params.append('limit', LIMIT)
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/recurring_journals?${params.toString()}`,
+        `${API.recurringJournals()}?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -80,7 +81,7 @@ const useRecurringJournals = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/recurring_journals/${templateId}`,
+        API.recurringJournalsById(templateId),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -113,7 +114,7 @@ const useRecurringJournals = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/recurring_journals`,
+        API.recurringJournals(),
         {
           method: 'POST',
           headers: {
@@ -150,7 +151,7 @@ const useRecurringJournals = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/recurring_journals/${templateId}`,
+        API.recurringJournalsById(templateId),
         {
           method: 'PUT',
           headers: {
@@ -187,7 +188,7 @@ const useRecurringJournals = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/recurring_journals/${templateId}`,
+        API.recurringJournalsById(templateId),
         {
           method: 'DELETE',
           headers: {
@@ -222,7 +223,7 @@ const useRecurringJournals = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/recurring_journals/${templateId}/generate`,
+        API.recurringJournalsGenerate(templateId),
         {
           method: 'POST',
           headers: {
@@ -257,7 +258,7 @@ const useRecurringJournals = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/recurring_journals/generate-all`,
+        API.recurringJournalsGenerateAll(),
         {
           method: 'POST',
           headers: {

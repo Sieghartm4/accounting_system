@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API } from '../../api/endpoints';
 
 const useAccess = () => {
     const [access, setAccess] = useState([]);
@@ -32,7 +33,7 @@ const useAccess = () => {
             }
 
             const response = await fetch(
-                `${import.meta.env.VITE_SERVER_LINK}/route_access`,
+                API.routeAccess(),
                 {
                     method: "POST",
                     headers: {
@@ -70,7 +71,7 @@ const useAccess = () => {
             }
 
             const response = await fetch(
-                `${import.meta.env.VITE_SERVER_LINK}/access`,
+                API.access(),
                 {
                     method: "POST",
                     headers: {
@@ -109,7 +110,7 @@ const useAccess = () => {
             }
 
             const response = await fetch(
-                `${import.meta.env.VITE_SERVER_LINK}/route_access`,
+                API.routeAccess(),
                 {
                     method: "PUT",
                     headers: {
@@ -146,7 +147,7 @@ const useAccess = () => {
             }
 
             const response = await fetch(
-                `${import.meta.env.VITE_SERVER_LINK}/route_access`,
+                API.routeAccess(),
                 {
                     method: "PUT",
                     headers: {
@@ -191,7 +192,7 @@ const useAccess = () => {
             }
 
             const response = await fetch(
-                `${import.meta.env.VITE_SERVER_LINK}/access`,
+                API.access(),
                 {
                     method: "GET",
                     headers: {

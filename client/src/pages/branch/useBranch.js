@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '../../api/endpoints';
 
 const useBranch = () => {
   const [branch, setBranch] = useState([]);
@@ -15,7 +16,7 @@ const useBranch = () => {
           throw new Error("No authorization token found");
         }
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/branch`,
+          API.branch(),
           {
             method: "GET",
             headers: {

@@ -1452,14 +1452,14 @@ const updateAdjustmentData = async (req, res, next) => {
         type: 'DOCUMENT_UPDATED',
         module: 'adjustments',
         severity: 'info',
-        title: `Adjustment ${adjustmentId} updated`,
+        title: `Adjustment ${adjustment_id} updated`,
         body:
           auditChanges && auditChanges.length > 0
             ? auditChanges.join('; ')
-            : `Adjustment ${adjustmentId} was updated.`,
+            : `Adjustment ${adjustment_id} was updated.`,
         link: '/adjustments',
         entityType: 'adjustment',
-        entityId: adjustmentId,
+        entityId: adjustment_id,
         changes: auditChanges || [],
       })
 

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { fetchWithAuth } from '../../utils/api'
 import LoadingScreen from '../../components/LoadingScreen'
+import { API } from '../../api/endpoints'
 
 /* ------------------------------------------------------------------ */
 /* Data-model expectations                                             */
@@ -350,7 +351,7 @@ export default function App() {
         })
 
         const response = await fetchWithAuth(
-          `/tax-compliance/calculate-tax?${params.toString()}`,
+          `${API.taxComplianceCalculateTax()}?${params.toString()}`,
           { method: 'GET', headers: { 'Content-Type': 'application/json' } },
         )
         if (!response.ok) {
@@ -378,7 +379,7 @@ export default function App() {
   useEffect(() => {
     const fetchCompany = async () => {
       try {
-        const response = await fetchWithAuth('/company/single', { method: 'GET' })
+        const response = await fetchWithAuth(API.companySingle(), { method: 'GET' })
         const result = await response.json()
         if (response.ok && result.success && result.data) {
           const profile = {
@@ -406,7 +407,7 @@ export default function App() {
     if (!companyDraft?.id || !companyDraft.name?.trim()) return
     setIsSavingCompany(true)
     try {
-      const response = await fetchWithAuth(`/company/${companyDraft.id}`, {
+      const response = await fetchWithAuth(API.companyById(companyDraft.id), {
         method: 'PUT',
         body: JSON.stringify({
           company_name: companyDraft.name.trim(),
@@ -557,7 +558,7 @@ export default function App() {
         ]),
       }
 
-      const response = await fetchWithAuth('/tax-compliance/save-draft', {
+      const response = await fetchWithAuth(API.taxComplianceSaveDraft(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -589,7 +590,7 @@ export default function App() {
         ]),
       }
 
-      const response = await fetchWithAuth('/tax-compliance/export-pdf', {
+      const response = await fetchWithAuth(API.taxComplianceExportPdf(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -621,7 +622,7 @@ export default function App() {
 
   const markFiled = async () => {
     try {
-      const response = await fetchWithAuth('/tax-compliance/mark-filed', {
+      const response = await fetchWithAuth(API.taxComplianceMarkFiled(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

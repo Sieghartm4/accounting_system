@@ -16,6 +16,7 @@ import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 import LoadingScreen from '../../components/LoadingScreen'
 import { currentReportPeriod } from '../../utils/reportPeriod'
+import { API } from '../../api/endpoints'
 
 export default function GeneralLedger() {
   const navigate = useNavigate()
@@ -61,7 +62,7 @@ export default function GeneralLedger() {
       if (endDate) params.append('end_date', endDate)
       if (filterAccountCode) params.append('account_code', filterAccountCode)
       if (filterType) params.append('type', filterType)
-      const url = `${import.meta.env.VITE_SERVER_LINK}/reports/general-ledger${params.toString() ? '?' + params.toString() : ''}`
+      const url = `${API.reportsGeneralLedger()}${params.toString() ? '?' + params.toString() : ''}`
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',

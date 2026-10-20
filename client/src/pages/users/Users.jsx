@@ -16,6 +16,7 @@ import ProtectedAction from '../../components/ProtectedAction'
 import RightSideModal from '../../components/RightSideModal'
 import LoadingScreen from '../../components/LoadingScreen'
 import useUsers from './useUsers'
+import { API } from '../../api/endpoints'
 
 export default function Users() {
   return (
@@ -68,7 +69,7 @@ function UsersContent() {
       const token = sessionStorage.getItem('authenticated')
       if (!token) return
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/access`, {
+      const response = await fetch(API.access(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +192,7 @@ function UsersContent() {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/users/${editUser.id}`,
+        API.usersById(editUser.id),
         {
           method: 'PUT',
           headers: {
@@ -249,7 +250,7 @@ function UsersContent() {
         throw new Error('No authorization token found')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/users`, {
+      const response = await fetch(API.users(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

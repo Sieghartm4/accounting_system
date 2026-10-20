@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 export const formatLocalDate = (d) => {
   const year = d.getFullYear()
@@ -576,7 +577,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
       const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/journal_entries${buildDateQuery(start, end)}`,
+        `${API.journalEntries()}${buildDateQuery(start, end)}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -623,7 +624,7 @@ export function useBankReconciliation(selectedReconciliation) {
 
       const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/journal_entries/coa/${coaId}${buildDateQuery(start, end)}`,
+        `${API.journalEntriesByCoa(coaId)}${buildDateQuery(start, end)}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -674,7 +675,7 @@ export function useBankReconciliation(selectedReconciliation) {
       const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}${buildDateQuery(startDate, endDate)}`,
+        `${API.bankReconciliationById(selectedReconciliation.id)}${buildDateQuery(startDate, endDate)}`,
 
         {
           headers: {
@@ -740,7 +741,7 @@ export function useBankReconciliation(selectedReconciliation) {
       const queryString = buildDateQuery(startDate, endDate)
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/adjustments${queryString}`,
+        `${API.bankReconciliationById(selectedReconciliation.id, '/adjustments')}${queryString}`,
 
         {
           headers: {
@@ -827,7 +828,7 @@ export function useBankReconciliation(selectedReconciliation) {
       const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/bank_statement_balance`,
+        `${API.bankReconciliationById(selectedReconciliation.id, '/bank_statement_balance')}`,
 
         {
           method: 'PUT',
@@ -874,7 +875,7 @@ export function useBankReconciliation(selectedReconciliation) {
     try {
       const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/item/${itemId}`,
+        API.bankReconciliationItemById(itemId),
         {
           method: 'DELETE',
           headers: {
@@ -914,7 +915,7 @@ export function useBankReconciliation(selectedReconciliation) {
     try {
       const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/match`,
+        API.bankReconciliationMatch(),
         {
           method: 'POST',
           headers: {
@@ -958,7 +959,7 @@ export function useBankReconciliation(selectedReconciliation) {
     try {
       const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/unmatch/${bankItemId}`,
+        API.bankReconciliationUnmatch(bankItemId),
         {
           method: 'DELETE',
           headers: {
@@ -999,7 +1000,7 @@ export function useBankReconciliation(selectedReconciliation) {
       const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/balance`,
+        `${API.bankReconciliationById(selectedReconciliation.id, '/balance')}`,
 
         {
           method: 'PUT',
@@ -1131,7 +1132,7 @@ export function useBankReconciliation(selectedReconciliation) {
           balance: credit - debit,
         }
 
-        let url = `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/item/add`
+        let url = API.bankReconciliationItemAdd()
 
         let method = 'POST'
 
@@ -1146,7 +1147,7 @@ export function useBankReconciliation(selectedReconciliation) {
         if (editingItem) {
           const itemId = editingItem.bri_id || editingItem.id
 
-          url = `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/item/${itemId}`
+          url = API.bankReconciliationItemById(itemId)
 
           method = 'PUT'
 
@@ -1235,7 +1236,7 @@ export function useBankReconciliation(selectedReconciliation) {
       const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/item/${itemId}`,
+        API.bankReconciliationItemById(itemId),
 
         {
           method: 'DELETE',
@@ -1327,7 +1328,7 @@ export function useBankReconciliation(selectedReconciliation) {
       const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/add`,
+        API.bankReconciliationAdjustmentAdd(),
 
         {
           method: 'POST',
@@ -1399,7 +1400,7 @@ export function useBankReconciliation(selectedReconciliation) {
       const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/add`,
+        API.bankReconciliationAdjustmentAdd(),
 
         {
           method: 'POST',
@@ -1457,7 +1458,7 @@ export function useBankReconciliation(selectedReconciliation) {
       const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/${id}`,
+        API.bankReconciliationAdjustmentById(id),
 
         {
           method: 'DELETE',
@@ -1494,7 +1495,7 @@ export function useBankReconciliation(selectedReconciliation) {
       const token = sessionStorage.getItem('authenticated')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/adjustment/${id}`,
+        API.bankReconciliationAdjustmentById(id),
 
         {
           method: 'DELETE',
@@ -1531,7 +1532,7 @@ export function useBankReconciliation(selectedReconciliation) {
     try {
       const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/match/add`,
+        API.bankReconciliationMatchAdd(),
         {
           method: 'POST',
           headers: {
@@ -1562,7 +1563,7 @@ export function useBankReconciliation(selectedReconciliation) {
     try {
       const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/match/${matchId}`,
+        API.bankReconciliationMatchById(matchId),
         {
           method: 'DELETE',
           headers: {
@@ -1587,7 +1588,7 @@ export function useBankReconciliation(selectedReconciliation) {
     try {
       const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${selectedReconciliation.id}/matches`,
+        `${API.bankReconciliationById(selectedReconciliation.id, '/matches')}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1614,7 +1615,7 @@ export function useBankReconciliation(selectedReconciliation) {
       setAvailableMonthsLoading(true)
       const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliationId}/summary-months`,
+        API.bankReconciliationById(reconciliationId, '/summary-months'),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1755,7 +1756,7 @@ export function useBankReconciliation(selectedReconciliation) {
     try {
       const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/summary/add`,
+        API.bankReconciliationSummaryAdd(),
         {
           method: 'POST',
           headers: {
@@ -1823,7 +1824,7 @@ export function useBankReconciliation(selectedReconciliation) {
       const normalizedEnd = normalizeDate(endDate)
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliationId}/summary?start_date=${encodeURIComponent(
+        `${API.bankReconciliationById(reconciliationId, '/summary')}?start_date=${encodeURIComponent(
           normalizedStart,
         )}&end_date=${encodeURIComponent(normalizedEnd)}`,
         {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 const useCompany = () => {
   const [company, setCompany] = useState(null)
@@ -31,7 +32,7 @@ const useCompany = () => {
           throw new Error('No authorization token found')
         }
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/company/single`,
+          API.companySingle(),
           {
             method: 'GET',
             headers: {
@@ -135,12 +136,12 @@ const useCompany = () => {
       // Check if we're in edit mode (company exists)
       const isEditMode = company !== null
 
-      let url = `${import.meta.env.VITE_SERVER_LINK}/company`
+      let url = API.company()
       let method = 'POST'
 
       if (isEditMode) {
         // Use the existing company ID for update
-        url = `${import.meta.env.VITE_SERVER_LINK}/company/${company.company_id}`
+        url = API.companyById(company.company_id)
         method = 'PUT'
       }
 

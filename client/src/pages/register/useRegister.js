@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { SUBSCRIPTION_API } from '../../api/endpoints'
 
 const useRegister = () => {
   const [registerData, setRegisterData] = useState(null)
@@ -15,9 +16,7 @@ const useRegister = () => {
       setError(null)
       setProgress({ step: 'starting', message: 'Starting registration...', progress: 0 })
 
-      const subscriptionUrl = `${import.meta.env.VITE_SUBSCRIPTION_LINK}`
-
-      const response = await fetch(`${subscriptionUrl}/credentials/register-progress`, {
+      const response = await fetch(SUBSCRIPTION_API.credentialsRegisterProgress(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

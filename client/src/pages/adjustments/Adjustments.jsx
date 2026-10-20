@@ -31,6 +31,7 @@ import { getAccessLevel } from '../../utils/routeProtection'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
+import { API } from '../../api/endpoints'
 
 export default function Adjustments() {
   return (
@@ -99,7 +100,7 @@ function AdjustmentsContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/adjustments/${encodeURIComponent(id)}`,
+          API.adjustmentsById(encodeURIComponent(id)),
           {
             method: 'GET',
             headers: {
@@ -512,7 +513,7 @@ function AdjustmentsContent() {
                   }
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/adjustments/${row.id}`,
+                    API.adjustmentsById(row.id),
                     {
                       method: 'GET',
                       headers: {
@@ -556,7 +557,7 @@ function AdjustmentsContent() {
                   }
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/adjustments/${row.id}`,
+                    API.adjustmentsById(row.id),
                     {
                       method: 'GET',
                       headers: {
@@ -676,7 +677,7 @@ function AdjustmentsContent() {
                       }))
 
                       const response = await fetch(
-                        `${import.meta.env.VITE_SERVER_LINK}/adjustments/adjustment-state`,
+                        API.adjustmentsState(),
                         {
                           method: 'PUT',
                           headers: {
@@ -750,7 +751,7 @@ function AdjustmentsContent() {
                       }))
 
                       const response = await fetch(
-                        `${import.meta.env.VITE_SERVER_LINK}/adjustments/cancel-state`,
+                        API.adjustmentsCancelState(),
                         {
                           method: 'PUT',
                           headers: {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 const useChartsOfAccounts = () => {
   const [chartsOfAccounts, setChartsOfAccounts] = useState([])
@@ -14,7 +15,7 @@ const useChartsOfAccounts = () => {
         throw new Error('No authorization token found')
       }
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
+        API.chartsOfAccounts(),
         {
           method: 'GET',
           headers: {
@@ -54,7 +55,7 @@ const useChartsOfAccounts = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
+        API.chartsOfAccounts(),
         {
           method: 'POST',
           headers: {
@@ -103,7 +104,7 @@ const useChartsOfAccounts = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts/${id}`,
+        API.chartsOfAccountsById(id),
         {
           method: 'PUT',
           headers: {
@@ -145,7 +146,7 @@ const useChartsOfAccounts = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts/import`,
+        API.chartsOfAccountsImport(),
         {
           method: 'POST',
           headers: {

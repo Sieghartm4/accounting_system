@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { API } from '../../api/endpoints'
 
 const useAgeingReceivables = () => {
   const [sales, setSales] = useState([])
@@ -19,7 +20,7 @@ const useAgeingReceivables = () => {
 
       const qs = []
       if (filters.as_of) qs.push(`as_of=${encodeURIComponent(filters.as_of)}`)
-      const url = `${import.meta.env.VITE_SERVER_LINK}/sales/aging${qs.length ? `?${qs.join('&')}` : ''}`
+      const url = `${API.salesAging()}${qs.length ? `?${qs.join('&')}` : ''}`
 
       const response = await fetch(url, {
         method: 'GET',

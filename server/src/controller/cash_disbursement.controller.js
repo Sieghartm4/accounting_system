@@ -2117,14 +2117,14 @@ const updateCashDisbursement = async (req, res, next) => {
         type: 'DOCUMENT_UPDATED',
         module: 'disbursement',
         severity: 'info',
-        title: `Cash Disbursement ${cashDisbursementId} updated`,
+        title: `Cash Disbursement ${disbursementId} updated`,
         body:
           auditChanges && auditChanges.length > 0
             ? auditChanges.join('; ')
-            : `Cash Disbursement ${cashDisbursementId} was updated.`,
+            : `Cash Disbursement ${disbursementId} was updated.`,
         link: '/disbursement',
         entityType: 'disbursement',
-        entityId: cashDisbursementId,
+        entityId: disbursementId,
         changes: auditChanges || [],
       })
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { API } from '../../api/endpoints'
 
 const useAgeingPayables = () => {
   const [purchases, setPurchases] = useState([])
@@ -17,7 +18,7 @@ const useAgeingPayables = () => {
       if (filters.date_to) params.set('date_to', filters.date_to)
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/purchase?${params.toString()}`,
+        `${API.purchase()}?${params.toString()}`,
         {
           headers: {
             'Content-Type': 'application/json',

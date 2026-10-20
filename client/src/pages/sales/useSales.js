@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDefaults'
+import { API } from '../../api/endpoints'
 
 export function useSales() {
   const [sales, setSales] = useState([])
@@ -60,7 +61,7 @@ export function useSales() {
       if (queryDateTo) params.append('dateTo', queryDateTo)
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/sales?${params.toString()}`,
+        `${API.sales()}?${params.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -388,7 +389,7 @@ export default function useSalesForm({
       setVendorLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
+      const res = await fetch(API.vendors(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -411,7 +412,7 @@ export default function useSalesForm({
       setCustomerLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
+      const res = await fetch(API.customer(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -443,7 +444,7 @@ export default function useSalesForm({
     try {
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
+      const res = await fetch(API.customer(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -488,9 +489,7 @@ export default function useSalesForm({
     try {
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
-        {
+      const res = await fetch(API.productService(), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -527,9 +526,7 @@ export default function useSalesForm({
       setCoaLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
-        {
+      const res = await fetch(API.chartsOfAccounts(), {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -553,9 +550,7 @@ export default function useSalesForm({
       setProductLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
-        {
+      const res = await fetch(API.productService(), {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -579,7 +574,7 @@ export default function useSalesForm({
       setVatLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat`, {
+      const res = await fetch(API.vat(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -613,9 +608,7 @@ export default function useSalesForm({
       setWhtLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/withholding_tax`,
-        {
+      const res = await fetch(API.withholdingTax(), {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -1130,8 +1123,8 @@ export default function useSalesForm({
 
       const url =
         isEditMode && salesId
-          ? `${import.meta.env.VITE_SERVER_LINK}/sales/${salesId}`
-          : `${import.meta.env.VITE_SERVER_LINK}/sales`
+          ? API.salesById(salesId)
+          : API.sales()
       const method = isEditMode && salesId ? 'PUT' : 'POST'
 
       const response = await fetch(url, {

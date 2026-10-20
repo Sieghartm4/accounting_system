@@ -28,6 +28,7 @@ import { generatePurchasePDF } from '../../utils/generatePurchasePDF'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
+import { API } from '../../api/endpoints'
 
 export default function Purchase() {
   return (
@@ -94,7 +95,7 @@ function PurchaseContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/purchase/${encodeURIComponent(id)}`,
+          API.purchaseById(encodeURIComponent(id)),
           {
             method: 'GET',
             headers: {
@@ -189,7 +190,7 @@ function PurchaseContent() {
         .join(',')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/purchase/print/${purchaseIds}?copyType=${copyType}`,
+        `${API.purchasePrint(purchaseIds)}?copyType=${copyType}`,
         {
           method: 'GET',
           headers: {
@@ -276,7 +277,7 @@ function PurchaseContent() {
                 }))
 
                 const approveResponse = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/purchase/purchase-state`,
+                  API.purchaseState(),
                   {
                     method: 'PUT',
                     headers: {
@@ -347,7 +348,7 @@ function PurchaseContent() {
                 }))
 
                 const cancelResponse = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/purchase/cancel-state`,
+                  API.purchaseCancelState(),
                   {
                     method: 'PUT',
                     headers: {
@@ -675,7 +676,7 @@ function PurchaseContent() {
                   }
 
                   const viewResponse = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/purchase/${encodeURIComponent(row.id)}`,
+                    API.purchaseById(encodeURIComponent(row.id)),
                     {
                       method: 'GET',
                       headers: {
@@ -721,7 +722,7 @@ function PurchaseContent() {
                   }
 
                   const editResponse = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/purchase/${encodeURIComponent(row.id)}`,
+                    API.purchaseById(encodeURIComponent(row.id)),
                     {
                       method: 'GET',
                       headers: {

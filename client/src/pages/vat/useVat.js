@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 const useVat = () => {
   const [vat, setVat] = useState([])
@@ -13,7 +14,7 @@ const useVat = () => {
       if (!token) {
         throw new Error('No authorization token found')
       }
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat`, {
+      const response = await fetch(API.vat(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -46,7 +47,7 @@ const useVat = () => {
         throw new Error('No authorization token found')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat`, {
+      const response = await fetch(API.vat(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -81,7 +82,7 @@ const useVat = () => {
         throw new Error('No authorization token found')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat/${id}`, {
+      const response = await fetch(API.vatById(id), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +117,7 @@ const useVat = () => {
         throw new Error('No authorization token found')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat/import`, {
+      const response = await fetch(API.vatImport(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

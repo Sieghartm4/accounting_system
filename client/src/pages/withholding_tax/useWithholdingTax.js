@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 const useWithholdingTax = () => {
   const [withholdingTax, setWithholdingTax] = useState([])
@@ -14,7 +15,7 @@ const useWithholdingTax = () => {
         throw new Error('No authorization token found')
       }
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/withholding_tax`,
+        API.withholdingTax(),
         {
           method: 'GET',
           headers: {
@@ -50,7 +51,7 @@ const useWithholdingTax = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/withholding_tax`,
+        API.withholdingTax(),
         {
           method: 'POST',
           headers: {
@@ -88,7 +89,7 @@ const useWithholdingTax = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/withholding_tax/${id}`,
+        API.withholdingTaxById(id),
         {
           method: 'PUT',
           headers: {
@@ -126,7 +127,7 @@ const useWithholdingTax = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/withholding_tax/import`,
+        API.withholdingTaxImport(),
         {
           method: 'POST',
           headers: {

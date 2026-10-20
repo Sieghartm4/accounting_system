@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { ROUTE_CONFIG } from '../utils/routeProtection'
 import { fetchWithAuth } from '../utils/api'
+import { API } from '../api/endpoints'
 
 /**
  * Display name for a module code, from the same registry the nav uses.
@@ -64,7 +65,7 @@ const useCatalog = (provided) => {
     if (provided || catalog) return
 
     let cancelled = false
-    fetchWithAuth('/entitlement/module-catalog')
+    fetchWithAuth(API.entitlementModuleCatalog())
       .then((r) => r.json())
       .then((payload) => {
         if (cancelled || !payload?.success) return

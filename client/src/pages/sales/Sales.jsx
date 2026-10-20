@@ -28,6 +28,7 @@ import { generateSalesPDF } from '../../utils/generateSalesPDF'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
+import { API } from '../../api/endpoints'
 
 export default function Sales() {
   return (
@@ -79,7 +80,7 @@ function SalesContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/sales/${id}`,
+          API.salesById(id),
           {
             method: 'GET',
             headers: {
@@ -190,7 +191,7 @@ function SalesContent() {
         .join(',')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/sales/print/${salesIds}?copyType=${copyType}`,
+        `${API.salesPrint(salesIds)}?copyType=${copyType}`,
         {
           method: 'GET',
           headers: {
@@ -257,7 +258,7 @@ function SalesContent() {
                 }))
 
                 const response = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/sales/sales-state`,
+                  API.salesState(),
                   {
                     method: 'PUT',
                     headers: {
@@ -329,7 +330,7 @@ function SalesContent() {
                 }))
 
                 const response = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/sales/cancel-state`,
+                  API.salesCancelState(),
                   {
                     method: 'PUT',
                     headers: {
@@ -651,7 +652,7 @@ function SalesContent() {
                   }
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/sales/${row.id}`,
+                    API.salesById(row.id),
                     {
                       method: 'GET',
                       headers: {
@@ -697,7 +698,7 @@ function SalesContent() {
                   }
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/sales/${row.id}`,
+                    API.salesById(row.id),
                     {
                       method: 'GET',
                       headers: {

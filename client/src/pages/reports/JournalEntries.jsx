@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import LoadingScreen from '../../components/LoadingScreen'
 import { currentReportPeriod } from '../../utils/reportPeriod'
+import { API } from '../../api/endpoints'
 
 function SummaryTile({ label, value, subText, color, icon: Icon }) {
   const theme = {
@@ -128,7 +129,7 @@ export default function JournalEntries() {
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
 
-      const url = `${import.meta.env.VITE_SERVER_LINK}/reports/journal-entries${params.toString() ? '?' + params.toString() : ''}`
+      const url = `${API.reportsJournalEntries()}${params.toString() ? '?' + params.toString() : ''}`
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',

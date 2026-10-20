@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 const formatNumber = (value) =>
   Number(value || 0)
@@ -45,7 +46,7 @@ const useVendorTransactions = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/vendors/transactions`,
+        API.vendorTransactions(),
         {
           method: 'GET',
           headers: {

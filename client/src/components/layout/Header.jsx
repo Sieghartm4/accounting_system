@@ -43,6 +43,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import RightSideModal from '../RightSideModal'
 import { hasRouteAccess, getAccessibleRoutes, ROUTE_CONFIG } from '../../utils/routeProtection'
+import { API, SUBSCRIPTION_API } from '../../api/endpoints'
 import LoadingScreen from '../LoadingScreen'
 
 const SEARCH_ROUTE_DOCUMENT_TYPE_MAP = {
@@ -249,7 +250,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/reports/search?${params}`,
+        `${API.reportsSearch()}?${params}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -363,7 +364,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     try {
       const token = sessionStorage.getItem('authenticated')
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/users/profile`,
+        API.userProfile(),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -460,7 +461,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/users/profile`,
+        API.userProfile(),
         {
           method: 'PUT',
           headers: {
@@ -521,13 +522,9 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
       const userData = sessionStorage.getItem('auth_user')
       const userId = userData ? JSON.parse(userData).id : null
 
-      const subscriptionUrl =
-        import.meta.env.VITE_SUBSCRIPTION_LINK ||
-        `http://${import.meta.env.VITE_SUBSCRIPTION_URL || 'localhost'}:${import.meta.env.VITE_SUBSCRIPTION_PORT || '5051'}`
-
       if (token) {
         // Logout from main server
-        await fetch(`${import.meta.env.VITE_SERVER_LINK}/credentials/logout`, {
+        await fetch(API.credentialsLogout(), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -537,7 +534,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
         })
 
         // Logout from subscription server
-        await fetch(`${subscriptionUrl}/credentials/logout`, {
+        await fetch(SUBSCRIPTION_API.credentialsLogout(), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

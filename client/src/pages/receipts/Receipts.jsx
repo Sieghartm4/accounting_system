@@ -30,6 +30,7 @@ import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
 import SummaryTile from '../../components/SummaryTile'
+import { API } from '../../api/endpoints'
 
 export default function Receipts() {
   return (
@@ -95,7 +96,7 @@ function ReceiptsContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/receipt/${id}`,
+          API.receiptById(id),
           {
             method: 'GET',
             headers: {
@@ -210,7 +211,7 @@ function ReceiptsContent() {
                 }))
 
                 const response = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/receipt/receipt-state`,
+                  API.receiptState(),
                   {
                     method: 'PUT',
                     headers: {
@@ -273,7 +274,7 @@ function ReceiptsContent() {
                 }))
 
                 const response = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/receipt/cancel-state`,
+                  API.receiptCancelState(),
                   {
                     method: 'PUT',
                     headers: {
@@ -360,7 +361,7 @@ function ReceiptsContent() {
         .join(',')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/receipt/print/${receiptIds}?copyType=${copyType}`,
+        `${API.receiptPrint(receiptIds)}?copyType=${copyType}`,
         {
           method: 'GET',
           headers: {
@@ -632,7 +633,7 @@ function ReceiptsContent() {
                   if (!token) throw new Error('No authentication token found')
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/receipt/${row.id}`,
+                    API.receiptById(row.id),
                     {
                       method: 'GET',
                       headers: {
@@ -669,7 +670,7 @@ function ReceiptsContent() {
                   if (!token) throw new Error('No authentication token found')
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/receipt/${row.id}`,
+                    API.receiptById(row.id),
                     {
                       method: 'GET',
                       headers: {

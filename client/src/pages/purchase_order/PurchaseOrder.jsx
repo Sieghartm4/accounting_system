@@ -28,6 +28,7 @@ import {
   findDefaultVatOption,
   findDefaultWhtOption,
 } from '../disbursements/useDisbursements'
+import { API } from '../../api/endpoints'
 
 const fmt = (value) =>
   new Intl.NumberFormat('en-PH', {
@@ -217,7 +218,7 @@ function PurchaseOrderContent() {
 
       const responses = await Promise.all(
         approvalTargetRows.map((row) =>
-          fetch(`${import.meta.env.VITE_SERVER_LINK}/purchase_order/${row.id}`, {
+          fetch(API.purchaseOrderById(row.id), {
             method: 'PUT',
             headers: {
               Authorization: `Bearer ${token}`,

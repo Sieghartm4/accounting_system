@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { API } from '../../api/endpoints'
 import {
   getItemResponsibilityCenter,
   getJournalEntryCenter,
@@ -292,7 +293,7 @@ export function useDisbursementForm({
       setVendorLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
+      const res = await fetch(API.vendors(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -324,7 +325,7 @@ export function useDisbursementForm({
     try {
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
+      const res = await fetch(API.vendors(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -370,7 +371,7 @@ export function useDisbursementForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
+        API.productService(),
         {
           method: 'POST',
           headers: {
@@ -409,7 +410,7 @@ export function useDisbursementForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
+        API.chartsOfAccounts(),
         {
           method: 'GET',
           headers: {
@@ -435,7 +436,7 @@ export function useDisbursementForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
+        API.productService(),
         {
           method: 'GET',
           headers: {
@@ -460,7 +461,7 @@ export function useDisbursementForm({
       setVatLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat`, {
+      const res = await fetch(API.vat(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -495,7 +496,7 @@ export function useDisbursementForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/withholding_tax`,
+        API.withholdingTax(),
         {
           method: 'GET',
           headers: {
@@ -1234,8 +1235,8 @@ export function useDisbursementForm({
 
       const url =
         isEditMode && disbursementId
-          ? `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${disbursementId}`
-          : `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements`
+          ? API.cashDisbursementsById(disbursementId)
+          : API.cashDisbursements()
 
       const response = await fetch(url, {
         method: isEditMode && disbursementId ? 'PUT' : 'POST',
@@ -1403,7 +1404,7 @@ const useDisbursements = () => {
         if (queryDateTo) params.append('dateTo', queryDateTo)
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements?${params.toString()}`,
+          `${API.cashDisbursements()}?${params.toString()}`,
           {
             method: 'GET',
             headers: {

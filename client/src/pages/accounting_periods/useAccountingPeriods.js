@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { API } from '../../api/endpoints'
 
 const normalizePeriod = (p = {}) => ({
   period_id: p.ap_id ?? p.period_id ?? p.ap_period_id ?? p.id ?? null,
@@ -59,7 +60,7 @@ const useAccountingPeriods = () => {
     if (!token) throw new Error('No authorization token found')
 
     const response = await fetch(
-      `${import.meta.env.VITE_SERVER_LINK}${path}`,
+      API.accountingPeriods(path),
       {
         method: options.method || 'GET',
         headers: {
@@ -95,7 +96,7 @@ const useAccountingPeriods = () => {
     try {
       setLoadingFiscalYears(true)
       setError(null)
-      const result = await apiRequest('/accounting_periods/fiscal-years')
+      const result = await apiRequest('/fiscal-years')
       const list = result.data || []
       setFiscalYears(normalizeFiscalYears(list))
 
@@ -133,7 +134,7 @@ const useAccountingPeriods = () => {
       if (statusFilter) params.append('status', statusFilter)
       const query = params.toString()
       const result = await apiRequest(
-        `/accounting_periods${query ? `?${query}` : ''}`,
+        `${query ? `?${query}` : ''}`,
       )
       setPeriods(normalizePeriods(result.data || []))
     } catch (err) {
@@ -146,7 +147,7 @@ const useAccountingPeriods = () => {
 
   const fetchCurrentPeriod = useCallback(async () => {
     try {
-      const result = await apiRequest('/accounting_periods/current-period')
+      const result = await apiRequest('/current-period')
       const row = Array.isArray(result.data)
         ? result.data[0]
         : result.data || {}
@@ -159,7 +160,7 @@ const useAccountingPeriods = () => {
 
   const createFiscalYear = useCallback(
     async (payload) => {
-      const result = await apiRequest('/accounting_periods/fiscal-years', {
+      const result = await apiRequest('/fiscal-years', {
         method: 'POST',
         body: payload,
       })
@@ -175,7 +176,7 @@ const useAccountingPeriods = () => {
         body.reopen_reason = reopenReason
       }
       const result = await apiRequest(
-        `/accounting_periods/${periodId}/status`,
+        `/${periodId}/status`,
         { method: 'PATCH', body },
       )
       return result

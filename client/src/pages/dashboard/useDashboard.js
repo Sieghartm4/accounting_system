@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 export function useDashboard() {
   const [data, setData] = useState(null)
@@ -43,7 +44,7 @@ export function useDashboard() {
         end_date: queryEndDate,
       })
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/dashboard?${params}`,
+        `${API.dashboard()}?${params}`,
         {
           headers: {
             'Content-Type': 'application/json',

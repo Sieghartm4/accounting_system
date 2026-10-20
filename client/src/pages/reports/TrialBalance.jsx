@@ -17,6 +17,7 @@ import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 import LoadingScreen from '../../components/LoadingScreen'
 import { currentReportPeriod } from '../../utils/reportPeriod'
+import { API } from '../../api/endpoints'
 
 export default function TrialBalance() {
   const navigate = useNavigate()
@@ -59,7 +60,7 @@ export default function TrialBalance() {
       const params = new URLSearchParams()
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
-      const url = `${import.meta.env.VITE_SERVER_LINK}/reports/trial-balance${params.toString() ? '?' + params : ''}`
+      const url = `${API.reportsTrialBalance()}${params.toString() ? '?' + params : ''}`
       const res = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',

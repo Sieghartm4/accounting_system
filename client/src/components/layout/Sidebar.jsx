@@ -38,6 +38,7 @@ import {
 } from 'lucide-react'
 
 import { getSidebarItems } from '../../utils/routeProtection'
+import { API } from '../../api/endpoints'
 
 export default function Sidebar({ isCollapsed }) {
     // Same source as the header bell, so the two badges always agree.
@@ -121,7 +122,6 @@ export default function Sidebar({ isCollapsed }) {
 
         setSidebarItems(items)
 
-        console.log('Sidebar items loaded:', items)
       }
     } catch (error) {
       console.error('Error loading sidebar items:', error)
@@ -148,7 +148,7 @@ export default function Sidebar({ isCollapsed }) {
         const token = sessionStorage.getItem('authenticated')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/company/single`,
+          API.companySingle(),
           {
             method: 'GET',
 
@@ -166,7 +166,6 @@ export default function Sidebar({ isCollapsed }) {
           if (result.success && result.data) {
             setCompany(result.data)
 
-            console.log('Company data loaded:', result.data)
           }
         }
       } catch (error) {

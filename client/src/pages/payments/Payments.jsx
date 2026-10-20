@@ -27,6 +27,7 @@ import { generatePaymentPDF } from '../../utils/generatePaymentPDF'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
+import { API } from '../../api/endpoints'
 
 export default function Payments() {
   return (
@@ -84,7 +85,7 @@ function PaymentsContent() {
 
       console.log('Fetching purchase data for IDs:', purchaseIds)
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/payments/purchase-payment?${queryParams.toString()}`,
+        `${API.paymentsPurchasePayment()}?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -123,7 +124,7 @@ function PaymentsContent() {
       if (filters.dateTo) queryParams.append('dateTo', filters.dateTo)
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/purchase?${queryParams.toString()}`,
+        `${API.purchase()}?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -247,7 +248,7 @@ function PaymentsContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/payments/${encodeURIComponent(id)}`,
+          API.paymentsById(encodeURIComponent(id)),
           {
             method: 'GET',
             headers: {
@@ -329,7 +330,7 @@ function PaymentsContent() {
         .join(',')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/payments/print/${paymentIds}?copyType=${copyType}`,
+        `${API.paymentsPrint(paymentIds)}?copyType=${copyType}`,
         {
           method: 'GET',
           headers: {
@@ -395,7 +396,7 @@ function PaymentsContent() {
                 }))
 
                 const response = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/payments/payment-state`,
+                  API.paymentsState(),
                   {
                     method: 'PUT',
                     headers: {
@@ -466,7 +467,7 @@ function PaymentsContent() {
                 }))
 
                 const response = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/payments/cancel-state`,
+                  API.paymentsCancelState(),
                   {
                     method: 'PUT',
                     headers: {
@@ -898,7 +899,7 @@ function PaymentsContent() {
                     }
 
                     const response = await fetch(
-                      `${import.meta.env.VITE_SERVER_LINK}/payments/${row.id}`,
+                      API.paymentsById(row.id),
                       {
                         method: 'GET',
                         headers: {
@@ -942,7 +943,7 @@ function PaymentsContent() {
                     }
 
                     const response = await fetch(
-                      `${import.meta.env.VITE_SERVER_LINK}/payments/${row.id}`,
+                      API.paymentsById(row.id),
                       {
                         method: 'GET',
                         headers: {

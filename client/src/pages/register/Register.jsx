@@ -26,6 +26,7 @@ import {
 import useRegister from './useRegister';
 import { REQUIRED_MODULES, moduleLabel } from '../../constants/modules';
 import DynamicToast from '../../components/DynamicToast';
+import { SUBSCRIPTION_API } from '../../api/endpoints';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -204,9 +205,7 @@ export default function Register() {
             }
             
             console.log('Username for subscription update:', username);
-            
-            const subscriptionUrl = import.meta.env.VITE_SUBSCRIPTION_LINK;
-            
+
             // Initialize variables for subscription history
             let paymentMethod = 'paymongo';
             let actualPaymentReference = paymentReference;
@@ -218,7 +217,7 @@ export default function Register() {
             if (sessionId && sessionId !== '{CHECKOUT_SESSION_ID}') {
               try {
                 console.log('Fetching payment details from PayMongo for session:', sessionId);
-                const paymentDetailsResponse = await fetch(`${subscriptionUrl}/subscription-plans/payment-details/${sessionId}`);
+                const paymentDetailsResponse = await fetch(SUBSCRIPTION_API.subscriptionPlansPaymentDetails(sessionId));
                 const paymentDetailsData = await paymentDetailsResponse.json();
                 console.log('Payment details from PayMongo:', paymentDetailsData);
                 
@@ -255,7 +254,7 @@ export default function Register() {
               let retryCount = 0;
               while (retryCount < 3 && !storedPlan) {
                 try {
-                  const plansResponse = await fetch(`${subscriptionUrl}/subscription-plans`);
+                  const plansResponse = await fetch(SUBSCRIPTION_API.subscriptionPlans());
                   const plansData = await plansResponse.json();
                   console.log(`Fetched plans data (attempt ${retryCount + 1}):`, plansData);
                   console.log('Plans data array:', plansData.data);
@@ -303,7 +302,7 @@ export default function Register() {
               // Update subscription with history details
               console.log('Updating subscription for user:', username, 'with plan:', storedPlanId);
               console.log('Sending to backend - planPrice:', planPrice, 'billingCycleDays:', billingCycleDays, 'paymentMethod:', paymentMethod, 'actualPaymentReference:', actualPaymentReference);
-              await fetch(`${subscriptionUrl}/credentials/subscription`, {
+              await fetch(SUBSCRIPTION_API.credentialsSubscription(), {
                 method: 'PUT',
                 headers: {
                   'Content-Type': 'application/json',
@@ -358,8 +357,7 @@ export default function Register() {
   useEffect(() => {
     const fetchSubscriptionPlans = async () => {
       try {
-        const subscriptionUrl = import.meta.env.VITE_SUBSCRIPTION_LINK || 'http://192.168.40.241:3012';
-        const response = await fetch(`${subscriptionUrl}/subscription-plans/public`);
+        const response = await fetch(SUBSCRIPTION_API.subscriptionPlansPublic());
         const data = await response.json();
 
         if (data.success && data.data) {
@@ -541,8 +539,7 @@ export default function Register() {
 
       if (username) {
         try {
-          const subscriptionUrl = import.meta.env.VITE_SUBSCRIPTION_LINK || 'http://192.168.40.241:3012';
-          const response = await fetch(`${subscriptionUrl}/credentials/check-free-trial?username=${username}`);
+          const response = await fetch(SUBSCRIPTION_API.credentialsCheckFreeTrial(username));
           const data = await response.json();
 
           if (data.success && data.hasUsedFreeTrial) {
@@ -592,8 +589,7 @@ export default function Register() {
   const fetchUsedFreeTrials = async (username) => {
     setLoadingUsedFreeTrials(true);
     try {
-      const subscriptionUrl = import.meta.env.VITE_SUBSCRIPTION_LINK || 'http://192.168.40.241:3012';
-      const response = await fetch(`${subscriptionUrl}/credentials/used-free-trials?username=${username}`);
+      const response = await fetch(SUBSCRIPTION_API.credentialsUsedFreeTrials(username));
       const data = await response.json();
       console.log('Used free trials data:', data);
       
@@ -648,8 +644,6 @@ export default function Register() {
     if (planPrice === 0 || planPrice === '0') {
       // For free plans, skip PayMongo and directly update subscription
       try {
-        const subscriptionUrl = import.meta.env.VITE_SUBSCRIPTION_LINK || 'http://192.168.40.241:3012';
-        
         // Update subscription with history details
         // Convert billing cycle to days if it's in human-readable format
         let billingCycleDays = selectedPlan.billingCycle;
@@ -660,7 +654,7 @@ export default function Register() {
         
         const planPrice = calculatePrice(selectedPlan);
         
-        await fetch(`${subscriptionUrl}/credentials/subscription`, {
+        await fetch(SUBSCRIPTION_API.credentialsSubscription(), {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -704,8 +698,7 @@ export default function Register() {
     }
 
     try {
-      const subscriptionUrl = import.meta.env.VITE_SUBSCRIPTION_LINK || 'http://192.168.40.241:3012';
-      const response = await fetch(`${subscriptionUrl}/subscription-plans/checkout`, {
+      const response = await fetch(SUBSCRIPTION_API.subscriptionPlansCheckout(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

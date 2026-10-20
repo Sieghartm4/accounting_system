@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 const useVendors = () => {
   const [vendors, setVendors] = useState([])
@@ -13,7 +14,7 @@ const useVendors = () => {
       if (!token) {
         throw new Error('No authorization token found')
       }
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
+      const response = await fetch(API.vendors(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +60,7 @@ const useVendors = () => {
         throw new Error('No authorization token found')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
+      const response = await fetch(API.vendors(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +120,7 @@ const useVendors = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/vendors/${id}`,
+        API.vendorsById(id),
         {
           method: 'PUT',
           headers: {
@@ -167,7 +168,7 @@ const useVendors = () => {
         throw new Error('No authorization token found')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors/import`, {
+      const response = await fetch(API.vendorsImport(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

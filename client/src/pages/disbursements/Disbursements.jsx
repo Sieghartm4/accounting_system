@@ -29,6 +29,7 @@ import { generateDisbursementPDF } from '../../utils/generateDisbursementPDF'
 import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
+import { API } from '../../api/endpoints'
 
 export default function Disbursements() {
   return (
@@ -105,7 +106,7 @@ function DisbursementsContent() {
         if (!token) throw new Error('No authentication token found')
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${id}`,
+          API.cashDisbursementsById(id),
           {
             method: 'GET',
             headers: {
@@ -205,7 +206,7 @@ function DisbursementsContent() {
         .join(',')
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/print/${disbursementIds}?copyType=${copyType}`,
+        `${API.cashDisbursementsPrint(disbursementIds)}?copyType=${copyType}`,
         {
           method: 'GET',
           headers: {
@@ -290,7 +291,7 @@ function DisbursementsContent() {
                 }))
 
                 const response = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/disbursement-state`,
+                  API.cashDisbursementsState(),
                   {
                     method: 'PUT',
                     headers: {
@@ -353,7 +354,7 @@ function DisbursementsContent() {
                 }))
 
                 const response = await fetch(
-                  `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/cancel-state`,
+                  API.cashDisbursementsCancelState(),
                   {
                     method: 'PUT',
                     headers: {
@@ -670,7 +671,7 @@ function DisbursementsContent() {
                   }
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${row.id}`,
+                    API.cashDisbursementsById(row.id),
                     {
                       method: 'GET',
                       headers: {
@@ -716,7 +717,7 @@ function DisbursementsContent() {
                   }
 
                   const response = await fetch(
-                    `${import.meta.env.VITE_SERVER_LINK}/cash_disbursements/${row.id}`,
+                    API.cashDisbursementsById(row.id),
                     {
                       method: 'GET',
                       headers: {

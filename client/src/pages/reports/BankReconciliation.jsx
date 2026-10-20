@@ -20,6 +20,7 @@ import DynamicToast from '../../components/DynamicToast'
 import LoadingScreen from '../../components/LoadingScreen'
 import BankReconciliationDetail from './BankReconciliationDetail'
 import { getItemSection, getItemMeta } from './useBankReconciliation'
+import { API } from '../../api/endpoints'
 
 const fmt = (n) =>
   parseFloat(n || 0).toLocaleString('en-US', {
@@ -91,7 +92,7 @@ export default function BankReconciliation() {
         try {
           // Fetch saved months to determine the new/open period
           const monthsResponse = await fetch(
-            `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliation.id}/summary-months`,
+            API.bankReconciliationById(reconciliation.id, '/summary-months'),
             {
               headers: {
                 'Content-Type': 'application/json',
@@ -129,7 +130,7 @@ export default function BankReconciliation() {
           const queryString = buildDateQuery(startDate, endDate)
 
           const detailResponse = await fetch(
-            `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliation.id}${queryString}`,
+            `${API.bankReconciliationById(reconciliation.id)}${queryString}`,
             {
               headers: {
                 'Content-Type': 'application/json',
@@ -140,7 +141,7 @@ export default function BankReconciliation() {
           const detailResult = await detailResponse.json()
 
           const adjustmentsResponse = await fetch(
-            `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation/${reconciliation.id}/adjustments${queryString}`,
+            `${API.bankReconciliationById(reconciliation.id, '/adjustments')}${queryString}`,
             {
               headers: {
                 'Content-Type': 'application/json',
@@ -152,7 +153,7 @@ export default function BankReconciliation() {
 
           const journalResponse = reconciliation.coa_id
             ? await fetch(
-                `${import.meta.env.VITE_SERVER_LINK}/journal_entries/coa/${reconciliation.coa_id}${queryString}`,
+                `${API.journalEntriesByCoa(reconciliation.coa_id)}${queryString}`,
                 {
                   headers: {
                     'Content-Type': 'application/json',
@@ -514,7 +515,7 @@ export default function BankReconciliation() {
       setError('')
       const token = sessionStorage.getItem('authenticated')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation`,
+        API.bankReconciliation(),
         {
           headers: {
             'Content-Type': 'application/json',
@@ -547,7 +548,7 @@ export default function BankReconciliation() {
     try {
       const token = sessionStorage.getItem('authenticated')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
+        API.chartsOfAccounts(),
         {
           headers: {
             'Content-Type': 'application/json',
@@ -588,7 +589,7 @@ export default function BankReconciliation() {
     try {
       const token = sessionStorage.getItem('authenticated')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/bank_reconciliation`,
+        API.bankReconciliation(),
         {
           method: 'POST',
           headers: {

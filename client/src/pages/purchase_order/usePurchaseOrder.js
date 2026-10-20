@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { API } from '../../api/endpoints'
 
 const usePurchaseOrder = () => {
   const [purchaseOrders, setPurchaseOrders] = useState([])
@@ -16,7 +17,7 @@ const usePurchaseOrder = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/purchase_order`,
+        API.purchaseOrder(),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -52,7 +53,7 @@ const usePurchaseOrder = () => {
         }
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/purchase_order/${poId}`,
+          API.purchaseOrderById(poId),
           {
             method: 'PUT',
             headers: {
@@ -93,7 +94,7 @@ const usePurchaseOrder = () => {
         }
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/purchase_order`,
+          API.purchaseOrder(),
           {
             method: 'POST',
             headers: {

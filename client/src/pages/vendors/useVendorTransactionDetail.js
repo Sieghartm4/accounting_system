@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 const useVendorTransactionDetail = (vendorId) => {
   const [disbursements, setDisbursements] = useState([])
@@ -18,14 +19,14 @@ const useVendorTransactionDetail = (vendorId) => {
         }
 
         const [disbursementsRes, purchasesRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_SERVER_LINK}/cash_disbursements`, {
+          fetch(API.cashDisbursements(), {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
           }),
-          fetch(`${import.meta.env.VITE_SERVER_LINK}/purchase`, {
+          fetch(API.purchase(), {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',

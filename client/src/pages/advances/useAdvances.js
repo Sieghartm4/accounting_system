@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { API } from '../../api/endpoints'
 
 const useAdvances = (startDate, endDate) => {
   const [advances, setAdvances] = useState([])
@@ -30,7 +31,7 @@ const useAdvances = (startDate, endDate) => {
           params.append('limit', LIMIT)
         }
 
-        const url = `${import.meta.env.VITE_SERVER_LINK}/reports/advances${
+        const url = `${API.reportsAdvances()}${
           params.toString() ? `?${params.toString()}` : ''
         }`
         const response = await fetch(url, {

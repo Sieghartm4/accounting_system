@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 const useCustomer = () => {
   const [customers, setCustomers] = useState([])
@@ -13,7 +14,7 @@ const useCustomer = () => {
       if (!token) {
         throw new Error('No authorization token found')
       }
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
+      const response = await fetch(API.customer(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +60,7 @@ const useCustomer = () => {
         throw new Error('No authorization token found')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
+      const response = await fetch(API.customer(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +120,7 @@ const useCustomer = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/customer/${id}`,
+        API.customerById(id),
         {
           method: 'PUT',
           headers: {
@@ -170,7 +171,7 @@ const useCustomer = () => {
         throw new Error('No authorization token found')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer/import`, {
+      const response = await fetch(API.customerImport(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

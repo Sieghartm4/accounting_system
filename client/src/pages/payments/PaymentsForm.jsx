@@ -22,6 +22,7 @@ import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
+import { API } from '../../api/endpoints'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
@@ -495,7 +496,7 @@ export default function PaymentsForm({
       setVendorLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
+      const res = await fetch(API.vendors(), {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
@@ -514,7 +515,7 @@ export default function PaymentsForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
+        API.chartsOfAccounts(),
         { headers: { Authorization: `Bearer ${token}` } },
       )
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
@@ -540,7 +541,7 @@ export default function PaymentsForm({
       setVendorCreateLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vendors`, {
+      const res = await fetch(API.vendors(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -638,7 +639,7 @@ export default function PaymentsForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/payments/purchase-payment/`,
+        `${API.paymentsPurchasePayment()}/`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -1001,7 +1002,7 @@ export default function PaymentsForm({
       selectedPurchases.forEach((id) => queryParams.append('purchase_id', id))
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/payments/purchase-payment?${queryParams.toString()}`,
+        `${API.paymentsPurchasePayment()}?${queryParams.toString()}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -1503,8 +1504,8 @@ export default function PaymentsForm({
 
       const url =
         isEditMode && paymentId
-          ? `${import.meta.env.VITE_SERVER_LINK}/payments/${paymentId}`
-          : `${import.meta.env.VITE_SERVER_LINK}/payments`
+          ? API.paymentsById(paymentId)
+          : API.payments()
 
       const method = isEditMode && paymentId ? 'PUT' : 'POST'
 

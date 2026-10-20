@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { fetchWithAuth } from '../../utils/api'
+import { API } from '../../api/endpoints'
 // Draws the professional letterhead on exported PDFs. Without this import the
 // name was an undeclared global, so exporting a return failed at runtime with
 // "renderPDFCompanyHeader is not defined" rather than at build time.
@@ -19,7 +20,7 @@ import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
  */
 
 const tax = async (path, { method = 'GET', body } = {}) => {
-  const res = await fetchWithAuth(`/tax${path}`, {
+  const res = await fetchWithAuth(API.taxRegistry(path), {
     method,
     headers: { 'Content-Type': 'application/json' },
     ...(body ? { body: JSON.stringify(body) } : {}),
@@ -190,7 +191,7 @@ const useTaxRegistry = () => {
     ;(async () => {
       try {
         setLoading(true)
-        const list = (await json('/company')) || []
+        const list = (await json(API.company())) || []
         if (!live) return
         
         if (list.length === 0) {

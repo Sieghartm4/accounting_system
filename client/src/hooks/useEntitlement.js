@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchWithAuth } from '../utils/api'
+import { API } from '../api/endpoints'
 
 /**
  * The current company's plan, fetched once per tab.
@@ -91,7 +92,7 @@ export const invalidateEntitlement = () => writeCache(null)
  */
 export const refreshEntitlement = async () => {
   try {
-    const response = await fetchWithAuth('/entitlement/refresh', { method: 'POST' })
+    const response = await fetchWithAuth(API.entitlementRefresh(), { method: 'POST' })
     const payload = await response.json()
     if (!response.ok || !payload.success) return null
     writeCache(payload.data)
@@ -118,7 +119,7 @@ export const useEntitlement = () => {
     if (!readCache()) setLoading(true)
     setError(null)
     try {
-      const response = await fetchWithAuth('/entitlement')
+      const response = await fetchWithAuth(API.entitlement())
       const payload = await response.json()
       if (!response.ok || !payload.success) {
         throw new Error(payload.message || `HTTP ${response.status}`)

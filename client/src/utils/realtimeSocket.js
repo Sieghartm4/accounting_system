@@ -24,9 +24,10 @@
  */
 
 import { fetchWithAuth } from './api'
+import { API, SERVER } from '../api/endpoints'
 
 const buildSocketUrl = () => {
-  const serverLink = import.meta.env.VITE_SERVER_LINK
+  const serverLink = SERVER()
   if (!serverLink) return null
   // http->ws, https->wss. Deriving from the page protocol instead would break
   // behind a TLS-terminating proxy, where the page is https but the socket
@@ -40,9 +41,7 @@ const buildSocketUrl = () => {
  * 401/402 handling as every other call.
  */
 const fetchTicket = async () => {
-  const serverLink = import.meta.env.VITE_SERVER_LINK
-  if (!serverLink) return null
-  const res = await fetchWithAuth(`${serverLink}/realtime/ticket`)
+  const res = await fetchWithAuth(API.realtimeTicket())
   if (!res.ok) return null
   const json = await res.json().catch(() => null)
   return json?.ticket || null

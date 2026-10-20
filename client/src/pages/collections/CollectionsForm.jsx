@@ -46,6 +46,8 @@ import RightSideModal from '../../components/RightSideModal'
 
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 
+import { API } from '../../api/endpoints'
+
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -887,7 +889,7 @@ export default function CollectionsForm({
 
       }
 
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
+      const res = await fetch(API.customer(), {
 
         method: 'POST',
 
@@ -1011,7 +1013,7 @@ export default function CollectionsForm({
 
       if (!token) throw new Error('No authorization token found')
 
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
+      const res = await fetch(API.customer(), {
 
         headers: { Authorization: `Bearer ${token}` },
 
@@ -1049,7 +1051,7 @@ export default function CollectionsForm({
 
       const res = await fetch(
 
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
+        API.chartsOfAccounts(),
 
         { headers: { Authorization: `Bearer ${token}` } },
 
@@ -1085,7 +1087,7 @@ export default function CollectionsForm({
 
       const res = await fetch(
 
-        `${import.meta.env.VITE_SERVER_LINK}/collections/sales-collection/`,
+        `${API.collectionsSalesCollection()}/`,
 
         {
 
@@ -1277,7 +1279,7 @@ export default function CollectionsForm({
 
 
 
-            const url = `${import.meta.env.VITE_SERVER_LINK}/collections/sales-collection?${queryParams.toString()}`
+            const url = `${API.collectionsSalesCollection()}?${queryParams.toString()}`
 
             console.log('Fetching from URL:', url)
 
@@ -1695,7 +1697,7 @@ export default function CollectionsForm({
 
       const response = await fetch(
 
-        `${import.meta.env.VITE_SERVER_LINK}/collections/sales-collection?${queryParams.toString()}`,
+        `${API.collectionsSalesCollection()}?${queryParams.toString()}`,
 
         {
 
@@ -2487,9 +2489,9 @@ export default function CollectionsForm({
 
         isEditMode && collectionId
 
-          ? `${import.meta.env.VITE_SERVER_LINK}/collections/${collectionId}`
+          ? API.collectionsById(collectionId)
 
-          : `${import.meta.env.VITE_SERVER_LINK}/collections`
+          : API.collections()
 
 
 

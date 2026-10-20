@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 const useUsers = () => {
   const [users, setUsers] = useState([])
@@ -21,7 +22,7 @@ const useUsers = () => {
         throw new Error('No authorization token found')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SERVER_LINK}/users`, {
+      const response = await fetch(API.users(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

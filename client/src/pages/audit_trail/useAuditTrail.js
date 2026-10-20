@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { API } from '../../api/endpoints'
 
 const useAuditTrail = () => {
   const [auditTrails, setAuditTrails] = useState([])
@@ -34,7 +35,7 @@ const useAuditTrail = () => {
       params.append('limit', LIMIT)
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/audit-trail?${params.toString()}`,
+        `${API.auditTrail()}?${params.toString()}`,
         {
           method: 'GET',
           headers: {

@@ -25,6 +25,7 @@ import {
 import RouteProtection from '../../components/RouteProtection'
 import LoadingScreen from '../../components/LoadingScreen'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
+import { API } from '../../api/endpoints'
 
 const getCurrentMonthRange = () => {
   const today = new Date()
@@ -123,7 +124,7 @@ function DashboardNewContent() {
           dashboardParams.set('responsibility_center', submittedResponsibilityCenter)
         }
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/dashboard?${dashboardParams.toString()}`,
+          `${API.dashboard()}?${dashboardParams.toString()}`,
           {
             method: 'GET',
             headers: {

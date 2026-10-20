@@ -20,6 +20,7 @@ import {
 import ReactDOM from 'react-dom'
 import * as XLSX from 'xlsx'
 import DynamicToast from '../../components/DynamicToast'
+import { API } from '../../api/endpoints'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -372,7 +373,7 @@ export default function AdjustmentsForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
+        API.chartsOfAccounts(),
         { headers: { Authorization: `Bearer ${token}` } },
       )
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
@@ -779,10 +780,10 @@ export default function AdjustmentsForm({
 
       const url =
         isEditMode && adjustmentData
-          ? `${import.meta.env.VITE_SERVER_LINK}/adjustments/${adjustmentData.data[0].id}`
+          ? API.adjustmentsById(adjustmentData.data[0].id)
           : isViewMode && adjustmentData
-            ? `${import.meta.env.VITE_SERVER_LINK}/adjustments/${adjustmentData.data[0].id}`
-            : `${import.meta.env.VITE_SERVER_LINK}/adjustments`
+            ? API.adjustmentsById(adjustmentData.data[0].id)
+            : API.adjustments()
 
       const method = (isEditMode || isViewMode) && adjustmentData ? 'PUT' : 'POST'
 

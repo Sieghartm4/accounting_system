@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API } from '../../api/endpoints';
 
 const useProforma = () => {
   const [proforma, setProforma] = useState([]);
@@ -16,7 +17,7 @@ const useProforma = () => {
         throw new Error("No authorization token found");
       }
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/proforma_entries`,
+        API.proformaEntries(),
         {
           method: "GET",
           headers: {
@@ -52,7 +53,7 @@ const useProforma = () => {
         throw new Error("No authorization token found");
       }
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
+        API.chartsOfAccounts(),
         {
           method: "GET",
           headers: {
@@ -88,7 +89,7 @@ const useProforma = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/proforma_entries`,
+        API.proformaEntries(),
         {
           method: "POST",
           headers: {
@@ -126,7 +127,7 @@ const useProforma = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/proforma_entries/${id}`,
+        API.proformaEntriesById(id),
         {
           method: "PUT",
           headers: {
@@ -163,7 +164,7 @@ const useProforma = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/proforma_entries/import`,
+        API.proformaEntriesImport(),
         {
           method: "POST",
           headers: {

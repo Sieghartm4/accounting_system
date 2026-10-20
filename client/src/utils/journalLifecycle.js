@@ -1,3 +1,5 @@
+import { API } from '../api/endpoints'
+
 const POSTED_STATES = ['APPROVED', 'POSTED', 'LOCKED']
 
 /**
@@ -19,7 +21,7 @@ export const createReversal = async ({ dbName, dbId, date, remarks }) => {
   if (!token) throw new Error('No authentication token found')
 
   const response = await fetch(
-    `${import.meta.env.VITE_SERVER_LINK}/journal_entries/reverse`,
+    API.journalEntriesReverse(),
     {
       method: 'POST',
       headers: {

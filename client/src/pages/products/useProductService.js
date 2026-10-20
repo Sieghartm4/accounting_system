@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API } from '../../api/endpoints'
 
 const useProductService = () => {
   const [productService, setProductService] = useState([])
@@ -14,7 +15,7 @@ const useProductService = () => {
         throw new Error('No authorization token found')
       }
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
+        API.productService(),
         {
           method: 'GET',
           headers: {
@@ -62,7 +63,7 @@ const useProductService = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
+        API.productService(),
         {
           method: 'POST',
           headers: {
@@ -111,7 +112,7 @@ const useProductService = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service/sync`,
+        API.productServiceSync(),
         {
           method: 'GET',
           headers: {
@@ -156,7 +157,7 @@ const useProductService = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service/${id}`,
+        API.productServiceById(id),
         {
           method: 'PUT',
           headers: {
@@ -206,7 +207,7 @@ const useProductService = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service/sync/preview`,
+        API.productServiceSyncPreview(),
         {
           method: 'GET',
           headers: {
@@ -250,7 +251,7 @@ const useProductService = () => {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service/sync/import`,
+        API.productServiceSyncImport(),
         {
           method: 'POST',
           headers: {

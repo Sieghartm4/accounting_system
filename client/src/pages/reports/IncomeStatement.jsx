@@ -19,6 +19,7 @@ import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 import LoadingScreen from '../../components/LoadingScreen'
 import { currentReportPeriod } from '../../utils/reportPeriod'
+import { API } from '../../api/endpoints'
 
 export default function IncomeStatement() {
   const navigate = useNavigate()
@@ -57,7 +58,7 @@ export default function IncomeStatement() {
       const params = new URLSearchParams()
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
-      const url = `${import.meta.env.VITE_SERVER_LINK}/reports/income-statement${params.toString() ? '?' + params : ''}`
+      const url = `${API.reportsIncomeStatement()}${params.toString() ? '?' + params : ''}`
 
       const response = await fetch(url, {
         headers: {

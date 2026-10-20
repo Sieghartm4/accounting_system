@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { API } from '../../api/endpoints'
 
 const usePayments = () => {
   const [payments, setPayments] = useState([])
@@ -41,7 +42,7 @@ const usePayments = () => {
         if (queryDateTo) params.append('dateTo', queryDateTo)
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/payments?${params.toString()}`,
+          `${API.payments()}?${params.toString()}`,
           {
             method: 'GET',
             headers: {

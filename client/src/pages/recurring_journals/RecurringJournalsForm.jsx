@@ -20,6 +20,7 @@ import {
 import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
+import { API } from '../../api/endpoints'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
@@ -358,7 +359,7 @@ export default function RecurringJournalsForm({
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
       const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
+        API.chartsOfAccounts(),
         { headers: { Authorization: `Bearer ${token}` } },
       )
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
@@ -546,8 +547,8 @@ export default function RecurringJournalsForm({
       console.log('📤 Journal entries data:', preparedJournalEntries)
 
       const url = isEditMode && templateData
-        ? `${import.meta.env.VITE_SERVER_LINK}/recurring_journals/${templateData.data[0].id}`
-        : `${import.meta.env.VITE_SERVER_LINK}/recurring_journals`
+        ? API.recurringJournalsById(templateData.data[0].id)
+        : API.recurringJournals()
 
       const method = isEditMode && templateData ? 'PUT' : 'POST'
 

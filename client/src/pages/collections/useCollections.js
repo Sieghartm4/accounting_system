@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { API } from '../../api/endpoints'
 
 const useCollections = () => {
   const [collections, setCollections] = useState([])
@@ -60,7 +61,7 @@ const useCollections = () => {
         if (queryDateTo) params.append('dateTo', queryDateTo)
 
         const response = await fetch(
-          `${import.meta.env.VITE_SERVER_LINK}/collections?${params.toString()}`,
+          `${API.collections()}?${params.toString()}`,
           {
             method: 'GET',
             headers: {

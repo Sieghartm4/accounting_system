@@ -18,6 +18,7 @@ import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
 import LoadingScreen from '../../components/LoadingScreen'
 import { currentReportPeriod } from '../../utils/reportPeriod'
+import { API } from '../../api/endpoints'
 
 export default function BalanceSheet() {
   const navigate = useNavigate()
@@ -46,7 +47,7 @@ export default function BalanceSheet() {
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
 
-      const url = `${import.meta.env.VITE_SERVER_LINK}/reports/balance-sheet${params.toString() ? '?' + params.toString() : ''}`
+      const url = `${API.reportsBalanceSheet()}${params.toString() ? '?' + params.toString() : ''}`
 
       const response = await fetch(url, {
         headers: {

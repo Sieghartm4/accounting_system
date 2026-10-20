@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import LoadingScreen from '../../components/LoadingScreen'
 import { currentReportPeriod } from '../../utils/reportPeriod'
+import { API } from '../../api/endpoints'
 
 export default function StatementOfComprehensiveIncome() {
   const [data, setData] = useState(null)
@@ -50,7 +51,7 @@ export default function StatementOfComprehensiveIncome() {
       const params = new URLSearchParams()
       if (startDate) params.append('start_date', startDate)
       if (endDate) params.append('end_date', endDate)
-      const url = `${import.meta.env.VITE_SERVER_LINK}/reports/statement-of-comprehensive-income${params.toString() ? '?' + params : ''}`
+      const url = `${API.reportsStatementOfComprehensiveIncome()}${params.toString() ? '?' + params : ''}`
 
       const response = await fetch(url, {
         headers: {

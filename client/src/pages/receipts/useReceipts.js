@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDefaults'
+import { API } from '../../api/endpoints'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drag to Scroll Hook
@@ -287,7 +288,7 @@ export function useReceiptsForm({
       setCustomerLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
+      const res = await fetch(API.customer(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -324,7 +325,7 @@ export function useReceiptsForm({
       setCustomerLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/customer`, {
+      const res = await fetch(API.customer(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -371,9 +372,7 @@ export function useReceiptsForm({
     try {
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
-        {
+      const res = await fetch(API.productService(), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -410,9 +409,7 @@ export function useReceiptsForm({
       setCoaLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/charts_of_accounts`,
-        {
+      const res = await fetch(API.chartsOfAccounts(), {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -436,9 +433,7 @@ export function useReceiptsForm({
       setProductLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/product_service`,
-        {
+      const res = await fetch(API.productService(), {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -462,7 +457,7 @@ export function useReceiptsForm({
       setVatLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(`${import.meta.env.VITE_SERVER_LINK}/vat`, {
+      const res = await fetch(API.vat(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -496,9 +491,7 @@ export function useReceiptsForm({
       setWhtLoading(true)
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
-      const res = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/withholding_tax`,
-        {
+      const res = await fetch(API.withholdingTax(), {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -1130,8 +1123,8 @@ export function useReceiptsForm({
       }
 
       const apiUrl = isEditMode
-        ? `${import.meta.env.VITE_SERVER_LINK}/receipt/${receiptId}`
-        : `${import.meta.env.VITE_SERVER_LINK}/receipt`
+        ? API.receiptById(receiptId)
+        : API.receipt()
 
       const response = await fetch(apiUrl, {
         method: isEditMode ? 'PUT' : 'POST',
@@ -1307,7 +1300,7 @@ const useReceipts = () => {
       if (queryDateTo) params.append('dateTo', queryDateTo)
 
       const response = await fetch(
-        `${import.meta.env.VITE_SERVER_LINK}/receipt?${params.toString()}`,
+        `${API.receipt()}?${params.toString()}`,
         {
           method: 'GET',
           headers: {

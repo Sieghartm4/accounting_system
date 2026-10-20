@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchWithAuth } from '../utils/api'
+import { API } from '../api/endpoints'
 import connectRealtime from '../utils/realtimeSocket'
 
 /**
@@ -23,7 +24,6 @@ import connectRealtime from '../utils/realtimeSocket'
  * when it is only the live update that is not arriving.
  */
 
-const SERVER = () => import.meta.env.VITE_SERVER_LINK
 const COMPANY_CACHE_KEY = 'notifications_company_id'
 
 /**
@@ -80,7 +80,7 @@ const resolveCompanyId = async () => {
   const cached = sessionStorage.getItem(COMPANY_CACHE_KEY)
   if (cached) return Number(cached)
 
-    const res = await fetchWithAuth(`${SERVER()}/company/single`)
+    const res = await fetchWithAuth(API.companySingle())
     if (!res.ok) throw new Error('Could not resolve the company for notifications')
     const json = await res.json().catch(() => null)
     // /company/single returns the company object. This used to arrive wrapped in
@@ -122,8 +122,8 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
     if (!companyRef.current) setCompanyId(id)
 
     const [res, moduleRes] = await Promise.all([
-      fetchWithAuth(`${SERVER()}/notifications?filter=${filter}&companyId=${id}`),
-      fetchWithAuth(`${SERVER()}/notifications/unread-by-module?companyId=${id}`),
+      fetchWithAuth(`${API.notifications()}?filter=${filter}&companyId=${id}`),
+      fetchWithAuth(`${API.notificationsUnreadByModule()}?companyId=${id}`),
     ])
 
     if (!res.ok) throw new Error('Could not load notifications')
@@ -220,7 +220,7 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
         return next
       })
     }
-    const res = await fetchWithAuth(`${SERVER()}/notifications/${id}/read?companyId=${cid}`, {
+    const res = await fetchWithAuth(`${API.notificationsRead(id)}?companyId=${cid}`, {
       method: 'POST',
     })
     if (!res.ok) {
@@ -253,7 +253,7 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
       if (!unreadByModuleRef.current[target]) return
 
       const res = await fetchWithAuth(
-        `${SERVER()}/notifications/read-by-module?module=${encodeURIComponent(target)}&companyId=${cid}`,
+        `${API.notificationsReadByModule()}?module=${encodeURIComponent(target)}&companyId=${cid}`,
         { method: 'POST' },
       )
       if (!res.ok) return
@@ -279,7 +279,7 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
   const markAllRead = useCallback(async () => {
     const cid = companyId
     if (!cid) return
-    const res = await fetchWithAuth(`${SERVER()}/notifications/read-all?companyId=${cid}`, {
+    const res = await fetchWithAuth(`${API.notificationsReadAll()}?companyId=${cid}`, {
       method: 'POST',
     })
     if (!res.ok) return
