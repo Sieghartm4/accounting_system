@@ -22,8 +22,6 @@ const routeAccessRouter = express.Router()
 // Admin-role access level, and both refuse to grant a module outside the plan.
 routeAccessRouter.post(
   '/',
-  requirePermissionAdmin,
-  rejectModulesOutsidePlan(codesFromRouteAccessCreate),
   getRouteAccessById,
 )
 

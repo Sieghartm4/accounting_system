@@ -131,7 +131,6 @@ function isEditableDocumentState(state) {
   if (!state) return true
   return !IMMUTABLE_STATES.includes(String(state).toUpperCase())
 }
-
 /**
  * Throws a JournalLockedError when the source document is posted/locked.
  * Used by every document update path so that posted journal entries can never

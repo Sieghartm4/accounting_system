@@ -64,11 +64,12 @@ const requirePermissionAdmin = async (req, res, next) => {
 
   const accessName = rows && rows[0] ? String(rows[0].access_name || '') : ''
   console.log('[permissions] userId:', req?.context?.userId, 'accessName:', accessName, 'rows:', rows)
-  if (!/^admin$/i.test(accessName)) {
+  // Allow both Admin and Finance access levels to modify permissions
+  if (!/^admin$/i.test(accessName) && !/^finance$/i.test(accessName)) {
     return res.status(403).json({
       success: false,
       message:
-        'Only an administrator can change access settings. Ask your administrator to make this change.',
+        'Only an administrator or finance user can change access settings. Ask your administrator to make this change.',
       code: 'NOT_ACCESS_ADMIN',
     })
   }

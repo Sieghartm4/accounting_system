@@ -22,6 +22,7 @@ import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
+import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 import {
   useDisbursementForm,
   useDragToScroll,
@@ -337,13 +338,27 @@ export default function CashDisbursementForm({
     error: responsibilityCentersError,
   } = useResponsibilityCenter()
 
-  const responsibilityCenterOptions = responsibilityCenters.map((center) => ({
-    label: center.name || '',
-    sublabel: center.department || '',
-    value: center.name || '',
-  }))
-
   const [bulkResponsibilityCenter, setBulkResponsibilityCenter] = useState('')
+
+  // Inactive responsibility centers are hidden, but any center already used
+  // by the loaded items / journal entries stays visible (edit/view mode).
+  const referencedCenterNames = [
+    ...disbursementItems.map((item) => item.responsibilityCenter),
+    ...journalEntries.map((entry) => entry.center),
+    bulkResponsibilityCenter,
+  ].filter(Boolean)
+  const activeResponsibilityCenters = filterActiveMasterRows(
+    responsibilityCenters,
+    referencedCenterNames,
+    'name',
+  )
+  const responsibilityCenterOptions = activeResponsibilityCenters.map(
+    (center) => ({
+      label: center.name || '',
+      sublabel: center.department || '',
+      value: center.name || '',
+    }),
+  )
 
   const [isDisbursementItemsCollapsed, setIsDisbursementItemsCollapsed] = useState(false)
   const [isJournalEntriesCollapsed, setIsJournalEntriesCollapsed] = useState(false)
@@ -543,7 +558,7 @@ export default function CashDisbursementForm({
     'w-full rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none ' +
     (isViewMode
       ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
-      : 'bg-gray-50/50 border border-gray-200 focus:ring-1 focus:ring-red-400')
+      : 'bg-gray-50/50 focus:ring-1 focus:ring-red-400')
   const pctInput = tableInput + ' pr-1'
 
   const fadeInUp = {

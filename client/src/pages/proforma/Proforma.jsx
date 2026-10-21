@@ -44,20 +44,22 @@ function ProformaContent() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const result = editingProforma
+    // Explicitly check if we have a valid ID for editing
+    const isEdit = editingProforma && editingProforma.id;
+    const result = isEdit
       ? await updateProformaEntry(editingProforma.id, formData)
       : await createProformaEntry(formData);
-    
+
     if (result.success) {
-      setToast({ type: 'success', message: `Proforma entry ${editingProforma ? 'updated' : 'created'} successfully!` });
+      setToast({ type: 'success', message: `Proforma entry ${isEdit ? 'updated' : 'created'} successfully!` });
       setFormData({ module: '', name: '', coa_id: '', t_account: '' });
       setCoaSearchTerm('');
       setIsModalOpen(false);
       setEditingProforma(null);
     } else {
-      setToast({ type: 'error', message: result.error || `Failed to ${editingProforma ? 'update' : 'create'} proforma entry` });
+      setToast({ type: 'error', message: result.error || `Failed to ${isEdit ? 'update' : 'create'} proforma entry` });
     }
-    
+
     setIsSubmitting(false);
   };
 
@@ -396,7 +398,7 @@ function ProformaContent() {
       <RightSideModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title={editingProforma ? "Edit Proforma Entry" : "Create New Proforma Entry"}
+        title={editingProforma && editingProforma.id ? "Edit Proforma Entry" : "Create New Proforma Entry"}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -505,7 +507,7 @@ function ProformaContent() {
               disabled={isSubmitting}
               className="flex-1 px-4 py-3 bg-black text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? (editingProforma ? 'UPDATING...' : 'CREATING...') : (editingProforma ? 'UPDATE ENTRY' : 'CREATE ENTRY')}
+              {isSubmitting ? (editingProforma && editingProforma.id ? 'UPDATING...' : 'CREATING...') : (editingProforma && editingProforma.id ? 'UPDATE ENTRY' : 'CREATE ENTRY')}
             </button>
           </div>
         </form>

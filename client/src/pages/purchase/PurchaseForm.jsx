@@ -23,6 +23,8 @@ import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDefaults'
+import { computeTotals, findMissingAutoAccounts } from '../../utils/taxCalculations'
+import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 import { API } from '../../api/endpoints'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -286,116 +288,23 @@ function SearchableDropdown({
 //  totalAmountDue   = totalDiscounted + totalVAT − totalWHT
 //
 function computeSummary(items) {
-  let totalSalesPrice = 0
-  let totalDiscount = 0
-  let totalDiscounted = 0
-  let totalVAT = 0
-  let vatableSales = 0
-  let vatExemptSales = 0
-  let zeroRatedSales = 0
-  let totalNoVatDiscount = 0
-  let totalNetOfVat = 0
-  let totalWHT = 0
-
-  items.forEach((item) => {
-    const qty = parseFloat(item.qty) || 0
-    const price = parseFloat(item.price) || 0
-    const discountValue = parseFloat(item.discount) || 0
-    const discountType = item.discountType || 'PERCENT'
-    const vatPct = parseFloat(item.vatRate) || 0
-    const whtPct = parseFloat(item.whtRate) || 0
-    const vatType = item.vatType || 'VAT-EX'
-
-    const gross = qty * price
-    let discAmt = 0
-
-    if (discountType === 'PERCENT') {
-      discAmt = gross * (discountValue / 100)
-    } else {
-      discAmt = discountValue * qty
-    }
-
-    const discounted = gross - discAmt
-    
-    let vatAmt, netBase
-    if (vatType === 'VAT-INC' && vatPct > 0) {
-      // VAT Inclusive: extract VAT from the discounted amount
-      // Formula: VAT = discounted - (discounted / (1 + vatRate/100))
-      // Net = discounted / (1 + vatRate/100)
-      netBase = discounted / (1 + vatPct / 100)
-      vatAmt = discounted - netBase
-    } else {
-      // VAT Exclusive: VAT is calculated on top of the discounted amount
-      vatAmt = discounted * (vatPct / 100)
-      netBase = discounted
-    }
-    
-    const whtAmt = netBase * (whtPct / 100)
-
-    // For VAT-exclusive pricing, VATable sales is the discounted amount (before VAT is added)
-    totalSalesPrice += gross
-    totalDiscount += discAmt
-    totalDiscounted += discounted
-    totalVAT += vatAmt
-    totalWHT += whtAmt
-    totalNetOfVat += netBase
-
-    if (vatPct > 0) {
-      vatableSales += netBase // This is now the discounted amount for VATable items
-      totalNoVatDiscount += discAmt
-    } else if (whtPct > 0) {
-      zeroRatedSales += discounted
-    } else {
-      vatExemptSales += discounted
-    }
-  })
-
-  // Calculate total amount due based on VAT type per item
-  let totalAmountDue = 0
-  items.forEach((item) => {
-    const qty = parseFloat(item.qty) || 0
-    const price = parseFloat(item.price) || 0
-    const discountValue = parseFloat(item.discount) || 0
-    const discountType = item.discountType || 'PERCENT'
-    const vatPct = parseFloat(item.vatRate) || 0
-    const whtPct = parseFloat(item.whtRate) || 0
-    const vatType = item.vatType || 'VAT-EX'
-
-    const gross = qty * price
-    const discAmt = discountType === 'PERCENT' ? gross * (discountValue / 100) : discountValue * qty
-    const discounted = gross - discAmt
-    
-    let netBase, vatAmt
-    if (vatType === 'VAT-INC' && vatPct > 0) {
-      netBase = discounted / (1 + vatPct / 100)
-      vatAmt = discounted - netBase
-    } else {
-      netBase = discounted
-      vatAmt = discounted * (vatPct / 100)
-    }
-    
-    const whtAmt = netBase * (whtPct / 100)
-    
-    // For VAT-INC, amount due is discounted (VAT already included)
-    // For VAT-EX, amount due is netBase + VAT
-    const amountDue = vatType === 'VAT-INC' ? discounted : (netBase + vatAmt)
-    totalAmountDue += (amountDue - whtAmt)
-  })
+  const { totals } = computeTotals(items)
 
   return {
-    totalSalesPrice,
-    totalDiscount,
-    totalDiscounted,
-    totalVAT,
-    vatableSales,
-    vatExemptSales,
-    zeroRatedSales,
-    totalNoVatDiscount,
-    totalNetOfVat,
-    totalWHT,
-    totalAmountDue,
+    totalSalesPrice: totals.gross,
+    totalDiscount: totals.discount,
+    totalDiscounted: totals.discounted,
+    totalVAT: totals.vat,
+    vatableSales: totals.vatableSales,
+    vatExemptSales: totals.vatExemptSales,
+    zeroRatedSales: totals.zeroRatedSales,
+    totalNoVatDiscount: totals.discountOnVatable,
+    totalNetOfVat: totals.netOfVat,
+    totalWHT: totals.wht,
+    totalAmountDue: totals.amountDue,
   }
 }
+
 
 const fmt = (n) =>
   n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -627,12 +536,6 @@ export default function PurchaseForm({
     error: responsibilityCentersError,
   } = useResponsibilityCenter()
 
-  const responsibilityCenterOptions = responsibilityCenters.map((center) => ({
-    label: center.name || '',
-    sublabel: center.department || '',
-    value: center.name || '',
-  }))
-
   const [bulkResponsibilityCenter, setBulkResponsibilityCenter] = useState('')
 
   const [isPurchaseItemsCollapsed, setIsPurchaseItemsCollapsed] = useState(false)
@@ -642,6 +545,25 @@ export default function PurchaseForm({
   const [journalEntries, setJournalEntries] = useState([
     { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 },
   ])
+
+  // Inactive responsibility centers are hidden, but any center already used
+  // by the loaded items / journal entries stays visible (edit/view mode).
+  const referencedCenterNames = [
+    ...purchaseItems.map((item) => getItemResponsibilityCenter(item)),
+    ...journalEntries.map((entry) => entry.center),
+  ].filter(Boolean)
+  const activeResponsibilityCenters = filterActiveMasterRows(
+    responsibilityCenters,
+    referencedCenterNames,
+    'name',
+  )
+  const responsibilityCenterOptions = activeResponsibilityCenters.map(
+    (center) => ({
+      label: center.name || '',
+      sublabel: center.department || '',
+      value: center.name || '',
+    }),
+  )
 
   const [vendors, setVendors] = useState([])
   const [vendorLoading, setVendorLoading] = useState(false)
@@ -746,7 +668,17 @@ export default function PurchaseForm({
   ]
   const termsOptions = ['DAYS', 'MONTHS', 'DURATION OF TIME']
 
-  const coaOptions = chartsOfAccounts.map((a) => ({
+  // ── Inactive masters are hidden from the dropdowns, but anything already
+  // referenced by the loaded items stays visible (edit/view mode).
+  const referencedMasterIds = purchaseItems
+    .flatMap((item) => [item.coa, item.productId, item.vat, item.wht])
+    .filter((v) => v !== '' && v !== null && v !== undefined)
+    .map(String)
+
+  const coaOptions = filterActiveMasterRows(
+    chartsOfAccounts,
+    referencedMasterIds,
+  ).map((a) => ({
     label: a.name || a.account_name,
     sublabel: a.code || a.account_code,
     value: a.id,
@@ -761,11 +693,22 @@ export default function PurchaseForm({
     sublabel: c.code,
     value: c.id,
   }))
-  const productOptions = products.map((p) => ({
+  const productOptions = filterActiveMasterRows(
+    products,
+    referencedMasterIds,
+  ).map((p) => ({
     label: p.name || p.product_name,
     sublabel: p.type || p.product_type || p.code || p.product_code,
     value: p.id,
   }))
+  const vatOptionsForSelect = filterActiveMasterRows(
+    vatOptions,
+    referencedMasterIds,
+  )
+  const whtOptionsForSelect = filterActiveMasterRows(
+    whtOptions,
+    referencedMasterIds,
+  )
 
   const fetchVendors = async () => {
     try {
@@ -932,6 +875,7 @@ export default function PurchaseForm({
           rate: parseFloat(vat.rate),
           code: vat.code,
           name: vat.name,
+          status: vat.status,
         }))
         setVatOptions(vatData)
       } else {
@@ -968,6 +912,7 @@ export default function PurchaseForm({
           rate: parseFloat(wht.rate),
           code: wht.code,
           name: wht.name,
+          status: wht.status,
         }))
         setWhtOptions(whtData)
       } else {
@@ -1542,245 +1487,125 @@ export default function PurchaseForm({
 
   const generateJournalEntries = (defaultResponsibilityCenter = '') => {
     const entries = []
-    let totalDebitAmount = 0
-    let totalCreditAmount = 0
-    let totalGrossAmount = 0
-    let totalDiscountedAmount = 0
-    let totalVatAmount = 0
-    let totalWhtAmount = 0
-    let totalDiscountAmount = 0
+    const { lines, totals } = computeTotals(purchaseItems)
 
-    // First pass: calculate totals
-    purchaseItems.forEach((item) => {
-      const qty = parseFloat(item.qty) || 0
-      const price = parseFloat(item.price) || 0
-      const discountPct = parseFloat(item.discount) || 0
-      const vatPct = parseFloat(item.vatRate) || 0
-      const whtPct = parseFloat(item.whtRate) || 0
-      const vatType = item.vatType || 'VAT-EX'
+    const accountName = (a) => (a.name || a.account_name || '').toLowerCase()
+    const findAccount = (terms) =>
+      chartsOfAccounts.find((a) =>
+        terms.some((term) => accountName(a).includes(term)),
+      )
+    const centerFallback =
+      defaultResponsibilityCenter ||
+      bulkResponsibilityCenter ||
+      purchaseItems[0]?.responsibilityCenter ||
+      ''
 
-      const gross = qty * price
-      const discountAmount = gross * (discountPct / 100)
-      const discountedAmount = gross - discountAmount
-      
-      let vatAmount, netBase, whtAmount
-      if (vatType === 'VAT-INC' && vatPct > 0) {
-        // VAT Inclusive: extract VAT from the discounted amount
-        netBase = discountedAmount / (1 + vatPct / 100)
-        vatAmount = discountedAmount - netBase
-      } else {
-        // VAT Exclusive: VAT is calculated on top of the discounted amount
-        vatAmount = discountedAmount * (vatPct / 100)
-        netBase = discountedAmount
-      }
-      
-      whtAmount = netBase * (whtPct / 100)
+    // Discount/VAT math comes from computeTotals (shared calculator):
+    // - expense is debited at the pre-discount tax-exclusive amount (grossEx)
+    // - input VAT is on the discounted (net) base
+    // - AP settles at the discounted total, so the standalone Purchase
+    //   Discounts credit keeps the entry balanced:
+    //   grossEx + vat = settled + discountBook + wht
+    const totalSettled =
+      totals.grossEx + totals.vat - totals.discountBook - totals.wht
 
-      totalGrossAmount += gross
-      totalDiscountAmount += discountAmount
-      totalDiscountedAmount += discountedAmount
-      totalVatAmount += vatAmount
-      totalWhtAmount += whtAmount
-    })
-
-    // Find accounts payable account
-    const apAccount = chartsOfAccounts.find((a) =>
-      (a.name || '').toLowerCase().includes('accounts payable'),
-    )
-
-    // 1. Expense Accounts (DEBIT) - the purchase items themselves
-    purchaseItems.forEach((item) => {
-      if (item.coa) {
+    // 1. Expense Accounts (DEBIT) - per item at pre-discount tax-exclusive amount
+    lines.forEach(({ item, f }) => {
+      if (item.coa && f.gross > 0) {
         const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
-        const qty = parseFloat(item.qty) || 0
-        const price = parseFloat(item.price) || 0
-        const discountPct = parseFloat(item.discount) || 0
-        const vatPct = parseFloat(item.vatRate) || 0
-        const vatType = item.vatType || 'VAT-EX'
-        
-        const gross = qty * price
-        const discountAmount = gross * (discountPct / 100)
-        const discountedAmount = gross - discountAmount
-        
-        let netBase
-        if (vatType === 'VAT-INC' && vatPct > 0) {
-          netBase = discountedAmount / (1 + vatPct / 100)
-        } else {
-          netBase = discountedAmount
-        }
-
-        if (selectedCoa && gross > 0) {
+        if (selectedCoa) {
           entries.push({
             id: Date.now() + Math.random(),
             account: selectedCoa.id,
             accountSearch: selectedCoa.name,
-            center: getItemResponsibilityCenter(
-              item,
-              defaultResponsibilityCenter ||
-                bulkResponsibilityCenter ||
-                purchaseItems[0]?.responsibilityCenter ||
-                '',
-            ),
-            debit: parseFloat(netBase.toFixed(2)),
+            center: getItemResponsibilityCenter(item, centerFallback),
+            debit: f.grossEx,
             credit: 0,
             isManual: false,
           })
-          totalDebitAmount += netBase
         }
       }
     })
 
-    // 2. Input VAT (DEBIT) - for VATable purchases
-    if (totalVatAmount > 0) {
-      const inputVatAccount = chartsOfAccounts.find((a) =>
-        (a.name || '').toLowerCase().includes('input vat'),
-      )
-
+    // 2. Input VAT (DEBIT) - on the discounted (net) base
+    if (totals.vat > 0) {
+      const inputVatAccount = findAccount(['input vat'])
       if (inputVatAccount) {
         entries.push({
           id: Date.now() + Math.random(),
           account: inputVatAccount.id,
           accountSearch: inputVatAccount.name,
-          center: getItemResponsibilityCenter(
-            purchaseItems[0],
-            defaultResponsibilityCenter ||
-              bulkResponsibilityCenter ||
-              purchaseItems[0]?.responsibilityCenter ||
-              '',
-          ),
-          debit: parseFloat(totalVatAmount.toFixed(2)),
+          center: getItemResponsibilityCenter(purchaseItems[0], centerFallback),
+          debit: totals.vat,
           credit: 0,
           isManual: false,
         })
-        totalDebitAmount += totalVatAmount
       }
     }
 
     // 3. Purchase Discounts (CREDIT)
-    if (totalDiscountAmount > 0) {
-      const discountAccount = chartsOfAccounts.find((a) =>
-        (a.name || '').toLowerCase().includes('purchase discounts'),
-      )
-
+    if (totals.discountBook > 0) {
+      const discountAccount = findAccount(['purchase discounts'])
       if (discountAccount) {
         entries.push({
           id: Date.now() + Math.random(),
           account: discountAccount.id,
           accountSearch: discountAccount.name,
-          center: getItemResponsibilityCenter(
-            purchaseItems[0],
-            defaultResponsibilityCenter ||
-              bulkResponsibilityCenter ||
-              purchaseItems[0]?.responsibilityCenter ||
-              '',
-          ),
+          center: getItemResponsibilityCenter(purchaseItems[0], centerFallback),
           debit: 0,
-          credit: parseFloat(totalDiscountAmount.toFixed(2)),
+          credit: totals.discountBook,
           isManual: false,
         })
-        totalCreditAmount += totalDiscountAmount
       }
     }
 
-    // 4. Withholding Tax (CREDIT) - Liability account
-    // Determine if this is payroll-related or supplier-related based on COA
-    if (totalWhtAmount > 0) {
-      // Payroll-related COA keywords - use Withholding Tax - Compensation
+    // 4. Withholding Tax (CREDIT) - liability account
+    // Payroll-related COA keywords use Withholding Tax - Compensation
+    if (totals.wht > 0) {
       const payrollKeywords = [
         'salary', 'wage', 'commission', 'bonus', 'compensation',
-        'sss', 'philhealth', 'pag-ibig', 'pagibig', 'payroll'
+        'sss', 'philhealth', 'pag-ibig', 'pagibig', 'payroll',
       ]
-      
-      // Check if any item has a payroll-related COA
-      const hasPayrollItem = purchaseItems.some((item) => {
+      const hasPayrollItem = lines.some(({ item }) => {
         const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
         const coaName = (selectedCoa?.name || '').toLowerCase()
-        return payrollKeywords.some(keyword => coaName.includes(keyword))
+        return payrollKeywords.some((keyword) => coaName.includes(keyword))
       })
-      
-      // Select appropriate WHT liability account
-      const whtAccount = chartsOfAccounts.find((a) => {
-        const name = (a.name || '').toLowerCase()
-        if (hasPayrollItem) {
-          return name.includes('withholding tax - compensation')
-        } else {
-          return name.includes('withholding tax - expanded')
-        }
-      })
-
+      const whtAccount = findAccount([
+        hasPayrollItem
+          ? 'withholding tax - compensation'
+          : 'withholding tax - expanded',
+      ])
       if (whtAccount) {
         entries.push({
           id: Date.now() + Math.random(),
           account: whtAccount.id,
           accountSearch: whtAccount.name,
-          center: getItemResponsibilityCenter(
-            purchaseItems[0],
-            defaultResponsibilityCenter ||
-              bulkResponsibilityCenter ||
-              purchaseItems[0]?.responsibilityCenter ||
-              '',
-          ),
+          center: getItemResponsibilityCenter(purchaseItems[0], centerFallback),
           debit: 0,
-          credit: parseFloat(totalWhtAmount.toFixed(2)),
+          credit: totals.wht,
           isManual: false,
         })
-        totalCreditAmount += totalWhtAmount
       }
     }
 
-    // 5. Accounts Payable (CREDIT) - what we owe
-    if (apAccount && totalDiscountedAmount > 0) {
-      // Calculate total amount owed based on VAT type
-      let totalAmountOwed = 0
-      purchaseItems.forEach((item) => {
-        const qty = parseFloat(item.qty) || 0
-        const price = parseFloat(item.price) || 0
-        const discountPct = parseFloat(item.discount) || 0
-        const vatPct = parseFloat(item.vatRate) || 0
-        const whtPct = parseFloat(item.whtRate) || 0
-        const vatType = item.vatType || 'VAT-EX'
-        
-        const gross = qty * price
-        const discountAmount = gross * (discountPct / 100)
-        const discountedAmount = gross - discountAmount
-        
-        let netBase, vatAmount, whtAmount
-        if (vatType === 'VAT-INC' && vatPct > 0) {
-          netBase = discountedAmount / (1 + vatPct / 100)
-          vatAmount = discountedAmount - netBase
-        } else {
-          netBase = discountedAmount
-          vatAmount = discountedAmount * (vatPct / 100)
-        }
-        
-        whtAmount = netBase * (whtPct / 100)
-        
-        // For VAT-INC, amount owed is discounted (VAT already included)
-        // For VAT-EX, amount owed is netBase + VAT
-        const amountOwed = vatType === 'VAT-INC' ? discountedAmount : (netBase + vatAmount)
-        totalAmountOwed += (amountOwed - whtAmount)
-      })
-      
+    // 5. Accounts Payable (CREDIT) - discounted settlement net of WHT
+    const apAccount = findAccount(['accounts payable'])
+    if (apAccount && totalSettled > 0) {
       entries.push({
         id: Date.now() + Math.random(),
         account: apAccount.id,
         accountSearch: apAccount.name,
-        center: getItemResponsibilityCenter(
-          purchaseItems[0],
-          defaultResponsibilityCenter ||
-            bulkResponsibilityCenter ||
-            purchaseItems[0]?.responsibilityCenter ||
-            '',
-        ),
+        center: getItemResponsibilityCenter(purchaseItems[0], centerFallback),
         debit: 0,
-        credit: parseFloat(totalAmountOwed.toFixed(2)),
+        credit: totalSettled,
         isManual: false,
       })
-      totalCreditAmount += totalAmountOwed
     }
 
     setJournalEntries(entries)
   }
+
 
   const handlePostTransaction = async () => {
     try {
@@ -1838,6 +1663,22 @@ export default function PurchaseForm({
         setToast({
           type: 'error',
           message: 'No authorization token found. Please login again.',
+        })
+        return
+      }
+
+      // Guard: auto-generated entries reference standard accounts by name.
+      // If one is missing the journal silently becomes unbalanced, so block
+      // posting until the chart of accounts has them.
+      const missingAccounts = findMissingAutoAccounts({
+        items: purchaseItems,
+        chartsOfAccounts,
+        side: 'purchase',
+      })
+      if (missingAccounts.length > 0) {
+        setToast({
+          type: 'error',
+          message: `Missing chart of account(s): ${missingAccounts.join(', ')}. Add them before posting.`,
         })
         return
       }
@@ -2989,7 +2830,7 @@ export default function PurchaseForm({
                                   updatePurchaseItem(item.id, 'vatSearch', opt.label)
                                   updatePurchaseItem(item.id, 'vatRate', opt.rate)
                                 }}
-                                options={vatOptions}
+                                options={vatOptionsForSelect}
                                 inputClassName={`${pctInput + ' font-black text-red-600'}`}
                                 emptyText={vatError || 'No VAT rates found'}
                                 disabled={vatLoading}
@@ -3016,7 +2857,7 @@ export default function PurchaseForm({
                                   updatePurchaseItem(item.id, 'whtSearch', opt.label)
                                   updatePurchaseItem(item.id, 'whtRate', opt.rate)
                                 }}
-                                options={whtOptions}
+                                options={whtOptionsForSelect}
                                 inputClassName={`${pctInput + ' font-black text-blue-600'}`}
                                 emptyText={whtError || 'No WHT rates found'}
                                 disabled={whtLoading}

@@ -22,6 +22,7 @@ import * as XLSX from 'xlsx'
 import DynamicToast from '../../components/DynamicToast'
 import { API } from '../../api/endpoints'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
+import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
@@ -341,11 +342,26 @@ export default function AdjustmentsForm({
     error: responsibilityCentersError,
   } = useResponsibilityCenter()
 
-  const responsibilityCenterOptions = responsibilityCenters.map((center) => ({
-    label: center.name || '',
-    sublabel: center.department || '',
-    value: center.name || '',
-  }))
+  // Inactive responsibility centers are hidden, but any center already used
+  // by the journal entries (or the initial/load-mode entries) stays visible.
+  const referencedCenterNames = [
+    ...journalEntries.map((entry) => entry.center),
+    ...initialJournalEntries.map(
+      (entry) => entry.center ?? entry.responsibility_center,
+    ),
+  ].filter(Boolean)
+  const activeResponsibilityCenters = filterActiveMasterRows(
+    responsibilityCenters,
+    referencedCenterNames,
+    'name',
+  )
+  const responsibilityCenterOptions = activeResponsibilityCenters.map(
+    (center) => ({
+      label: center.name || '',
+      sublabel: center.department || '',
+      value: center.name || '',
+    }),
+  )
 
   const [bulkResponsibilityCenter, setBulkResponsibilityCenter] = useState('')
 
@@ -362,7 +378,10 @@ export default function AdjustmentsForm({
   const [toast, setToast] = useState(null)
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' })
 
-  const coaOptions = chartsOfAccounts.map((a) => ({
+  const coaOptions = filterActiveMasterRows(
+    chartsOfAccounts,
+    journalEntries.map((entry) => entry.account),
+  ).map((a) => ({
     label: a.name || a.account_name,
     sublabel: a.code || a.account_code,
     value: a.id,

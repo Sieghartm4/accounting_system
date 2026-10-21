@@ -275,7 +275,7 @@ function NotificationList({
 
     return (
       <>
-      <ul className={compact ? '' : 'divide-y divide-slate-100'}>
+      <ul className={compact ? 'divide-y divide-gray-300' : 'divide-y divide-slate-100'}>
         {visible.map((item) => {
           const Icon =
             TYPE_ICONS[item.type] || MODULE_ICONS[item.module] || Bell
@@ -287,7 +287,7 @@ function NotificationList({
                 disabled={busyId === item.id}
                 title={unread ? 'Unread - click to open' : 'Already read'}
                 className={`w-full text-left flex gap-3 pl-4 pr-4 transition-colors ${
-                  compact ? 'py-2.5 border-b border-slate-100 last:border-0' : 'py-3'
+                  compact ? 'py-2.5' : 'py-3'
                 } ${
                   // The two states have to be separable at a glance, not by
                   // reading: unread gets a tinted row and a solid accent bar down

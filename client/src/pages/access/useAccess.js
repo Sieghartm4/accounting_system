@@ -128,6 +128,10 @@ const useAccess = () => {
             const result = await response.json();
 
             if (result.success) {
+                // Refresh route access data after successful update
+                if (selectedAccessId) {
+                    await fetchRouteAccess(selectedAccessId);
+                }
                 return { success: true, data: result.data };
             } else {
                 return { success: false, message: result.message || "Failed to update route access" };
@@ -224,17 +228,18 @@ const useAccess = () => {
         fetchAccess();
     }, []);
 
-    return { 
-        access, 
-        loading, 
-        error, 
-        handleAccessRowClick, 
-        selectedAccessId, 
-        routeAccessData, 
+    return {
+        access,
+        loading,
+        error,
+        handleAccessRowClick,
+        selectedAccessId,
+        routeAccessData,
         routeAccessLoading,
         createAccess,
         updateRouteAccess,
-        updateSingleRouteAccess
+        updateSingleRouteAccess,
+        fetchRouteAccess
     };
 };
 

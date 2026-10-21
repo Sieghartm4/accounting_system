@@ -173,11 +173,6 @@ function AccessContent() {
           const result = await updateRouteAccess(route_access_Data)
 
           if (result.success) {
-            // Update the status for each selected row locally
-            selectedRows.forEach((row) => {
-              row.status = selectedValue
-            })
-
             setToast({
               type: 'success',
               message: `Access set to "${selectedValue}" for ${selectedRows.length} route(s).`,

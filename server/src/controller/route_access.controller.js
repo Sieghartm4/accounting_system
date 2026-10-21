@@ -14,9 +14,9 @@ const getRouteAccessById = async (req, res, next) => {
   try {
     const query = `SELECT ${Master.master_route_access.selectOptionColumns.id} as id, ${Master.master_route_access.selectOptionColumns.name} as name, ${Master.master_route_access.selectOptionColumns.status} as status FROM ${Master.master_route_access.tablename} WHERE ${Master.master_route_access.selectOptionColumns.access_id} = ?`
     const condition = [access_id]
-    
-    const access = await SelectWithCondition(query, condition)
-    
+
+    const access = await SelectWithCondition(query, condition, [Master.master_route_access.prefix_])
+
     res.status(200).json({
       success: true,
       message: 'Route Access retrieved successfully',
@@ -26,7 +26,7 @@ const getRouteAccessById = async (req, res, next) => {
 
   } catch (error) {
     console.error('Error fetching route access:', error)
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
       message: 'Server error while fetching route access',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
@@ -40,7 +40,7 @@ const updateRouteAccess = async (req, res, next) => {
       updates
     } = req.body;
     console.log("body", req.body);
-    
+
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({
         success: false,
@@ -48,6 +48,7 @@ const updateRouteAccess = async (req, res, next) => {
       });
     }
 
+    const dbName = req?.context?.dbName || req?.context?.tenantDb || null
     let connection;
     try {
       connection = await getTenantPool().getConnection();
@@ -55,7 +56,7 @@ const updateRouteAccess = async (req, res, next) => {
 
       const updatePromises = updates.map(async (update) => {
         const { id, access_id, status } = update;
-        
+
         if (!id || !access_id || !status) {
           throw new Error('Each update requires id, access_id, and status');
         }
@@ -69,28 +70,25 @@ const updateRouteAccess = async (req, res, next) => {
       });
 
       const results = await Promise.all(updatePromises);
-      
+
       await connection.commit();
 
-      // Audit trail for update
+      // Audit trail for update - execute directly on the connection
       const now = new Date();
-      const auditQueries = [];
-      auditQueries.push({
-        sql: sql.insert(Master.audit_trail.tablename, {
-          columns: Master.audit_trail.insertColumns,
-          prefix: Master.audit_trail.prefix,
-          isTransaction: true
-        }).build(),
-        values: [
-          null,
-          'ROUTE_ACCESS',
-          req.context?.username || null,
-          now.toISOString().split('T')[0],
-          now.toTimeString().split(' ')[0],
-          `UPDATE: ${results.length} route(s) modified`
-        ]
-      });
-      await Transaction(auditQueries);
+      const auditQuery = sql.insert(Master.audit_trail.tablename, {
+        columns: Master.audit_trail.insertColumns,
+        prefix: Master.audit_trail.prefix,
+        isTransaction: true
+      }).build();
+      const auditValues = [
+        null,
+        'ROUTE_ACCESS',
+        req.context?.username || null,
+        now.toISOString().split('T')[0],
+        now.toTimeString().split(' ')[0],
+        `UPDATE: ${results.length} route(s) modified`
+      ];
+      await connection.execute(auditQuery, auditValues);
 
       res.status(200).json({
         success: true,

@@ -23,6 +23,7 @@ import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
 import { useReceiptsForm, useDragToScroll, fmt } from './useReceipts'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
+import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
@@ -331,16 +332,30 @@ export default function ReceiptsForm({
     error: responsibilityCentersError,
   } = useResponsibilityCenter()
 
-  const responsibilityCenterOptions = responsibilityCenters.map((center) => ({
-    label: center.name || '',
-    sublabel: center.department || '',
-    value: center.name || '',
-  }))
-
   const [isBasicDetailsCollapsed, setIsBasicDetailsCollapsed] = useState(false)
   const [isReceiptItemsCollapsed, setIsReceiptItemsCollapsed] = useState(false)
   const [isJournalEntriesCollapsed, setIsJournalEntriesCollapsed] = useState(false)
   const [bulkResponsibilityCenter, setBulkResponsibilityCenter] = useState('')
+
+  // Inactive responsibility centers are hidden, but any center already used
+  // by the loaded items / journal entries stays visible (edit/view mode).
+  const referencedCenterNames = [
+    ...receiptItems.map((item) => item.responsibilityCenter),
+    ...journalEntries.map((entry) => entry.center),
+    bulkResponsibilityCenter,
+  ].filter(Boolean)
+  const activeResponsibilityCenters = filterActiveMasterRows(
+    responsibilityCenters,
+    referencedCenterNames,
+    'name',
+  )
+  const responsibilityCenterOptions = activeResponsibilityCenters.map(
+    (center) => ({
+      label: center.name || '',
+      sublabel: center.department || '',
+      value: center.name || '',
+    }),
+  )
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
   const [customerCreateLoading, setCustomerCreateLoading] = useState(false)

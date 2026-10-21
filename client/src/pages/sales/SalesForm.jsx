@@ -23,6 +23,8 @@ import DynamicToast from '../../components/DynamicToast'
 import RightSideModal from '../../components/RightSideModal'
 import useSalesForm, { fmt, useDragToScroll } from './useSales'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
+import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDefaults'
+import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
@@ -263,17 +265,30 @@ export default function SalesForm({
     error: responsibilityCentersError,
   } = useResponsibilityCenter()
 
-  const responsibilityCenterOptions = responsibilityCenters.map((center) => ({
-    label: center.name || '',
-    sublabel: center.department || '',
-    value: center.name || '',
-  }))
-
   const [bulkResponsibilityCenter, setBulkResponsibilityCenter] = useState('')
-
   const [isSalesItemsCollapsed, setIsSalesItemsCollapsed] = useState(false)
   const [isJournalEntriesCollapsed, setIsJournalEntriesCollapsed] = useState(false)
   const [isBasicDetailsCollapsed, setIsBasicDetailsCollapsed] = useState(false)
+
+  // Inactive responsibility centers are hidden, but any center already used
+  // by the loaded items / journal entries stays visible (edit/view mode).
+  const referencedCenterNames = [
+    ...form.salesItems.map((item) => getItemResponsibilityCenter(item)),
+    ...form.journalEntries.map((entry) => entry.center),
+    bulkResponsibilityCenter,
+  ].filter(Boolean)
+  const activeResponsibilityCenters = filterActiveMasterRows(
+    responsibilityCenters,
+    referencedCenterNames,
+    'name',
+  )
+  const responsibilityCenterOptions = activeResponsibilityCenters.map(
+    (center) => ({
+      label: center.name || '',
+      sublabel: center.department || '',
+      value: center.name || '',
+    }),
+  )
 
   const modeOfPaymentOptions = [
     'CASH',

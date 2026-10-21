@@ -6292,7 +6292,10 @@ const getPrintPurchases = async (req, res, next) => {
 
 
 
-        const discountAmount = totalPrice * (discount / 100)
+        const discountAmount =
+          String(item.discount_type || 'PERCENT').toUpperCase() === 'PERCENT'
+            ? totalPrice * (discount / 100)
+            : discount
 
 
 
