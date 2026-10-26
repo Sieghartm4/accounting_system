@@ -14,6 +14,7 @@ import {
   Building,
   ClipboardList,
   XCircle,
+  Clock3,
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import DynamicToast from '../../components/DynamicToast'
@@ -635,6 +636,55 @@ function CollectionsContent() {
     )
   }
 
+  // Tab switcher shared by both tab headers — sits beside the page title
+  // (no extra vertical space), inset slate track with distinct active pill
+  // and per-tab count badges so the switch is hard to miss.
+  const tabPills = (
+    <div className="ml-4 flex items-center bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner">
+      <button
+        onClick={() => setActiveTab('collections')}
+        className={`transition-all duration-200 ease-in-out pl-5 pr-1 py-2.5 rounded-lg text-xs font-black tracking-wider uppercase flex items-center gap-2 focus:outline-none ${
+          activeTab === 'collections'
+            ? 'bg-red-600 text-white shadow'
+            : 'text-slate-600 hover:text-black hover:bg-white/70'
+        }`}
+      >
+        <CheckCircle size={14} />
+        <span>Collected</span>
+        <span
+          className={`ml-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${
+            activeTab === 'collections'
+              ? 'bg-white/20 text-white'
+              : 'bg-slate-200 text-slate-700'
+          }`}
+        >
+          {collections?.length || 0}
+        </span>
+      </button>
+
+      <button
+        onClick={() => setActiveTab('toBeCollected')}
+        className={`transition-all duration-200 ease-in-out pl-5 pr-1 py-2.5 rounded-lg text-xs font-black tracking-wider uppercase flex items-center gap-2 focus:outline-none ${
+          activeTab === 'toBeCollected'
+            ? 'bg-red-600 text-white shadow'
+            : 'text-slate-600 hover:text-black hover:bg-white/70'
+        }`}
+      >
+        <Clock3 size={14} />
+        <span>To Be Collected</span>
+        <span
+          className={`ml-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${
+            activeTab === 'toBeCollected'
+              ? 'bg-white/20 text-white'
+              : 'bg-slate-200 text-slate-700'
+          }`}
+        >
+          {toBeCollectedData?.length || 0}
+        </span>
+      </button>
+    </div>
+  )
+
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
       {toast && (
@@ -674,16 +724,17 @@ function CollectionsContent() {
               initial="hidden"
               animate="visible"
               variants={fadeInUp}
-              className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-4"
+              className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-4"
             >
               <div>
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
                     <Layers size={24} />
                   </div>
-                  <h1 className="text-4xl font-black text-black tracking-tighter">
+                  <h1 className="text-4xl font-black text-black tracking-tighter leading-tight self-center">
                     <span className="text-red-600 italic">Collections</span>
                   </h1>
+                  {tabPills}
                 </div>
               </div>
 
@@ -787,16 +838,17 @@ function CollectionsContent() {
               initial="hidden"
               animate="visible"
               variants={fadeInUp}
-              className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-4"
+              className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-4"
             >
               <div>
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
                     <Wallet size={24} />
                   </div>
-                  <h1 className="text-4xl font-black text-black tracking-tighter">
+                  <h1 className="text-4xl font-black text-black tracking-tighter leading-tight self-center">
                     <span className="text-red-600 italic">To Be Collected</span>
                   </h1>
+                  {tabPills}
                 </div>
               </div>
 
@@ -855,29 +907,6 @@ function CollectionsContent() {
             </div>
           </>
         )}
-      </div>
-      <div className="flex items-center gap-2 mb-2 p-1 bg-white rounded-xl w-fit border border-gray-200 shadow-sm">
-        <button
-          onClick={() => setActiveTab('collections')}
-          className={`px-5 py-2 text-xs font-bold tracking-wider rounded-lg transition-all relative ${
-            activeTab === 'collections'
-              ? 'bg-red-600 text-white shadow'
-              : 'text-gray-600 hover:text-black hover:bg-gray-100'
-          }`}
-        >
-          COLLECTED
-        </button>
-
-        <button
-          onClick={() => setActiveTab('toBeCollected')}
-          className={`px-5 py-2 text-xs font-bold tracking-wider rounded-lg transition-all relative ${
-            activeTab === 'toBeCollected'
-              ? 'bg-red-600 text-white shadow'
-              : 'text-gray-600 hover:text-black hover:bg-gray-100'
-          }`}
-        >
-          TO BE COLLECTED
-        </button>
       </div>
       {/* --- TABLE SECTION --- */}
       {activeTab === 'collections' && (

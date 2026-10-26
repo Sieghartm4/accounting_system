@@ -439,6 +439,225 @@ const getIncomeStatement = async (req, res, next) => {
   }
 }
 
+const getCashFlowStatement = async (req, res, next) => {
+  try {
+    const { start_date, end_date } = req.query
+
+    let dateFilter = ''
+    if (start_date || end_date) {
+      const conditions = []
+      if (start_date) {
+        conditions.push(`
+          (
+            (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+              SELECT 1 FROM ${Accounting.receipts.tablename} r
+              WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND r.${Accounting.receipts.selectOptionColumns.collection_date} >= '${start_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+              SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+              WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} >= '${start_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+              SELECT 1 FROM ${Accounting.sales.tablename} s
+              WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND s.${Accounting.sales.selectOptionColumns.date_delivered} >= '${start_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+              SELECT 1 FROM ${Accounting.collections.tablename} c
+              WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND c.${Accounting.collections.selectOptionColumns.collection_date} >= '${start_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+              SELECT 1 FROM ${Accounting.purchase.tablename} p
+              WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND p.${Accounting.purchase.selectOptionColumns.date_delivered} >= '${start_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+              SELECT 1 FROM ${Accounting.payments.tablename} pay
+              WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND pay.${Accounting.payments.selectOptionColumns.payment_date} >= '${start_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+              SELECT 1 FROM ${Accounting.adjustments.tablename} a
+              WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND a.${Accounting.adjustments.selectOptionColumns.posting_date} >= '${start_date}'
+            ))
+          )
+        `)
+      }
+      if (end_date) {
+        conditions.push(`
+          (
+            (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+              SELECT 1 FROM ${Accounting.receipts.tablename} r
+              WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND r.${Accounting.receipts.selectOptionColumns.collection_date} <= '${end_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+              SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+              WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} <= '${end_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+              SELECT 1 FROM ${Accounting.sales.tablename} s
+              WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND s.${Accounting.sales.selectOptionColumns.date_delivered} <= '${end_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+              SELECT 1 FROM ${Accounting.collections.tablename} c
+              WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND c.${Accounting.collections.selectOptionColumns.collection_date} <= '${end_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+              SELECT 1 FROM ${Accounting.purchase.tablename} p
+              WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND p.${Accounting.purchase.selectOptionColumns.date_delivered} <= '${end_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+              SELECT 1 FROM ${Accounting.payments.tablename} pay
+              WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND pay.${Accounting.payments.selectOptionColumns.payment_date} <= '${end_date}'
+            ))
+            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+              SELECT 1 FROM ${Accounting.adjustments.tablename} a
+              WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+              AND a.${Accounting.adjustments.selectOptionColumns.posting_date} <= '${end_date}'
+            ))
+          )
+        `)
+      }
+      dateFilter = ` AND ${conditions.join(' AND ')}`
+    }
+
+    // Approval filter - only include journal entries from approved documents
+    const approvalFilter = `
+      AND (
+        (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
+          SELECT 1 FROM ${Accounting.receipts.tablename} r
+          WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND r.${Accounting.receipts.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
+          SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
+          WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND cd.${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
+          SELECT 1 FROM ${Accounting.sales.tablename} s
+          WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
+          SELECT 1 FROM ${Accounting.collections.tablename} c
+          WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
+          SELECT 1 FROM ${Accounting.purchase.tablename} p
+          WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND p.${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.payments.tablename} pay
+          WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+        ))
+        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
+          SELECT 1 FROM ${Accounting.adjustments.tablename} a
+          WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
+          AND a.${Accounting.adjustments.selectOptionColumns.status} = 'APPROVED'
+        ))
+      )
+    `
+
+    // Cash Flow Statement: Track actual cash inflows and outflows
+    // CASH INFLOWS: Receipts (cash), Collections (cash from sales)
+    // CASH OUTFLOWS: Cash Disbursements, Payments (cash for purchases)
+    const cash_flow_query = `
+      SELECT 
+        ${Master.charts_of_accounts.selectOptionColumns.code}   AS 'Account Code',
+        ${Master.charts_of_accounts.selectOptionColumns.name}   AS 'Account Name',
+        ${Master.charts_of_accounts.selectOptionColumns.type}   AS 'Account Type',
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' 
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalCredit,
+        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'  
+              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalDebit,
+        CASE
+          WHEN ${Master.charts_of_accounts.selectOptionColumns.type} = 'REVENUE'
+            THEN SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+               - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+          WHEN ${Master.charts_of_accounts.selectOptionColumns.type} = 'EXPENSES'
+            THEN SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+               - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
+                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
+        END AS Current
+      FROM ${Master.charts_of_accounts.tablename}
+      LEFT JOIN ${Accounting.journal_entries.tablename}
+        ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
+           ${dateFilter}
+      WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
+        AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
+        AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
+        AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
+        AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
+        ${approvalFilter}
+      GROUP BY
+        ${Master.charts_of_accounts.selectOptionColumns.id},
+        ${Master.charts_of_accounts.selectOptionColumns.code},
+        ${Master.charts_of_accounts.selectOptionColumns.name},
+        ${Master.charts_of_accounts.selectOptionColumns.type}
+      ORDER BY
+        ${Master.charts_of_accounts.selectOptionColumns.type},
+        ${Master.charts_of_accounts.selectOptionColumns.code}
+    `
+
+    const cashFlow = await Query(cash_flow_query)
+
+    const inflows = cashFlow.filter(
+      (item) => item['Account Type'] === 'REVENUE',
+    )
+    const outflows = cashFlow.filter(
+      (item) => item['Account Type'] === 'EXPENSES',
+    )
+
+    const totalInflows = inflows.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
+
+    const totalOutflows = outflows.reduce(
+      (sum, item) => sum + parseFloat(item.Current || 0),
+      0,
+    )
+
+    const netCashFlow = totalInflows - totalOutflows
+
+    res.status(200).json({
+      success: true,
+      message: 'Cash Flow Statement retrieved successfully',
+      data: {
+        inflows,
+        outflows,
+        totalInflows,
+        totalOutflows,
+        netCashFlow,
+      },
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching cash flow statement:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching cash flow statement',
+    })
+  }
+}
+
 const getGeneralLedger = async (req, res, next) => {
   try {
     const { start_date, end_date, account_code, amount, type } = req.query
@@ -1854,6 +2073,7 @@ const getBankReconciliation = async (req, res, next) => {
 module.exports = {
   getTrialBalance,
   getIncomeStatement,
+  getCashFlowStatement,
   getGeneralLedger,
   getBalanceSheet,
   getSearch,

@@ -860,7 +860,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
               onClick={() => setShowBell((open) => !open)}
               aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
               className={`p-2 rounded-full transition-colors relative ${
-                showBell ? 'bg-gray-100 text-gray-800' : 'hover:bg-gray-100 text-gray-500'
+                showBell ? 'bg-gray-100 text-gray-800 cursor-pointer ' : 'cursor-pointer hover:bg-gray-100 text-gray-500'
               }`}
             >
               <Bell size={20} />

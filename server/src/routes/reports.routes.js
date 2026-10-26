@@ -2,6 +2,7 @@ const express = require('express')
 const {
   getTrialBalance,
   getIncomeStatement,
+  getCashFlowStatement,
   getGeneralLedger,
   getBalanceSheet,
   getSearch,
@@ -45,6 +46,8 @@ reportsRouter.use(validateReportQuery)
 reportsRouter.get('/trial-balance', getTrialBalance)
 
 reportsRouter.get('/income-statement', getIncomeStatement)
+
+reportsRouter.get('/cash-flow-statement', getCashFlowStatement)
 
 reportsRouter.get('/general-ledger', getGeneralLedger)
 

@@ -274,6 +274,7 @@ export const API = {
   reportsGeneralLedger: () => url('/reports/general-ledger'),
   reportsTrialBalance: () => url('/reports/trial-balance'),
   reportsIncomeStatement: () => url('/reports/income-statement'),
+  reportsCashFlowStatement: () => url('/reports/cash-flow-statement'),
   reportsStatementOfComprehensiveIncome: () =>
     url('/reports/statement-of-comprehensive-income'),
   reportsBalanceSheet: () => url('/reports/balance-sheet'),

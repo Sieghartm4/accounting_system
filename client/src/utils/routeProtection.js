@@ -482,6 +482,11 @@ export const ROUTE_CONFIG = {
     label: 'Income Statement',
     icon: 'FileText',
   },
+  cash_flow_statement: {
+    name: 'cash_flow_statement',
+    label: 'Cash Flow Statement',
+    icon: 'Wallet',
+  },
   general_ledger: {
     name: 'general_ledger',
     label: 'General Ledger',
@@ -668,6 +673,7 @@ export const getSidebarItems = (user) => {
   const reportRoutes = [
     'trial_balance',
     'income_statement',
+    'cash_flow_statement',
     'general_ledger',
     'balance_sheet',
     'statement_of_comprehensive_income',

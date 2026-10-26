@@ -34,6 +34,7 @@ import TaxRegistry from './pages/tax_compliance/TaxRegistry'
 import Adjustments from './pages/adjustments/Adjustments'
 import TrialBalance from './pages/reports/TrialBalance'
 import IncomeStatement from './pages/reports/IncomeStatement'
+import CashFlowStatement from './pages/reports/CashFlowStatement'
 import GeneralLedger from './pages/reports/GeneralLedger'
 import BalanceSheet from './pages/reports/BalanceSheet'
 import JournalEntries from './pages/reports/JournalEntries'
@@ -341,6 +342,14 @@ path="dashboard"
             element={
               <ProtectedRoute routeName="income_statement">
                 <IncomeStatement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="cash-flow-statement"
+            element={
+              <ProtectedRoute routeName="cash_flow_statement">
+                <CashFlowStatement />
               </ProtectedRoute>
             }
           />

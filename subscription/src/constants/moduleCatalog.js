@@ -67,6 +67,7 @@ const REQUIRED_MODULES = [
   // balance sheet is not usable, so these are required.
   'trial_balance',
   'income_statement',
+  'cash_flow_statement',
   'general_ledger',
   'balance_sheet',
   'statement_of_comprehensive_income',

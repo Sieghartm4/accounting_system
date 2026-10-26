@@ -17,16 +17,26 @@ function CustomerTransactionDetailContent({ customerId, customerName, onBack }) 
   const { receipts, sales, loading, error } =
     useCustomerTransactionDetail(customerId)
   const [activeTab, setActiveTab] = useState('receipts')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  // First load shows the current month (1st → today). The inputs are drafts;
+  // Submit applies the range to the loaded data, Clear empties both.
+  const [month, today] = (() => {
+    const now = new Date()
+    const iso = (d) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return [iso(new Date(now.getFullYear(), now.getMonth(), 1)), iso(now)]
+  })()
+  const [dateFrom, setDateFrom] = useState(month)
+  const [dateTo, setDateTo] = useState(today)
+  const [appliedFrom, setAppliedFrom] = useState(month)
+  const [appliedTo, setAppliedTo] = useState(today)
 
   const filterByDate = (data, fromField, toField) => {
-    if (!dateFrom && !dateTo) return data
+    if (!appliedFrom && !appliedTo) return data
 
     return data.filter((item) => {
       const itemDate = item[fromField] ? new Date(item[fromField]) : null
-      const from = dateFrom ? new Date(dateFrom) : null
-      const to = dateTo ? new Date(dateTo) : null
+      const from = appliedFrom ? new Date(appliedFrom) : null
+      const to = appliedTo ? new Date(appliedTo) : null
 
       if (from && itemDate && itemDate < from) return false
       if (to && itemDate && itemDate > to) return false
@@ -58,85 +68,101 @@ function CustomerTransactionDetailContent({ customerId, customerName, onBack }) 
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
-      {/* Header */}
+      {/* Header — back button, title and date filter share one row, filter
+          pushed to the right end. Previously the title sat under the back
+          button and the filter took its own full-width strip. */}
       <div className="shrink-0 mb-6">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-600 hover:text-black transition-colors mb-4"
-        >
-          <ArrowLeft size={16} />
-          Back to Transactions
-        </button>
+        <div className="flex items-center flex-wrap gap-3 mb-4">
+          <button
+            onClick={onBack}
+            className="cursor-pointer px-4 py-2 bg-gray-600 text-white text-[12px] font-black rounded-lg hover:bg-gray-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-gray-200"
+          >
+            <ArrowLeft size={17} />
+            Back
+          </button>
 
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
-            <Users size={24} />
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
+              <Users size={24} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black text-black tracking-tighter">
+                {customerName}
+              </h1>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
+                Transaction Details & History
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-black text-black tracking-tighter">
-              {customerName}
-            </h1>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
-              Transaction Details & History
-            </p>
-          </div>
-        </div>
 
-        {/* Date Filter */}
-        <div className="flex gap-4 bg-white p-4 rounded-xl border border-gray-100 mb-4">
-          <div className="flex items-center gap-2">
-            <Calendar size={16} className="text-gray-500" />
-            <label className="text-xs font-bold text-gray-600 uppercase">From</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="px-3 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-bold text-gray-600 uppercase">To</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="px-3 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-            />
-          </div>
-          {(dateFrom || dateTo) && (
+          {/* Date Filter (right end of the header row) */}
+          <div className="ml-auto flex flex-wrap items-center gap-3 bg-white p-3 rounded-xl border border-gray-100">
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-gray-500" />
+              <label className="text-xs font-bold text-gray-600 uppercase">From</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="px-3 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-gray-600 uppercase">To</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="px-3 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            {(dateFrom || dateTo || appliedFrom || appliedTo) && (
+              <button
+                onClick={() => {
+                  setDateFrom('')
+                  setDateTo('')
+                  setAppliedFrom('')
+                  setAppliedTo('')
+                }}
+                className="px-4 py-1.5 rounded-lg border border-slate-300 bg-white text-[10px] font-black text-slate-600 uppercase tracking-widest hover:border-red-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+              >
+                Clear
+              </button>
+            )}
             <button
               onClick={() => {
-                setDateFrom('')
-                setDateTo('')
+                setAppliedFrom(dateFrom)
+                setAppliedTo(dateTo)
               }}
-              className="px-4 py-1 bg-red-100 text-red-600 text-xs font-bold rounded-lg hover:bg-red-200 transition-colors"
+              className="px-4 py-1.5 rounded-lg bg-red-600 text-[10px] font-black text-white uppercase tracking-widest shadow-sm shadow-red-600/30 hover:bg-red-700 transition-colors"
             >
-              Clear
+              Submit
             </button>
-          )}
+          </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 border-b border-gray-200">
+        {/* Tabs — pill design matching the Collections page */}
+        <div className="flex items-center gap-2 p-1 bg-white rounded-xl w-fit border border-gray-200 shadow-sm">
           <button
             onClick={() => setActiveTab('receipts')}
-            className={`px-6 py-3 font-bold text-sm uppercase tracking-widest transition-all ${
+            className={`px-5 py-2 text-xs font-bold tracking-wider rounded-lg transition-all relative ${
               activeTab === 'receipts'
-                ? 'text-red-600 border-b-2 border-red-600'
-                : 'text-gray-500 hover:text-black'
+                ? 'bg-red-600 text-white shadow'
+                : 'text-gray-600 hover:text-black hover:bg-gray-100'
             }`}
           >
-            Receipts ({filteredReceipts.length})
+            RECEIPTS ({filteredReceipts.length})
           </button>
+
           <button
             onClick={() => setActiveTab('sales')}
-            className={`px-6 py-3 font-bold text-sm uppercase tracking-widest transition-all ${
+            className={`px-5 py-2 text-xs font-bold tracking-wider rounded-lg transition-all relative ${
               activeTab === 'sales'
-                ? 'text-red-600 border-b-2 border-red-600'
-                : 'text-gray-500 hover:text-black'
+                ? 'bg-red-600 text-white shadow'
+                : 'text-gray-600 hover:text-black hover:bg-gray-100'
             }`}
           >
-            Sales ({filteredSales.length})
+            SALES ({filteredSales.length})
           </button>
         </div>
       </div>
