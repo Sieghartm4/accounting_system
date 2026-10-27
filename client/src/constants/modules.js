@@ -56,6 +56,7 @@ const LABELS = {
   journal_entries: 'Journal Entries',
   trial_balance: 'Trial Balance',
   income_statement: 'Income Statement',
+  cash_flow_statement: 'Cash Flow Statement',
   general_ledger: 'General Ledger',
   balance_sheet: 'Balance Sheet',
   statement_of_comprehensive_income: 'Comprehensive Income',

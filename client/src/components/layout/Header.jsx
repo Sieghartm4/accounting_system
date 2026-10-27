@@ -578,7 +578,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
           <Menu size={20} />
         </button>
 
-<div className="flex-1 flex justify-center px-4">
+        <div className="flex-1 flex justify-center px-4">
           <div
             className="hidden md:flex items-center relative max-w-xl w-full"
             ref={searchRef}
@@ -665,7 +665,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                     className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl p-5 z-50 w-full overflow-hidden"
                   >
                     <div className={`grid grid-cols-1 ${hidePages || hideDocuments ? 'grid-cols-1' : 'md:grid-cols-12'} gap-5`}>
-                      
+
                       {/* Column 1: Page Matches */}
                       {!hidePages && (
                         <div className={`${hideDocuments ? 'col-span-12 flex flex-col items-center text-center' : 'md:col-span-5 flex flex-col'}`}>
@@ -688,9 +688,8 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                                         setShowSearchModal(false);
                                         setSearchQuery('');
                                       }}
-                                      className={`w-full flex items-center ${hideDocuments ? 'justify-center' : ''} gap-2.5 px-3 py-2.5 text-left rounded-xl transition-all group cursor-pointer ${
-                                        isSelected ? 'bg-red-100 border-red-300' : 'bg-gray-50/50 hover:bg-red-50/80 hover:border-red-200 border border-transparent'
-                                      }`}
+                                      className={`w-full flex items-center ${hideDocuments ? 'justify-center' : ''} gap-2.5 px-3 py-2.5 text-left rounded-xl transition-all group cursor-pointer ${isSelected ? 'bg-red-100 border-red-300' : 'bg-gray-50/50 hover:bg-red-50/80 hover:border-red-200 border border-transparent'
+                                        }`}
                                     >
                                       <IconComponent size={14} className="text-red-600 shrink-0 group-hover:text-red-700" />
                                       <span className="text-xs font-medium text-gray-700 group-hover:text-red-900 truncate">{match.label}</span>
@@ -725,7 +724,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                               </button>
                             )}
                           </div>
-                          
+
                           <form onSubmit={handleSearchSubmit} className="space-y-3 flex-1 flex flex-col">
                             <div>
                               <label className="block text-[11px] font-semibold text-gray-600 mb-1">
@@ -789,9 +788,8 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                                               el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                                             }
                                           }}
-                                          className={`p-2.5 rounded-xl transition-all cursor-pointer group ${
-                                            isSelected ? 'bg-red-100 border-red-300' : 'bg-gray-50/80 hover:bg-red-50/50 hover:border-red-200 border border-transparent'
-                                          }`}
+                                          className={`p-2.5 rounded-xl transition-all cursor-pointer group ${isSelected ? 'bg-red-100 border-red-300' : 'bg-gray-50/80 hover:bg-red-50/50 hover:border-red-200 border border-transparent'
+                                            }`}
                                           onClick={() => handleSearchResultClick(result)}
                                         >
                                           <div className="flex items-start gap-2.5">
@@ -859,14 +857,10 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
             <button
               onClick={() => setShowBell((open) => !open)}
               aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
-              className={`p-2 rounded-full transition-colors relative ${
-                showBell ? 'bg-gray-100 text-gray-800 cursor-pointer ' : 'cursor-pointer hover:bg-gray-100 text-gray-500'
-              }`}
+              className={`p-2 rounded-full transition-colors relative ${showBell ? 'bg-gray-100 text-gray-800 cursor-pointer ' : 'cursor-pointer hover:bg-gray-100 text-gray-500'
+                }`}
             >
               <Bell size={20} />
-              {/* The count comes from the server. A dot was hard-coded here
-                  before notifications existed, so it showed on every account
-                  regardless of whether there was anything to read. */}
               {unreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center border-2 border-white tabular-nums">
                   {unreadCount > 99 ? '99+' : unreadCount}
@@ -875,7 +869,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
             </button>
 
             {showBell && (
-              <div className="absolute right-0 mt-2 w-[380px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl shadow-black/10 border border-gray-100 overflow-hidden z-50">
+              <div className="fixed inset-x-4 top-20 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-3 sm:w-[380px] bg-white rounded-2xl shadow-[0_20px_50px_rgba(8,112,184,0.15)] ring-1 ring-slate-900/10 overflow-hidden z-50">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
                   <span className="text-[11px] font-black uppercase tracking-[2px] text-slate-700">
                     Notifications

@@ -67,7 +67,6 @@ const REQUIRED_MODULES = [
   // balance sheet is not usable, so these are required.
   'trial_balance',
   'income_statement',
-  'cash_flow_statement',
   'general_ledger',
   'balance_sheet',
   'statement_of_comprehensive_income',
@@ -79,6 +78,7 @@ const REQUIRED_MODULES = [
 
 /** In the default template, admin may deselect. */
 const DEFAULT_ON_MODULES = [
+  'cash_flow_statement',
   'aging_receivables',
   'aging_payables',
   'advances',

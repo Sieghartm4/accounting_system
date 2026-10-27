@@ -47,8 +47,6 @@ reportsRouter.get('/trial-balance', getTrialBalance)
 
 reportsRouter.get('/income-statement', getIncomeStatement)
 
-reportsRouter.get('/cash-flow-statement', getCashFlowStatement)
-
 reportsRouter.get('/general-ledger', getGeneralLedger)
 
 reportsRouter.get('/balance-sheet', getBalanceSheet)
@@ -61,6 +59,12 @@ reportsRouter.get(
 reportsRouter.get('/journal-entries', getJournalEntries)
 
 // --- Sellable-module reports: refused unless the plan includes them ---
+
+reportsRouter.get(
+  '/cash-flow-statement',
+  requireModule('cash_flow_statement'),
+  getCashFlowStatement,
+)
 
 reportsRouter.get('/advances', requireModule('advances'), getAdvances)
 

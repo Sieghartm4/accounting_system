@@ -898,7 +898,7 @@ function SummaryTile({ label, value, subText, color, icon: Icon }) {
 
   return (
     <div
-      className={`${activeBgClass} p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between h-full hover:scale-105 hover:shadow-lg group transition-all duration-300`}
+      className={`${activeBgClass} p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between h-full  group `}
     >
       {/* Bottom Accent Indicator - Animates on hover (behind content) */}
       <div className={`absolute bottom-0 left-0 right-0 h-1 ${theme.bar} group-hover:h-full transition-all duration-300 z-0`} />

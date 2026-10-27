@@ -440,212 +440,489 @@ const getIncomeStatement = async (req, res, next) => {
 }
 
 const getCashFlowStatement = async (req, res, next) => {
+  // Direct-method cash flow statement.
+  //
+  // Every approved journal document that touches a cash/bank account is read
+  // with ALL of its lines (cash lines + counter lines). Cash-family lines give
+  // the real movement of cash; the document's counter lines explain where that
+  // money came from / went to and classify the flow:
+  //
+  //   OPERATING (default) - revenue/expense/working-capital counter accounts
+  //   INVESTING           - purchase/disposal of equipment & noncurrent assets
+  //   FINANCING           - equity and loan / advance-from accounts
+  //   INTERNAL            - cash-to-cash transfers (excluded from totals)
+  //
+  // Because flows come from actual journal lines, contra or credit-balanced
+  // expense accounts cannot distort rows, and openingCash + netChange ties
+  // back to closingCash (the trial balance of the cash family at period end).
   try {
     const { start_date, end_date } = req.query
 
-    let dateFilter = ''
-    if (start_date || end_date) {
-      const conditions = []
-      if (start_date) {
-        conditions.push(`
-          (
-            (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
-              SELECT 1 FROM ${Accounting.receipts.tablename} r
-              WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND r.${Accounting.receipts.selectOptionColumns.collection_date} >= '${start_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
-              SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
-              WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} >= '${start_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
-              SELECT 1 FROM ${Accounting.sales.tablename} s
-              WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND s.${Accounting.sales.selectOptionColumns.date_delivered} >= '${start_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
-              SELECT 1 FROM ${Accounting.collections.tablename} c
-              WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND c.${Accounting.collections.selectOptionColumns.collection_date} >= '${start_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
-              SELECT 1 FROM ${Accounting.purchase.tablename} p
-              WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND p.${Accounting.purchase.selectOptionColumns.date_delivered} >= '${start_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
-              SELECT 1 FROM ${Accounting.payments.tablename} pay
-              WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND pay.${Accounting.payments.selectOptionColumns.payment_date} >= '${start_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
-              SELECT 1 FROM ${Accounting.adjustments.tablename} a
-              WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND a.${Accounting.adjustments.selectOptionColumns.posting_date} >= '${start_date}'
-            ))
-          )
-        `)
-      }
-      if (end_date) {
-        conditions.push(`
-          (
-            (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
-              SELECT 1 FROM ${Accounting.receipts.tablename} r
-              WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND r.${Accounting.receipts.selectOptionColumns.collection_date} <= '${end_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
-              SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
-              WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND cd.${Accounting.cash_disbursements.selectOptionColumns.payment_date} <= '${end_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
-              SELECT 1 FROM ${Accounting.sales.tablename} s
-              WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND s.${Accounting.sales.selectOptionColumns.date_delivered} <= '${end_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
-              SELECT 1 FROM ${Accounting.collections.tablename} c
-              WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND c.${Accounting.collections.selectOptionColumns.collection_date} <= '${end_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
-              SELECT 1 FROM ${Accounting.purchase.tablename} p
-              WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND p.${Accounting.purchase.selectOptionColumns.date_delivered} <= '${end_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
-              SELECT 1 FROM ${Accounting.payments.tablename} pay
-              WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND pay.${Accounting.payments.selectOptionColumns.payment_date} <= '${end_date}'
-            ))
-            OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
-              SELECT 1 FROM ${Accounting.adjustments.tablename} a
-              WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-              AND a.${Accounting.adjustments.selectOptionColumns.posting_date} <= '${end_date}'
-            ))
-          )
-        `)
-      }
-      dateFilter = ` AND ${conditions.join(' AND ')}`
+    const je = Accounting.journal_entries.selectOptionColumns
+    const coa = Master.charts_of_accounts.selectOptionColumns
+    const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100
+
+    // Source documents that carry the finance date of their journals.
+    // (adjustments is approved via status; every other module uses state.)
+    const DOC_SOURCES = [
+      ['receipts', Accounting.receipts, 'collection_date'],
+      ['cash_disbursements', Accounting.cash_disbursements, 'payment_date'],
+      ['sales', Accounting.sales, 'date_delivered'],
+      ['collections', Accounting.collections, 'collection_date'],
+      ['purchase', Accounting.purchase, 'date_delivered'],
+      ['payments', Accounting.payments, 'payment_date'],
+      ['adjustments', Accounting.adjustments, 'posting_date'],
+    ]
+
+    const docDateCondition = (op) =>
+      '(' +
+      DOC_SOURCES.map(
+        ([dbName, model, dateKey]) => `(${je.db_name} = '${dbName}' AND EXISTS (
+              SELECT 1 FROM ${model.tablename} d
+              WHERE d.${model.selectOptionColumns.id} = ${je.db_id}
+                AND d.${model.selectOptionColumns[dateKey]} ${op} ?))`,
+      ).join(' OR ') +
+      ')'
+
+    const docApprovalCondition = () =>
+      '(' +
+      DOC_SOURCES.map(
+        ([dbName, model]) => `(${je.db_name} = '${dbName}' AND EXISTS (
+              SELECT 1 FROM ${model.tablename} d
+              WHERE d.${model.selectOptionColumns.id} = ${je.db_id}
+                AND d.${
+                  model.selectOptionColumns[
+                    dbName === 'adjustments' ? 'status' : 'state'
+                  ]
+                } = 'APPROVED'))`,
+      ).join(' OR ') +
+      ')'
+
+    // ── 1. Identify the cash/bank account family ──
+    const cashAccounts = await Query(
+      `SELECT ${coa.id} AS id, ${coa.code} AS code, ${coa.name} AS name
+         FROM ${Master.charts_of_accounts.tablename}
+        WHERE ${coa.status} = 'ACTIVE'
+          AND ${coa.type} = 'ASSETS'
+          AND (LOWER(${coa.name}) LIKE '%cash%' OR LOWER(${coa.name}) LIKE '%bank%')
+        ORDER BY ${coa.code}`
+    )
+
+    const emptySection = { rows: [], totalInflows: 0, totalOutflows: 0, net: 0 }
+    const emptyData = {
+      openingCash: 0,
+      closingCash: 0,
+      netChange: 0,
+      operating: emptySection,
+      investing: emptySection,
+      financing: emptySection,
+      internalTransfers: { rows: [], total: 0 },
+      cashAccounts: [],
     }
 
-    // Approval filter - only include journal entries from approved documents
-    const approvalFilter = `
-      AND (
-        (${Accounting.journal_entries.selectOptionColumns.db_name} = 'receipts' AND EXISTS (
-          SELECT 1 FROM ${Accounting.receipts.tablename} r
-          WHERE r.${Accounting.receipts.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-          AND r.${Accounting.receipts.selectOptionColumns.state} = 'APPROVED'
-        ))
-        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'cash_disbursements' AND EXISTS (
-          SELECT 1 FROM ${Accounting.cash_disbursements.tablename} cd
-          WHERE cd.${Accounting.cash_disbursements.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-          AND cd.${Accounting.cash_disbursements.selectOptionColumns.state} = 'APPROVED'
-        ))
-        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'sales' AND EXISTS (
-          SELECT 1 FROM ${Accounting.sales.tablename} s
-          WHERE s.${Accounting.sales.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-          AND s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
-        ))
-        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'collections' AND EXISTS (
-          SELECT 1 FROM ${Accounting.collections.tablename} c
-          WHERE c.${Accounting.collections.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-          AND c.${Accounting.collections.selectOptionColumns.state} = 'APPROVED'
-        ))
-        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'purchase' AND EXISTS (
-          SELECT 1 FROM ${Accounting.purchase.tablename} p
-          WHERE p.${Accounting.purchase.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-          AND p.${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'
-        ))
-        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'payments' AND EXISTS (
-          SELECT 1 FROM ${Accounting.payments.tablename} pay
-          WHERE pay.${Accounting.payments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-          AND pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
-        ))
-        OR (${Accounting.journal_entries.selectOptionColumns.db_name} = 'adjustments' AND EXISTS (
-          SELECT 1 FROM ${Accounting.adjustments.tablename} a
-          WHERE a.${Accounting.adjustments.selectOptionColumns.id} = ${Accounting.journal_entries.selectOptionColumns.db_id}
-          AND a.${Accounting.adjustments.selectOptionColumns.status} = 'APPROVED'
-        ))
+    if (!cashAccounts || cashAccounts.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'Cash Flow Statement retrieved successfully',
+        data: emptyData,
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    const cashIdSet = new Set(cashAccounts.map((a) => Number(a.id)))
+    const cashIds = cashAccounts.map((a) => a.id)
+
+    // ── 2. Opening cash balance (cash-family movement before start_date) ──
+    let openingCash = 0
+    if (start_date) {
+      const openingSql = `
+        SELECT COALESCE(SUM(CASE WHEN je.${je.type} = 'DEBIT'
+                                  THEN je.${je.amount}
+                                  ELSE -je.${je.amount} END), 0) AS net
+          FROM ${Accounting.journal_entries.tablename} je
+         WHERE je.${je.coa_id} IN (?)
+           AND (${docDateCondition('<')})
+           AND (${docApprovalCondition()})
+      `
+      const openingRows = await Query(openingSql, [
+        cashIds,
+        ...DOC_SOURCES.map(() => start_date),
+      ])
+      openingCash = parseFloat(openingRows?.[0]?.net) || 0
+    }
+
+    // ── 3. All lines of documents that touch cash in the period ──
+    let linesSql = `
+      SELECT je.${je.db_name} AS db_name,
+             je.${je.db_id} AS db_id,
+             je.${je.coa_id} AS coa_id,
+             je.${je.type} AS entry_type,
+             je.${je.amount} AS amount,
+             ${coa.code} AS code,
+             ${coa.name} AS name,
+             ${coa.type} AS coa_type
+        FROM ${Accounting.journal_entries.tablename} je
+        JOIN ${Master.charts_of_accounts.tablename}
+          ON ${coa.id} = je.${je.coa_id}
+       WHERE je.${je.db_name} IS NOT NULL
+         AND je.${je.db_id} IS NOT NULL
+         AND je.${je.coa_id} IS NOT NULL
+         AND EXISTS (
+           SELECT 1 FROM ${Accounting.journal_entries.tablename} je2
+            WHERE je2.${je.db_name} = je.${je.db_name}
+              AND je2.${je.db_id} = je.${je.db_id}
+              AND je2.${je.coa_id} IN (?))
+    `
+    const lineParams = [cashIds]
+    if (start_date) {
+      linesSql += `\n  AND (${docDateCondition('>=')})`
+      lineParams.push(...DOC_SOURCES.map(() => start_date))
+    }
+    if (end_date) {
+      linesSql += `\n  AND (${docDateCondition('<=')})`
+      lineParams.push(...DOC_SOURCES.map(() => end_date))
+    }
+    linesSql += `\n  AND (${docApprovalCondition()})`
+
+    const lines = await Query(linesSql, lineParams)
+
+    // Lookup for classification + row labels
+    const coaInfo = new Map()
+    for (const line of lines || []) {
+      const id = Number(line.coa_id)
+      if (!coaInfo.has(id)) {
+        coaInfo.set(id, { code: line.code, name: line.name, type: line.coa_type })
+      }
+    }
+
+    // ── 4. Classification ──
+    const investingTerms = [
+      'office equipment',
+      'tools and equipment',
+      'furniture and fixtures',
+      'transportation equipment',
+      'accumulated depreciation',
+      'building',
+      'land',
+      'noncurrent asset',
+    ]
+    const financingTerms = [
+      'loan',
+      'borrowings',
+      'notes payable',
+      'advances from',
+      'retained earnings',
+      'noncurrent liability',
+    ]
+
+    const classifyCounter = (info, coaId) => {
+      if (cashIdSet.has(Number(coaId))) return 'INTERNAL'
+      if (info && info.type === 'EQUITY') return 'FINANCING'
+      const name = String(info?.name || '').toLowerCase()
+      if (financingTerms.some((term) => name.includes(term))) return 'FINANCING'
+      if (investingTerms.some((term) => name.includes(term))) return 'INVESTING'
+      return 'OPERATING'
+    }
+
+    // ── 5. Group lines per document, then attribute cash flow per counter ──
+    const sections = {
+      OPERATING: new Map(),
+      INVESTING: new Map(),
+      FINANCING: new Map(),
+      INTERNAL: new Map(),
+    }
+
+    const docs = new Map()
+    for (const line of lines || []) {
+      const docKey = `${line.db_name}:${line.db_id}`
+      let doc = docs.get(docKey)
+      if (!doc) {
+        doc = { cashNet: 0, counters: new Map(), cashByCoa: new Map() }
+        docs.set(docKey, doc)
+      }
+      const value = parseFloat(line.amount) || 0
+      const signed = line.entry_type === 'DEBIT' ? value : -value
+      const coaId = Number(line.coa_id)
+      if (cashIdSet.has(coaId)) {
+        doc.cashNet += signed
+        doc.cashByCoa.set(coaId, (doc.cashByCoa.get(coaId) || 0) + signed)
+      } else {
+        doc.counters.set(coaId, (doc.counters.get(coaId) || 0) + signed)
+      }
+    }
+
+    for (const doc of docs.values()) {
+      // Pure cash-to-cash transfer (deposit, withdrawal, top-up made by moving
+      // money between cash/bank accounts): at least two distinct cash accounts,
+      // no non-cash counter lines. Emit per-account movements under INTERNAL.
+      if (doc.counters.size === 0 && doc.cashByCoa.size >= 2) {
+        for (const [rowCoaId, cashSigned] of doc.cashByCoa) {
+          if (Math.abs(cashSigned) <= 0.005) continue
+          const info = coaInfo.get(rowCoaId)
+          let row = sections.INTERNAL.get(rowCoaId)
+          if (!row) {
+            row = {
+              code: info?.code || '',
+              name: info?.name || 'Unknown account',
+              inflow: 0,
+              outflow: 0,
+            }
+            sections.INTERNAL.set(rowCoaId, row)
+          }
+          if (cashSigned >= 0) row.inflow += cashSigned
+          else row.outflow += -cashSigned
+        }
+        continue
+      }
+
+      let explained = 0
+      for (const [rowCoaId, counterNet] of doc.counters) {
+        // Cash change attributed to this counter account
+        const cashDelta = -counterNet
+        explained += cashDelta
+
+        const info = coaInfo.get(rowCoaId)
+        const section = classifyCounter(info, rowCoaId)
+        let row = sections[section].get(rowCoaId)
+        if (!row) {
+          row = {
+            code: info?.code || '',
+            name: info?.name || 'Unknown account',
+            inflow: 0,
+            outflow: 0,
+          }
+          sections[section].set(rowCoaId, row)
+        }
+        if (cashDelta >= 0) row.inflow += cashDelta
+        else row.outflow += -cashDelta
+      }
+
+      // Malformed/partial documents: attribute the leftover to Operating.
+      const residual = doc.cashNet - explained
+      if (Math.abs(residual) > 0.005) {
+        let residualRow = sections.OPERATING.get('RESIDUAL')
+        if (!residualRow) {
+          residualRow = {
+            code: '',
+            name: 'Other cash movements (unclassified)',
+            inflow: 0,
+            outflow: 0,
+          }
+          sections.OPERATING.set('RESIDUAL', residualRow)
+        }
+        if (residual >= 0) residualRow.inflow += residual
+        else residualRow.outflow += -residual
+      }
+    }
+
+    // ── 6. Build response sections ──
+    const buildSection = (map) => {
+      const rows = [...map.values()]
+        .filter((row) => round2(row.inflow + row.outflow) !== 0)
+        .map((row) => ({
+          code: row.code,
+          name: row.name,
+          inflow: round2(row.inflow),
+          outflow: round2(row.outflow),
+          net: round2(row.inflow - row.outflow),
+        }))
+        .sort((a, b) => String(a.code).localeCompare(String(b.code)))
+
+      const totalInflows = round2(rows.reduce((sum, r) => sum + r.inflow, 0))
+      const totalOutflows = round2(rows.reduce((sum, r) => sum + r.outflow, 0))
+      return { rows, totalInflows, totalOutflows, net: round2(totalInflows - totalOutflows) }
+    }
+
+    const operating = buildSection(sections.OPERATING)
+    const investing = buildSection(sections.INVESTING)
+    const financing = buildSection(sections.FINANCING)
+    const internal = buildSection(sections.INTERNAL)
+
+    const netChange = round2(operating.net + investing.net + financing.net)
+    const closingCash = round2(openingCash + netChange)
+
+    // ── 7. Canonical captions (BASIC view / DIRECT caption grouping) ──
+    const typeByCode = new Map()
+    for (const info of coaInfo.values()) typeByCode.set(info.code, info.type)
+    const lower = (text) => String(text || '').toLowerCase()
+
+    const CAP_OTHER_OPERATING = 'Other operating cash movements'
+    const canonicalOperatingCaption = (row) => {
+      const name = lower(row.name)
+      const type = typeByCode.get(row.code) || ''
+      if (row.name === 'Other cash movements (unclassified)') return CAP_OTHER_OPERATING
+      if (/contra|discount/.test(name)) return CAP_OTHER_OPERATING
+      if (type === 'REVENUE' || name.includes('receivable'))
+        return 'Cash collections from customers'
+      if (/(salaries|wages|payroll|compensation|13th|bonus|hazard pay|overtime)/.test(name))
+        return 'Cash paid to and benefits paid on behalf of employees'
+      if (name.includes('interest')) return 'Interest paid'
+      if (/(tax|permit|duty|levy|license|licensing)/.test(name)) return 'Taxes and licenses paid'
+      if (
+        /(rent|lease|utilities|utility|supplies|fuel|gasoline|diesel|oil|insurance|freight|shipping|repairs and maintenance|professional fees|legal|audit|consulting|advertising|marketing|promotion|subscriptions|memberships|bank charges|service charge|delivery|courier|commission|meals|representation|communications|telephone|internet|electricity|water bill|printing|photocopy|travel|parking|toll)/.test(
+          name,
+        ) ||
+        type === 'EXPENSES'
       )
-    `
+        return 'Cash paid to suppliers and for services'
+      return CAP_OTHER_OPERATING
+    }
 
-    // Cash Flow Statement: Track actual cash inflows and outflows
-    // CASH INFLOWS: Receipts (cash), Collections (cash from sales)
-    // CASH OUTFLOWS: Cash Disbursements, Payments (cash for purchases)
-    const cash_flow_query = `
-      SELECT 
-        ${Master.charts_of_accounts.selectOptionColumns.code}   AS 'Account Code',
-        ${Master.charts_of_accounts.selectOptionColumns.name}   AS 'Account Name',
-        ${Master.charts_of_accounts.selectOptionColumns.type}   AS 'Account Type',
-        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT' 
-              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalCredit,
-        SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'  
-              THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END) AS TotalDebit,
-        CASE
-          WHEN ${Master.charts_of_accounts.selectOptionColumns.type} = 'REVENUE'
-            THEN SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
-                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
-               - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
-                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
-          WHEN ${Master.charts_of_accounts.selectOptionColumns.type} = 'EXPENSES'
-            THEN SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'DEBIT'
-                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
-               - SUM(CASE WHEN ${Accounting.journal_entries.selectOptionColumns.type} = 'CREDIT'
-                          THEN ${Accounting.journal_entries.selectOptionColumns.amount} ELSE 0 END)
-        END AS Current
-      FROM ${Master.charts_of_accounts.tablename}
-      LEFT JOIN ${Accounting.journal_entries.tablename}
-        ON ${Accounting.journal_entries.selectOptionColumns.coa_id} = ${Master.charts_of_accounts.selectOptionColumns.id}
-           ${dateFilter}
-      WHERE ${Master.charts_of_accounts.selectOptionColumns.status} = 'ACTIVE'
-        AND ${Master.charts_of_accounts.selectOptionColumns.type} IN ('REVENUE', 'EXPENSES')
-        AND ${Accounting.journal_entries.selectOptionColumns.db_name} IS NOT NULL
-        AND ${Accounting.journal_entries.selectOptionColumns.db_id} IS NOT NULL
-        AND ${Accounting.journal_entries.selectOptionColumns.coa_id} IS NOT NULL
-        ${approvalFilter}
-      GROUP BY
-        ${Master.charts_of_accounts.selectOptionColumns.id},
-        ${Master.charts_of_accounts.selectOptionColumns.code},
-        ${Master.charts_of_accounts.selectOptionColumns.name},
-        ${Master.charts_of_accounts.selectOptionColumns.type}
-      ORDER BY
-        ${Master.charts_of_accounts.selectOptionColumns.type},
-        ${Master.charts_of_accounts.selectOptionColumns.code}
-    `
+    const CAP_INVEST_IN = 'Purchase of long-term assets and investments'
+    const CAP_INVEST_OUT = 'Cash proceeds from sale of long-term assets and investments'
+    const canonicalInvestingCaption = (row) =>
+      row.net >= 0 ? CAP_INVEST_OUT : CAP_INVEST_IN
 
-    const cashFlow = await Query(cash_flow_query)
+    const CAP_FIN_EQUITY_IN = "Owner's capital contributions"
+    const CAP_FIN_EQUITY_OUT = "Owner's withdrawals and dividends paid"
+    const CAP_FIN_DEBT_IN = 'Proceeds from long-term debt and borrowings'
+    const CAP_FIN_DEBT_OUT = 'Repayments of long-term debt'
+    const canonicalFinancingCaption = (row) => {
+      const isEquity = (typeByCode.get(row.code) || '') === 'EQUITY'
+      if (row.net >= 0) return isEquity ? CAP_FIN_EQUITY_IN : CAP_FIN_DEBT_IN
+      return isEquity ? CAP_FIN_EQUITY_OUT : CAP_FIN_DEBT_OUT
+    }
 
-    const inflows = cashFlow.filter(
-      (item) => item['Account Type'] === 'REVENUE',
-    )
-    const outflows = cashFlow.filter(
-      (item) => item['Account Type'] === 'EXPENSES',
-    )
+    const buildCaptions = (sectionRows, captionFn) => {
+      const map = new Map()
+      for (const row of sectionRows) {
+        const caption = captionFn(row)
+        let group = map.get(caption)
+        if (!group) {
+          group = { caption, rows: [], totalInflows: 0, totalOutflows: 0, net: 0 }
+          map.set(caption, group)
+        }
+        group.rows.push(row)
+        group.totalInflows = round2(group.totalInflows + row.inflow)
+        group.totalOutflows = round2(group.totalOutflows + row.outflow)
+        group.net = round2(group.net + row.net)
+      }
+      return [...map.values()]
+    }
 
-    const totalInflows = inflows.reduce(
-      (sum, item) => sum + parseFloat(item.Current || 0),
-      0,
-    )
+    const captions = {
+      operating: buildCaptions(operating.rows, canonicalOperatingCaption),
+      investing: buildCaptions(investing.rows, canonicalInvestingCaption),
+      financing: buildCaptions(financing.rows, canonicalFinancingCaption),
+    }
 
-    const totalOutflows = outflows.reduce(
-      (sum, item) => sum + parseFloat(item.Current || 0),
-      0,
-    )
+    // ── 8. Indirect-method operating figures (net income → cash flows) ──
+    // Net income needs ALL approved documents of the period (cash-touching or
+    // not), while working-capital movements read cumulative account balances
+    // just before start and at period end.
+    const indirect = {
+      netIncome: 0,
+      addBacks: [],
+      workingCapital: [],
+      operatingNet: 0,
+    }
+    if (start_date && end_date) {
+      const periodBothCondition = `${docDateCondition('>=')} AND ${docDateCondition('<=')}`
 
-    const netCashFlow = totalInflows - totalOutflows
+      const niSql = `
+        SELECT
+          COALESCE(SUM(CASE WHEN c.${coa.type} = 'REVENUE' THEN pc.net ELSE 0 END), 0) AS revenueNet,
+          COALESCE(SUM(CASE WHEN c.${coa.type} = 'EXPENSES' AND LOWER(c.${coa.name}) LIKE '%depreciation%' THEN pc.net ELSE 0 END), 0) AS depreciationNet,
+          COALESCE(SUM(CASE WHEN c.${coa.type} = 'EXPENSES' AND LOWER(c.${coa.name}) LIKE '%amortization%' THEN pc.net ELSE 0 END), 0) AS amortizationNet,
+          COALESCE(SUM(CASE WHEN c.${coa.type} = 'EXPENSES' AND LOWER(c.${coa.name}) NOT LIKE '%depreciation%' AND LOWER(c.${coa.name}) NOT LIKE '%amortization%' THEN pc.net ELSE 0 END), 0) AS otherExpenseNet
+          FROM (
+            SELECT j.${je.coa_id} AS coa_id,
+                   SUM(CASE WHEN j.${je.type} = 'DEBIT' THEN j.${je.amount} ELSE -j.${je.amount} END) AS net
+              FROM ${Accounting.journal_entries.tablename} j
+             WHERE ${periodBothCondition}
+               AND (${docApprovalCondition()})
+             GROUP BY j.${je.coa_id}
+          ) pc
+          JOIN ${Master.charts_of_accounts.tablename} c ON c.${coa.id} = pc.coa_id
+         WHERE c.${coa.type} IN ('REVENUE', 'EXPENSES')
+      `
+      const niRows = await Query(niSql, [
+        ...DOC_SOURCES.map(() => start_date),
+        ...DOC_SOURCES.map(() => end_date),
+      ])
+      const revenueNet = parseFloat(niRows?.[0]?.revenueNet || 0)
+      const depreciationNet = parseFloat(niRows?.[0]?.depreciationNet || 0)
+      const amortizationNet = parseFloat(niRows?.[0]?.amortizationNet || 0)
+      const otherExpenseNet = parseFloat(niRows?.[0]?.otherExpenseNet || 0)
+
+      // Stored sign convention: revenue credits make revenueNet negative.
+      const netIncome = round2(-revenueNet - (depreciationNet + amortizationNet + otherExpenseNet))
+      indirect.netIncome = netIncome
+      if (depreciationNet > 0.005)
+        indirect.addBacks.push({ label: 'Add back: Depreciation', amount: round2(depreciationNet) })
+      if (amortizationNet > 0.005)
+        indirect.addBacks.push({ label: 'Add back: Amortization', amount: round2(amortizationNet) })
+
+      const balanceGroupsSql = (op) => `
+        SELECT
+          COALESCE(SUM(CASE WHEN LOWER(c.${coa.name}) LIKE '%receivable%' THEN t.net ELSE 0 END), 0) AS receivables,
+          COALESCE(SUM(CASE WHEN LOWER(c.${coa.name}) LIKE '%inventory%' THEN t.net ELSE 0 END), 0) AS inventories,
+          COALESCE(SUM(CASE WHEN LOWER(c.${coa.name}) LIKE '%prepaid%' THEN t.net ELSE 0 END), 0) AS prepaid,
+          COALESCE(SUM(CASE WHEN c.${coa.type} = 'LIABILITIES'
+                             AND (LOWER(c.${coa.name}) LIKE '%payable%' OR LOWER(c.${coa.name}) LIKE '%accrued%')
+                             AND LOWER(c.${coa.name}) NOT LIKE '%loan%'
+                             AND LOWER(c.${coa.name}) NOT LIKE '%notes payable%'
+                             AND LOWER(c.${coa.name}) NOT LIKE '%noncurrent%'
+                           THEN t.net ELSE 0 END), 0) AS payables
+          FROM (
+            SELECT j.${je.coa_id} AS coa_id,
+                   SUM(CASE WHEN j.${je.type} = 'DEBIT' THEN j.${je.amount} ELSE -j.${je.amount} END) AS net
+              FROM ${Accounting.journal_entries.tablename} j
+             WHERE ${docDateCondition(op)}
+               AND (${docApprovalCondition()})
+             GROUP BY j.${je.coa_id}
+          ) t
+          JOIN ${Master.charts_of_accounts.tablename} c ON c.${coa.id} = t.coa_id
+      `
+
+      const [startBalances, endBalances] = await Promise.all([
+        Query(balanceGroupsSql('<'), DOC_SOURCES.map(() => start_date)),
+        Query(balanceGroupsSql('<='), DOC_SOURCES.map(() => end_date)),
+      ])
+
+      // Sign convention for working-capital rows: a source of cash is positive.
+      // Assets growing = cash out (negative), liabilities growing = cash in (positive).
+      const wcGroups = [
+        { key: 'receivables', label: 'Trade receivables', assetLike: true },
+        { key: 'inventories', label: 'Inventories', assetLike: true },
+        { key: 'prepaid', label: 'Prepaid expenses', assetLike: true },
+        { key: 'payables', label: 'Trade and accrued payables', assetLike: false },
+      ]
+      for (const g of wcGroups) {
+        const startVal = parseFloat(startBalances?.[0]?.[g.key] || 0)
+        const endVal = parseFloat(endBalances?.[0]?.[g.key] || 0)
+        // Account-net sign convention: asset debits positive, liability credits
+        // negative. effect = -(end - start) works for both via signed deltas.
+        const effect = round2(-(endVal - startVal))
+        if (Math.abs(effect) > 0.005) {
+          indirect.workingCapital.push({
+            label: `Changes in ${g.label.toLowerCase()}`,
+            amount: effect,
+          })
+        }
+      }
+
+      indirect.operatingNet = round2(
+        netIncome +
+          indirect.addBacks.reduce((sum, item) => sum + item.amount, 0) +
+          indirect.workingCapital.reduce((sum, item) => sum + item.amount, 0),
+      )
+    }
 
     res.status(200).json({
       success: true,
       message: 'Cash Flow Statement retrieved successfully',
       data: {
-        inflows,
-        outflows,
-        totalInflows,
-        totalOutflows,
-        netCashFlow,
+        openingCash: round2(openingCash),
+        closingCash,
+        netChange,
+        operating,
+        investing,
+        financing,
+        captions,
+        indirect,
+        internalTransfers: { rows: internal.rows, total: internal.net },
+        cashAccounts: cashAccounts.map((a) => ({ code: a.code, name: a.name })),
       },
       timestamp: new Date().toISOString(),
     })
@@ -657,6 +934,7 @@ const getCashFlowStatement = async (req, res, next) => {
     })
   }
 }
+
 
 const getGeneralLedger = async (req, res, next) => {
   try {
