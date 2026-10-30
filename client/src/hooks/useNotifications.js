@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchWithAuth } from '../utils/api'
 import { API } from '../api/endpoints'
 import connectRealtime from '../utils/realtimeSocket'
@@ -27,33 +27,6 @@ import connectRealtime from '../utils/realtimeSocket'
 const COMPANY_CACHE_KEY = 'notifications_company_id'
 
 /**
- * Which notification module a URL belongs to.
- *
- * The three vocabularies do not line up, which is why this is written out rather
- * than derived:
- *
- *   - the server groups notifications by module code: `collection`, not
- *     `collections`;
- *   - the router and the sidebar use the plural: `/collections`;
- *   - `recurring_journals` is routed as `/recurring-journals`.
- *
- * Assuming path === module silently produced a Collections row that could never
- * show a badge, because it looked up `collections` in a map keyed `collection`.
- */
-export const PATH_TO_MODULE = {
-  receipts: 'receipts',
-  disbursement: 'disbursement',
-  sales: 'sales',
-  collections: 'collection',
-  purchase: 'purchase',
-  purchase_order: 'purchase_order',
-  payments: 'payments',
-  adjustments: 'adjustments',
-  'recurring-journals': 'recurring_journals',
-  recurring_journals: 'recurring_journals',
-}
-
-/**
  * Sidebar row name -> notification module.
  *
  * Same reason: a nav row is named after its route, the server groups by module.
@@ -70,10 +43,30 @@ export const NAV_TO_MODULE = {
   recurring_journals: 'recurring_journals',
 }
 
-/** The notification module a pathname belongs to, or null. */
-export const moduleForPath = (pathname) => {
-  const segment = String(pathname || '').split('/').filter(Boolean)[0]
-  return segment ? PATH_TO_MODULE[segment] || null : null
+/**
+ * Unread document counts for one notification module.
+ *
+ * Viewing, editing, approving or reversing a document clears its notifications
+ * one by one; tables use this to float a `NEW` chip on the exact row instead of
+ * leaving the user to hunt for what the sidebar badge counts.
+ *
+ * Matching mirrors markReadForDocument: entityId carries the document id or a
+ * document reference, link is a deep link ending in `?id=<pk>`. Several
+ * notifications about the same document collapse into one count.
+ */
+export const buildUnreadDocCounts = (items, module) => {
+  const counts = new Map()
+  const target = String(module || '').trim()
+  if (!target || !Array.isArray(items)) return counts
+
+  items.forEach((n) => {
+    if (!n || n.module !== target || n.isRead !== false) return
+    const linkMatch = String(n.link || '').match(/[?&]id=([^&]+)/)
+    const docId = (linkMatch ? linkMatch[1] : String(n.entityId ?? '')).trim()
+    if (!docId) return
+    counts.set(docId, (counts.get(docId) || 0) + 1)
+  })
+  return counts
 }
 
 const resolveCompanyId = async () => {
@@ -110,12 +103,10 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
   const companyRef = useRef(companyId)
   companyRef.current = companyId
 
-  // Read inside markRead/markModuleRead without making them depend on the item
-  // list, which would rebuild them on every push.
+  // Read inside markRead without making it depend on the item list, which
+  // would rebuild it on every push.
   const itemsRef = useRef(items)
   itemsRef.current = items
-  const unreadByModuleRef = useRef(unreadByModule)
-  unreadByModuleRef.current = unreadByModule
 
   const load = useCallback(async (filter = 'all') => {
     const id = providedCompanyId ? Number(providedCompanyId) : await resolveCompanyId()
@@ -235,46 +226,37 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
   }, [companyId, items, refresh])
 
   /**
-   * Clear every unread notification in one module.
+   * Clear every unread notification for one specific document.
    *
-   * Called when the reader opens the screen the notifications belong to, so the
-   * sidebar badge for that screen goes away on arrival. Opening Receipts does not
-   * mean you opened each of the five receipts waiting for you.
+   * Viewing, editing, approving or reversing a document acted on the exact
+   * thing the notification warns about, so only that document's notification
+   * is cleared - other unread notices in the module keep their badge.
    *
-   * The server decides what counts; it returns both totals so the header badge
-   * and the sidebar badge are corrected from one answer.
+   * entityId is the raw carrier ('1051' or a document reference); link is a
+   * deep link ending in `?id=<pk>`. id values are matched last-segment style so
+   * `?id=105` cannot swallow `?id=1051`.
    */
-  const markModuleRead = useCallback(
-    async (module) => {
-      const cid = companyId
-      const target = String(module || '').trim()
-      if (!cid || !target) return
-      // Nothing unread in that module: no request, no flicker on every visit.
-      if (!unreadByModuleRef.current[target]) return
+  const markReadForDocument = useCallback(async (module, docIds) => {
+    const target = String(module || '').trim()
+    const keys = (Array.isArray(docIds) ? docIds : [docIds])
+      .map((id) => String(id ?? '').trim())
+      .filter(Boolean)
+    if (!target || keys.length === 0) return
 
-      const res = await fetchWithAuth(
-        `${API.notificationsReadByModule()}?module=${encodeURIComponent(target)}&companyId=${cid}`,
-        { method: 'POST' },
-      )
-      if (!res.ok) return
-      const json = await res.json().catch(() => null)
-      if (!json?.success) return
-
-      setUnreadCount(Number(json.data?.unreadCount ?? 0))
-      if (json.data?.unreadByModule) setUnreadByModule(json.data.unreadByModule)
-      // The rows themselves stay listed; they are now read, and the page and
-      // dropdown both re-derive that from isRead.
-      const wasUnread = new Set(
-        itemsRef.current.filter((n) => n.module === target && n.isRead === false).map((n) => n.id),
-      )
-      if (wasUnread.size > 0) {
-        setItems((current) =>
-          current.map((n) => (wasUnread.has(n.id) ? { ...n, isRead: true } : n)),
-        )
+    const unreadIds = new Set()
+    itemsRef.current.forEach((n) => {
+      if (n.module !== target || n.isRead !== false) return
+      const entityId = String(n.entityId ?? '').trim()
+      const linkMatch = String(n.link || '').match(/[?&]id=([^&]+)/)
+      const linkId = linkMatch ? linkMatch[1] : ''
+      if (keys.includes(entityId) || keys.includes(linkId)) {
+        unreadIds.add(n.id)
       }
-    },
-    [companyId],
-  )
+    })
+    for (const id of unreadIds) {
+      await markRead(id)
+    }
+  }, [markRead])
 
   const markAllRead = useCallback(async () => {
     const cid = companyId
@@ -299,7 +281,7 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
     companyId,
     refresh,
     markRead,
-    markModuleRead,
+    markReadForDocument,
     markAllRead,
   }
 }

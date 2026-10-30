@@ -604,6 +604,14 @@ export default function CashDisbursementForm({
           <ArrowLeft size={17} />
           <span className="text-white"> Go Back</span>
         </nav>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
+            <Wallet size={24} />
+          </div>
+          <h1 className="text-4xl font-black text-black tracking-tighter">
+            Cash <span className="text-red-600 italic">Disbursements</span>
+          </h1>
+        </div>
         {!isViewMode && (
           <div className="flex gap-4 items-center">
             {postedLock && (
@@ -620,6 +628,10 @@ export default function CashDisbursementForm({
             >
               <Save size={14} /> Post Transaction
             </button>
+          </div>
+        )}
+        {isViewMode && (
+          <div>
           </div>
         )}
       </div>
@@ -773,146 +785,146 @@ export default function CashDisbursementForm({
                 </div>
                 {!isBasicDetailsCollapsed && (
                   <div className="p-4">
-                  <div className={`grid gap-4 ${modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-4'}`}>
-                    {/* Vendor Selection */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                        Vendor / Payee <span className="text-red-500">*</span>
-                      </label>
-                      {isViewMode || postedLock ? (
-                        <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
-                          {vendorSearch || 'No vendor selected'}
-                        </div>
-                      ) : vendorLoading ? (
-                        <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
-                          Loading vendors...
-                        </div>
-                      ) : (
-                        <SearchableDropdown
-                          placeholder="Select Vendor..."
-                          value={vendorSearch}
-                          onChange={(v) => {
-                            setVendorSearch(v)
-                            setSelectedVendor('')
-                          }}
-                          onSelect={(opt) => {
-                            setSelectedVendor(opt.value)
-                            setVendorSearch(opt.label)
-                          }}
-                          options={vendorOptions}
-                          inputClassName={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${!vendorSearch ? 'border-red-500' : 'border-zinc-300'}`}
-                          emptyText={vendorError || 'No vendors found'}
-                          onFocus={() => {
-                            if (!vendorSearch && vendorOptions.length === 0) {
-                              setVendorSearch('')
+                    <div className={`grid gap-4 ${modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-4'}`}>
+                      {/* Vendor Selection */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Vendor / Payee <span className="text-red-500">*</span>
+                        </label>
+                        {isViewMode || postedLock ? (
+                          <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
+                            {vendorSearch || 'No vendor selected'}
+                          </div>
+                        ) : vendorLoading ? (
+                          <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
+                            Loading vendors...
+                          </div>
+                        ) : (
+                          <SearchableDropdown
+                            placeholder="Select Vendor..."
+                            value={vendorSearch}
+                            onChange={(v) => {
+                              setVendorSearch(v)
+                              setSelectedVendor('')
+                            }}
+                            onSelect={(opt) => {
+                              setSelectedVendor(opt.value)
+                              setVendorSearch(opt.label)
+                            }}
+                            options={vendorOptions}
+                            inputClassName={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${!vendorSearch ? 'border-red-500' : 'border-zinc-300'}`}
+                            emptyText={vendorError || 'No vendors found'}
+                            onFocus={() => {
+                              if (!vendorSearch && vendorOptions.length === 0) {
+                                setVendorSearch('')
+                              }
+                            }}
+                            dropdownFooter={
+                              <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={openVendorModal}
+                                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-black text-white text-[11px] font-black rounded-xl hover:bg-red-600 transition-all"
+                              >
+                                <Plus size={12} /> Add Vendor
+                              </button>
                             }
-                          }}
-                          dropdownFooter={
-                            <button
-                              type="button"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={openVendorModal}
-                              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-black text-white text-[11px] font-black rounded-xl hover:bg-red-600 transition-all"
-                            >
-                              <Plus size={12} /> Add Vendor
-                            </button>
-                          }
+                          />
+                        )}
+                      </div>
+
+                      {/* Reference Number */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Reference
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Reference"
+                          value={documentReference}
+                          onChange={(e) => setDocumentReference(e.target.value)}
+                          disabled={isViewMode}
+                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!documentReference ? 'border-red-500' : 'border-zinc-300'}`}
                         />
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Reference Number */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                        Reference
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Reference"
-                        value={documentReference}
-                        onChange={(e) => setDocumentReference(e.target.value)}
-                        disabled={isViewMode}
-                        className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!documentReference ? 'border-red-500' : 'border-zinc-300'}`}
-                      />
-                    </div>
+                      {/* Mode of Payment */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Mode of Payment <span className="text-red-500">*</span>
+                        </label>
+                        {isViewMode || postedLock ? (
+                          <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
+                            {modeSearch || 'No mode selected'}
+                          </div>
+                        ) : (
+                          <SearchableDropdown
+                            placeholder="Select Mode..."
+                            value={modeSearch}
+                            onChange={(v) => {
+                              setModeSearch(v)
+                              setModeOfPayment('')
+                            }}
+                            onSelect={(opt) => {
+                              setModeOfPayment(opt.value)
+                              setModeSearch(opt.label)
+                            }}
+                            options={modeOfPaymentOptions.map((m) => ({ label: m, value: m }))}
+                            inputClassName={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${!modeOfPayment ? 'border-red-500' : 'border-zinc-300'}`}
+                            emptyText="No modes found"
+                          />
+                        )}
+                      </div>
 
-                    {/* Mode of Payment */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                        Mode of Payment <span className="text-red-500">*</span>
-                      </label>
-                      {isViewMode || postedLock ? (
-                        <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
-                          {modeSearch || 'No mode selected'}
+                      {/* Payment Date */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Payment Date <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={paymentDate}
+                          onChange={(e) => setPaymentDate(e.target.value)}
+                          disabled={isViewMode || postedLock}
+                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!paymentDate ? 'border-red-500' : 'border-zinc-300'}`}
+                        />
+                      </div>
+
+                      {/* Bank Name (conditional) */}
+                      {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Bank Name
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Bank Name"
+                            value={bankName}
+                            onChange={(e) => setBankName(e.target.value)}
+                            disabled={isViewMode || postedLock}
+                            className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                          />
                         </div>
-                      ) : (
-                        <SearchableDropdown
-                          placeholder="Select Mode..."
-                          value={modeSearch}
-                          onChange={(v) => {
-                            setModeSearch(v)
-                            setModeOfPayment('')
-                          }}
-                          onSelect={(opt) => {
-                            setModeOfPayment(opt.value)
-                            setModeSearch(opt.label)
-                          }}
-                          options={modeOfPaymentOptions.map((m) => ({ label: m, value: m }))}
-                          inputClassName={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${!modeOfPayment ? 'border-red-500' : 'border-zinc-300'}`}
-                          emptyText="No modes found"
-                        />
+                      )}
+
+                      {/* Check Number (conditional) */}
+                      {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Check #
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Check #"
+                            value={checkNumber}
+                            onChange={(e) => setCheckNumber(e.target.value)}
+                            disabled={isViewMode || postedLock}
+                            className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                          />
+                        </div>
                       )}
                     </div>
-
-                    {/* Payment Date */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                        Payment Date <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={paymentDate}
-                        onChange={(e) => setPaymentDate(e.target.value)}
-                        disabled={isViewMode || postedLock}
-                        className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!paymentDate ? 'border-red-500' : 'border-zinc-300'}`}
-                      />
-                    </div>
-
-                    {/* Bank Name (conditional) */}
-                    {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                          Bank Name
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Bank Name"
-                          value={bankName}
-                          onChange={(e) => setBankName(e.target.value)}
-                          disabled={isViewMode || postedLock}
-                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
-                        />
-                      </div>
-                    )}
-
-                    {/* Check Number (conditional) */}
-                    {(modeOfPayment === 'CHECK' || modeOfPayment === 'BANK_TRANSFER') && (
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                          Check #
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Check #"
-                          value={checkNumber}
-                          onChange={(e) => setCheckNumber(e.target.value)}
-                          disabled={isViewMode || postedLock}
-                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
-                        />
-                      </div>
-                    )}
                   </div>
-                </div>
                 )}
               </section>
 
@@ -929,33 +941,47 @@ export default function CashDisbursementForm({
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-white pointer-events-none" />
                       <div className="pl-7">
-                        <SearchableDropdown
-                          placeholder="Resp. Center to All"
-                          value={bulkResponsibilityCenter}
-                          onChange={setBulkResponsibilityCenter}
-                          onSelect={(opt) => {
-                            setBulkResponsibilityCenter(opt.value)
-                            disbursementItems.forEach((item) =>
-                              updateDisbursementItem(
-                                item.id,
-                                'responsibilityCenter',
-                                opt.value,
-                              ),
-                            )
-                            journalEntries.forEach((entry) =>
-                              updateJournalEntry(entry.id, 'center', opt.value),
-                            )
-                          }}
-                          options={responsibilityCenterOptions}
-                          inputClassName="w-full px-2 py-1.5 rounded-lg text-[11px] font-medium outline-none transition-all bg-zinc-800 border border-white text-white focus:ring-2 focus:ring-red-500"
-                          emptyText={
-                            responsibilityCentersError ||
-                            'No responsibility centers found'
-                          }
-                          disabled={isViewMode}
-                        />
+                        {/* Search Card Container with white/light background and subtle border */}
+                        <div className="flex items-center bg-white border border-gray-300 rounded-lg px-2.5 py-1 shadow-sm focus-within:ring-2 focus-within:ring-red-500 focus-within:border-transparent transition-all">
+                          {/* Connected Search Icon */}
+                          <svg
+                            className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+
+                          {/* SearchableDropdown with transparent input styling */}
+                          <SearchableDropdown
+                            placeholder="Resp. Center to All"
+                            value={bulkResponsibilityCenter}
+                            onChange={setBulkResponsibilityCenter}
+                            onSelect={(opt) => {
+                              setBulkResponsibilityCenter(opt.value)
+                              disbursementItems.forEach((item) =>
+                                updateDisbursementItem(
+                                  item.id,
+                                  'responsibilityCenter',
+                                  opt.value,
+                                ),
+                              )
+                              journalEntries.forEach((entry) =>
+                                updateJournalEntry(entry.id, 'center', opt.value),
+                              )
+                            }}
+                            options={responsibilityCenterOptions}
+                            inputClassName="w-full bg-transparent text-gray-900 placeholder-gray-400 text-[11px] font-medium outline-none border-none focus:ring-0 p-0"
+                            emptyText={
+                              responsibilityCentersError ||
+                              'No responsibility centers found'
+                            }
+                            disabled={isViewMode}
+                          />
+                        </div>
                       </div>
                     </div>
                     <button
@@ -1003,354 +1029,354 @@ export default function CashDisbursementForm({
                             <th className="py-3 px-2 w-10 text-center"></th>
                           </tr>
                         </thead>
-                    <tbody className="divide-y divide-zinc-200">
-                      {disbursementItems.map((item) => (
-                        <tr
-                          key={item.id}
-                          className={item.isOther ? 'bg-gray-50/30' : ''}
-                        >
-                          <td className="py-1 px-1">
-                            {item.isOther ? (
-                              <div className="cursor-not-allowed text-center text-gray-400 text-[11px] italic py-2" />
-                            ) : (
-                              <SearchableDropdown
-                                disabled={isViewMode}
-                                placeholder="Search product..."
-                                value={item.productSearch}
-                                onChange={(v) => {
-                                  updateDisbursementItem(item.id, 'productSearch', v)
-                                  // Clear productId when user manually changes search text
-                                  if (v === '') {
-                                    updateDisbursementItem(item.id, 'productId', '')
+                        <tbody className="divide-y divide-zinc-200">
+                          {disbursementItems.map((item) => (
+                            <tr
+                              key={item.id}
+                              className={item.isOther ? 'bg-gray-50/30' : ''}
+                            >
+                              <td className="py-1 px-1">
+                                {item.isOther ? (
+                                  <div className="cursor-not-allowed text-center text-gray-400 text-[11px] italic py-2" />
+                                ) : (
+                                  <SearchableDropdown
+                                    disabled={isViewMode}
+                                    placeholder="Search product..."
+                                    value={item.productSearch}
+                                    onChange={(v) => {
+                                      updateDisbursementItem(item.id, 'productSearch', v)
+                                      // Clear productId when user manually changes search text
+                                      if (v === '') {
+                                        updateDisbursementItem(item.id, 'productId', '')
+                                      }
+                                    }}
+                                    onSelect={(opt) => {
+                                      updateDisbursementItem(
+                                        item.id,
+                                        'productId',
+                                        opt.value,
+                                      )
+                                      updateDisbursementItem(
+                                        item.id,
+                                        'productSearch',
+                                        opt.label,
+                                      )
+                                    }}
+                                    options={productOptions}
+                                    inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    emptyText={productError || 'No products found'}
+                                    dropdownFooter={
+                                      !isViewMode ? (
+                                        <button
+                                          onPointerDown={(e) => {
+                                            e.preventDefault()
+                                          }}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault()
+                                          }}
+                                          onClick={() => openProductModal()}
+                                          className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-black rounded-lg transition-colors"
+                                        >
+                                          <Plus size={14} />
+                                          Add Product
+                                        </button>
+                                      ) : null
+                                    }
+                                  />
+                                )}
+                              </td>
+                              <td className="py-1 px-1">
+                                <SearchableDropdown
+                                  disabled={isViewMode}
+                                  placeholder="Search account..."
+                                  value={item.coaSearch}
+                                  onChange={(v) =>
+                                    updateDisbursementItem(item.id, 'coaSearch', v)
                                   }
-                                }}
-                                onSelect={(opt) => {
-                                  updateDisbursementItem(
-                                    item.id,
-                                    'productId',
-                                    opt.value,
-                                  )
-                                  updateDisbursementItem(
-                                    item.id,
-                                    'productSearch',
-                                    opt.label,
-                                  )
-                                }}
-                                options={productOptions}
-                                inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                emptyText={productError || 'No products found'}
-                                dropdownFooter={
-                                  !isViewMode ? (
-                                    <button
-                                      onPointerDown={(e) => {
-                                        e.preventDefault()
-                                      }}
-                                      onMouseDown={(e) => {
-                                        e.preventDefault()
-                                      }}
-                                      onClick={() => openProductModal()}
-                                      className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-black rounded-lg transition-colors"
-                                    >
-                                      <Plus size={14} />
-                                      Add Product
-                                    </button>
-                                  ) : null
-                                }
-                              />
-                            )}
-                          </td>
-                          <td className="py-1 px-1">
-                            <SearchableDropdown
-                              disabled={isViewMode}
-                              placeholder="Search account..."
-                              value={item.coaSearch}
-                              onChange={(v) =>
-                                updateDisbursementItem(item.id, 'coaSearch', v)
-                              }
-                              onSelect={(opt) => {
-                                updateDisbursementItem(item.id, 'coa', opt.value)
-                                updateDisbursementItem(
-                                  item.id,
-                                  'coaSearch',
-                                  opt.label,
-                                )
-                              }}
-                              options={coaOptions}
-                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              emptyText="No accounts found"
-                            />
-                          </td>
-                          <td className="py-1 px-1">
-                            <input
-                              disabled={isViewMode}
-                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              placeholder="Details..."
-                              value={item.description}
-                              onChange={(e) =>
-                                updateDisbursementItem(
-                                  item.id,
-                                  'description',
-                                  e.target.value,
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="py-1 px-1">
-                            <input
-                              disabled={isViewMode || item.isOther}
-                              type="number"
-                              min="0"
-                              className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              placeholder={item.isOther ? '' : '1'}
-                              value={item.isOther ? '' : item.qty || ''}
-                              onChange={(e) =>
-                                updateDisbursementItem(
-                                  item.id,
-                                  'qty',
-                                  e.target.value === ''
-                                    ? ''
-                                    : parseFloat(e.target.value) || 0,
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="py-1 px-1">
-                            <div className="flex items-center gap-1">
-                              <input
-                                disabled={isViewMode}
-                                className={`${tableInput + ' font-black w-28'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                type="text"
-                                placeholder="0.00"
-                                inputMode="decimal"
-                                value={formatPriceDisplay(item.price)}
-                                onChange={(e) => {
-                                  const parsed = parsePriceInput(e.target.value)
-                                  updateDisbursementItem(item.id, 'price', parsed)
-                                }}
-                              />
-                              <select
-                                disabled={isViewMode}
-                                value={item.vatType || 'VAT-EX'}
-                                onChange={(e) => updateDisbursementItem(item.id, 'vatType', e.target.value)}
-                                className={`text-[10px] font-bold px-1 py-1 rounded border ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' : 'bg-white border-gray-200 text-black focus:ring-1 focus:ring-red-500'} outline-none`}
-                              >
-                                <option value="VAT-EX">EX</option>
-                                <option value="VAT-INC">INC</option>
-                              </select>
-                            </div>
-                          </td>
-                          <td className="py-1 px-1">
-                            <div className="relative">
-                              <input
-                                disabled={isViewMode}
-                                className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                type="number"
-                                min="0"
-                                max={
-                                  item.discountType === 'PERCENT' ? '100' : '999999'
-                                }
-                                step="0.01"
-                                placeholder="0"
-                                value={
-                                  item.discount === null ||
-                                  item.discount === undefined
-                                    ? ''
-                                    : item.discount
-                                }
-                                onChange={(e) =>
-                                  updateDisbursementItem(
-                                    item.id,
-                                    'discount',
-                                    e.target.value === ''
-                                      ? null
-                                      : parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                              />
-                              {item.discountType === 'PERCENT' && (
-                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">
-                                  %
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-1 px-1">
-                            {isViewMode ? (
-                              <div
-                                className={`${tableInput} text-black py-1.5 text-center`}
-                              >
-                                {item.discountType === 'PERCENT'
-                                  ? 'PERCENT'
-                                  : 'FIXED'}
-                              </div>
-                            ) : (
-                              <select
-                                value={item.discountType || 'PERCENT'}
-                                onChange={(e) =>
-                                  updateDisbursementItem(
-                                    item.id,
-                                    'discountType',
-                                    e.target.value,
-                                  )
-                                }
-                                className="w-full px-2 py-1 text-[11px] font-bold border border-gray-200 rounded focus:ring-1 focus:ring-red-400 outline-none"
-                              >
-                                <option value="PERCENT">PERCENT</option>
-                                <option value="FIXED">FIXED</option>
-                              </select>
-                            )}
-                          </td>
-                          <td className="py-1 px-1">
-                            {isViewMode ? (
-                              <div
-                                className={`${tableInput} text-black py-1.5 text-center`}
-                              >
-                                {item.vatSearch}
-                              </div>
-                            ) : (
-                              <SearchableDropdown
-                                placeholder="VAT Rate"
-                                value={item.vatSearch}
-                                onChange={(v) =>
-                                  updateDisbursementItem(item.id, 'vatSearch', v)
-                                }
-                                onFocus={loadVatOnDemand}
-                                onSelect={(opt) => {
-                                  updateDisbursementItem(item.id, 'vat', opt.value)
-                                  updateDisbursementItem(
-                                    item.id,
-                                    'vatSearch',
-                                    opt.label,
-                                  )
-                                  updateDisbursementItem(
-                                    item.id,
-                                    'vatRate',
-                                    opt.rate,
-                                  )
-                                }}
-                                options={vatOptions}
-                                inputClassName={`${pctInput + ' font-black text-red-600'}`}
-                                emptyText={vatError || 'No VAT rates found'}
-                                disabled={vatLoading}
-                              />
-                            )}
-                          </td>
-                          <td className="py-1 px-1">
-                            {isViewMode ? (
-                              <div
-                                className={`${tableInput} text-black py-1.5 text-center`}
-                              >
-                                {item.whtSearch}
-                              </div>
-                            ) : (
-                              <SearchableDropdown
-                                placeholder="WHT Rate"
-                                value={item.whtSearch}
-                                onChange={(v) =>
-                                  updateDisbursementItem(item.id, 'whtSearch', v)
-                                }
-                                onFocus={loadWhtOnDemand}
-                                onSelect={(opt) => {
-                                  updateDisbursementItem(item.id, 'wht', opt.value)
-                                  updateDisbursementItem(
-                                    item.id,
-                                    'whtSearch',
-                                    opt.label,
-                                  )
-                                  updateDisbursementItem(
-                                    item.id,
-                                    'whtRate',
-                                    opt.rate,
-                                  )
-                                }}
-                                options={whtOptions}
-                                inputClassName={`${pctInput + ' font-black text-blue-600'}`}
-                                emptyText={whtError || 'No WHT rates found'}
-                                disabled={whtLoading}
-                              />
-                            )}
-                          </td>
-                          <td className="py-1 px-1">
-                            <SearchableDropdown
-                              disabled={isViewMode}
-                              placeholder="Select"
-                              value={item.responsibilityCenter}
-                              onChange={(v) =>
-                                updateDisbursementItem(
-                                  item.id,
-                                  'responsibilityCenter',
-                                  v,
-                                )
-                              }
-                              onSelect={(opt) =>
-                                updateDisbursementItem(
-                                  item.id,
-                                  'responsibilityCenter',
-                                  opt.value,
-                                )
-                              }
-                              options={responsibilityCenterOptions}
-                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              emptyText={
-                                responsibilityCentersError ||
-                                'No responsibility centers found'
-                              }
-                            />
-                          </td>
-                          <td className="py-1 px-1 text-center">
-                            {!isViewMode && (
-                              <button
-                                onClick={() => removeDisbursementItem(item.id)}
-                                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {!isViewMode && (
-                  <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          const defaultVat = findDefaultVatOption(vatOptions)
-                          const defaultWht = findDefaultWhtOption(whtOptions)
-                          addDisbursementItem(
-                            false,
-                            defaultVat,
-                            defaultWht,
-                            bulkResponsibilityCenter,
-                          )
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
-                      >
-                        <Plus size={12} /> Add Product / Service
-                      </button>
-                      <button
-                        onClick={() => {
-                          const defaultVat = findDefaultVatOption(vatOptions)
-                          const defaultWht = findDefaultWhtOption(whtOptions)
-                          addDisbursementItem(
-                            true,
-                            defaultVat,
-                            defaultWht,
-                            bulkResponsibilityCenter,
-                          )
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-zinc-300 text-xs font-semibold rounded-lg text-zinc-700 bg-white hover:bg-zinc-100 transition-colors"
-                      >
-                        <Plus size={12} /> Add Service Line
-                      </button>
+                                  onSelect={(opt) => {
+                                    updateDisbursementItem(item.id, 'coa', opt.value)
+                                    updateDisbursementItem(
+                                      item.id,
+                                      'coaSearch',
+                                      opt.label,
+                                    )
+                                  }}
+                                  options={coaOptions}
+                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  emptyText="No accounts found"
+                                />
+                              </td>
+                              <td className="py-1 px-1">
+                                <input
+                                  disabled={isViewMode}
+                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder="Details..."
+                                  value={item.description}
+                                  onChange={(e) =>
+                                    updateDisbursementItem(
+                                      item.id,
+                                      'description',
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td className="py-1 px-1">
+                                <input
+                                  disabled={isViewMode || item.isOther}
+                                  type="number"
+                                  min="0"
+                                  className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder={item.isOther ? '' : '1'}
+                                  value={item.isOther ? '' : item.qty || ''}
+                                  onChange={(e) =>
+                                    updateDisbursementItem(
+                                      item.id,
+                                      'qty',
+                                      e.target.value === ''
+                                        ? ''
+                                        : parseFloat(e.target.value) || 0,
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td className="py-1 px-1">
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    disabled={isViewMode}
+                                    className={`${tableInput + ' font-black w-28'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    type="text"
+                                    placeholder="0.00"
+                                    inputMode="decimal"
+                                    value={formatPriceDisplay(item.price)}
+                                    onChange={(e) => {
+                                      const parsed = parsePriceInput(e.target.value)
+                                      updateDisbursementItem(item.id, 'price', parsed)
+                                    }}
+                                  />
+                                  <select
+                                    disabled={isViewMode}
+                                    value={item.vatType || 'VAT-EX'}
+                                    onChange={(e) => updateDisbursementItem(item.id, 'vatType', e.target.value)}
+                                    className={`text-[10px] font-bold px-1 py-1 rounded border ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' : 'bg-white border-gray-200 text-black focus:ring-1 focus:ring-red-500'} outline-none`}
+                                  >
+                                    <option value="VAT-EX">EX</option>
+                                    <option value="VAT-INC">INC</option>
+                                  </select>
+                                </div>
+                              </td>
+                              <td className="py-1 px-1">
+                                <div className="relative">
+                                  <input
+                                    disabled={isViewMode}
+                                    className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    type="number"
+                                    min="0"
+                                    max={
+                                      item.discountType === 'PERCENT' ? '100' : '999999'
+                                    }
+                                    step="0.01"
+                                    placeholder="0"
+                                    value={
+                                      item.discount === null ||
+                                        item.discount === undefined
+                                        ? ''
+                                        : item.discount
+                                    }
+                                    onChange={(e) =>
+                                      updateDisbursementItem(
+                                        item.id,
+                                        'discount',
+                                        e.target.value === ''
+                                          ? null
+                                          : parseFloat(e.target.value) || 0,
+                                      )
+                                    }
+                                  />
+                                  {item.discountType === 'PERCENT' && (
+                                    <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">
+                                      %
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-1 px-1">
+                                {isViewMode ? (
+                                  <div
+                                    className={`${tableInput} text-black py-1.5 text-center`}
+                                  >
+                                    {item.discountType === 'PERCENT'
+                                      ? 'PERCENT'
+                                      : 'FIXED'}
+                                  </div>
+                                ) : (
+                                  <select
+                                    value={item.discountType || 'PERCENT'}
+                                    onChange={(e) =>
+                                      updateDisbursementItem(
+                                        item.id,
+                                        'discountType',
+                                        e.target.value,
+                                      )
+                                    }
+                                    className="w-full px-2 py-1 text-[11px] font-bold border border-gray-200 rounded focus:ring-1 focus:ring-red-400 outline-none"
+                                  >
+                                    <option value="PERCENT">PERCENT</option>
+                                    <option value="FIXED">FIXED</option>
+                                  </select>
+                                )}
+                              </td>
+                              <td className="py-1 px-1">
+                                {isViewMode ? (
+                                  <div
+                                    className={`${tableInput} text-black py-1.5 text-center`}
+                                  >
+                                    {item.vatSearch}
+                                  </div>
+                                ) : (
+                                  <SearchableDropdown
+                                    placeholder="VAT Rate"
+                                    value={item.vatSearch}
+                                    onChange={(v) =>
+                                      updateDisbursementItem(item.id, 'vatSearch', v)
+                                    }
+                                    onFocus={loadVatOnDemand}
+                                    onSelect={(opt) => {
+                                      updateDisbursementItem(item.id, 'vat', opt.value)
+                                      updateDisbursementItem(
+                                        item.id,
+                                        'vatSearch',
+                                        opt.label,
+                                      )
+                                      updateDisbursementItem(
+                                        item.id,
+                                        'vatRate',
+                                        opt.rate,
+                                      )
+                                    }}
+                                    options={vatOptions}
+                                    inputClassName={`${pctInput + ' font-black text-red-600'}`}
+                                    emptyText={vatError || 'No VAT rates found'}
+                                    disabled={vatLoading}
+                                  />
+                                )}
+                              </td>
+                              <td className="py-1 px-1">
+                                {isViewMode ? (
+                                  <div
+                                    className={`${tableInput} text-black py-1.5 text-center`}
+                                  >
+                                    {item.whtSearch}
+                                  </div>
+                                ) : (
+                                  <SearchableDropdown
+                                    placeholder="WHT Rate"
+                                    value={item.whtSearch}
+                                    onChange={(v) =>
+                                      updateDisbursementItem(item.id, 'whtSearch', v)
+                                    }
+                                    onFocus={loadWhtOnDemand}
+                                    onSelect={(opt) => {
+                                      updateDisbursementItem(item.id, 'wht', opt.value)
+                                      updateDisbursementItem(
+                                        item.id,
+                                        'whtSearch',
+                                        opt.label,
+                                      )
+                                      updateDisbursementItem(
+                                        item.id,
+                                        'whtRate',
+                                        opt.rate,
+                                      )
+                                    }}
+                                    options={whtOptions}
+                                    inputClassName={`${pctInput + ' font-black text-blue-600'}`}
+                                    emptyText={whtError || 'No WHT rates found'}
+                                    disabled={whtLoading}
+                                  />
+                                )}
+                              </td>
+                              <td className="py-1 px-1">
+                                <SearchableDropdown
+                                  disabled={isViewMode}
+                                  placeholder="Select"
+                                  value={item.responsibilityCenter}
+                                  onChange={(v) =>
+                                    updateDisbursementItem(
+                                      item.id,
+                                      'responsibilityCenter',
+                                      v,
+                                    )
+                                  }
+                                  onSelect={(opt) =>
+                                    updateDisbursementItem(
+                                      item.id,
+                                      'responsibilityCenter',
+                                      opt.value,
+                                    )
+                                  }
+                                  options={responsibilityCenterOptions}
+                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  emptyText={
+                                    responsibilityCentersError ||
+                                    'No responsibility centers found'
+                                  }
+                                />
+                              </td>
+                              <td className="py-1 px-1 text-center">
+                                {!isViewMode && (
+                                  <button
+                                    onClick={() => removeDisbursementItem(item.id)}
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    <span className="text-xs text-zinc-500 font-medium">
-                      {disbursementItems.length} {disbursementItems.length === 1 ? 'item' : 'items'} added
-                    </span>
-                  </div>
-                )}
+                    {!isViewMode && (
+                      <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              const defaultVat = findDefaultVatOption(vatOptions)
+                              const defaultWht = findDefaultWhtOption(whtOptions)
+                              addDisbursementItem(
+                                false,
+                                defaultVat,
+                                defaultWht,
+                                bulkResponsibilityCenter,
+                              )
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                          >
+                            <Plus size={12} /> Add Product / Service
+                          </button>
+                          <button
+                            onClick={() => {
+                              const defaultVat = findDefaultVatOption(vatOptions)
+                              const defaultWht = findDefaultWhtOption(whtOptions)
+                              addDisbursementItem(
+                                true,
+                                defaultVat,
+                                defaultWht,
+                                bulkResponsibilityCenter,
+                              )
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-zinc-300 text-xs font-semibold rounded-lg text-zinc-700 bg-white hover:bg-zinc-100 transition-colors"
+                          >
+                            <Plus size={12} /> Add Service Line
+                          </button>
+                        </div>
+                        <span className="text-xs text-zinc-500 font-medium">
+                          {disbursementItems.length} {disbursementItems.length === 1 ? 'item' : 'items'} added
+                        </span>
+                      </div>
+                    )}
                   </>
                 )}
               </section>
@@ -1404,125 +1430,125 @@ export default function CashDisbursementForm({
                             <th className="py-2.5 px-3 w-10 text-center"></th>
                           </tr>
                         </thead>
-                    <tbody className="divide-y divide-zinc-200">
-                      {journalEntries.map((entry) => (
-                        <tr key={entry.id}>
-                          <td className="py-2 px-3 text-center">
-                            <SearchableDropdown
-                              disabled={isViewMode}
-                              placeholder="Search account..."
-                              value={entry.accountSearch}
-                              onChange={(v) =>
-                                updateJournalEntry(entry.id, 'accountSearch', v)
-                              }
-                              onSelect={(opt) => {
-                                updateJournalEntry(entry.id, 'account', opt.value)
-                                updateJournalEntry(
-                                  entry.id,
-                                  'accountSearch',
-                                  opt.label,
-                                )
-                              }}
-                              options={coaOptions}
-                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              emptyText="No accounts found"
-                            />
-                          </td>
-                          <td className="py-2 px-3 text-center font-mono">
-                            <input
-                              disabled={isViewMode}
-                              className={`${tableInput + ' font-black text-center'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              placeholder="0.00"
-                              type="text"
-                              inputMode="decimal"
-                              value={formatPriceDisplay(entry.debit ?? '')}
-                              onChange={(e) => {
-                                const parsed = parsePriceInput(e.target.value)
-                                updateJournalEntry(
-                                  entry.id,
-                                  'debit',
-                                  parsed === '' ? '' : parseFloat(parsed) || 0,
-                                )
-                              }}
-                            />
-                          </td>
-                          <td className="py-2 px-3 text-center font-mono">
-                            <input
-                              disabled={isViewMode}
-                              className={`${tableInput + ' font-black text-center text-red-600'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
-                              placeholder="0.00"
-                              type="text"
-                              inputMode="decimal"
-                              value={formatPriceDisplay(entry.credit ?? '')}
-                              onChange={(e) => {
-                                const parsed = parsePriceInput(e.target.value)
-                                updateJournalEntry(
-                                  entry.id,
-                                  'credit',
-                                  parsed === '' ? '' : parseFloat(parsed) || 0,
-                                )
-                              }}
-                            />
-                          </td>
-                          <td className="py-2 px-3 text-center">
-                            <SearchableDropdown
-                              disabled={isViewMode}
-                              placeholder="Select"
-                              value={entry.center}
-                              onChange={(v) =>
-                                updateJournalEntry(entry.id, 'center', v)
-                              }
-                              onSelect={(opt) =>
-                                updateJournalEntry(entry.id, 'center', opt.value)
-                              }
-                              options={responsibilityCenterOptions}
-                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              emptyText={
-                                responsibilityCentersError ||
-                                'No responsibility centers found'
-                              }
-                            />
-                          </td>
-                          <td className="py-2 px-3 text-center">
-                            {!isViewMode && (
-                              <button
-                                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                onClick={() => removeJournalEntry(entry.id)}
-                              >
-                                <Trash2 size={15} className="mx-auto" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
-                      {(() => {
-                        const balance = calculateJournalBalance()
-                        return (
-                          <tr>
-                            <td className="py-2.5 px-3 text-center text-xs font-bold">Total Ledger Balance:</td>
-                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(balance.totalDebit)}</td>
-                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(balance.totalCredit)}</td>
-                            <td />
-                            <td />
-                          </tr>
-                        )
-                      })()}
-                    </tfoot>
-                  </table>
-                </div>
-                {!isViewMode && (
-                  <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
-                    <button
-                      onClick={() => addJournalEntry(bulkResponsibilityCenter)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
-                    >
-                      <Plus size={12} /> Add Ledger Row
-                    </button>
-                    <span className="text-xs text-zinc-500 font-medium">{journalEntries.length} {journalEntries.length === 1 ? 'entry' : 'entries'}</span>
-                  </div>
-                )}
+                        <tbody className="divide-y divide-zinc-200">
+                          {journalEntries.map((entry) => (
+                            <tr key={entry.id}>
+                              <td className="py-2 px-3 text-center">
+                                <SearchableDropdown
+                                  disabled={isViewMode}
+                                  placeholder="Search account..."
+                                  value={entry.accountSearch}
+                                  onChange={(v) =>
+                                    updateJournalEntry(entry.id, 'accountSearch', v)
+                                  }
+                                  onSelect={(opt) => {
+                                    updateJournalEntry(entry.id, 'account', opt.value)
+                                    updateJournalEntry(
+                                      entry.id,
+                                      'accountSearch',
+                                      opt.label,
+                                    )
+                                  }}
+                                  options={coaOptions}
+                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  emptyText="No accounts found"
+                                />
+                              </td>
+                              <td className="py-2 px-3 text-center font-mono">
+                                <input
+                                  disabled={isViewMode}
+                                  className={`${tableInput + ' font-black text-center'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder="0.00"
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={formatPriceDisplay(entry.debit ?? '')}
+                                  onChange={(e) => {
+                                    const parsed = parsePriceInput(e.target.value)
+                                    updateJournalEntry(
+                                      entry.id,
+                                      'debit',
+                                      parsed === '' ? '' : parseFloat(parsed) || 0,
+                                    )
+                                  }}
+                                />
+                              </td>
+                              <td className="py-2 px-3 text-center font-mono">
+                                <input
+                                  disabled={isViewMode}
+                                  className={`${tableInput + ' font-black text-center text-red-600'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                                  placeholder="0.00"
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={formatPriceDisplay(entry.credit ?? '')}
+                                  onChange={(e) => {
+                                    const parsed = parsePriceInput(e.target.value)
+                                    updateJournalEntry(
+                                      entry.id,
+                                      'credit',
+                                      parsed === '' ? '' : parseFloat(parsed) || 0,
+                                    )
+                                  }}
+                                />
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <SearchableDropdown
+                                  disabled={isViewMode}
+                                  placeholder="Select"
+                                  value={entry.center}
+                                  onChange={(v) =>
+                                    updateJournalEntry(entry.id, 'center', v)
+                                  }
+                                  onSelect={(opt) =>
+                                    updateJournalEntry(entry.id, 'center', opt.value)
+                                  }
+                                  options={responsibilityCenterOptions}
+                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  emptyText={
+                                    responsibilityCentersError ||
+                                    'No responsibility centers found'
+                                  }
+                                />
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                {!isViewMode && (
+                                  <button
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                    onClick={() => removeJournalEntry(entry.id)}
+                                  >
+                                    <Trash2 size={15} className="mx-auto" />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
+                          {(() => {
+                            const balance = calculateJournalBalance()
+                            return (
+                              <tr>
+                                <td className="py-2.5 px-3 text-center text-xs font-bold">Total Ledger Balance:</td>
+                                <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(balance.totalDebit)}</td>
+                                <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(balance.totalCredit)}</td>
+                                <td />
+                                <td />
+                              </tr>
+                            )
+                          })()}
+                        </tfoot>
+                      </table>
+                    </div>
+                    {!isViewMode && (
+                      <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
+                        <button
+                          onClick={() => addJournalEntry(bulkResponsibilityCenter)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                        >
+                          <Plus size={12} /> Add Ledger Row
+                        </button>
+                        <span className="text-xs text-zinc-500 font-medium">{journalEntries.length} {journalEntries.length === 1 ? 'entry' : 'entries'}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </section>
@@ -1593,8 +1619,8 @@ export default function CashDisbursementForm({
                                     className={`${tableInput} text-black cursor-not-allowed flex items-center justify-center`}
                                   >
                                     {file.file &&
-                                    typeof file.file === 'string' &&
-                                    file.file.startsWith('data:image/') ? (
+                                      typeof file.file === 'string' &&
+                                      file.file.startsWith('data:image/') ? (
                                       <>
                                         <img
                                           src={file.file}

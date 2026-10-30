@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -29,6 +29,8 @@ import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
 import { API } from '../../api/endpoints'
+import { useNotificationsState } from '../../components/layout/NotificationContext'
+import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Sales() {
   return (
@@ -49,6 +51,11 @@ function SalesContent() {
     loadMore,
     prependSales,
   } = useSales()
+  const { markReadForDocument, items: notificationItems } = useNotificationsState()
+  const unreadRowMap = useMemo(
+    () => buildUnreadDocCounts(notificationItems, 'sales'),
+    [notificationItems],
+  )
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [isAdding, setIsAdding] = useState(false)
@@ -96,6 +103,7 @@ function SalesContent() {
 
         setViewingSales(result)
         setIsViewing(true)
+        markReadForDocument('sales', [id])
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev)
@@ -283,6 +291,10 @@ function SalesContent() {
                     result.message ||
                     `${validRows.length} sale(s) approved successfully`,
                 })
+                markReadForDocument(
+                  'sales',
+                  validRows.map((row) => row.id),
+                )
               } catch (error) {
                 console.error('Error approving sales:', error)
                 setToast({
@@ -355,6 +367,10 @@ function SalesContent() {
                     result.message ||
                     `${validRows.length} sale(s) cancelled successfully`,
                 })
+                markReadForDocument(
+                  'sales',
+                  validRows.map((row) => row.id),
+                )
               } catch (error) {
                 console.error('Error cancelling sales:', error)
                 setToast({
@@ -516,7 +532,7 @@ function SalesContent() {
                 <TrendingUp size={24} />
               </div>
               <h1 className="text-4xl font-black text-black tracking-tighter">
-                Revenue <span className="text-red-600 italic">Tracking</span>
+                Sales <span className="text-red-600 italic">Order</span>
               </h1>
             </div>
             {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
@@ -627,6 +643,7 @@ function SalesContent() {
         <DynamicTable
           data={filteredSales}
           title="Sales Ledger"
+          unreadRowMap={unreadRowMap}
           enableDateFilter={true}
           dateFrom={pendingDateFrom}
           dateTo={pendingDateTo}
@@ -675,6 +692,7 @@ function SalesContent() {
                   // Set sales data for viewing
                   setViewingSales(result)
                   setIsViewing(true)
+                  markReadForDocument('sales', [row.id])
                 } catch (error) {
                   console.error('Error fetching sales details:', error)
                   setToast({
@@ -721,6 +739,7 @@ function SalesContent() {
                   // Set sales data for editing
                   setEditingSales(result)
                   setIsEditing(true)
+                  markReadForDocument('sales', [row.id])
                 } catch (error) {
                   console.error('Error fetching sales details for editing:', error)
                   setToast({
@@ -754,6 +773,7 @@ function SalesContent() {
                         type: 'success',
                         message: reversed.message || 'Reversal created',
                       })
+                      markReadForDocument('sales', [row.id])
                       navigate('/adjustments')
                       await refetchSales()
                     } catch (error) {

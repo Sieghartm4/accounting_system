@@ -3,6 +3,20 @@ import { useSearchParams } from 'react-router-dom'
 import { Search, Filter, Columns, Plus, X, Maximize2, Eye, Edit, RotateCcw, Trash2, Zap } from 'lucide-react'
 import { getAccessLevel } from '../utils/routeProtection'
 
+/** Floating unread-notification chip for one table row.
+ *
+ * Absolutely positioned in the corner of the row's first column cell, so it
+ * overlays the cell's padding instead of taking part in the flow: no column
+ * grows, no row changes height, and pointer events are suppressed both because
+ * the chip is informational and because the row itself opens the document.
+ */
+const UnreadNoticeChip = ({ count }) => (
+  <span className="pointer-events-none absolute top-1 left-1 z-10 flex items-center gap-1 whitespace-nowrap rounded-full bg-amber-500/95 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-md">
+    <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+    {count > 1 ? `${count}` : ''} new
+  </span>
+)
+
 const DynamicTable = ({
   data,
   title = 'Records',
@@ -35,6 +49,11 @@ const DynamicTable = ({
   highlightRow = null, // { column: 'id', value: 123 } - highlight where column matches.
                        // `value` may also be an array, to highlight several rows at
                        // once - the Advances page opens more than one group.
+  // --- UNREAD NOTIFICATION PROPS ---
+  unreadRowMap = null, // Map of String(docId) -> unread notice count for that row.
+                       // Rows it holds get a floating `NEW` chip overlaid on the
+                       // first cell - absolute positioning, so no cell grows or
+                       // shifts and rows without notices are untouched.
   // --- INFINITE SCROLL PROPS ---
   enableInfiniteScroll = false, // if true, enables infinite scroll
   hasMore = false, // if true, more rows can be loaded
@@ -856,6 +875,10 @@ const DynamicTable = ({
               const rowKey = getRowKey(row, idx)
               const isChecked = selectedKeys.has(rowKey)
               const isHighlighted = shouldHighlightRow(row)
+              const unreadCount = unreadRowMap?.get(String(row.id)) || 0
+              // The chip rides on the row's first visible column cell; the flag
+              // walks the headers so exactly one cell takes it.
+              let pendingUnreadCell = unreadCount > 0
               return (
                 <tr
                   key={idx}
@@ -878,23 +901,28 @@ const DynamicTable = ({
                       )}
                     </td>
                   )}
-                  {headers.map(
-                    (header) =>
-                      visibleColumns.has(header) && (
-                        <td
-                          key={header}
-                          className="px-3 py-4 text-center text-xs font-bold text-gray-700 tracking-tight"
-                        >
-                          {(() => {
-                            const columnDef = columns.find(col => col.key === header)
-                            if (columnDef && columnDef.render) {
-                              return columnDef.render(row[header], row)
-                            }
-                            return renderCellValue(row[header], header, row)
-                          })()}
-                        </td>
-                      ),
-                  )}
+                  {headers.map((header) => {
+                    if (!visibleColumns.has(header)) return null
+                    const cellGetsUnreadChip = pendingUnreadCell
+                    pendingUnreadCell = false
+                    return (
+                      <td
+                        key={header}
+                        className={`px-3 py-4 text-center text-xs font-bold text-gray-700 tracking-tight ${cellGetsUnreadChip ? 'relative' : ''}`}
+                      >
+                        {cellGetsUnreadChip && (
+                          <UnreadNoticeChip count={unreadCount} />
+                        )}
+                        {(() => {
+                          const columnDef = columns.find(col => col.key === header)
+                          if (columnDef && columnDef.render) {
+                            return columnDef.render(row[header], row)
+                          }
+                          return renderCellValue(row[header], header, row)
+                        })()}
+                      </td>
+                    )
+                  })}
                   {/* ACTION COLUMN CELL */}
                   {enableActionColumn && (
                     <td className="px-6 py-4 text-center">

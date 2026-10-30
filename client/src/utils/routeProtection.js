@@ -473,7 +473,7 @@ export const ROUTE_CONFIG = {
   payments: { name: 'payments', label: 'Payments', icon: 'PaymentCard' },
   adjustments: {
     name: 'adjustments',
-    label: 'Adjustments',
+    label: 'Journal Vouchers',
     icon: 'FileSpreadsheet',
   },
   trial_balance: { name: 'trial_balance', label: 'Trial Balance', icon: 'Scale' },

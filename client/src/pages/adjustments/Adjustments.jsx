@@ -32,6 +32,8 @@ import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
 import { API } from '../../api/endpoints'
+import { useNotificationsState } from '../../components/layout/NotificationContext'
+import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Adjustments() {
   return (
@@ -52,6 +54,11 @@ function AdjustmentsContent() {
     loadMore,
     prependAdjustment,
   } = useAdjustments()
+  const { markReadForDocument, items: notificationItems } = useNotificationsState()
+  const unreadRowMap = useMemo(
+    () => buildUnreadDocCounts(notificationItems, 'adjustments'),
+    [notificationItems],
+  )
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -116,6 +123,7 @@ function AdjustmentsContent() {
 
         setViewingAdjustment(result)
         setIsViewing(true)
+        markReadForDocument('adjustments', [id])
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev)
@@ -329,7 +337,7 @@ function AdjustmentsContent() {
     )
 
   if (loading) {
-    return <LoadingScreen label="Loading Adjustments Data..." />
+    return <LoadingScreen label="Loading Journal Vouchers Data..." />
   }
 
   if (error) {
@@ -380,7 +388,7 @@ function AdjustmentsContent() {
                 <Layers size={24} />
               </div>
               <h1 className="text-4xl font-black text-black tracking-tighter">
-                <span className="text-red-600 italic">Adjustments</span>
+                Journal <span className="text-red-600 italic">Vouchers</span>
               </h1>
             </div>
           </div>
@@ -396,7 +404,7 @@ function AdjustmentsContent() {
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
                 <FilePlus size={14} />
-                New Adjustment
+                New Journal Voucher
               </button>
             </ProtectedAction>
           </div>
@@ -488,6 +496,7 @@ function AdjustmentsContent() {
         <DynamicTable
           data={filteredAdjustments}
           title="Adjustments Ledger"
+          unreadRowMap={unreadRowMap}
           enableDateFilter={true}
           dateFrom={pendingDateFrom}
           dateTo={pendingDateTo}
@@ -534,6 +543,7 @@ function AdjustmentsContent() {
                   console.log('Adjustment details fetched:', result)
                   setViewingAdjustment(result)
                   setIsViewing(true)
+                  markReadForDocument('adjustments', [row.id])
                 } catch (error) {
                   console.error('Error fetching adjustment details:', error)
                   setToast({
@@ -579,6 +589,7 @@ function AdjustmentsContent() {
                   setViewingAdjustment(result)
                   setIsEditing(true)
                   setIsAdding(true)
+                  markReadForDocument('adjustments', [row.id])
                 } catch (error) {
                   console.error(
                     'Error fetching adjustment details for editing:',
@@ -615,6 +626,7 @@ function AdjustmentsContent() {
                         type: 'success',
                         message: reversed.message || 'Reversal created',
                       })
+                      markReadForDocument('adjustments', [row.id])
                       navigate('/adjustments')
                       await refetchAdjustments()
                     } catch (error) {
@@ -703,8 +715,12 @@ function AdjustmentsContent() {
                         type: 'success',
                         message:
                           result.message ||
-                          `${approvableRows.length} adjustment(s) approved successfully`,
+                          `                          ${approvableRows.length} adjustment(s) approved successfully`,
                       })
+                      markReadForDocument(
+                        'adjustments',
+                        approvableRows.map((row) => row.id),
+                      )
                     } catch (error) {
                       console.error('Error approving adjustments:', error)
                       setToast({
@@ -777,8 +793,12 @@ function AdjustmentsContent() {
                         type: 'success',
                         message:
                           result.message ||
-                          `${cancellableRows.length} adjustment(s) cancelled successfully`,
+                          `                          ${cancellableRows.length} adjustment(s) cancelled successfully`,
                       })
+                      markReadForDocument(
+                        'adjustments',
+                        cancellableRows.map((row) => row.id),
+                      )
                     } catch (error) {
                       console.error('Error cancelling adjustments:', error)
                       setToast({

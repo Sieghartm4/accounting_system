@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -31,6 +31,8 @@ import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
 import SummaryTile from '../../components/SummaryTile'
 import { API } from '../../api/endpoints'
+import { useNotificationsState } from '../../components/layout/NotificationContext'
+import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Receipts() {
   return (
@@ -51,6 +53,11 @@ function ReceiptsContent() {
     loadMore,
     prependReceipt,
   } = useReceipts()
+  const { markReadForDocument, items: notificationItems } = useNotificationsState()
+  const unreadRowMap = useMemo(
+    () => buildUnreadDocCounts(notificationItems, 'receipts'),
+    [notificationItems],
+  )
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [isAdding, setIsAdding] = useState(false)
@@ -112,6 +119,7 @@ function ReceiptsContent() {
 
         setViewingReceipt(result)
         setIsEditMode(false)
+        markReadForDocument('receipts', [id])
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev)
@@ -233,6 +241,10 @@ function ReceiptsContent() {
                     result.message ||
                     `${approvableRows.length} receipt(s) approved successfully`,
                 })
+                markReadForDocument(
+                  'receipts',
+                  approvableRows.map((row) => row.id),
+                )
               } catch (error) {
                 setToast({
                   type: 'error',
@@ -296,6 +308,10 @@ function ReceiptsContent() {
                     result.message ||
                     `${cancellableRows.length} receipt(s) cancelled successfully`,
                 })
+                markReadForDocument(
+                  'receipts',
+                  cancellableRows.map((row) => row.id),
+                )
               } catch (error) {
                 setToast({
                   type: 'error',
@@ -594,6 +610,7 @@ function ReceiptsContent() {
         <DynamicTable
           data={filteredReceipts}
           title="Receipt Ledger"
+          unreadRowMap={unreadRowMap}
           enableDateFilter={true}
           dateFrom={pendingDateFrom}
           dateTo={pendingDateTo}
@@ -651,6 +668,7 @@ function ReceiptsContent() {
 
                   setViewingReceipt(result)
                   setIsEditMode(false)
+                  markReadForDocument('receipts', [row.id])
                 } catch (error) {
                   setToast({
                     type: 'error',
@@ -688,6 +706,7 @@ function ReceiptsContent() {
 
                   setViewingReceipt(result)
                   setIsEditMode(true)
+                  markReadForDocument('receipts', [row.id])
                 } catch (error) {
                   setToast({
                     type: 'error',
@@ -720,6 +739,7 @@ function ReceiptsContent() {
                         type: 'success',
                         message: reversed.message || 'Reversal created',
                       })
+                      markReadForDocument('receipts', [row.id])
                       navigate('/adjustments')
                       await refetchReceipts()
                     } catch (error) {

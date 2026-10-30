@@ -426,6 +426,23 @@ export default function CashFlowStatement() {
           foot: { label: 'NET TRANSFERS (EXCLUDED)', amount: data.internalTransfers.total },
         })
       }
+      if (data?.unbalanced?.count) {
+        // Documents whose journal lines don't balance — the audit trail
+        // behind the "Other cash movements (unclassified)" bucket.
+        sections.push({
+          title: 'AUDIT: UNBALANCED DOCUMENTS (CASH MOVEMENT NOT FULLY EXPLAINED)',
+          lines: (data.unbalanced.documents || []).map((doc, i) => ({
+            code: doc.db_id,
+            label: `${doc.db_name || 'document'} #${i + 1}`,
+            amount: doc.amount,
+            indent: false,
+          })),
+          foot: {
+            label: `Total residual across ${data.unbalanced.count} document(s) — these amounts must equal the Operating "Other cash movements" line`,
+            amount: data.unbalanced.total,
+          },
+        })
+      }
     }
     return { titleSub, sections }
   }
@@ -1059,6 +1076,20 @@ export default function CashFlowStatement() {
                   <p className="mt-2 text-[10px] font-medium text-amber-600">
                     Indirect operating figure differs from actual cash movement by ₱{fmt(netChangeMismatch)} — this stems from unbalanced or unclassified journal documents. The Net Change tile always reflects real cash (Opening → Closing).
                   </p>
+                )}
+
+                {(data?.unbalanced?.count || 0) > 0 && (
+                  <div className="mt-2 flex flex-col sm:flex-row items-stretch gap-2">
+                    <div className="flex-1 flex flex-col gap-1 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5">
+                      <span className="text-[10px] font-black uppercase tracking-[2px] text-amber-700">
+                        Data Quality Audit: ₱{fmt(data.unbalanced.total)} from {data.unbalanced.count} document{data.unbalanced.count === 1 ? '' : 's'} not fully explained
+                      </span>
+                      <span className="text-[10px] font-medium text-amber-700/90">
+                        {data.unbalanced.documents?.slice(0, 6).map((doc) => `${doc.db_name} #${doc.db_id} (₱${fmt(doc.amount)})`).join(', ')}
+                        {(data.unbalanced.documents?.length || 0) > 6 ? ' …' : ''} — see the exported audit section; these journal lines should be corrected or completed at the source.
+                      </span>
+                    </div>
+                  </div>
                 )}
 
                 {(data?.internalTransfers?.rows || []).length > 0 && (

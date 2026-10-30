@@ -913,6 +913,14 @@ export default function AdjustmentsForm({
           <ArrowLeft size={17} />
           <span className="text-white">Go Back</span>
         </nav>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
+            <Layers size={24} />
+          </div>
+          <h1 className="text-4xl font-black text-black tracking-tighter">
+            Journal <span className="text-red-600 italic">Vouchers</span>
+          </h1>
+        </div>
         {!isViewMode && (
           <div className="flex gap-2 items-center">
             {postedLock && (
@@ -924,13 +932,13 @@ export default function AdjustmentsForm({
               Save Draft
             </button>
             {!postedLock && (
-            <button
-              type="button"
-              onClick={() => uploadInputRef.current?.click()}
-              className="px-4 py-2 bg-blue-600 text-white text-[12px] font-black rounded-lg hover:bg-blue-700 transition-all uppercase tracking-[1px] flex items-center gap-2"
-            >
-              <Upload size={14} /> Upload Excel
-            </button>
+              <button
+                type="button"
+                onClick={() => uploadInputRef.current?.click()}
+                className="px-4 py-2 bg-blue-600 text-white text-[12px] font-black rounded-lg hover:bg-blue-700 transition-all uppercase tracking-[1px] flex items-center gap-2"
+              >
+                <Upload size={14} /> Upload Excel
+              </button>
             )}
             <input
               ref={uploadInputRef}
@@ -945,6 +953,10 @@ export default function AdjustmentsForm({
             >
               <Save size={14} /> {isEditMode ? 'Update Adjustment' : 'Post Adjustment'}
             </button>
+          </div>
+        )}
+        {isViewMode&&(
+          <div>
           </div>
         )}
       </div>
@@ -1098,26 +1110,40 @@ export default function AdjustmentsForm({
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-white pointer-events-none" />
                       <div className="pl-7">
-                        <SearchableDropdown
-                          placeholder="Resp. Center to All"
-                          value={bulkResponsibilityCenter}
-                          onChange={setBulkResponsibilityCenter}
-                          onSelect={(opt) => {
-                            setBulkResponsibilityCenter(opt.value)
-                            journalEntries.forEach((entry) =>
-                              updateJournalEntry(entry.id, 'center', opt.value),
-                            )
-                          }}
-                          options={responsibilityCenterOptions}
-                          inputClassName="w-full px-2 py-1.5 rounded-lg text-[11px] font-medium outline-none transition-all bg-zinc-800 border border-white text-white focus:ring-2 focus:ring-red-500"
-                          emptyText={
-                            responsibilityCentersError ||
-                            'No responsibility centers found'
-                          }
-                          disabled={isViewMode}
-                        />
+                        {/* Search Card Container with white/light background and subtle border */}
+                        <div className="flex items-center bg-white border border-gray-300 rounded-lg px-2.5 py-1 shadow-sm focus-within:ring-2 focus-within:ring-red-500 focus-within:border-transparent transition-all">
+                          {/* Connected Search Icon */}
+                          <svg
+                            className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+
+                          {/* SearchableDropdown with transparent input styling */}
+                          <SearchableDropdown
+                            placeholder="Resp. Center to All"
+                            value={bulkResponsibilityCenter}
+                            onChange={setBulkResponsibilityCenter}
+                            onSelect={(opt) => {
+                              setBulkResponsibilityCenter(opt.value)
+                              journalEntries.forEach((entry) =>
+                                updateJournalEntry(entry.id, 'center', opt.value),
+                              )
+                            }}
+                            options={responsibilityCenterOptions}
+                            inputClassName="w-full bg-transparent text-gray-900 placeholder-gray-400 text-[11px] font-medium outline-none border-none focus:ring-0 p-0"
+                            emptyText={
+                              responsibilityCentersError ||
+                              'No responsibility centers found'
+                            }
+                            disabled={isViewMode}
+                          />
+                        </div>
                       </div>
                     </div>
                     <button
@@ -1302,7 +1328,7 @@ export default function AdjustmentsForm({
                         </colgroup>
                         <thead>
                           <tr className="border-b border-gray-100">
-                            {[ 'File Name', 'File', 'Remarks', 'Uploaded By', '', ].map((h, i) => (
+                            {['File Name', 'File', 'Remarks', 'Uploaded By', '',].map((h, i) => (
                               <th
                                 key={i}
                                 className="pb-3 text-[12px] font-black uppercase text-gray-900 tracking-tighter text-center px-1"
@@ -1339,21 +1365,21 @@ export default function AdjustmentsForm({
                                       typeof file.file === 'string' &&
                                       file.file.startsWith('data:image/') ? (
                                       <>
-                                      <img
-                                        src={file.file}
-                                        alt={file.fileName || 'Attachment'}
-                                        className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
-                                        onClick={() =>
-                                          setImageModal({
-                                            isOpen: true,
-                                            imageSrc: file.file,
-                                          })
-                                        }
-                                        title="Click to view full size"
-                                      />
-                                      <span className="text-[8px] text-gray-500 ml-2">
-                                        {Math.round(file.file.length / 1024)}KB
-                                      </span>
+                                        <img
+                                          src={file.file}
+                                          alt={file.fileName || 'Attachment'}
+                                          className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
+                                          onClick={() =>
+                                            setImageModal({
+                                              isOpen: true,
+                                              imageSrc: file.file,
+                                            })
+                                          }
+                                          title="Click to view full size"
+                                        />
+                                        <span className="text-[8px] text-gray-500 ml-2">
+                                          {Math.round(file.file.length / 1024)}KB
+                                        </span>
                                       </>
                                     ) : file.file && typeof file.file === 'string' ? (
                                       <span className="text-blue-600 text-[11px] font-bold">
@@ -1538,11 +1564,10 @@ function SidebarInput({
         value={value}
         onChange={onChange}
         disabled={disabled}
-        className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${
-          disabled
-            ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
-            : 'bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
-        }`}
+        className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${disabled
+          ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
+          : 'bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
+          }`}
       />
     </div>
   )

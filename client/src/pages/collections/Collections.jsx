@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -29,6 +29,8 @@ import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
 import { API } from '../../api/endpoints'
+import { useNotificationsState } from '../../components/layout/NotificationContext'
+import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Collections() {
   return (
@@ -49,6 +51,11 @@ function CollectionsContent() {
     loadMore,
     prependCollection,
   } = useCollections()
+  const { markReadForDocument, items: notificationItems } = useNotificationsState()
+  const unreadRowMap = useMemo(
+    () => buildUnreadDocCounts(notificationItems, 'collection'),
+    [notificationItems],
+  )
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [isAdding, setIsAdding] = useState(false)
@@ -234,6 +241,7 @@ function CollectionsContent() {
 
         setViewingCollection(result)
         setIsViewing(true)
+        markReadForDocument('collection', [id])
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev)
@@ -436,6 +444,10 @@ function CollectionsContent() {
                     result.message ||
                     `${approvableRows.length} collection(s) approved successfully`,
                 })
+                markReadForDocument(
+                  'collection',
+                  approvableRows.map((row) => row.id),
+                )
               } catch (error) {
                 console.error('Error approving collections:', error)
                 setToast({
@@ -510,6 +522,10 @@ function CollectionsContent() {
                     result.message ||
                     `${cancellableRows.length} collection(s) cancelled successfully`,
                 })
+                markReadForDocument(
+                  'collection',
+                  cancellableRows.map((row) => row.id),
+                )
               } catch (error) {
                 console.error('Error cancelling collections:', error)
                 setToast({
@@ -920,6 +936,7 @@ function CollectionsContent() {
           <DynamicTable
             data={filteredCollections}
             title="Collections Ledger"
+            unreadRowMap={unreadRowMap}
             enableDateFilter={true}
             dateFrom={pendingDateFrom}
             dateTo={pendingDateTo}
@@ -1012,6 +1029,7 @@ function CollectionsContent() {
                     console.log('Collection details fetched:', result)
                     setViewingCollection(result)
                     setIsViewing(true)
+                    markReadForDocument('collection', [row.id])
                   } catch (error) {
                     console.error('Error fetching collection details:', error)
                     setToast({
@@ -1056,6 +1074,7 @@ function CollectionsContent() {
                     console.log('Collection details fetched for editing:', result)
                     setEditingCollection(result)
                     setIsEditing(true)
+                    markReadForDocument('collection', [row.id])
                   } catch (error) {
                     console.error(
                       'Error fetching collection details for editing:',
@@ -1092,6 +1111,7 @@ function CollectionsContent() {
                           type: 'success',
                           message: reversed.message || 'Reversal created',
                         })
+                        markReadForDocument('collection', [row.id])
                         navigate('/adjustments')
                         await refetchCollections()
                       } catch (error) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -29,6 +29,8 @@ import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
 import { API } from '../../api/endpoints'
+import { useNotificationsState } from '../../components/layout/NotificationContext'
+import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Purchase() {
   return (
@@ -49,6 +51,11 @@ function PurchaseContent() {
     loadMore,
     prependPurchase,
   } = usePurchase()
+  const { markReadForDocument, items: notificationItems } = useNotificationsState()
+  const unreadRowMap = useMemo(
+    () => buildUnreadDocCounts(notificationItems, 'purchase'),
+    [notificationItems],
+  )
   const [searchParams, setSearchParams] = useSearchParams()
 
   console.log('PurchaseContent - purchases:', purchases)
@@ -111,6 +118,7 @@ function PurchaseContent() {
 
         setViewingPurchase(result)
         setIsViewing(true)
+        markReadForDocument('purchase', [id])
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev)
@@ -302,6 +310,10 @@ function PurchaseContent() {
                     approveResult.message ||
                     `${approvableRows.length} purchase(s) approved successfully`,
                 })
+                markReadForDocument(
+                  'purchase',
+                  approvableRows.map((row) => row.id),
+                )
               } catch (error) {
                 console.error('Error approving purchases:', error)
                 setToast({
@@ -373,6 +385,10 @@ function PurchaseContent() {
                     cancelResult.message ||
                     `${cancellableRows.length} purchase(s) cancelled successfully`,
                 })
+                markReadForDocument(
+                  'purchase',
+                  cancellableRows.map((row) => row.id),
+                )
               } catch (error) {
                 console.error('Error cancelling purchases:', error)
                 setToast({
@@ -539,7 +555,7 @@ function PurchaseContent() {
                 <ShoppingCart size={24} />
               </div>
               <h1 className="text-4xl font-black text-black tracking-tighter">
-                Purchase <span className="text-red-600 italic">Management</span>
+                Purchase <span className="text-red-600 italic">Order</span>
               </h1>
             </div>
             {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
@@ -651,6 +667,7 @@ function PurchaseContent() {
         <DynamicTable
           data={filteredPurchases}
           title="Purchase Ledger"
+          unreadRowMap={unreadRowMap}
           enableDateFilter={true}
           dateFrom={pendingDateFrom}
           dateTo={pendingDateTo}
@@ -699,6 +716,7 @@ function PurchaseContent() {
                   // Set purchase data for viewing
                   setViewingPurchase(viewResult)
                   setIsViewing(true)
+                  markReadForDocument('purchase', [row.id])
                 } catch (error) {
                   console.error('Error fetching purchase details:', error)
                   setToast({
@@ -745,6 +763,7 @@ function PurchaseContent() {
                   // Set purchase data for editing
                   setEditingPurchase(editResult)
                   setIsEditing(true)
+                  markReadForDocument('purchase', [row.id])
                 } catch (error) {
                   console.error(
                     'Error fetching purchase details for editing:',
@@ -781,6 +800,7 @@ function PurchaseContent() {
                         type: 'success',
                         message: reversed.message || 'Reversal created',
                       })
+                      markReadForDocument('purchase', [row.id])
                       navigate('/adjustments')
                       await refetchPurchases()
                     } catch (error) {

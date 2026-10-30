@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -29,6 +29,8 @@ import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
 import { API } from '../../api/endpoints'
+import { useNotificationsState } from '../../components/layout/NotificationContext'
+import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Payments() {
   return (
@@ -49,6 +51,11 @@ function PaymentsContent() {
     loadMore,
     prependPayment,
   } = usePayments()
+  const { markReadForDocument, items: notificationItems } = useNotificationsState()
+  const unreadRowMap = useMemo(
+    () => buildUnreadDocCounts(notificationItems, 'payments'),
+    [notificationItems],
+  )
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [isAdding, setIsAdding] = useState(false)
@@ -265,6 +272,7 @@ function PaymentsContent() {
 
         setViewingPayment(result)
         setIsViewing(true)
+        markReadForDocument('payments', [id])
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev)
@@ -422,6 +430,10 @@ function PaymentsContent() {
                     result.message ||
                     `${approvableRows.length} payment(s) approved successfully`,
                 })
+                markReadForDocument(
+                  'payments',
+                  approvableRows.map((row) => row.id),
+                )
               } catch (error) {
                 console.error('Error approving payments:', error)
                 setToast({
@@ -493,6 +505,10 @@ function PaymentsContent() {
                     result.message ||
                     `${cancellableRows.length} payment(s) cancelled successfully`,
                 })
+                markReadForDocument(
+                  'payments',
+                  cancellableRows.map((row) => row.id),
+                )
               } catch (error) {
                 console.error('Error cancelling payments:', error)
                 setToast({
@@ -881,6 +897,7 @@ function PaymentsContent() {
           <DynamicTable
             data={filteredPayments}
             title="Payments Ledger"
+            unreadRowMap={unreadRowMap}
             enableDateFilter={true}
             dateFrom={pendingDateFrom}
             dateTo={pendingDateTo}
@@ -947,6 +964,7 @@ function PaymentsContent() {
                     console.log('Payment details fetched:', result)
                     setViewingPayment(result)
                     setIsViewing(true)
+                    markReadForDocument('payments', [row.id])
                   } catch (error) {
                     console.error('Error fetching payment details:', error)
                     setToast({
@@ -991,6 +1009,7 @@ function PaymentsContent() {
                     console.log('Payment details fetched for editing:', result)
                     setViewingPayment(result)
                     setIsEditing(true)
+                    markReadForDocument('payments', [row.id])
                   } catch (error) {
                     console.error('Error fetching payment details for editing:', error)
                     setToast({
@@ -1024,6 +1043,7 @@ function PaymentsContent() {
                           type: 'success',
                           message: reversed.message || 'Reversal created',
                         })
+                        markReadForDocument('payments', [row.id])
                         navigate('/adjustments')
                         await refetchPayments()
                       } catch (error) {

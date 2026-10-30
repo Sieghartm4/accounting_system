@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -30,6 +30,8 @@ import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
 import LoadingScreen from '../../components/LoadingScreen'
 import connectRealtime from '../../utils/realtimeSocket'
 import { API } from '../../api/endpoints'
+import { useNotificationsState } from '../../components/layout/NotificationContext'
+import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Disbursements() {
   return (
@@ -50,6 +52,11 @@ function DisbursementsContent() {
     loadMore,
     prependDisbursement,
   } = useDisbursements()
+  const { markReadForDocument, items: notificationItems } = useNotificationsState()
+  const unreadRowMap = useMemo(
+    () => buildUnreadDocCounts(notificationItems, 'disbursement'),
+    [notificationItems],
+  )
   const [searchParams, setSearchParams] = useSearchParams()
   const [isAdding, setIsAdding] = useState(false)
   const [viewingDisbursement, setViewingDisbursement] = useState(null)
@@ -122,6 +129,7 @@ function DisbursementsContent() {
 
         setViewingDisbursement(result)
         setIsEditMode(false)
+        markReadForDocument('disbursement', [id])
         setSearchParams(
           (prev) => {
             const next = new URLSearchParams(prev)
@@ -313,6 +321,10 @@ function DisbursementsContent() {
                     result.message ||
                     `${approvableRows.length} disbursement(s) approved successfully`,
                 })
+                markReadForDocument(
+                  'disbursement',
+                  approvableRows.map((row) => row.id),
+                )
               } catch (error) {
                 setToast({
                   type: 'error',
@@ -376,6 +388,10 @@ function DisbursementsContent() {
                     result.message ||
                     `${cancellableRows.length} disbursement(s) cancelled successfully`,
                 })
+                markReadForDocument(
+                  'disbursement',
+                  cancellableRows.map((row) => row.id),
+                )
               } catch (error) {
                 setToast({
                   type: 'error',
@@ -628,6 +644,7 @@ function DisbursementsContent() {
         <DynamicTable
           data={filteredDisbursements}
           title="Disbursement Ledger"
+          unreadRowMap={unreadRowMap}
           enableDateFilter={true}
           dateFrom={pendingDateFrom}
           dateTo={pendingDateTo}
@@ -694,6 +711,7 @@ function DisbursementsContent() {
                   // Set disbursement data for viewing
                   setViewingDisbursement(result)
                   setIsEditMode(false)
+                  markReadForDocument('disbursement', [row.id])
                 } catch (error) {
                   console.error('Error fetching disbursement details:', error)
                   setToast({
@@ -740,6 +758,7 @@ function DisbursementsContent() {
                   // Set disbursement data for editing (edit mode)
                   setViewingDisbursement(result)
                   setIsEditMode(true)
+                  markReadForDocument('disbursement', [row.id])
                 } catch (error) {
                   console.error(
                     'Error fetching disbursement details for editing:',
@@ -776,6 +795,7 @@ function DisbursementsContent() {
                         type: 'success',
                         message: reversed.message || 'Reversal created',
                       })
+                      markReadForDocument('disbursement', [row.id])
                       navigate('/adjustments')
                       await refetchDisbursements()
                     } catch (error) {

@@ -17,6 +17,7 @@ import {
   ChevronUp,
   Receipt,
   Divide,
+  ShoppingCart
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import DynamicToast from '../../components/DynamicToast'
@@ -506,11 +507,10 @@ function SidebarInput({
         value={value}
         onChange={onChange}
         disabled={disabled}
-        className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${
-          disabled
+        className={`w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${disabled
             ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
             : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'
-        }`}
+          }`}
       />
     </div>
   )
@@ -1209,10 +1209,10 @@ export default function PurchaseForm({
           whtSearch: item.withholding_tax_code
             ? `${item.withholding_tax_code}${item.withholding_tax_name ? ' - ' + item.withholding_tax_name : ''}`
             : item.withholding_tax_name ||
-                item.witholding_tax_id === 0 ||
-                item.withholding_tax_id === 0 ||
-                item.witholding_tax === 0 ||
-                item.wht === 0
+              item.witholding_tax_id === 0 ||
+              item.withholding_tax_id === 0 ||
+              item.witholding_tax === 0 ||
+              item.wht === 0
               ? 'NON-WHT - NON-WHT'
               : '',
           whtRate:
@@ -1723,8 +1723,8 @@ export default function PurchaseForm({
               item.vat !== undefined && item.vat !== '' && item.vat !== null
                 ? item.vat
                 : item.vat_id !== undefined &&
-                    item.vat_id !== '' &&
-                    item.vat_id !== null
+                  item.vat_id !== '' &&
+                  item.vat_id !== null
                   ? item.vat_id
                   : defaultVatOpt?.value || 0,
             ) || 0,
@@ -1733,20 +1733,20 @@ export default function PurchaseForm({
               item.wht !== undefined && item.wht !== '' && item.wht !== null
                 ? item.wht
                 : item.witholding_tax !== undefined &&
-                    item.witholding_tax !== '' &&
-                    item.witholding_tax !== null
+                  item.witholding_tax !== '' &&
+                  item.witholding_tax !== null
                   ? item.witholding_tax
                   : item.withholding_tax !== undefined &&
-                      item.withholding_tax !== '' &&
-                      item.withholding_tax !== null
+                    item.withholding_tax !== '' &&
+                    item.withholding_tax !== null
                     ? item.withholding_tax
                     : item.witholding_tax_id !== undefined &&
-                        item.witholding_tax_id !== '' &&
-                        item.witholding_tax_id !== null
+                      item.witholding_tax_id !== '' &&
+                      item.witholding_tax_id !== null
                       ? item.witholding_tax_id
                       : item.withholding_tax_id !== undefined &&
-                          item.withholding_tax_id !== '' &&
-                          item.withholding_tax_id !== null
+                        item.withholding_tax_id !== '' &&
+                        item.withholding_tax_id !== null
                         ? item.withholding_tax_id
                         : defaultWhtOpt?.value || 0,
             ) || 0,
@@ -2261,6 +2261,14 @@ export default function PurchaseForm({
           <ArrowLeft size={17} />
           <span className="text-white">Go Back</span>
         </nav>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
+            <ShoppingCart size={24} />
+          </div>
+          <h1 className="text-4xl font-black text-black tracking-tighter">
+            Purchase <span className="text-red-600 italic">Order</span>
+          </h1>
+        </div>
         {!isViewMode && (
           <div className="flex gap-2 items-center">
             {postedLock && (
@@ -2277,6 +2285,10 @@ export default function PurchaseForm({
             >
               <Save size={14} /> {isEditMode ? 'Update Receipt' : 'Post Transaction'}
             </button>
+          </div>
+        )}
+        {isViewMode &&(
+          <div>
           </div>
         )}
       </div>
@@ -2557,33 +2569,47 @@ export default function PurchaseForm({
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-white pointer-events-none" />
                       <div className="pl-7">
-                        <SearchableDropdown
-                          placeholder="Resp. Center to All"
-                          value={bulkResponsibilityCenter}
-                          onChange={setBulkResponsibilityCenter}
-                          onSelect={(opt) => {
-                            setBulkResponsibilityCenter(opt.value)
-                            purchaseItems.forEach((item) =>
-                              updatePurchaseItem(
-                                item.id,
-                                'responsibilityCenter',
-                                opt.value,
-                              ),
-                            )
-                            journalEntries.forEach((entry) =>
-                              updateJournalEntry(entry.id, 'center', opt.value),
-                            )
-                          }}
-                          options={responsibilityCenterOptions}
-                          inputClassName="w-full px-2 py-1.5 rounded-lg text-[11px] font-medium outline-none transition-all bg-zinc-800 border border-white text-white focus:ring-2 focus:ring-red-500"
-                          emptyText={
-                            responsibilityCentersError ||
-                            'No responsibility centers found'
-                          }
-                          disabled={isViewMode}
-                        />
+                        {/* Search Card Container with white/light background and subtle border */}
+                        <div className="flex items-center bg-white border border-gray-300 rounded-lg px-2.5 py-1 shadow-sm focus-within:ring-2 focus-within:ring-red-500 focus-within:border-transparent transition-all">
+                          {/* Connected Search Icon */}
+                          <svg
+                            className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+
+                          {/* SearchableDropdown with transparent input styling */}
+                          <SearchableDropdown
+                            placeholder="Resp. Center to All"
+                            value={bulkResponsibilityCenter}
+                            onChange={setBulkResponsibilityCenter}
+                            onSelect={(opt) => {
+                              setBulkResponsibilityCenter(opt.value)
+                              purchaseItems.forEach((item) =>
+                                updatePurchaseItem(
+                                  item.id,
+                                  'responsibilityCenter',
+                                  opt.value,
+                                ),
+                              )
+                              journalEntries.forEach((entry) =>
+                                updateJournalEntry(entry.id, 'center', opt.value),
+                              )
+                            }}
+                            options={responsibilityCenterOptions}
+                            inputClassName="w-full bg-transparent text-gray-900 placeholder-gray-400 text-[11px] font-medium outline-none border-none focus:ring-0 p-0"
+                            emptyText={
+                              responsibilityCentersError ||
+                              'No responsibility centers found'
+                            }
+                            disabled={isViewMode}
+                          />
+                        </div>
                       </div>
                     </div>
                     <button
@@ -2630,293 +2656,293 @@ export default function PurchaseForm({
                             <th className="py-3 px-2 w-10 text-center"></th>
                           </tr>
                         </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {purchaseItems.map((item) => (
-                        <tr
-                          key={item.id}
-                          className={item.isOther ? 'bg-gray-50/30' : ''}
-                        >
-                          <td className="py-1 px-1">
-                            <SearchableDropdown
-                              disabled={isViewMode || item.isOther}
-                              placeholder="Search product..."
-                              value={item.productSearch}
-                              onChange={(v) => {
-                                updatePurchaseItem(item.id, 'productSearch', v)
-                                // Clear productId when user manually changes search text
-                                if (v === '') {
-                                  updatePurchaseItem(item.id, 'productId', '')
-                                }
-                              }}
-                              onSelect={(opt) => {
-                                updatePurchaseItem(item.id, 'productId', opt.value)
-                                updatePurchaseItem(
-                                  item.id,
-                                  'productSearch',
-                                  opt.label,
-                                )
-                              }}
-                              options={productOptions}
-                              inputClassName={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              emptyText={productError || 'No products found'}
-                              dropdownFooter={
-                                !isViewMode && !item.isOther ? (
-                                  <button
-                                    onPointerDown={(e) => {
-                                      e.preventDefault()
+                        <tbody className="divide-y divide-gray-50">
+                          {purchaseItems.map((item) => (
+                            <tr
+                              key={item.id}
+                              className={item.isOther ? 'bg-gray-50/30' : ''}
+                            >
+                              <td className="py-1 px-1">
+                                <SearchableDropdown
+                                  disabled={isViewMode || item.isOther}
+                                  placeholder="Search product..."
+                                  value={item.productSearch}
+                                  onChange={(v) => {
+                                    updatePurchaseItem(item.id, 'productSearch', v)
+                                    // Clear productId when user manually changes search text
+                                    if (v === '') {
+                                      updatePurchaseItem(item.id, 'productId', '')
+                                    }
+                                  }}
+                                  onSelect={(opt) => {
+                                    updatePurchaseItem(item.id, 'productId', opt.value)
+                                    updatePurchaseItem(
+                                      item.id,
+                                      'productSearch',
+                                      opt.label,
+                                    )
+                                  }}
+                                  options={productOptions}
+                                  inputClassName={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  emptyText={productError || 'No products found'}
+                                  dropdownFooter={
+                                    !isViewMode && !item.isOther ? (
+                                      <button
+                                        onPointerDown={(e) => {
+                                          e.preventDefault()
+                                        }}
+                                        onMouseDown={(e) => {
+                                          e.preventDefault()
+                                        }}
+                                        onClick={() => openProductModal()}
+                                        className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-black rounded-lg transition-colors"
+                                      >
+                                        <Plus size={12} />
+                                        Add Product
+                                      </button>
+                                    ) : null
+                                  }
+                                />
+                              </td>
+                              <td className="py-1 px-1">
+                                <SearchableDropdown
+                                  disabled={isViewMode}
+                                  placeholder="Search account..."
+                                  value={item.coaSearch}
+                                  onChange={(v) =>
+                                    updatePurchaseItem(item.id, 'coaSearch', v)
+                                  }
+                                  onSelect={(opt) => {
+                                    updatePurchaseItem(item.id, 'coa', opt.value)
+                                    updatePurchaseItem(item.id, 'coaSearch', opt.label)
+                                  }}
+                                  options={coaOptions}
+                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  emptyText="No accounts found"
+                                />
+                              </td>
+                              <td className="py-1 px-1">
+                                <input
+                                  disabled={isViewMode}
+                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder="Details..."
+                                  value={item.description}
+                                  onChange={(e) =>
+                                    updatePurchaseItem(
+                                      item.id,
+                                      'description',
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td className="py-1 px-1">
+                                <input
+                                  disabled={isViewMode || item.isOther}
+                                  type="number"
+                                  min="0"
+                                  className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder={item.isOther ? '' : '1'}
+                                  value={item.isOther ? '' : item.qty || ''}
+                                  onChange={(e) =>
+                                    updatePurchaseItem(
+                                      item.id,
+                                      'qty',
+                                      e.target.value === ''
+                                        ? ''
+                                        : parseFloat(e.target.value) || 0,
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td className="py-1 px-1">
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    disabled={isViewMode}
+                                    className={`${tableInput + ' font-black w-28'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    type="text"
+                                    placeholder="0.00"
+                                    inputMode="decimal"
+                                    value={formatPriceDisplay(item.price)}
+                                    onChange={(e) => {
+                                      const parsed = parsePriceInput(e.target.value)
+                                      updatePurchaseItem(item.id, 'price', parsed)
                                     }}
-                                    onMouseDown={(e) => {
-                                      e.preventDefault()
-                                    }}
-                                    onClick={() => openProductModal()}
-                                    className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-[11px] font-black rounded-lg transition-colors"
+                                  />
+                                  <select
+                                    disabled={isViewMode}
+                                    value={item.vatType || 'VAT-EX'}
+                                    onChange={(e) => updatePurchaseItem(item.id, 'vatType', e.target.value)}
+                                    className={`text-[10px] font-bold px-1 py-1 rounded border ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' : 'bg-white border-gray-200 text-black focus:ring-1 focus:ring-red-500'} outline-none`}
                                   >
-                                    <Plus size={12} />
-                                    Add Product
+                                    <option value="VAT-EX">EX</option>
+                                    <option value="VAT-INC">INC</option>
+                                  </select>
+                                </div>
+                              </td>
+                              <td className="py-1 px-1">
+                                <div className="relative">
+                                  <input
+                                    disabled={isViewMode}
+                                    className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    type="number"
+                                    min="0"
+                                    max={
+                                      item.discountType === 'PERCENT' ? '100' : '999999'
+                                    }
+                                    step="0.01"
+                                    placeholder="0"
+                                    value={item.discount || ''}
+                                    onChange={(e) =>
+                                      updatePurchaseItem(
+                                        item.id,
+                                        'discount',
+                                        e.target.value === ''
+                                          ? ''
+                                          : parseFloat(e.target.value) || 0,
+                                      )
+                                    }
+                                  />
+                                  <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">
+                                    {item.discountType === 'PERCENT' ? '%' : '₱'}
+                                  </span>
+                                </div>
+                              </td>
+                              {/* DISCOUNT TYPE */}
+                              <td className="py-1 px-1">
+                                {isViewMode ? (
+                                  <div
+                                    className={`${tableInput} text-black py-1.5 text-center`}
+                                  >
+                                    {item.discountType === 'PERCENT'
+                                      ? 'PERCENT'
+                                      : 'FIXED'}
+                                  </div>
+                                ) : (
+                                  <select
+                                    value={item.discountType || 'PERCENT'}
+                                    onChange={(e) =>
+                                      updatePurchaseItem(
+                                        item.id,
+                                        'discountType',
+                                        e.target.value,
+                                      )
+                                    }
+                                    className={`w-full px-2 py-1 text-[11px] font-bold border border-gray-200 rounded focus:ring-1 focus:ring-red-400 outline-none`}
+                                  >
+                                    <option value="PERCENT">PERCENT</option>
+                                    <option value="FIXED">FIXED</option>
+                                  </select>
+                                )}
+                              </td>
+                              {/* VAT % */}
+                              <td className="py-1 px-1">
+                                {isViewMode ? (
+                                  <div
+                                    className={`${tableInput} text-black py-1.5 text-center`}
+                                  >
+                                    {item.vatSearch}
+                                  </div>
+                                ) : (
+                                  <SearchableDropdown
+                                    placeholder="VAT Rate"
+                                    value={item.vatSearch}
+                                    onChange={(v) =>
+                                      updatePurchaseItem(item.id, 'vatSearch', v)
+                                    }
+                                    onFocus={loadVatOnDemand}
+                                    onSelect={(opt) => {
+                                      updatePurchaseItem(item.id, 'vat', opt.value)
+                                      updatePurchaseItem(item.id, 'vatSearch', opt.label)
+                                      updatePurchaseItem(item.id, 'vatRate', opt.rate)
+                                    }}
+                                    options={vatOptionsForSelect}
+                                    inputClassName={`${pctInput + ' font-black text-red-600'}`}
+                                    emptyText={vatError || 'No VAT rates found'}
+                                    disabled={vatLoading}
+                                  />
+                                )}
+                              </td>
+                              <td className="py-1 px-1">
+                                {isViewMode ? (
+                                  <div
+                                    className={`${tableInput} text-black py-1.5 text-center`}
+                                  >
+                                    {item.whtSearch}
+                                  </div>
+                                ) : (
+                                  <SearchableDropdown
+                                    placeholder="WHT Rate"
+                                    value={item.whtSearch}
+                                    onChange={(v) =>
+                                      updatePurchaseItem(item.id, 'whtSearch', v)
+                                    }
+                                    onFocus={loadWhtOnDemand}
+                                    onSelect={(opt) => {
+                                      updatePurchaseItem(item.id, 'wht', opt.value)
+                                      updatePurchaseItem(item.id, 'whtSearch', opt.label)
+                                      updatePurchaseItem(item.id, 'whtRate', opt.rate)
+                                    }}
+                                    options={whtOptionsForSelect}
+                                    inputClassName={`${pctInput + ' font-black text-blue-600'}`}
+                                    emptyText={whtError || 'No WHT rates found'}
+                                    disabled={whtLoading}
+                                  />
+                                )}
+                              </td>
+                              <td className="py-1 px-1">
+                                <SearchableDropdown
+                                  disabled={isViewMode}
+                                  placeholder="Select"
+                                  value={item.responsibilityCenter}
+                                  onChange={(v) =>
+                                    updatePurchaseItem(
+                                      item.id,
+                                      'responsibilityCenter',
+                                      v,
+                                    )
+                                  }
+                                  onSelect={(opt) =>
+                                    updatePurchaseItem(
+                                      item.id,
+                                      'responsibilityCenter',
+                                      opt.value,
+                                    )
+                                  }
+                                  options={responsibilityCenterOptions}
+                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  emptyText={
+                                    responsibilityCentersError ||
+                                    'No responsibility centers found'
+                                  }
+                                />
+                              </td>
+                              <td className="py-1 px-1 text-center">
+                                {!isViewMode && (
+                                  <button
+                                    onClick={() => removePurchaseItem(item.id)}
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  >
+                                    <Trash2 size={15} />
                                   </button>
-                                ) : null
-                              }
-                            />
-                          </td>
-                          <td className="py-1 px-1">
-                            <SearchableDropdown
-                              disabled={isViewMode}
-                              placeholder="Search account..."
-                              value={item.coaSearch}
-                              onChange={(v) =>
-                                updatePurchaseItem(item.id, 'coaSearch', v)
-                              }
-                              onSelect={(opt) => {
-                                updatePurchaseItem(item.id, 'coa', opt.value)
-                                updatePurchaseItem(item.id, 'coaSearch', opt.label)
-                              }}
-                              options={coaOptions}
-                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              emptyText="No accounts found"
-                            />
-                          </td>
-                          <td className="py-1 px-1">
-                            <input
-                              disabled={isViewMode}
-                              className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              placeholder="Details..."
-                              value={item.description}
-                              onChange={(e) =>
-                                updatePurchaseItem(
-                                  item.id,
-                                  'description',
-                                  e.target.value,
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="py-1 px-1">
-                            <input
-                              disabled={isViewMode || item.isOther}
-                              type="number"
-                              min="0"
-                              className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              placeholder={item.isOther ? '' : '1'}
-                              value={item.isOther ? '' : item.qty || ''}
-                              onChange={(e) =>
-                                updatePurchaseItem(
-                                  item.id,
-                                  'qty',
-                                  e.target.value === ''
-                                    ? ''
-                                    : parseFloat(e.target.value) || 0,
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="py-1 px-1">
-                            <div className="flex items-center gap-1">
-                              <input
-                                disabled={isViewMode}
-                                className={`${tableInput + ' font-black w-28'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                type="text"
-                                placeholder="0.00"
-                                inputMode="decimal"
-                                value={formatPriceDisplay(item.price)}
-                                onChange={(e) => {
-                                  const parsed = parsePriceInput(e.target.value)
-                                  updatePurchaseItem(item.id, 'price', parsed)
-                                }}
-                              />
-                              <select
-                                disabled={isViewMode}
-                                value={item.vatType || 'VAT-EX'}
-                                onChange={(e) => updatePurchaseItem(item.id, 'vatType', e.target.value)}
-                                className={`text-[10px] font-bold px-1 py-1 rounded border ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' : 'bg-white border-gray-200 text-black focus:ring-1 focus:ring-red-500'} outline-none`}
-                              >
-                                <option value="VAT-EX">EX</option>
-                                <option value="VAT-INC">INC</option>
-                              </select>
-                            </div>
-                          </td>
-                          <td className="py-1 px-1">
-                            <div className="relative">
-                              <input
-                                disabled={isViewMode}
-                                className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                type="number"
-                                min="0"
-                                max={
-                                  item.discountType === 'PERCENT' ? '100' : '999999'
-                                }
-                                step="0.01"
-                                placeholder="0"
-                                value={item.discount || ''}
-                                onChange={(e) =>
-                                  updatePurchaseItem(
-                                    item.id,
-                                    'discount',
-                                    e.target.value === ''
-                                      ? ''
-                                      : parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                              />
-                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-black pointer-events-none">
-                                {item.discountType === 'PERCENT' ? '%' : '₱'}
-                              </span>
-                            </div>
-                          </td>
-                          {/* DISCOUNT TYPE */}
-                          <td className="py-1 px-1">
-                            {isViewMode ? (
-                              <div
-                                className={`${tableInput} text-black py-1.5 text-center`}
-                              >
-                                {item.discountType === 'PERCENT'
-                                  ? 'PERCENT'
-                                  : 'FIXED'}
-                              </div>
-                            ) : (
-                              <select
-                                value={item.discountType || 'PERCENT'}
-                                onChange={(e) =>
-                                  updatePurchaseItem(
-                                    item.id,
-                                    'discountType',
-                                    e.target.value,
-                                  )
-                                }
-                                className={`w-full px-2 py-1 text-[11px] font-bold border border-gray-200 rounded focus:ring-1 focus:ring-red-400 outline-none`}
-                              >
-                                <option value="PERCENT">PERCENT</option>
-                                <option value="FIXED">FIXED</option>
-                              </select>
-                            )}
-                          </td>
-                          {/* VAT % */}
-                          <td className="py-1 px-1">
-                            {isViewMode ? (
-                              <div
-                                className={`${tableInput} text-black py-1.5 text-center`}
-                              >
-                                {item.vatSearch}
-                              </div>
-                            ) : (
-                              <SearchableDropdown
-                                placeholder="VAT Rate"
-                                value={item.vatSearch}
-                                onChange={(v) =>
-                                  updatePurchaseItem(item.id, 'vatSearch', v)
-                                }
-                                onFocus={loadVatOnDemand}
-                                onSelect={(opt) => {
-                                  updatePurchaseItem(item.id, 'vat', opt.value)
-                                  updatePurchaseItem(item.id, 'vatSearch', opt.label)
-                                  updatePurchaseItem(item.id, 'vatRate', opt.rate)
-                                }}
-                                options={vatOptionsForSelect}
-                                inputClassName={`${pctInput + ' font-black text-red-600'}`}
-                                emptyText={vatError || 'No VAT rates found'}
-                                disabled={vatLoading}
-                              />
-                            )}
-                          </td>
-                          <td className="py-1 px-1">
-                            {isViewMode ? (
-                              <div
-                                className={`${tableInput} text-black py-1.5 text-center`}
-                              >
-                                {item.whtSearch}
-                              </div>
-                            ) : (
-                              <SearchableDropdown
-                                placeholder="WHT Rate"
-                                value={item.whtSearch}
-                                onChange={(v) =>
-                                  updatePurchaseItem(item.id, 'whtSearch', v)
-                                }
-                                onFocus={loadWhtOnDemand}
-                                onSelect={(opt) => {
-                                  updatePurchaseItem(item.id, 'wht', opt.value)
-                                  updatePurchaseItem(item.id, 'whtSearch', opt.label)
-                                  updatePurchaseItem(item.id, 'whtRate', opt.rate)
-                                }}
-                                options={whtOptionsForSelect}
-                                inputClassName={`${pctInput + ' font-black text-blue-600'}`}
-                                emptyText={whtError || 'No WHT rates found'}
-                                disabled={whtLoading}
-                              />
-                            )}
-                          </td>
-                          <td className="py-1 px-1">
-                            <SearchableDropdown
-                              disabled={isViewMode}
-                              placeholder="Select"
-                              value={item.responsibilityCenter}
-                              onChange={(v) =>
-                                updatePurchaseItem(
-                                  item.id,
-                                  'responsibilityCenter',
-                                  v,
-                                )
-                              }
-                              onSelect={(opt) =>
-                                updatePurchaseItem(
-                                  item.id,
-                                  'responsibilityCenter',
-                                  opt.value,
-                                )
-                              }
-                              options={responsibilityCenterOptions}
-                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              emptyText={
-                                responsibilityCentersError ||
-                                'No responsibility centers found'
-                              }
-                            />
-                          </td>
-                          <td className="py-1 px-1 text-center">
-                            {!isViewMode && (
-                              <button
-                                onClick={() => removePurchaseItem(item.id)}
-                                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {!isViewMode && (
-                  <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
-                    <button
-                      onClick={() => addPurchaseItem(false, bulkResponsibilityCenter)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
-                    >
-                      <Plus size={12} /> Add Product / Service
-                    </button>
-                    <span className="text-xs text-zinc-500 font-medium">{purchaseItems.length} {purchaseItems.length === 1 ? 'item' : 'items'}</span>
-                  </div>
-                )}
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {!isViewMode && (
+                      <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
+                        <button
+                          onClick={() => addPurchaseItem(false, bulkResponsibilityCenter)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                        >
+                          <Plus size={12} /> Add Product / Service
+                        </button>
+                        <span className="text-xs text-zinc-500 font-medium">{purchaseItems.length} {purchaseItems.length === 1 ? 'item' : 'items'}</span>
+                      </div>
+                    )}
                   </>
                 )}
               </section>
@@ -2971,132 +2997,132 @@ export default function PurchaseForm({
                             <th className="py-2.5 px-3 w-10 text-center"></th>
                           </tr>
                         </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {journalEntries.map((entry) => (
-                        <tr key={entry.id}>
-                          <td className="py-1.5 px-1">
-                            <SearchableDropdown
-                              disabled={isViewMode}
-                              placeholder="Search account..."
-                              value={entry.accountSearch}
-                              onChange={(v) =>
-                                updateJournalEntry(entry.id, 'accountSearch', v)
-                              }
-                              onSelect={(opt) => {
-                                updateJournalEntry(entry.id, 'account', opt.value)
-                                updateJournalEntry(
-                                  entry.id,
-                                  'accountSearch',
-                                  opt.label,
-                                )
-                              }}
-                              options={coaOptions}
-                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              emptyText="No accounts found"
-                            />
-                          </td>
-                          <td className="py-1.5 px-1">
-                            <input
-                              disabled={isViewMode || !entry.isManual}
-                              className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              placeholder="0.00"
-                              type="text"
-                              inputMode="decimal"
-                              value={formatPriceDisplay(entry.debit ?? '')}
-                              onChange={(e) => {
-                                const parsed = parsePriceInput(e.target.value)
-                                updateJournalEntry(
-                                  entry.id,
-                                  'debit',
-                                  parsed === '' ? '' : parseFloat(parsed) || 0,
-                                )
-                              }}
-                              readOnly={isViewMode || !entry.isManual}
-                            />
-                          </td>
-                          <td className="py-1.5 px-1">
-                            <input
-                              disabled={isViewMode || !entry.isManual}
-                              className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              placeholder="0.00"
-                              type="text"
-                              inputMode="decimal"
-                              value={formatPriceDisplay(entry.credit ?? '')}
-                              onChange={(e) => {
-                                const parsed = parsePriceInput(e.target.value)
-                                updateJournalEntry(
-                                  entry.id,
-                                  'credit',
-                                  parsed === '' ? '' : parseFloat(parsed) || 0,
-                                )
-                              }}
-                              readOnly={isViewMode || !entry.isManual}
-                            />
-                          </td>
-                          <td className="py-1.5 px-1">
-                            <SearchableDropdown
-                              disabled={isViewMode}
-                              placeholder="Select"
-                              value={entry.center}
-                              onChange={(v) =>
-                                updateJournalEntry(entry.id, 'center', v)
-                              }
-                              onSelect={(opt) =>
-                                updateJournalEntry(entry.id, 'center', opt.value)
-                              }
-                              options={responsibilityCenterOptions}
-                              inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                              emptyText={
-                                responsibilityCentersError ||
-                                'No responsibility centers found'
-                              }
-                            />
-                          </td>
-                          <td className="py-1.5 text-center">
-                            {!isViewMode && entry.isManual ? (
-                              <button
-                                className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded"
-                                onClick={() => removeJournalEntry(entry.id)}
-                              >
-                                <Trash2 size={15} className="mx-auto" />
-                              </button>
-                            ) : (
-                              <span className="text-gray-300 text-[11px] italic">
-                                {isViewMode ? '' : 'Auto'}
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
-                      {(() => {
-                        const totalDebit = journalEntries.reduce((s, e) => s + (parseFloat(e.debit) || 0), 0)
-                        const totalCredit = journalEntries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0)
-                        return (
-                          <tr>
-                            <td className="py-2.5 px-3 text-center text-xs font-bold">Total Ledger Balance:</td>
-                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(totalDebit)}</td>
-                            <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(totalCredit)}</td>
-                            <td />
-                            <td />
-                          </tr>
-                        )
-                      })()}
-                    </tfoot>
-                  </table>
-                </div>
-                {!isViewMode && (
-                  <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
-                    <button
-                      onClick={() => addJournalEntry(bulkResponsibilityCenter)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
-                    >
-                      <Plus size={12} /> Add Ledger Row
-                    </button>
-                    <span className="text-xs text-zinc-500 font-medium">{journalEntries.length} {journalEntries.length === 1 ? 'entry' : 'entries'}</span>
-                  </div>
-                )}
+                        <tbody className="divide-y divide-gray-50">
+                          {journalEntries.map((entry) => (
+                            <tr key={entry.id}>
+                              <td className="py-1.5 px-1">
+                                <SearchableDropdown
+                                  disabled={isViewMode}
+                                  placeholder="Search account..."
+                                  value={entry.accountSearch}
+                                  onChange={(v) =>
+                                    updateJournalEntry(entry.id, 'accountSearch', v)
+                                  }
+                                  onSelect={(opt) => {
+                                    updateJournalEntry(entry.id, 'account', opt.value)
+                                    updateJournalEntry(
+                                      entry.id,
+                                      'accountSearch',
+                                      opt.label,
+                                    )
+                                  }}
+                                  options={coaOptions}
+                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  emptyText="No accounts found"
+                                />
+                              </td>
+                              <td className="py-1.5 px-1">
+                                <input
+                                  disabled={isViewMode || !entry.isManual}
+                                  className={`${tableInput + ' font-black'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder="0.00"
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={formatPriceDisplay(entry.debit ?? '')}
+                                  onChange={(e) => {
+                                    const parsed = parsePriceInput(e.target.value)
+                                    updateJournalEntry(
+                                      entry.id,
+                                      'debit',
+                                      parsed === '' ? '' : parseFloat(parsed) || 0,
+                                    )
+                                  }}
+                                  readOnly={isViewMode || !entry.isManual}
+                                />
+                              </td>
+                              <td className="py-1.5 px-1">
+                                <input
+                                  disabled={isViewMode || !entry.isManual}
+                                  className={`${tableInput + ' font-black text-red-600'} ${isViewMode || !entry.isManual ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder="0.00"
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={formatPriceDisplay(entry.credit ?? '')}
+                                  onChange={(e) => {
+                                    const parsed = parsePriceInput(e.target.value)
+                                    updateJournalEntry(
+                                      entry.id,
+                                      'credit',
+                                      parsed === '' ? '' : parseFloat(parsed) || 0,
+                                    )
+                                  }}
+                                  readOnly={isViewMode || !entry.isManual}
+                                />
+                              </td>
+                              <td className="py-1.5 px-1">
+                                <SearchableDropdown
+                                  disabled={isViewMode}
+                                  placeholder="Select"
+                                  value={entry.center}
+                                  onChange={(v) =>
+                                    updateJournalEntry(entry.id, 'center', v)
+                                  }
+                                  onSelect={(opt) =>
+                                    updateJournalEntry(entry.id, 'center', opt.value)
+                                  }
+                                  options={responsibilityCenterOptions}
+                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  emptyText={
+                                    responsibilityCentersError ||
+                                    'No responsibility centers found'
+                                  }
+                                />
+                              </td>
+                              <td className="py-1.5 text-center">
+                                {!isViewMode && entry.isManual ? (
+                                  <button
+                                    className="p-1 text-red-600 transition-colors hover:bg-red-50 rounded"
+                                    onClick={() => removeJournalEntry(entry.id)}
+                                  >
+                                    <Trash2 size={15} className="mx-auto" />
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-300 text-[11px] italic">
+                                    {isViewMode ? '' : 'Auto'}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-slate-50 font-semibold text-slate-900 border-t border-slate-200">
+                          {(() => {
+                            const totalDebit = journalEntries.reduce((s, e) => s + (parseFloat(e.debit) || 0), 0)
+                            const totalCredit = journalEntries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0)
+                            return (
+                              <tr>
+                                <td className="py-2.5 px-3 text-center text-xs font-bold">Total Ledger Balance:</td>
+                                <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(totalDebit)}</td>
+                                <td className="py-2.5 px-3 text-center font-mono text-emerald-700 text-xs font-bold">{fmt(totalCredit)}</td>
+                                <td />
+                                <td />
+                              </tr>
+                            )
+                          })()}
+                        </tfoot>
+                      </table>
+                    </div>
+                    {!isViewMode && (
+                      <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
+                        <button
+                          onClick={() => addJournalEntry(bulkResponsibilityCenter)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500 border-dashed text-xs font-bold rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                        >
+                          <Plus size={12} /> Add Ledger Row
+                        </button>
+                        <span className="text-xs text-zinc-500 font-medium">{journalEntries.length} {journalEntries.length === 1 ? 'entry' : 'entries'}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </section>
@@ -3143,105 +3169,105 @@ export default function PurchaseForm({
                             ))}
                           </tr>
                         </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {attachments.map((file) => (
-                          <tr key={file.id}>
-                            <td className="py-2 px-1">
-                              <input
-                                disabled={isViewMode}
-                                className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                placeholder="e.g. Invoice_Scan"
-                                value={file.fileName}
-                                onChange={(e) =>
-                                  updateAttachment(
-                                    file.id,
-                                    'fileName',
-                                    e.target.value,
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="py-2 px-1">
-                              {isViewMode ? (
-                                <div
-                                  className={`${tableInput} bg-transparent text-black cursor-not-allowed flex items-center justify-center`}
-                                >
-                                  {file.file &&
-                                  typeof file.file === 'string' &&
-                                  file.file.startsWith('data:image/') ? (
-                                    <img
-                                      src={file.file}
-                                      alt={file.fileName || 'Attachment'}
-                                      className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
-                                      onClick={() =>
-                                        setImageModal({
-                                          isOpen: true,
-                                          imageSrc: file.file,
-                                        })
-                                      }
-                                      title="Click to view full size"
-                                    />
-                                  ) : file.file ? (
-                                    <span className="text-gray-500 text-[11px] italic">
-                                      File attached
-                                    </span>
-                                  ) : (
-                                    <span className="text-gray-400 text-[11px] italic">
-                                      No file
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
+                        <tbody className="divide-y divide-gray-50">
+                          {attachments.map((file) => (
+                            <tr key={file.id}>
+                              <td className="py-2 px-1">
                                 <input
-                                  type="file"
-                                  className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full"
+                                  disabled={isViewMode}
+                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder="e.g. Invoice_Scan"
+                                  value={file.fileName}
                                   onChange={(e) =>
-                                    handleFileChange(file.id, e.target.files[0])
+                                    updateAttachment(
+                                      file.id,
+                                      'fileName',
+                                      e.target.value,
+                                    )
                                   }
                                 />
-                              )}
-                            </td>
-                            <td className="py-2 px-1">
-                              <input
-                                disabled={isViewMode}
-                                className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                placeholder="Add note..."
-                                value={file.remarks}
-                                onChange={(e) =>
-                                  updateAttachment(
-                                    file.id,
-                                    'remarks',
-                                    e.target.value,
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">
-                              {file.uploadedBy}
-                            </td>
-                            <td className="py-2 text-center">
-                              {!isViewMode && (
-                                <button
-                                  onClick={() => removeAttachment(file.id)}
-                                  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                >
-                                  <Trash2 size={15} />
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {!isViewMode && (
-                    <button
-                      onClick={addAttachment}
-                      className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
-                    >
-                      <Plus size={15} /> Add File
-                    </button>
-                  )}
+                              </td>
+                              <td className="py-2 px-1">
+                                {isViewMode ? (
+                                  <div
+                                    className={`${tableInput} bg-transparent text-black cursor-not-allowed flex items-center justify-center`}
+                                  >
+                                    {file.file &&
+                                      typeof file.file === 'string' &&
+                                      file.file.startsWith('data:image/') ? (
+                                      <img
+                                        src={file.file}
+                                        alt={file.fileName || 'Attachment'}
+                                        className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={() =>
+                                          setImageModal({
+                                            isOpen: true,
+                                            imageSrc: file.file,
+                                          })
+                                        }
+                                        title="Click to view full size"
+                                      />
+                                    ) : file.file ? (
+                                      <span className="text-gray-500 text-[11px] italic">
+                                        File attached
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400 text-[11px] italic">
+                                        No file
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <input
+                                    type="file"
+                                    className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full"
+                                    onChange={(e) =>
+                                      handleFileChange(file.id, e.target.files[0])
+                                    }
+                                  />
+                                )}
+                              </td>
+                              <td className="py-2 px-1">
+                                <input
+                                  disabled={isViewMode}
+                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder="Add note..."
+                                  value={file.remarks}
+                                  onChange={(e) =>
+                                    updateAttachment(
+                                      file.id,
+                                      'remarks',
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">
+                                {file.uploadedBy}
+                              </td>
+                              <td className="py-2 text-center">
+                                {!isViewMode && (
+                                  <button
+                                    onClick={() => removeAttachment(file.id)}
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {!isViewMode && (
+                      <button
+                        onClick={addAttachment}
+                        className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
+                      >
+                        <Plus size={15} /> Add File
+                      </button>
+                    )}
                   </div>
                 </section>
 

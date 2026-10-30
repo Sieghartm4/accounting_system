@@ -614,7 +614,16 @@ export default function ReceiptsForm({
         >
           <ArrowLeft size={17} />
           <span className="text-white">Go Back</span>
+          
         </nav>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-black rounded-lg text-red-500 shadow-lg shadow-black/20">
+                        <Receipt size={24} />
+                      </div>
+                      <h1 className="text-4xl font-black text-black tracking-tighter">
+                        Cash <span className="text-red-600 italic">Receipts</span>
+                      </h1>
+                    </div>
         {!isDisabled && (
           <div className="flex items-center gap-2">
             {postedLock && (
@@ -631,6 +640,10 @@ export default function ReceiptsForm({
             >
               <Save size={14} /> {isEditMode ? 'Update Receipt' : 'Post Transaction'}
             </button>
+          </div>
+        )}
+        {isDisabled && (
+          <div>
           </div>
         )}
       </div>
@@ -941,33 +954,47 @@ export default function ReceiptsForm({
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-white pointer-events-none" />
                       <div className="pl-7">
-                        <SearchableDropdown
-                          placeholder="Resp. Center to All"
-                          value={bulkResponsibilityCenter}
-                          onChange={setBulkResponsibilityCenter}
-                          onSelect={(opt) => {
-                            setBulkResponsibilityCenter(opt.value)
-                            receiptItems.forEach((item) =>
-                              updateReceiptItem(
-                                item.id,
-                                'responsibilityCenter',
-                                opt.value,
-                              ),
-                            )
-                            journalEntries.forEach((entry) =>
-                              updateJournalEntry(entry.id, 'center', opt.value),
-                            )
-                          }}
-                          options={responsibilityCenterOptions}
-                          inputClassName="w-full px-2 py-1.5 rounded-lg text-[11px] font-medium outline-none transition-all bg-zinc-800 border border-white text-white focus:ring-2 focus:ring-red-500"
-                          emptyText={
-                            responsibilityCentersError ||
-                            'No responsibility centers found'
-                          }
-                          disabled={isDisabled}
-                        />
+                        {/* Search Card Container with white/light background and subtle border */}
+                        <div className="flex items-center bg-white border border-gray-300 rounded-lg px-2.5 py-1 shadow-sm focus-within:ring-2 focus-within:ring-red-500 focus-within:border-transparent transition-all">
+                          {/* Connected Search Icon */}
+                          <svg
+                            className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+
+                          {/* SearchableDropdown with transparent input styling */}
+                          <SearchableDropdown
+                            placeholder="Resp. Center to All"
+                            value={bulkResponsibilityCenter}
+                            onChange={setBulkResponsibilityCenter}
+                            onSelect={(opt) => {
+                              setBulkResponsibilityCenter(opt.value)
+                              receiptItems.forEach((item) =>
+                                updateReceiptItem(
+                                  item.id,
+                                  'responsibilityCenter',
+                                  opt.value,
+                                ),
+                              )
+                              journalEntries.forEach((entry) =>
+                                updateJournalEntry(entry.id, 'center', opt.value),
+                              )
+                            }}
+                            options={responsibilityCenterOptions}
+                            inputClassName="w-full bg-transparent text-gray-900 placeholder-gray-400 text-[11px] font-medium outline-none border-none focus:ring-0 p-0"
+                            emptyText={
+                              responsibilityCentersError ||
+                              'No responsibility centers found'
+                            }
+                            disabled={isDisabled}
+                          />
+                        </div>
                       </div>
                     </div>
                     <button

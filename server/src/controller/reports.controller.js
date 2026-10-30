@@ -619,6 +619,10 @@ const getCashFlowStatement = async (req, res, next) => {
       if (cashIdSet.has(Number(coaId))) return 'INTERNAL'
       if (info && info.type === 'EQUITY') return 'FINANCING'
       const name = String(info?.name || '').toLowerCase()
+      // Disposal gain/loss accounts belong with the disposal (Investing);
+      // as operating counters they would overstate operating outflows.
+      if (/(loss|gain).*(sale|disposal)|(sale|disposal).*(loss|gain)/.test(name))
+        return 'INVESTING'
       if (financingTerms.some((term) => name.includes(term))) return 'FINANCING'
       if (investingTerms.some((term) => name.includes(term))) return 'INVESTING'
       return 'OPERATING'
@@ -633,6 +637,7 @@ const getCashFlowStatement = async (req, res, next) => {
     }
 
     const docs = new Map()
+    const unbalancedDocs = []
     for (const line of lines || []) {
       const docKey = `${line.db_name}:${line.db_id}`
       let doc = docs.get(docKey)
@@ -651,7 +656,7 @@ const getCashFlowStatement = async (req, res, next) => {
       }
     }
 
-    for (const doc of docs.values()) {
+    for (const [docKey, doc] of docs) {
       // Pure cash-to-cash transfer (deposit, withdrawal, top-up made by moving
       // money between cash/bank accounts): at least two distinct cash accounts,
       // no non-cash counter lines. Emit per-account movements under INTERNAL.
@@ -697,7 +702,8 @@ const getCashFlowStatement = async (req, res, next) => {
         else row.outflow += -cashDelta
       }
 
-      // Malformed/partial documents: attribute the leftover to Operating.
+      // Malformed/partial documents: attribute the leftover to Operating and
+      // flag the document for the audit section.
       const residual = doc.cashNet - explained
       if (Math.abs(residual) > 0.005) {
         let residualRow = sections.OPERATING.get('RESIDUAL')
@@ -712,6 +718,12 @@ const getCashFlowStatement = async (req, res, next) => {
         }
         if (residual >= 0) residualRow.inflow += residual
         else residualRow.outflow += -residual
+        const keyParts = String(docKey).split(':')
+        unbalancedDocs.push({
+          db_name: keyParts[0] || '',
+          db_id: keyParts[1] || '',
+          amount: round2(residual),
+        })
       }
     }
 
@@ -752,6 +764,8 @@ const getCashFlowStatement = async (req, res, next) => {
       const type = typeByCode.get(row.code) || ''
       if (row.name === 'Other cash movements (unclassified)') return CAP_OTHER_OPERATING
       if (/contra|discount/.test(name)) return CAP_OTHER_OPERATING
+      if (/(loss|gain).*sale|sale.*(loss|gain)|(loss|gain).*disposal|disposal.*(loss|gain)/.test(name))
+        return CAP_OTHER_OPERATING
       if (type === 'REVENUE' || name.includes('receivable'))
         return 'Cash collections from customers'
       if (/(salaries|wages|payroll|compensation|13th|bonus|hazard pay|overtime)/.test(name))
@@ -770,8 +784,13 @@ const getCashFlowStatement = async (req, res, next) => {
 
     const CAP_INVEST_IN = 'Purchase of long-term assets and investments'
     const CAP_INVEST_OUT = 'Cash proceeds from sale of long-term assets and investments'
-    const canonicalInvestingCaption = (row) =>
-      row.net >= 0 ? CAP_INVEST_OUT : CAP_INVEST_IN
+    const CAP_DISPOSAL_DIFF = 'Gain / loss adjustments on asset disposals'
+    const canonicalInvestingCaption = (row) => {
+      const name = lower(row.name)
+      if (/(loss|gain).*(sale|disposal)|(sale|disposal).*(loss|gain)/.test(name))
+        return CAP_DISPOSAL_DIFF
+      return row.net >= 0 ? CAP_INVEST_OUT : CAP_INVEST_IN
+    }
 
     const CAP_FIN_EQUITY_IN = "Owner's capital contributions"
     const CAP_FIN_EQUITY_OUT = "Owner's withdrawals and dividends paid"
@@ -821,10 +840,12 @@ const getCashFlowStatement = async (req, res, next) => {
 
       const niSql = `
         SELECT
-          COALESCE(SUM(CASE WHEN c.${coa.type} = 'REVENUE' THEN pc.net ELSE 0 END), 0) AS revenueNet,
+          COALESCE(SUM(CASE WHEN c.${coa.type} = 'REVENUE' AND NOT (LOWER(c.${coa.name}) LIKE '%gain%' AND (LOWER(c.${coa.name}) LIKE '%sale%' OR LOWER(c.${coa.name}) LIKE '%disposal%')) THEN pc.net ELSE 0 END), 0) AS revenueNet,
+          COALESCE(SUM(CASE WHEN c.${coa.type} = 'REVENUE' AND LOWER(c.${coa.name}) LIKE '%gain%' AND (LOWER(c.${coa.name}) LIKE '%sale%' OR LOWER(c.${coa.name}) LIKE '%disposal%') THEN pc.net ELSE 0 END), 0) AS revenueGainNet,
           COALESCE(SUM(CASE WHEN c.${coa.type} = 'EXPENSES' AND LOWER(c.${coa.name}) LIKE '%depreciation%' THEN pc.net ELSE 0 END), 0) AS depreciationNet,
           COALESCE(SUM(CASE WHEN c.${coa.type} = 'EXPENSES' AND LOWER(c.${coa.name}) LIKE '%amortization%' THEN pc.net ELSE 0 END), 0) AS amortizationNet,
-          COALESCE(SUM(CASE WHEN c.${coa.type} = 'EXPENSES' AND LOWER(c.${coa.name}) NOT LIKE '%depreciation%' AND LOWER(c.${coa.name}) NOT LIKE '%amortization%' THEN pc.net ELSE 0 END), 0) AS otherExpenseNet
+          COALESCE(SUM(CASE WHEN c.${coa.type} = 'EXPENSES' AND LOWER(c.${coa.name}) LIKE '%loss%' AND (LOWER(c.${coa.name}) LIKE '%sale%' OR LOWER(c.${coa.name}) LIKE '%disposal%') THEN pc.net ELSE 0 END), 0) AS expenseLossNet,
+          COALESCE(SUM(CASE WHEN c.${coa.type} = 'EXPENSES' AND LOWER(c.${coa.name}) NOT LIKE '%depreciation%' AND LOWER(c.${coa.name}) NOT LIKE '%amortization%' AND NOT (LOWER(c.${coa.name}) LIKE '%loss%' AND (LOWER(c.${coa.name}) LIKE '%sale%' OR LOWER(c.${coa.name}) LIKE '%disposal%')) THEN pc.net ELSE 0 END), 0) AS otherExpenseNet
           FROM (
             SELECT j.${je.coa_id} AS coa_id,
                    SUM(CASE WHEN j.${je.type} = 'DEBIT' THEN j.${je.amount} ELSE -j.${je.amount} END) AS net
@@ -841,17 +862,32 @@ const getCashFlowStatement = async (req, res, next) => {
         ...DOC_SOURCES.map(() => end_date),
       ])
       const revenueNet = parseFloat(niRows?.[0]?.revenueNet || 0)
+      const revenueGainNet = parseFloat(niRows?.[0]?.revenueGainNet || 0)
       const depreciationNet = parseFloat(niRows?.[0]?.depreciationNet || 0)
       const amortizationNet = parseFloat(niRows?.[0]?.amortizationNet || 0)
+      const expenseLossNet = parseFloat(niRows?.[0]?.expenseLossNet || 0)
       const otherExpenseNet = parseFloat(niRows?.[0]?.otherExpenseNet || 0)
 
       // Stored sign convention: revenue credits make revenueNet negative.
-      const netIncome = round2(-revenueNet - (depreciationNet + amortizationNet + otherExpenseNet))
+      const netIncome = round2(
+        -revenueNet - revenueGainNet -
+          (depreciationNet + amortizationNet + expenseLossNet + otherExpenseNet),
+      )
       indirect.netIncome = netIncome
       if (depreciationNet > 0.005)
         indirect.addBacks.push({ label: 'Add back: Depreciation', amount: round2(depreciationNet) })
       if (amortizationNet > 0.005)
         indirect.addBacks.push({ label: 'Add back: Amortization', amount: round2(amortizationNet) })
+      if (expenseLossNet > 0.005)
+        indirect.addBacks.push({
+          label: 'Add back: Loss on sale/disposal of assets',
+          amount: round2(expenseLossNet),
+        })
+      if (revenueGainNet < -0.005)
+        indirect.addBacks.push({
+          label: 'Less: Gain on sale/disposal of assets',
+          amount: round2(revenueGainNet),
+        })
 
       const balanceGroupsSql = (op) => `
         SELECT
@@ -922,6 +958,11 @@ const getCashFlowStatement = async (req, res, next) => {
         captions,
         indirect,
         internalTransfers: { rows: internal.rows, total: internal.net },
+        unbalanced: {
+          count: unbalancedDocs.length,
+          total: round2(unbalancedDocs.reduce((sum, doc) => sum + doc.amount, 0)),
+          documents: unbalancedDocs.slice(0, 50),
+        },
         cashAccounts: cashAccounts.map((a) => ({ code: a.code, name: a.name })),
       },
       timestamp: new Date().toISOString(),
@@ -1864,7 +1905,7 @@ const getSearch = async (req, res, next) => {
       // Enhanced Adjustments Query - searches across multiple fields
       const adjustmentsQuery = `
       SELECT 
-        'Adjustment' as document_type,
+        'Journal Voucher' as document_type,
         adj.${Accounting.adjustments.selectOptionColumns.id} as document_id,
         adj.${Accounting.adjustments.selectOptionColumns.id} as id,
         adj.${Accounting.adjustments.selectOptionColumns.document_reference} as document_reference,
