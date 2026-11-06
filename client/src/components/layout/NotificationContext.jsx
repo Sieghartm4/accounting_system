@@ -36,10 +36,12 @@ export const useNotificationsState = () => {
       loading: false,
       error: null,
       companyId: null,
+      hasMore: false,
+      loadingMore: false,
       refresh: () => {},
+      loadMore: () => {},
       markRead: () => {},
       markReadForDocument: () => {},
-      markAllRead: () => {},
       markAllRead: () => {},
     }
   )

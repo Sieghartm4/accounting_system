@@ -155,6 +155,9 @@ export const API = {
   productServiceSyncPreview: () => url('/product_service/sync/preview'),
   productServiceSyncImport: () => url('/product_service/sync/import'),
 
+  sequenceSettings: () => url('/sequence_settings'),
+  sequenceSettingsById: (id) => url(`/sequence_settings/${id}`),
+
   // -----------------------------------------------------------------------
   // 2.7 TRANSACTION MODULES
   //  Ordered as the accounting flow runs: journal entries -> adjustments ->

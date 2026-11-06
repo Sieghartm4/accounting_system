@@ -125,6 +125,9 @@ function NotificationList({
   onRefresh,
   onMarkRead,
   onMarkAllRead,
+  onLoadMore = null,
+  hasMore = false,
+  loadingMore = false,
   compact = false,
   emptyHint = 'Activity from other people in your company will appear here.',
 }) {
@@ -375,12 +378,23 @@ function NotificationList({
         })}
       </ul>
 
-      {compact && unreadCount > 0 && (
+      {onMarkAllRead && compact && unreadCount > 0 && (
         <button
           onClick={onMarkAllRead}
           className="w-full py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-600 border-t border-slate-100 transition-colors"
         >
           Mark all as read
+        </button>
+      )}
+
+      {onLoadMore && hasMore && (
+        <button
+          onClick={onLoadMore}
+          disabled={loadingMore}
+          className="w-full flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-600 border-t border-slate-100 transition-colors disabled:opacity-50"
+        >
+          {loadingMore && <Loader2 size={12} className="animate-spin" />}
+          Load older notifications
         </button>
       )}
       </>

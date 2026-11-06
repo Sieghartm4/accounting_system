@@ -160,6 +160,9 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
     loading: notificationsLoading,
     error: notificationsError,
     refresh: refreshNotifications,
+    hasMore: notificationsHasMore,
+    loadingMore: notificationsLoadingMore,
+    loadMore,
     markRead,
     markAllRead,
   } = useNotificationsState()
@@ -719,7 +722,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                               <button
                                 type="button"
                                 onClick={() => setShowSearchModal(false)}
-                                className="p-1 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                                className="p-1 hover:bg-gray-100 rounded- lg transition-colors cursor-pointer"
                               >
                                 <X size={14} className="text-gray-400" />
                               </button>
@@ -888,13 +891,16 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
                 <div className="max-h-[420px] overflow-y-auto custom-scrollbar">
                   <NotificationList
                     compact
-                    items={notifications.slice(0, 12)}
+                    items={notifications}
                     unreadCount={unreadCount}
                     loading={notificationsLoading}
                     error={notificationsError}
                     onRefresh={refreshNotifications}
                     onMarkRead={markRead}
                     onMarkAllRead={markAllRead}
+                    onLoadMore={loadMore}
+                    hasMore={notificationsHasMore}
+                    loadingMore={notificationsLoadingMore}
                   />
                 </div>
               </div>

@@ -19,7 +19,8 @@ module.exports = {
       // Present in existing tenants but never listed here, so a fresh tenant
       // would have been missing them entirely. Also seeded so the client
       // registry has something to resolve.
-      'accounting_tools', 'fiscal_periods'
+      'accounting_tools', 'fiscal_periods',
+      'sequence_settings'
     ];
     const seedData = [];
     routes.forEach(route => {

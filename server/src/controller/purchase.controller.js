@@ -72,6 +72,8 @@ const {
   getPeriodKeyForDate,
 } = require('../util/accountingPeriod.util')
 
+const { generateDocumentId } = require('../util/sequence.util')
+
 const { notifyFromController } = require('../services/notification/notifyFromController')
 
 const sql = new SQLQueryBuilder()
@@ -82,51 +84,13 @@ require('dotenv').config()
 
 
 
-const generatePurchaseId = async (connection) => {
+const generatePurchaseId = async (connection) =>
 
-  const now = new Date()
+  // delegates to the company's sequence settings
 
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  // (defaults to the legacy PO-MMDDYY-0001 format)
 
-  const dd = String(now.getDate()).padStart(2, '0')
-
-  const yy = String(now.getFullYear()).slice(-2)
-
-  const datePart = `${mm}${dd}${yy}`
-
-  const idPrefix = `PO-${datePart}-`
-
-
-
-  const [existing] = await connection.execute(
-
-    `SELECT p_id FROM ${Accounting.purchase.tablename} WHERE p_id LIKE ? ORDER BY p_id DESC LIMIT 1`,
-
-    [`${idPrefix}%`],
-
-  )
-
-
-
-  let seq = 1
-
-  if (existing && existing.length > 0) {
-
-    const lastId = existing[0].p_id
-
-    const parts = lastId.split('-')
-
-    const lastSeq = parseInt(parts[parts.length - 1], 10) || 0
-
-    seq = lastSeq + 1
-
-  }
-
-
-
-  return `${idPrefix}${String(seq).padStart(4, '0')}`
-
-}
+  generateDocumentId(connection, 'purchase')
 
 
 

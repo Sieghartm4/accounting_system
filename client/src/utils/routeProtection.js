@@ -412,6 +412,11 @@ export const ROUTE_CONFIG = {
     label: 'Product & Service',
     icon: 'Package',
   },
+  sequence_settings: {
+    name: 'sequence_settings',
+    label: 'Sequence Settings',
+    icon: 'ListStart',
+  },
   company: { name: 'company', label: 'Company Management', icon: 'Building' },
   vat: { name: 'vat', label: 'VAT Management', icon: 'Percent' },
   responsibility_center: {
@@ -587,6 +592,7 @@ export const getSidebarItems = (user) => {
     'charts',
     'proforma_entries',
     'product_service',
+    'sequence_settings',
     'company',
     'vat',
     'responsibility_center',

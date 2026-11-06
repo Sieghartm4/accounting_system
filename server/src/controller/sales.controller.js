@@ -44,33 +44,16 @@ const {
   getPeriodKeyForDate,
 } = require('../util/accountingPeriod.util')
 
+const { generateDocumentId } = require('../util/sequence.util')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
 
-const generateSalesId = async (connection) => {
-  const now = new Date()
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
-  const dd = String(now.getDate()).padStart(2, '0')
-  const yy = String(now.getFullYear()).slice(-2)
-  const datePart = `${mm}${dd}${yy}`
-  const idPrefix = `SO-${datePart}-`
-
-  const [existing] = await connection.execute(
-    `SELECT s_id FROM ${Accounting.sales.tablename} WHERE s_id LIKE ? ORDER BY s_id DESC LIMIT 1`,
-    [`${idPrefix}%`],
-  )
-
-  let seq = 1
-  if (existing && existing.length > 0) {
-    const lastId = existing[0].s_id
-    const parts = lastId.split('-')
-    const lastSeq = parseInt(parts[parts.length - 1], 10) || 0
-    seq = lastSeq + 1
-  }
-
-  return `${idPrefix}${String(seq).padStart(4, '0')}`
-}
+const generateSalesId = async (connection) =>
+  // delegates to the company's sequence settings
+  // (defaults to the legacy SO-MMDDYY-0001 format)
+  generateDocumentId(connection, 'sales')
 
 const generateSalesItemId = (salesId) => `${salesId}-ITEM-${crypto.randomUUID()}`
 

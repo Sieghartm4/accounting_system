@@ -48,6 +48,7 @@ module.exports = {
       'accounting_periods',
       'accounting_tools',
       'fiscal_periods',
+      'sequence_settings',
     ]
 
     // Inserted one row at a time behind an existence check. `db:seed:all`

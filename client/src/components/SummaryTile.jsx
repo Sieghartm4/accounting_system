@@ -133,7 +133,7 @@ function SummaryTile({
             />
           )}
           <span
-            className={`text-2xl font-bold font-mono tracking-tight ${isActive ? 'text-white' : plainLabel ? theme.text : 'text-black'} ${showHover ? 'group-hover:text-white' : ''}`}
+            className={`text-2xl font-bold font-mono tracking-tight ${isActive ? 'text-white' : plainLabel || color === 'dark' ? theme.text : 'text-black'} ${showHover ? 'group-hover:text-white' : ''}`}
           >
             {value}
           </span>

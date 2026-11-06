@@ -94,6 +94,12 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
   const [unreadByModule, setUnreadByModule] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // Older notifications were silently dropped because the server caps one
+  // response at 50 rows. The bell now pulls a bigger first page and pages back
+  // with loadMore, so read history stays reachable instead of disappearing.
+  const PAGE_SIZE = 200
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [companyId, setCompanyId] = useState(
     providedCompanyId ? Number(providedCompanyId) : null,
   )
@@ -108,12 +114,17 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
   const itemsRef = useRef(items)
   itemsRef.current = items
 
+  // Sequential loadMore calls would race on the offset; a ref is the guard.
+  const loadingMoreRef = useRef(false)
+
   const load = useCallback(async (filter = 'all') => {
     const id = providedCompanyId ? Number(providedCompanyId) : await resolveCompanyId()
     if (!companyRef.current) setCompanyId(id)
 
     const [res, moduleRes] = await Promise.all([
-      fetchWithAuth(`${API.notifications()}?filter=${filter}&companyId=${id}`),
+      fetchWithAuth(
+        `${API.notifications()}?filter=${filter}&limit=${PAGE_SIZE}&companyId=${id}`,
+      ),
       fetchWithAuth(`${API.notificationsUnreadByModule()}?companyId=${id}`),
     ])
 
@@ -121,8 +132,10 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
     const json = await res.json().catch(() => null)
     if (!json?.success) throw new Error(json?.message || 'Could not load notifications')
 
-    setItems(json.data?.items ?? [])
+    const page = json.data?.items ?? []
+    setItems(page)
     setUnreadCount(Number(json.data?.unreadCount ?? 0))
+    setHasMore(page.length === PAGE_SIZE)
 
     if (moduleRes.ok) {
       const moduleJson = await moduleRes.json().catch(() => null)
@@ -133,6 +146,32 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
 
     return json.data
   }, [providedCompanyId])
+
+  const loadMore = useCallback(async () => {
+    const cid = companyRef.current
+    if (!cid || loadingMoreRef.current || itemsRef.current.length === 0) return
+    loadingMoreRef.current = true
+    setLoadingMore(true)
+    try {
+      // The list is ordered newest first, so the next page starts after
+      // everything currently in hand.
+      const res = await fetchWithAuth(
+        `${API.notifications()}?filter=all&limit=${PAGE_SIZE}&offset=${itemsRef.current.length}&companyId=${cid}`,
+      )
+      if (!res.ok) return
+      const json = await res.json().catch(() => null)
+      if (!json?.success) return
+      const page = json.data?.items ?? []
+      setItems((current) => {
+        const seen = new Set(current.map((n) => n.id))
+        return [...current, ...page.filter((n) => !seen.has(n.id))]
+      })
+      setHasMore(page.length === PAGE_SIZE)
+    } finally {
+      loadingMoreRef.current = false
+      setLoadingMore(false)
+    }
+  }, [])
 
   const refresh = useCallback(async () => {
     try {
@@ -279,7 +318,10 @@ const useNotifications = ({ companyId: providedCompanyId } = {}) => {
     loading,
     error,
     companyId,
+    hasMore,
+    loadingMore,
     refresh,
+    loadMore,
     markRead,
     markReadForDocument,
     markAllRead,

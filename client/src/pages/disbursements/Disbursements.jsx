@@ -16,10 +16,12 @@ import {
   ClipboardList,
   CheckCircle,
   XCircle,
+  ListStart,
 } from 'lucide-react'
 import DynamicTable from '../../components/DynamicTable'
 import DynamicToast from '../../components/DynamicToast'
 import DynamicConfirmModal from '../../components/DynamicConfirmModal'
+import SequenceSettingsModal from '../../components/SequenceSettingsModal'
 import RouteProtection from '../../components/RouteProtection'
 import ProtectedAction from '../../components/ProtectedAction'
 import useDisbursements from './useDisbursements'
@@ -63,6 +65,7 @@ function DisbursementsContent() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [isPostedEdit, setIsPostedEdit] = useState(false)
   const [toast, setToast] = useState(null)
+  const [isSequenceModalOpen, setIsSequenceModalOpen] = useState(false)
   const [pendingDateFrom, setPendingDateFrom] = useState('')
   const [pendingDateTo, setPendingDateTo] = useState('')
   const [activeDateFrom, setActiveDateFrom] = useState(null)
@@ -522,6 +525,13 @@ function DisbursementsContent() {
         type="warning"
       />
 
+      <SequenceSettingsModal
+        isOpen={isSequenceModalOpen}
+        onClose={() => setIsSequenceModalOpen(false)}
+        module="disbursements"
+        onSaved={() => setToast({ type: 'success', message: 'Sequence updated. New documents will use it.' })}
+      />
+
       {/* --- HEADER SECTION --- */}
       <div className="shrink-0">
         <motion.div
@@ -542,6 +552,13 @@ function DisbursementsContent() {
           </div>
 
           <div className="flex flex-col md:flex-row md:items-center gap-3">
+            <button
+              onClick={() => setIsSequenceModalOpen(true)}
+              className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm"
+            >
+              <ListStart size={14} />
+              Edit Sequence
+            </button>
             <button className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm">
               <Download size={14} />
               EXPORT DATA

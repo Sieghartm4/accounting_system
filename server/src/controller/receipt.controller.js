@@ -41,6 +41,8 @@ const {
   getPeriodKeyForDate,
 } = require('../util/accountingPeriod.util')
 
+const { generateDocumentId } = require('../util/sequence.util')
+
 const sql = new SQLQueryBuilder()
 
 require('dotenv').config()
@@ -1059,29 +1061,9 @@ const createReceipts = async (req, res, next) => {
       // Get user full name from database
       const userFullName = await getUserFullName(created_by, connection, Master)
 
-      // generate receipt id in format CR-MMDDYY-0001 (sequence per day)
-      const nowForId = new Date()
-      const mm = String(nowForId.getMonth() + 1).padStart(2, '0')
-      const dd = String(nowForId.getDate()).padStart(2, '0')
-      const yy = String(nowForId.getFullYear()).slice(-2)
-      const datePart = `${mm}${dd}${yy}`
-      const idPrefix = `CR-${datePart}-`
-
-      const [existing] = await connection.execute(
-        `SELECT r_id FROM receipts WHERE r_id LIKE ? ORDER BY r_id DESC LIMIT 1`,
-        [`${idPrefix}%`],
-      )
-
-      let seq = 1
-      if (existing && existing.length > 0) {
-        const lastId = existing[0].r_id
-        const parts = lastId.split('-')
-        const lastSeq = parseInt(parts[parts.length - 1], 10) || 0
-        seq = lastSeq + 1
-      }
-
-      const seqStr = String(seq).padStart(4, '0')
-      const newReceiptId = `${idPrefix}${seqStr}`
+      // generate receipt id via the company's sequence settings
+      // (defaults to the legacy CR-MMDDYY-0001 format)
+      const newReceiptId = await generateDocumentId(connection, 'receipts')
 
       const transactionDateKey = getPeriodKeyForDate(
         String(payment_date || new Date().toISOString().slice(0, 10)).slice(0, 10),

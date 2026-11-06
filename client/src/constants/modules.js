@@ -69,6 +69,7 @@ const LABELS = {
   bank_reconciliation: 'Bank Reconciliation',
   product_service: 'Products & Services',
   purchase_order: 'Purchase Orders',
+  sequence_settings: 'Sequence Settings',
   responsibility_center: 'Responsibility Centers',
   vat: 'VAT',
   withholding_tax: 'Withholding Tax',

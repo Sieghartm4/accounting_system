@@ -1,5 +1,7 @@
 const os = require('os')
 
+const { generateDocumentId } = require('../util/sequence.util')
+
 const {
   checkConnection,
   SelectAll,
@@ -595,28 +597,12 @@ const createCashDisbursement = async (req, res, next) => {
       // Get user full name from database
       const userFullName = await getUserFullName(created_by, connection, Master)
 
-      const nowForId = new Date()
-      const mm = String(nowForId.getMonth() + 1).padStart(2, '0')
-      const dd = String(nowForId.getDate()).padStart(2, '0')
-      const yy = String(nowForId.getFullYear()).slice(-2)
-      const datePart = `${mm}${dd}${yy}`
-      const idPrefix = `CD-${datePart}-`
-
-      const [existing] = await connection.execute(
-        `SELECT cd_id FROM cash_disbursements WHERE cd_id LIKE ? ORDER BY cd_id DESC LIMIT 1`,
-        [`${idPrefix}%`],
+      // generate disbursement id via the company's sequence settings
+      // (defaults to the legacy CD-MMDDYY-0001 format)
+      const newCashDisbursementId = await generateDocumentId(
+        connection,
+        'disbursements',
       )
-
-      let seq = 1
-      if (existing && existing.length > 0) {
-        const lastId = existing[0].cd_id
-        const parts = lastId.split('-')
-        const lastSeq = parseInt(parts[parts.length - 1], 10) || 0
-        seq = lastSeq + 1
-      }
-
-      const seqStr = String(seq).padStart(4, '0')
-      const newCashDisbursementId = `${idPrefix}${seqStr}`
 
       const transactionDateKey = getPeriodKeyForDate(
         String(payment_date || new Date().toISOString().slice(0, 10)).slice(0, 10),

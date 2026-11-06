@@ -33,6 +33,8 @@ const {
   getPeriodKeyForDate,
 } = require('../util/accountingPeriod.util')
 
+const { generateDocumentId } = require('../util/sequence.util')
+
 const { broadcastUpdates } = require('../startup/socket.startup')
 const { notifyFromController } = require('../services/notification/notifyFromController')
 const sql = new SQLQueryBuilder()
@@ -348,29 +350,9 @@ const createAdjustment = async (req, res, next) => {
       connection = await getTenantPool().getConnection()
       await connection.beginTransaction()
 
-      // generate adjustment id in format JV-MMDDYY-0001 (sequence per day)
-      const nowForId = new Date()
-      const mm = String(nowForId.getMonth() + 1).padStart(2, '0')
-      const dd = String(nowForId.getDate()).padStart(2, '0')
-      const yy = String(nowForId.getFullYear()).slice(-2)
-      const datePart = `${mm}${dd}${yy}`
-      const idPrefix = `JV-${datePart}-`
-
-      const [existing] = await connection.execute(
-        `SELECT a_id FROM adjustments WHERE a_id LIKE ? ORDER BY a_id DESC LIMIT 1`,
-        [`${idPrefix}%`],
-      )
-
-      let seq = 1
-      if (existing && existing.length > 0) {
-        const lastId = existing[0].a_id
-        const parts = lastId.split('-')
-        const lastSeq = parseInt(parts[parts.length - 1], 10) || 0
-        seq = lastSeq + 1
-      }
-
-      const seqStr = String(seq).padStart(4, '0')
-      const newAdjustmentId = `${idPrefix}${seqStr}`
+      // generate adjustment id via the company's sequence settings
+      // (defaults to the legacy JV-MMDDYY-0001 format)
+      const newAdjustmentId = await generateDocumentId(connection, 'adjustments')
 
       const transactionDateKey = getPeriodKeyForDate(
         String(posting_date || new Date().toISOString().slice(0, 10)).slice(0, 10),

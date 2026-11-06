@@ -110,9 +110,10 @@ const getNotifications = async (req, res) => {
     const companyId = await resolveCompany(req)
     const filter = String(req.query.filter || 'all')
     const limit = req.query.limit
+    const offset = req.query.offset
 
     const [items, unread] = await Promise.all([
-      listForUser({ companyId, userId: user.userId, filter, limit, dbName: user.dbName }),
+      listForUser({ companyId, userId: user.userId, filter, limit, offset, dbName: user.dbName }),
       unreadCount({ companyId, userId: user.userId, dbName: user.dbName }),
     ])
 

@@ -15,6 +15,7 @@ import Company from './pages/company/Company'
 import ChartsOfAccounts from './pages/charts/Charts'
 import Proforma from './pages/proforma/Proforma'
 import ProductService from './pages/products/Products'
+import SequenceSettings from './pages/sequence_settings/SequenceSettings'
 import Receipts from './pages/receipts/Receipts'
 import Disbursements from './pages/disbursements/Disbursements'
 import Sales from './pages/sales/Sales'
@@ -118,6 +119,14 @@ path="dashboard"
             element={
               <ProtectedRoute routeName="product_service">
                 <ProductService />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="sequence_settings"
+            element={
+              <ProtectedRoute routeName="sequence_settings">
+                <SequenceSettings />
               </ProtectedRoute>
             }
           />

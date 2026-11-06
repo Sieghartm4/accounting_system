@@ -36,6 +36,7 @@ import {
   CalendarRange,
   Bell,
   Wallet,
+  ListStart,
 } from 'lucide-react'
 
 import { getSidebarItems } from '../../utils/routeProtection'
@@ -363,6 +364,7 @@ export default function Sidebar({ isCollapsed }) {
       charts: BarChart,
       proforma_entries: FileText,
       product_service: Package,
+      sequence_settings: ListStart,
       vat: Percent,
       withholding_tax: Receipt,
       tax_compliance: ShieldCheck,
@@ -672,6 +674,8 @@ return (
                       proforma_entries: FileText,
 
                       product_service: Package,
+
+                      sequence_settings: ListStart,
 
                       vat: Percent,
 

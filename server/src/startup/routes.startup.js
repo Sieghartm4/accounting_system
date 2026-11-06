@@ -26,6 +26,7 @@ const { chartsOfAccountsRouter } = require('../routes/charts_of_accounts.routes'
 const { customerRouter } = require('../routes/customer.routes')
 const { vendorRouter } = require('../routes/vendor.routes')
 const { productServiceRouter } = require('../routes/product_service.routes')
+const { sequenceSettingsRouter } = require('../routes/sequence_settings.routes')
 const { proformaEntriesRouter } = require('../routes/proforma_entries.routes')
 const { vatRouter } = require('../routes/vat.routes')
 const {
@@ -77,6 +78,7 @@ const ROUTE_MODULES = [
   { path: '/customer', router: 'customerRouter', module: 'customers' },
   { path: '/vendors', router: 'vendorRouter', module: 'vendors' },
   { path: '/product_service', router: 'productServiceRouter', module: 'product_service' },
+  { path: '/sequence_settings', router: 'sequenceSettingsRouter', module: 'sequence_settings' },
   { path: '/proforma_entries', router: 'proformaEntriesRouter', module: 'proforma_entries' },
   { path: '/vat', router: 'vatRouter', module: 'vat' },
   { path: '/responsibility_center', router: 'responsibilityCenterRouter', module: 'responsibility_center' },
@@ -111,6 +113,7 @@ const ROUTERS = {
   customerRouter,
   vendorRouter,
   productServiceRouter,
+  sequenceSettingsRouter,
   proformaEntriesRouter,
   vatRouter,
   responsibilityCenterRouter,

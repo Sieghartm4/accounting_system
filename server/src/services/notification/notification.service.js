@@ -310,8 +310,11 @@ const rowToNotification = (row) => ({
  * `filter` is 'unread', 'read' or 'all'. Read state comes from the join, so the
  * badge and the list can never disagree.
  */
-const listForUser = async ({ companyId, userId, filter = 'all', limit = 50, dbName }) => {
+const listForUser = async ({ companyId, userId, filter = 'all', limit = 50, offset = 0, dbName }) => {
+  // One page at a time; the caller pages further back with `offset`. 200 is the
+  // page cap so a bell asking for more cannot pull the whole table in one go.
   const cap = Math.min(Math.max(Number(limit) || 50, 1), 200)
+  const off = Math.max(Number(offset) || 0, 0)
 
   const readClause =
     filter === 'unread'
@@ -344,7 +347,7 @@ const listForUser = async ({ companyId, userId, filter = 'all', limit = 50, dbNa
         AND ${notMine}
         ${readClause}
       ORDER BY nt.${n.selectOptionColumns.created_at} DESC, nt.${n.selectOptionColumns.id} DESC
-      LIMIT ${cap}`
+      LIMIT ${cap} OFFSET ${off}`
 
   // Positional parameters, in the order the placeholders appear: the join's
   // reader id, then the company, then the reader again for the actor exclusion.

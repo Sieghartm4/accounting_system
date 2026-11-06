@@ -86,6 +86,7 @@ const DEFAULT_ON_MODULES = [
   'bank_reconciliation',
   'product_service',
   'purchase_order',
+  'sequence_settings',
   'responsibility_center',
   'vat',
   'withholding_tax',
