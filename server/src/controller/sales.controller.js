@@ -370,7 +370,6 @@ const getSales = async (req, res, next) => {
       whereClause += ` WHERE (${Accounting.sales.selectOptionColumns.total_amount_due} - COALESCE((${collectionsSubquery}), 0)) > 0`
       whereClause += ` AND ${Accounting.sales.selectOptionColumns.state} = 'APPROVED'`
       
-      console.log('Collections filter whereClause:', whereClause)
     }
 
     if (salesDateFrom) {
@@ -514,7 +513,6 @@ const getAllSales = async (req, res, next) => {
 
   const salesId = String(id)
 
-  console.log('Fetching sales_id:', salesId, 'type:', typeof salesId)
 
   try {
     const sales_query = sql
@@ -771,8 +769,6 @@ const getAllSales = async (req, res, next) => {
       [Accounting.sales_attachments.prefix_],
     )
 
-    console.log(sales, sales_items, sales_journal, sales_attachments)
-
     res.status(200).json({
       success: true,
 
@@ -838,7 +834,6 @@ const createSales = async (req, res, next) => {
       attachments,
     } = req.body
 
-    console.log(req.body)
 
     if (
       !customer_id ||
@@ -1186,7 +1181,6 @@ const updateSalesState = async (req, res, next) => {
   try {
     const { updates } = req.body
 
-    console.log('body', req.body)
 
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({
@@ -1508,7 +1502,6 @@ const updateSale = async (req, res, next) => {
 
   const salesId = String(sales_id)
 
-  console.log('Updating sales_id:', salesId, 'type:', typeof salesId)
 
   try {
     const {
@@ -1535,7 +1528,6 @@ const updateSale = async (req, res, next) => {
       attachments,
     } = req.body
 
-    console.log('Update data:', req.body)
 
     if (
       !customer_id ||
@@ -2456,19 +2448,6 @@ const updateSale = async (req, res, next) => {
       const normalizeNumber = (val) =>
         val === null || val === undefined ? 0 : parseFloat(val)
 
-      console.log('DEBUG: Current sales data:', currentSalesData)
-      console.log('DEBUG: Request body data:', {
-        customer_id,
-        document_reference,
-        terms,
-        date_delivered,
-        date_due,
-        remarks,
-        total_amount_due,
-      })
-      console.log('DEBUG: Sales items data:', sales_items)
-      console.log('DEBUG: Journal entries data:', journal_entries)
-      console.log('DEBUG: Attachments data:', attachments)
 
       if (currentSalesData.length > 0) {
         const current = currentSalesData[0]
@@ -2479,11 +2458,7 @@ const updateSale = async (req, res, next) => {
 
         const currentDocRef = normalizeValue(current.document_reference)
         const newDocRef = normalizeValue(document_reference)
-        console.log('DEBUG: Doc Ref comparison:', {
-          current: currentDocRef,
-          new: newDocRef,
-          changed: currentDocRef !== newDocRef,
-        })
+
         if (currentDocRef !== newDocRef) {
           auditChanges.push(
             `Doc Ref: ${currentDocRef || 'NULL'} → ${newDocRef || 'NULL'}`,
@@ -2492,11 +2467,7 @@ const updateSale = async (req, res, next) => {
 
         const currentTerms = normalizeValue(current.terms)
         const newTerms = normalizeValue(terms)
-        console.log('DEBUG: Terms comparison:', {
-          current: currentTerms,
-          new: newTerms,
-          changed: currentTerms !== newTerms,
-        })
+
         if (currentTerms !== newTerms) {
           auditChanges.push(
             `Terms: ${currentTerms || 'NULL'} → ${newTerms || 'NULL'}`,
@@ -2521,11 +2492,7 @@ const updateSale = async (req, res, next) => {
 
         const currentRemarks = normalizeValue(current.remarks)
         const newRemarks = normalizeValue(remarks)
-        console.log('DEBUG: Remarks comparison:', {
-          current: currentRemarks,
-          new: newRemarks,
-          changed: currentRemarks !== newRemarks,
-        })
+
         if (currentRemarks !== newRemarks) {
           auditChanges.push(
             `Remarks: ${currentRemarks || 'NULL'} → ${newRemarks || 'NULL'}`,
@@ -2542,12 +2509,9 @@ const updateSale = async (req, res, next) => {
         }
       }
 
-      // Track sales items changes using data fetched earlier
-      console.log('DEBUG: Current items data from DB:', currentItemsData)
       if (sales_items && sales_items.length > 0) {
         for (let i = 0; i < sales_items.length; i++) {
           const item = sales_items[i]
-          console.log('DEBUG: Processing item:', item)
           let currentItem = null
 
           if (item.id) {
@@ -2568,18 +2532,12 @@ const updateSale = async (req, res, next) => {
             }
           }
 
-          console.log('DEBUG: Found current item:', currentItem)
           if (currentItem) {
             // Only compare qty if it's provided in the request (not undefined/null)
             if (item.qty !== undefined && item.qty !== null) {
               const currentQty = normalizeNumber(currentItem.quantity)
               const newQty = normalizeNumber(item.qty)
-              console.log('DEBUG: Item qty comparison:', {
-                itemId: currentItem.id,
-                current: currentQty,
-                new: newQty,
-                changed: currentQty !== newQty,
-              })
+
               if (currentQty !== newQty) {
                 auditChanges.push(
                   `Item ${currentItem.id} Qty: ${currentQty} → ${newQty}`,
@@ -2591,12 +2549,7 @@ const updateSale = async (req, res, next) => {
             if (item.price !== undefined && item.price !== null) {
               const currentPrice = normalizeNumber(currentItem.sales_price)
               const newPrice = normalizeNumber(item.price)
-              console.log('DEBUG: Item price comparison:', {
-                itemId: currentItem.id,
-                current: currentPrice,
-                new: newPrice,
-                changed: currentPrice !== newPrice,
-              })
+
               if (currentPrice !== newPrice) {
                 auditChanges.push(
                   `Item ${currentItem.id} Price: ${currentPrice} → ${newPrice}`,
@@ -2608,12 +2561,7 @@ const updateSale = async (req, res, next) => {
             if (item.description !== undefined) {
               const currentDesc = normalizeValue(currentItem.description)
               const newDesc = normalizeValue(item.description)
-              console.log('DEBUG: Item desc comparison:', {
-                itemId: currentItem.id,
-                current: currentDesc,
-                new: newDesc,
-                changed: currentDesc !== newDesc,
-              })
+
               if (currentDesc !== newDesc) {
                 auditChanges.push(
                   `Item ${currentItem.id} Desc: ${currentDesc || 'NULL'} → ${newDesc || 'NULL'}`,
@@ -2627,12 +2575,7 @@ const updateSale = async (req, res, next) => {
                 currentItem.responsibility_center,
               )
               const newRespCenter = normalizeValue(item.responsibility_center)
-              console.log('DEBUG: Item resp center comparison:', {
-                itemId: currentItem.id,
-                current: currentRespCenter,
-                new: newRespCenter,
-                changed: currentRespCenter !== newRespCenter,
-              })
+
               if (currentRespCenter !== newRespCenter) {
                 auditChanges.push(
                   `Item ${currentItem.id} Resp Center: ${currentRespCenter || 'NULL'} → ${newRespCenter || 'NULL'}`,
@@ -2647,12 +2590,9 @@ const updateSale = async (req, res, next) => {
         }
       }
 
-      // Track journal entries changes using data fetched earlier
-      console.log('DEBUG: Current journal data from DB:', currentJournalData)
       if (journal_entries && journal_entries.length > 0) {
         for (let i = 0; i < journal_entries.length; i++) {
           const entry = journal_entries[i]
-          console.log('DEBUG: Processing journal entry:', entry)
           const type = entry.debit > 0 ? 'debit' : 'credit'
           const amount = entry.debit > 0 ? entry.debit : entry.credit
           let currentEntry = null
@@ -2689,18 +2629,12 @@ const updateSale = async (req, res, next) => {
             }
           }
 
-          console.log('DEBUG: Found current journal entry:', currentEntry)
           if (currentEntry) {
             const currentRespCenter = normalizeValue(
               currentEntry.responsibility_center,
             )
             const newRespCenter = normalizeValue(entry.responsibility_center)
-            console.log('DEBUG: Journal resp center comparison:', {
-              entryId: currentEntry.id,
-              current: currentRespCenter,
-              new: newRespCenter,
-              changed: currentRespCenter !== newRespCenter,
-            })
+
             if (currentRespCenter !== newRespCenter) {
               auditChanges.push(
                 `Journal ${currentEntry.id} Resp Center: ${currentRespCenter || 'NULL'} → ${newRespCenter || 'NULL'}`,
@@ -2729,9 +2663,6 @@ const updateSale = async (req, res, next) => {
         }
       }
 
-      // Track attachment changes
-      console.log('DEBUG: Current attachments data from DB:', currentAttachmentsData)
-      console.log('DEBUG: Request attachments data:', attachments)
 
       // Get existing attachments for comparison
       const existingAttachmentsQuery = sql
@@ -2749,8 +2680,6 @@ const updateSale = async (req, res, next) => {
         (attachment) => attachment.id,
       )
 
-      console.log('DEBUG: Existing attachment IDs:', existingAttachmentIds)
-
       if (attachments && attachments.length > 0) {
         // Filter out attachments with invalid IDs (null, undefined, 'null', 'undefined', empty string)
         const validAttachments = attachments.filter(
@@ -2765,21 +2694,15 @@ const updateSale = async (req, res, next) => {
         const payloadAttachmentIds = validAttachments.map(
           (attachment) => attachment.id,
         )
-        console.log('DEBUG: Valid payload attachments:', validAttachments)
-        console.log('DEBUG: Payload attachment IDs:', payloadAttachmentIds)
-
-        // Find deleted attachments - IDs in DB but not in valid payload
         const deletedAttachmentIds = existingAttachmentIds.filter(
           (id) => !payloadAttachmentIds.includes(id),
         )
-        console.log('DEBUG: Deleted attachment IDs:', deletedAttachmentIds)
         if (deletedAttachmentIds.length > 0) {
           for (const deletedId of deletedAttachmentIds) {
             // Fix: Access currentAttachmentsData[0] since connection.execute returns array
             const deletedAttachment = currentAttachmentsData[0]?.find(
               (a) => a.id === deletedId,
             )
-            console.log('DEBUG: Found deleted attachment:', deletedAttachment)
             if (deletedAttachment) {
               auditChanges.push(
                 `Deleted attachment: ${normalizeValue(deletedAttachment.name) || 'Unknown'} (ID: ${deletedId})`,
@@ -2789,13 +2712,6 @@ const updateSale = async (req, res, next) => {
         }
 
         for (const attachment of attachments) {
-          console.log('DEBUG: Processing attachment:', attachment)
-          console.log(
-            'DEBUG: Attachment ID:',
-            attachment.id,
-            'Type:',
-            typeof attachment.id,
-          )
 
           // Check if ID is valid (not null, undefined, empty string, or string 'null')
           const hasValidId =
@@ -2806,26 +2722,17 @@ const updateSale = async (req, res, next) => {
             attachment.id !== 'null' &&
             attachment.id !== 'undefined'
 
-          console.log('DEBUG: Has valid ID:', hasValidId)
 
           if (hasValidId) {
-            console.log('DEBUG: Attachment has valid ID, checking for updates...')
-            // Fix: Access currentAttachmentsData[0] since connection.execute returns array
             const currentAttachment = currentAttachmentsData[0]?.find(
               (a) => a.id === attachment.id,
             )
-            console.log('DEBUG: Found current attachment:', currentAttachment)
             if (currentAttachment) {
               // Only compare remarks if it's provided in the request (not undefined)
               if (attachment.remarks !== undefined) {
                 const currentRemarks = normalizeValue(currentAttachment.remarks)
                 const newRemarks = normalizeValue(attachment.remarks)
-                console.log('DEBUG: Attachment remarks comparison:', {
-                  attachmentId: attachment.id,
-                  current: currentRemarks,
-                  new: newRemarks,
-                  changed: currentRemarks !== newRemarks,
-                })
+
                 if (currentRemarks !== newRemarks) {
                   auditChanges.push(
                     `Attachment ${attachment.id} Remarks: ${currentRemarks || 'NULL'} → ${newRemarks || 'NULL'}`,
@@ -2833,28 +2740,18 @@ const updateSale = async (req, res, next) => {
                 }
               }
             } else {
-              console.log(
-                'DEBUG: Attachment ID not found in current data, treating as new',
-              )
               auditChanges.push(
                 `Added new attachment: ${normalizeValue(attachment.name) || normalizeValue(attachment.fileName) || 'Unknown'}`,
               )
             }
           } else {
-            console.log('DEBUG: No valid attachment ID, treating as new attachment')
-            console.log(
-              'DEBUG: Attachment name:',
-              attachment.name,
-              'fileName:',
-              attachment.fileName,
-            )
+
             auditChanges.push(
               `Added new attachment: ${normalizeValue(attachment.name) || normalizeValue(attachment.fileName) || 'Unknown'}`,
             )
           }
         }
       } else {
-        console.log('DEBUG: No attachments in payload, checking for deletions')
         // All attachments were deleted
         if (existingAttachmentIds.length > 0) {
           for (const existingId of existingAttachmentIds) {
@@ -2862,7 +2759,6 @@ const updateSale = async (req, res, next) => {
             const deletedAttachment = currentAttachmentsData[0]?.find(
               (a) => a.id === existingId,
             )
-            console.log('DEBUG: Found deleted attachment (all):', deletedAttachment)
             if (deletedAttachment) {
               auditChanges.push(
                 `Deleted attachment: ${normalizeValue(deletedAttachment.name) || 'Unknown'} (ID: ${existingId})`,
@@ -2965,9 +2861,6 @@ const getPrintSales = async (req, res, next) => {
     .map((id) => id.trim())
     .filter((id) => id.length > 0)
 
-  console.log('Parsed sales_ids:', salesIds, 'type:', typeof salesIds)
-
-  console.log('Copy type:', copyType)
 
   if (salesIds.length === 0) {
     return res.status(400).json({
@@ -3218,8 +3111,6 @@ const getPrintSales = async (req, res, next) => {
       [Accounting.journal_entries.prefix_],
     )
 
-    console.log('Raw journal data:', sales_journal)
-
     const sales_attachments_query = sql
       .select([
         { col: Accounting.sales_attachments.selectOptionColumns.id, as: 'id' },
@@ -3362,11 +3253,7 @@ const getPrintSales = async (req, res, next) => {
       const mappedJournal = saleJournal.map((entry) => {
         const isDebit = entry.type === 'DEBIT'
 
-        console.log('Processing journal entry:', {
-          type: entry.type,
-          amount: entry.amount,
-          isDebit,
-        })
+
 
         const mapped = {
           id: entry.id,
@@ -3379,8 +3266,6 @@ const getPrintSales = async (req, res, next) => {
 
           credit: !isDebit ? parseFloat(entry.amount || 0) : 0,
         }
-
-        console.log('Mapped journal entry:', mapped)
 
         return mapped
       })
@@ -3397,8 +3282,6 @@ const getPrintSales = async (req, res, next) => {
         company: company,
       }
     })
-
-    console.log('Grouped sales data:', groupedData)
 
     res.status(200).json({
       success: true,

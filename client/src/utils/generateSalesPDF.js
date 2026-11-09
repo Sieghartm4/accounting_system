@@ -22,15 +22,8 @@ export async function generateSalesPDF(salesData, copyType = 'internal') {
     return parts.join('-')
   }
 
-  // Debug logging
-  console.log('[PDF Generator] Received sales:', sales)
   sales.forEach((s, idx) => {
-    console.log(`[PDF Generator] Sale ${idx}:`, {
-      id: s.id,
-      customer: s.customer_name || s.customer,
-      date: s.date_delivered || s.created_at,
-      company: s.company?.company_name,
-    })
+
   })
 
   // Create a single PDF document with multiple pages

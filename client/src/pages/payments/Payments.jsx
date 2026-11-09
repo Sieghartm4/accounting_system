@@ -94,7 +94,6 @@ function PaymentsContent() {
       const queryParams = new URLSearchParams()
       purchaseIds.forEach(id => queryParams.append('purchase_id', id))
 
-      console.log('Fetching purchase data for IDs:', purchaseIds)
       const response = await fetch(
         `${API.paymentsPurchasePayment()}?${queryParams.toString()}`,
         {
@@ -109,8 +108,6 @@ function PaymentsContent() {
       const result = await response.json()
       if (!response.ok) throw new Error(result.message || 'Failed to fetch purchase data')
 
-      console.log('Purchase data API response:', result)
-      console.log('Purchase data:', result.data)
       return result.data || []
     } catch (error) {
       console.error('Error fetching purchase data:', error)
@@ -148,20 +145,14 @@ function PaymentsContent() {
       const result = await response.json()
       if (!response.ok) throw new Error(result.message || 'Failed to fetch unpaid purchases')
 
-      console.log('Purchases data received:', result.data)
-
       // Backend now handles filtering based on payments sum vs amount due
       const unpaidPurchases = result.data || []
-
-      console.log('Purchases from backend (already filtered):', unpaidPurchases)
 
       // Group by unique vendors
       const vendorMap = new Map()
       unpaidPurchases.forEach(purchase => {
         const vendorId = purchase.vendor_id || purchase.id // Use vendor_id from API
         const vendorName = purchase.vendor || purchase.vendor_name // Use vendor name from API
-        console.log('Processing purchase:', purchase)
-        console.log('Vendor ID:', vendorId, 'Vendor Name:', vendorName)
 
         if (!vendorMap.has(vendorId)) {
           vendorMap.set(vendorId, {
@@ -182,7 +173,6 @@ function PaymentsContent() {
       })
 
       const vendors = Array.from(vendorMap.values())
-      console.log('Vendors with unpaid purchases:', vendors)
 
       setToBePaidData(vendors)
     } catch (error) {
@@ -357,7 +347,6 @@ function PaymentsContent() {
         throw new Error(result.message || 'Failed to fetch payments for printing')
 
       const data = result.data || []
-      console.log('PDF Data received:', data)
       if (!Array.isArray(data))
         throw new Error('Invalid data format received from server')
 
@@ -395,7 +384,6 @@ function PaymentsContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                console.log('Approving payments:', approvableRows)
 
                 const token = sessionStorage.getItem('authenticated')
                 if (!token) {
@@ -470,7 +458,6 @@ function PaymentsContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                console.log('Cancelling payments:', cancellableRows)
 
                 const token = sessionStorage.getItem('authenticated')
                 if (!token) {
@@ -959,7 +946,6 @@ function PaymentsContent() {
                 label: 'View',
                 onClick: async (row) => {
                   try {
-                    console.log('Viewing payment:', row)
 
                     const token = sessionStorage.getItem('authenticated')
                     if (!token) {
@@ -985,7 +971,6 @@ function PaymentsContent() {
                       )
                     }
 
-                    console.log('Payment details fetched:', result)
                     setViewingPayment(result)
                     setIsViewing(true)
                     markReadForDocument('payments', [row.id])
@@ -1002,7 +987,6 @@ function PaymentsContent() {
                 label: 'Edit',
                 onClick: async (row) => {
                   try {
-                    console.log('Editing payment:', row)
 
                     setIsPostedEdit(isPostedDocument(row.state))
 
@@ -1030,7 +1014,6 @@ function PaymentsContent() {
                       )
                     }
 
-                    console.log('Payment details fetched for editing:', result)
                     setViewingPayment(result)
                     setIsEditing(true)
                     markReadForDocument('payments', [row.id])

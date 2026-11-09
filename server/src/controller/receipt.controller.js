@@ -175,8 +175,6 @@ const getAllReceipts = async (req, res, next) => {
 
   const receiptId = receipt_id
 
-  console.log('Converted receipt_id:', receiptId, 'type:', typeof receiptId)
-
   try {
     const receipts_query = sql
       .select([
@@ -453,8 +451,6 @@ const getAllReceipts = async (req, res, next) => {
       [Accounting.receipt_attachments.prefix_],
     )
 
-    console.log(receipts, receipts_items, receipts_journal, receipts_attachments)
-
     res.status(200).json({
       success: true,
 
@@ -498,9 +494,6 @@ const getPrintReceipts = async (req, res, next) => {
     .map((id) => id.trim())
     .filter((id) => id !== '')
 
-  console.log('Converted receipt_ids:', receiptIds, 'type:', typeof receiptIds)
-
-  console.log('Copy type:', copyType)
 
   if (receiptIds.length === 0) {
     return res.status(400).json({
@@ -775,8 +768,6 @@ const getPrintReceipts = async (req, res, next) => {
       [Accounting.journal_entries.prefix_],
     )
 
-    console.log('Raw journal data:', receipts_journal)
-
     const receipts_attachments_query = sql
       .select([
         { col: Accounting.receipt_attachments.selectOptionColumns.id, as: 'id' },
@@ -934,11 +925,6 @@ const getPrintReceipts = async (req, res, next) => {
       const mappedJournal = receiptJournal.map((entry) => {
         const isDebit = entry.type === 'DEBIT'
 
-        console.log('Processing journal entry:', {
-          type: entry.type,
-          amount: entry.amount,
-          isDebit,
-        })
 
         const mapped = {
           id: entry.id,
@@ -951,8 +937,6 @@ const getPrintReceipts = async (req, res, next) => {
 
           credit: !isDebit ? parseFloat(entry.amount || 0) : 0,
         }
-
-        console.log('Mapped journal entry:', mapped)
 
         return mapped
       })
@@ -972,7 +956,6 @@ const getPrintReceipts = async (req, res, next) => {
       }
     })
 
-    console.log('Grouped receipts data:', groupedData)
 
     res.status(200).json({
       success: true,
@@ -1035,7 +1018,6 @@ const createReceipts = async (req, res, next) => {
       attachments,
     } = req.body
 
-    console.log('BODY', req.body)
 
     if (
       !customer_id ||
@@ -1382,8 +1364,6 @@ const updateReceipt = async (req, res, next) => {
 
   const receiptId = receipt_id
 
-  console.log('Updating receipt_id:', receiptId, 'type:', typeof receiptId)
-
   try {
     const {
       customer_id,
@@ -1411,7 +1391,6 @@ const updateReceipt = async (req, res, next) => {
       attachments,
     } = req.body
 
-    console.log('Update data:', req.body)
 
     if (
       !customer_id ||
@@ -2018,31 +1997,13 @@ const updateReceipt = async (req, res, next) => {
       const normalizeNumber = (val) =>
         val === null || val === undefined ? 0 : parseFloat(val)
 
-      console.log('DEBUG: Current receipt data:', currentReceiptData)
-      console.log('DEBUG: Request body data:', {
-        document_reference,
-        remarks,
-        customer_id,
-        payment_date,
-        mode_of_payment,
-        bank_name,
-        check_number,
-        total_amount_due,
-      })
-      console.log('DEBUG: Receipt items data:', receipt_items)
-      console.log('DEBUG: Journal entries data:', journal_entries)
-      console.log('DEBUG: Attachments data:', attachments)
 
       if (currentReceiptData.length > 0) {
         const current = currentReceiptData[0]
 
         const currentDocRef = normalizeValue(current.doc_ref)
         const newDocRef = normalizeValue(document_reference)
-        console.log('DEBUG: Doc Ref comparison:', {
-          current: currentDocRef,
-          new: newDocRef,
-          changed: currentDocRef !== newDocRef,
-        })
+
         if (currentDocRef !== newDocRef) {
           auditChanges.push(
             `Doc Ref: ${currentDocRef || 'NULL'} → ${newDocRef || 'NULL'}`,
@@ -2051,11 +2012,7 @@ const updateReceipt = async (req, res, next) => {
 
         const currentRemarks = normalizeValue(current.remarks)
         const newRemarks = normalizeValue(remarks)
-        console.log('DEBUG: Remarks comparison:', {
-          current: currentRemarks,
-          new: newRemarks,
-          changed: currentRemarks !== newRemarks,
-        })
+
         if (currentRemarks !== newRemarks) {
           auditChanges.push(
             `Remarks: ${currentRemarks || 'NULL'} → ${newRemarks || 'NULL'}`,
@@ -2107,36 +2064,22 @@ const updateReceipt = async (req, res, next) => {
           )
         }
       }
-
-      // Track receipt items changes using data fetched earlier
-      console.log('DEBUG: Current items data from DB:', currentItemsData)
       if (receipt_items && receipt_items.length > 0) {
         for (const item of receipt_items) {
-          console.log('DEBUG: Processing item:', item)
           if (item.id) {
             const currentItem = currentItemsData[0]?.find((i) => i.id === item.id)
-            console.log('DEBUG: Found current item:', currentItem)
+
             if (currentItem) {
               const currentQty = normalizeNumber(currentItem.quantity)
               const newQty = normalizeNumber(item.qty)
-              console.log('DEBUG: Item qty comparison:', {
-                itemId: item.id,
-                current: currentQty,
-                new: newQty,
-                changed: currentQty !== newQty,
-              })
+
               if (currentQty !== newQty) {
                 auditChanges.push(`Item ${item.id} Qty: ${currentQty} → ${newQty}`)
               }
 
               const currentPrice = normalizeNumber(currentItem.sales_price)
               const newPrice = normalizeNumber(item.price)
-              console.log('DEBUG: Item price comparison:', {
-                itemId: item.id,
-                current: currentPrice,
-                new: newPrice,
-                changed: currentPrice !== newPrice,
-              })
+ 
               if (currentPrice !== newPrice) {
                 auditChanges.push(
                   `Item ${item.id} Price: ${currentPrice} → ${newPrice}`,
@@ -2145,12 +2088,7 @@ const updateReceipt = async (req, res, next) => {
 
               const currentDesc = normalizeValue(currentItem.description)
               const newDesc = normalizeValue(item.description)
-              console.log('DEBUG: Item desc comparison:', {
-                itemId: item.id,
-                current: currentDesc,
-                new: newDesc,
-                changed: currentDesc !== newDesc,
-              })
+
               if (currentDesc !== newDesc) {
                 auditChanges.push(
                   `Item ${item.id} Desc: ${currentDesc || 'NULL'} → ${newDesc || 'NULL'}`,
@@ -2161,12 +2099,7 @@ const updateReceipt = async (req, res, next) => {
                 currentItem.responsibility_center,
               )
               const newRespCenter = normalizeValue(item.responsibility_center)
-              console.log('DEBUG: Item resp center comparison:', {
-                itemId: item.id,
-                current: currentRespCenter,
-                new: newRespCenter,
-                changed: currentRespCenter !== newRespCenter,
-              })
+
               if (currentRespCenter !== newRespCenter) {
                 auditChanges.push(
                   `Item ${item.id} Resp Center: ${currentRespCenter || 'NULL'} → ${newRespCenter || 'NULL'}`,
@@ -2181,16 +2114,12 @@ const updateReceipt = async (req, res, next) => {
         }
       }
 
-      // Track journal entries changes using data fetched earlier
-      console.log('DEBUG: Current journal data from DB:', currentJournalData)
       if (journal_entries && journal_entries.length > 0) {
         for (const entry of journal_entries) {
-          console.log('DEBUG: Processing journal entry:', entry)
           if (entry.id) {
             const currentEntry = currentJournalData[0]?.find(
               (j) => j.id === entry.id,
             )
-            console.log('DEBUG: Found current journal entry:', currentEntry)
             if (currentEntry) {
               const type = entry.debit > 0 ? 'debit' : 'credit'
               const amount = entry.debit > 0 ? entry.debit : entry.credit
@@ -2199,12 +2128,7 @@ const updateReceipt = async (req, res, next) => {
                 currentEntry.responsibility_center,
               )
               const newRespCenter = normalizeValue(entry.responsibility_center)
-              console.log('DEBUG: Journal resp center comparison:', {
-                entryId: entry.id,
-                current: currentRespCenter,
-                new: newRespCenter,
-                changed: currentRespCenter !== newRespCenter,
-              })
+
               if (currentRespCenter !== newRespCenter) {
                 auditChanges.push(
                   `Journal ${entry.id} Resp Center: ${currentRespCenter || 'NULL'} → ${newRespCenter || 'NULL'}`,
@@ -2419,11 +2343,9 @@ const updateReceipt = async (req, res, next) => {
 
 const updateReceiptState = async (req, res, next) => {
   try {
-    console.log('updateReceiptState called')
 
     const { updates } = req.body
 
-    console.log('body', req.body)
 
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({

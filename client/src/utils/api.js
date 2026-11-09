@@ -69,7 +69,7 @@ window.fetch = async function (...args) {
 
       // If token expired, force logout
       if (data.code === 'TOKEN_EXPIRED' || data.message === 'Token expired') {
-        console.log('Token expired, forcing logout')
+
         handleLogout()
         throw new Error('Session expired. Please login again.')
       }

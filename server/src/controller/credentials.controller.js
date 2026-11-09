@@ -95,10 +95,7 @@ const logout = async (req, res, next) => {
         }
 
         await client.close()
-        console.log(
-          '🔍 Logout - MongoDB session deleted for user:',
-          username || userId,
-        )
+
       } catch (mongoError) {
         console.error('🔍 Logout - MongoDB session delete error:', mongoError)
         // Continue with logout even if MongoDB delete fails
@@ -133,10 +130,8 @@ const logout = async (req, res, next) => {
 const login = async (req, res, next) => {
   const { username, password } = req.body
 
-  console.log('🔍 Login Controller - authentication started')
 
   try {
-    console.log('🔍 Login Controller - Starting authentication process...')
 
     // Step 1: Check if user is an admin in subscription admin database
     const adminPool = mysql.createPool({
@@ -156,7 +151,6 @@ const login = async (req, res, next) => {
     await adminPool.end()
 
     if (adminUsers.length > 0) {
-      console.log('🔍 Admin user found in subscription database')
       const adminUser = adminUsers[0]
 
       // Verify admin password
@@ -170,7 +164,7 @@ const login = async (req, res, next) => {
         }
 
         if (password !== decryptedPassword) {
-          console.log('Invalid admin password')
+
           return res.status(401).json({
             success: false,
             message: 'Invalid password',
@@ -194,23 +188,17 @@ const login = async (req, res, next) => {
       return
     }
 
-    console.log(
-      '🔍 Not an admin user, proceeding with tenant database authentication',
-    )
+
 
     // Step 2: Get tenant pool from config (MongoDB lookup + pool creation)
     const { pool: tenantPool, tenantDb } = await CONFIG.getTenantPool(username)
 
-    console.log('🔍 Tenant database from MongoDB:', tenantDb)
 
     // Step 3: Query user from tenant database (manual query to fix WHERE clause issue)
     const query = `SELECT mu_id AS id, mu_username AS username, mu_password AS password, mu_fullname AS fullname, mu_access_id AS access_id, mu_email AS email, ma_access_name AS access
                    FROM master_user
                    INNER JOIN master_access ON mu_access_id = ma_access_id
                    WHERE mu_username = ? AND mu_status = ?`
-
-    console.log('🔍 SQL Query:', query)
-    console.log('🔍 Query params:', [username, 'active'])
 
     const users = await Query(
       query,
@@ -219,15 +207,10 @@ const login = async (req, res, next) => {
       tenantPool,
     )
 
-    console.log('🔍 Users found in tenant database:', users)
-
-    // Let's also check all users in the database to see their status
 
     const allUsersQuery = `SELECT mu_id, mu_username, mu_status, mu_fullname FROM master_user WHERE mu_username = ?`
 
     const allUsers = await Query(allUsersQuery, [username], [], tenantPool)
-
-    console.log('🔍 All users with username:', allUsers)
 
     const route_access_query = sql
       .select([
@@ -242,7 +225,6 @@ const login = async (req, res, next) => {
 
       .build()
 
-    console.log('Tenant123:', tenantPool)
 
     const route_access = await Query(
       route_access_query,
@@ -265,7 +247,6 @@ const login = async (req, res, next) => {
 
     const user = users[0]
 
-    console.log('🔍 User found:', user.username)
 
     // Check if input is already an MD5 hash (32-character hex string) or plain text
 
@@ -280,7 +261,6 @@ const login = async (req, res, next) => {
 
       isPasswordValid = password === user.password
 
-      console.log('🔍 Direct hash comparison:', isPasswordValid)
     } else {
       // Hash and compare if plain text
 
@@ -288,13 +268,11 @@ const login = async (req, res, next) => {
 
       isPasswordValid = manualHash === user.password
 
-      console.log('🔍 Hashes match:', isPasswordValid)
     }
 
     // Use the result directly
 
     if (isPasswordValid) {
-      console.log('🔍 Password validation successful')
 
       // Subscription gate, on the accounting server's own login endpoint.
       //
@@ -347,17 +325,12 @@ const login = async (req, res, next) => {
         { expiresIn: '24h' },
       )
 
-      console.log('🔍 Login Controller - Storing JWT in session...')
-
-      console.log('🔍 Session before storing JWT:', req.session)
-
       req.session.jwt = token
 
       req.session.tenantDb = tenantDb
       req.session.userId = user.id
       req.session.username = user.username
 
-      console.log('🔍 Session authentication state stored')
 
       // Explicitly save the session
 
@@ -365,7 +338,6 @@ const login = async (req, res, next) => {
         if (err) {
           console.error('🔍 Session save error:', err)
         } else {
-          console.log('✅ Session saved successfully')
         }
       })
 
@@ -385,7 +357,6 @@ const login = async (req, res, next) => {
         timestamp: new Date().toISOString(),
       })
     } else {
-      console.log('🔍 Password validation failed')
 
       return res.status(401).json({
         success: false,

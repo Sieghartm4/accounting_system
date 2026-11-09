@@ -103,7 +103,6 @@ const useRegister = () => {
             if (data.step === 'complete' && data.success) {
               clearInterval(progressIntervalRef.current)
               setRegisterData(data)
-              console.log('Registration successful:', data.message)
               // Store credentials for payment flow
               if (typeof window !== 'undefined') {
                 sessionStorage.setItem('registeredUsername', userData.username);

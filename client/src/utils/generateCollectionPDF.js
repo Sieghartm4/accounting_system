@@ -24,8 +24,6 @@ export async function generateCollectionPDF(collectionData, copyType = 'internal
     return parts.join('-')
   }
 
-  // Debug logging
-  console.log('[PDF Generator] Received collections:', collections)
 
   // Create a single PDF document with multiple pages
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' })

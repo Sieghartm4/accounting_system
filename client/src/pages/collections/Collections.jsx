@@ -95,7 +95,6 @@ function CollectionsContent() {
       const queryParams = new URLSearchParams()
       salesIds.forEach((id) => queryParams.append('sales_id', id))
 
-      console.log('Fetching sales items for IDs:', salesIds)
       const response = await fetch(
         `${API.collectionsSalesItemsCollection()}?${queryParams.toString()}`,
         {
@@ -111,12 +110,7 @@ function CollectionsContent() {
       if (!response.ok)
         throw new Error(result.message || 'Failed to fetch sales items')
 
-      console.log('Sales items API response:', result)
-      console.log('Sales items data:', result.data)
-      console.log(
-        'Sales items data structure:',
-        result.data ? result.data.map((item) => Object.keys(item)) : 'No data',
-      )
+
       return result.data || []
     } catch (error) {
       console.error('Error fetching sales items:', error)
@@ -155,14 +149,9 @@ function CollectionsContent() {
       if (!response.ok)
         throw new Error(result.message || 'Failed to fetch unpaid sales')
 
-      console.log('Sales data received:', result.data)
-
-      // Backend now handles filtering based on collections sum vs amount due
       const unpaidSales = result.data || []
 
-      console.log('Sales from backend (already filtered):', unpaidSales)
 
-      // Group by unique customers
       const customerMap = new Map()
       unpaidSales.forEach((sale) => {
         const customerId = sale.customer_id || sale.customer
@@ -190,14 +179,7 @@ function CollectionsContent() {
         })
       })
 
-      console.log(
-        'Customer totals:',
-        Array.from(customerMap.values()).map((c) => ({
-          customer: c.customerName,
-          totalUnpaid: c.totalUnpaid,
-          salesCount: c.sales.length,
-        })),
-      )
+
 
       setToBeCollectedData(Array.from(customerMap.values()))
     } catch (error) {
@@ -371,7 +353,6 @@ function CollectionsContent() {
         throw new Error(result.message || 'Failed to fetch collections for printing')
 
       const data = result.data || []
-      console.log('PDF Data received:', data)
       if (!Array.isArray(data))
         throw new Error('Invalid data format received from server')
 
@@ -409,7 +390,6 @@ function CollectionsContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                console.log('Approving collections:', approvableRows)
 
                 const token = sessionStorage.getItem('authenticated')
                 if (!token) {
@@ -487,7 +467,6 @@ function CollectionsContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                console.log('Cancelling collections:', cancellableRows)
 
                 const token = sessionStorage.getItem('authenticated')
                 if (!token) {
@@ -956,7 +935,6 @@ function CollectionsContent() {
           transition={{ delay: 0.3 }}
           className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
         >
-          {console.log('Rendering DynamicTable with collections:', collections)}
           <DynamicTable
             data={filteredCollections}
             title="Collections Ledger"
@@ -1024,7 +1002,6 @@ function CollectionsContent() {
                 label: 'View',
                 onClick: async (row) => {
                   try {
-                    console.log('Viewing collection:', row)
 
                     const token = sessionStorage.getItem('authenticated')
                     if (!token) {
@@ -1050,7 +1027,6 @@ function CollectionsContent() {
                       )
                     }
 
-                    console.log('Collection details fetched:', result)
                     setViewingCollection(result)
                     setIsViewing(true)
                     markReadForDocument('collection', [row.id])
@@ -1067,7 +1043,6 @@ function CollectionsContent() {
                 label: 'Edit',
                 onClick: async (row) => {
                   try {
-                    console.log('Editing collection:', row)
 
                     setIsPostedEdit(isPostedDocument(row.state))
 
@@ -1095,7 +1070,6 @@ function CollectionsContent() {
                       )
                     }
 
-                    console.log('Collection details fetched for editing:', result)
                     setEditingCollection(result)
                     setIsEditing(true)
                     markReadForDocument('collection', [row.id])

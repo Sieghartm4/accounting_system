@@ -183,7 +183,6 @@ const getTrialBalance = async (req, res, next) => {
     `
 
     const trialBalance = await Query(trial_balance_query)
-    console.log('Trial Balance Query:', trial_balance_query)
     res.status(200).json({
       success: true,
       message: 'Trial Balance retrieved successfully',

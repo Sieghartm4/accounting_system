@@ -356,7 +356,6 @@ const getMyProfile = async (req, res, next) => {
   try {
     const userId = req.context?.userId
     const username = req.context?.username
-console.log("loldsadsa", userId, username)
     if (!userId && !username) {
       return res.status(401).json({
         success: false,

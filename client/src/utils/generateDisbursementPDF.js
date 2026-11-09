@@ -27,20 +27,8 @@ export async function generateDisbursementPDF(
     return parts.join('-')
   }
 
-  // Debug logging
-  console.log('[PDF Generator] Received disbursements:', disbursements)
   disbursements.forEach((d, idx) => {
-    console.log(`[PDF Generator] Disbursement ${idx}:`, {
-      id: d.id,
-      vendor: d.vendor_name || d.vendor || d.customer_name || d.customer,
-      date:
-        d.payment_date ||
-        d.disbursement_date ||
-        d.collection_date ||
-        d.date ||
-        d.created_at,
-      company: d.company?.company_name,
-    })
+
   })
 
   // Create a single PDF document with multiple pages

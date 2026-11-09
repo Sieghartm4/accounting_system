@@ -1165,29 +1165,9 @@ export default function CollectionsForm({
 
     ) {
 
-      console.log('Auto-filling form from preSelectedSales:', preSelectedSales)
-
-      console.log(
-
-        'Auto-filling form from preSelectedSalesItems:',
-
-        preSelectedSalesItems,
-
-      )
-
-      console.log('Available customers:', customers)
-
-
-
-      // Set customer from first sale - find matching customer by name to get ID
-
       const firstSale = preSelectedSales[0]
 
       const customerName = firstSale.customer_name || firstSale.customer || ''
-
-      console.log('Looking for customer with name:', customerName)
-
-
 
       const matchingCustomer = customers.find(
 
@@ -1205,15 +1185,11 @@ export default function CollectionsForm({
 
       if (matchingCustomer) {
 
-        console.log('Found matching customer:', matchingCustomer)
-
         setSelectedCustomer(matchingCustomer.id)
 
         setCustomerSearch(matchingCustomer.name || matchingCustomer.customer_name)
 
       } else {
-
-        console.log('No matching customer found, using name as fallback')
 
         setSelectedCustomer('')
 
@@ -1226,16 +1202,6 @@ export default function CollectionsForm({
       // Fetch sales data directly for partial payments (new logic)
 
       if (preSelectedSales && preSelectedSales.length > 0) {
-
-        console.log('Fetching sales data for partial payments')
-
-        console.log('preSelectedSales:', preSelectedSales)
-
-        console.log('preSelectedSales types:', preSelectedSales.map(item => typeof item))
-
-
-
-        // Extract IDs from sales objects
 
         const salesIds = preSelectedSales.map(sale => {
 
@@ -1252,11 +1218,6 @@ export default function CollectionsForm({
         }).filter(id => id !== undefined && id !== null && id !== '')
 
 
-
-        console.log('Extracted salesIds:', salesIds)
-
-
-
         const fetchSalesData = async () => {
 
           try {
@@ -1271,8 +1232,6 @@ export default function CollectionsForm({
 
             salesIds.forEach((id) => {
 
-              console.log('Appending sales_id:', id, 'type:', typeof id)
-
               queryParams.append('sales_id', id)
 
             })
@@ -1280,10 +1239,6 @@ export default function CollectionsForm({
 
 
             const url = `${API.collectionsSalesCollection()}?${queryParams.toString()}`
-
-            console.log('Fetching from URL:', url)
-
-
 
             const response = await fetch(url, {
 
@@ -1301,23 +1256,11 @@ export default function CollectionsForm({
 
             const result = await response.json()
 
-
-
-            console.log('Sales collection API response:', result)
-
-
-
             if (!result.success)
 
               throw new Error(result.message || 'Failed to fetch sales data')
 
-
-
-            // Map sales → collection items for partial payments
-
             const newItems = result.data.map((s) => {
-
-              console.log('Processing sales item:', s)
 
               const totalDue = parseFloat(s.total_amount_due) || 0
 
@@ -1361,8 +1304,6 @@ export default function CollectionsForm({
 
             setCollectionItems(newItems)
 
-            console.log('Auto-filled collection items from sales data:', newItems)
-
           } catch (error) {
 
             console.error('Error fetching sales data:', error)
@@ -1391,73 +1332,31 @@ export default function CollectionsForm({
 
     if ((isViewMode || isEditMode) && collectionData) {
 
-      console.log('Populating form with collection data:', collectionData)
-
-      console.log('collectionData structure:', Object.keys(collectionData))
-
-      console.log('collectionData items:', collectionData.items)
-
-      console.log('collectionData journal:', collectionData.journal)
-
-
-
-      // Populate basic collection info - handle different data structures
-
       let collection = null
 
       if (collectionData.data && collectionData.data.length > 0) {
 
         collection = collectionData.data[0]
 
-        console.log('Using collectionData.data[0]:', collection)
-
       } else if (collectionData.data && collectionData.data.id) {
 
         collection = collectionData.data
-
-        console.log('Using collectionData.data directly:', collection)
 
       } else if (collectionData.id) {
 
         collection = collectionData
 
-        console.log('Using collectionData directly:', collection)
 
       } else if (typeof collectionData === 'object' && collectionData !== null) {
 
         collection = collectionData
 
-        console.log('Using collectionData as direct object:', collection)
 
       }
 
 
 
       if (collection) {
-
-        console.log('Setting collection fields:', {
-
-          customer: collection.customer,
-
-          doc_ref: collection.doc_ref,
-
-          mode_of_payment: collection.mode_of_payment,
-
-          bank_name: collection.bank_name,
-
-          check_number: collection.check_number,
-
-          collection_date: collection.collection_date,
-
-          remarks: collection.remarks,
-
-          id: collection.id,
-
-        })
-
-
-
-        // Based on the API response, use 'customer' for both ID and search
 
         setSelectedCustomer(collection.customer || '')
 
@@ -1479,8 +1378,6 @@ export default function CollectionsForm({
 
       } else {
 
-        console.warn('No collection data found in expected structure')
-
       }
 
 
@@ -1489,7 +1386,6 @@ export default function CollectionsForm({
 
       if (collectionData.items && collectionData.items.length > 0) {
 
-        console.log('Populating collection items:', collectionData.items)
 
         const items = collectionData.items.map((item) => ({
 
@@ -1517,13 +1413,10 @@ export default function CollectionsForm({
 
         }))
 
-        console.log('Setting collection items:', items)
-
         setCollectionItems(items)
 
       } else {
 
-        console.log('No collection items found or empty array')
 
       }
 
@@ -1533,7 +1426,6 @@ export default function CollectionsForm({
 
       if (collectionData.journal && collectionData.journal.length > 0) {
 
-        console.log('Populating journal entries:', collectionData.journal)
 
         const journal = collectionData.journal.map((entry) => ({
 
@@ -1553,13 +1445,9 @@ export default function CollectionsForm({
 
         }))
 
-        console.log('Setting journal entries:', journal)
-
         setJournalEntries(journal)
 
       } else {
-
-        console.log('No journal entries found or empty array')
 
       }
 
@@ -1569,27 +1457,8 @@ export default function CollectionsForm({
 
       if (collectionData.attachments && collectionData.attachments.length > 0) {
 
-        console.log('Processing attachments:', collectionData.attachments)
-
         const attachments = collectionData.attachments.map((att) => {
 
-          console.log(
-
-            'Processing attachment:',
-
-            att.id,
-
-            att.name,
-
-            'File data type:',
-
-            typeof att.file,
-
-            'File data length:',
-
-            att.file ? att.file.length : 'null',
-
-          )
 
           return {
 
@@ -1609,29 +1478,14 @@ export default function CollectionsForm({
 
         })
 
-        console.log('Final attachments array:', attachments)
-
         setAttachments(attachments)
 
       } else {
-
-        console.log('No attachments found or empty array')
 
       }
 
     } else {
 
-      console.log('Not populating data - conditions not met:', {
-
-        isViewMode,
-
-        isEditMode,
-
-        hasCollectionData: !!collectionData,
-
-        collectionDataKeys: collectionData ? Object.keys(collectionData) : 'null',
-
-      })
 
     }
 
@@ -1719,10 +1573,6 @@ export default function CollectionsForm({
 
 
 
-      console.log('Sales collection API response:', result)
-
-
-
       if (!result.success)
 
         throw new Error(result.message || 'Failed to fetch sales items')
@@ -1736,8 +1586,6 @@ export default function CollectionsForm({
       //  The user can specify how much to apply to each sales invoice
 
       const newItems = result.data.map((s) => {
-
-        console.log('Processing sales item:', s)
 
         const totalDue = parseFloat(s.total_amount_due) || 0
 
@@ -4567,17 +4415,6 @@ export default function CollectionsForm({
 
                                         title="Click to view full size"
 
-                                        onLoad={() =>
-
-                                          console.log(
-
-                                            'Image loaded successfully:',
-
-                                            file.fileName,
-
-                                          )
-
-                                        }
 
                                         onError={(e) => {
 

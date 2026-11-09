@@ -587,9 +587,7 @@ export function useBankReconciliation(selectedReconciliation) {
       )
 
       const result = await response.json()
-      console.log('Journal entries response:', result)
       if (result.success) {
-        console.log('First journal entry sample:', result.data?.[0])
         // Deduplicate journal entries by id to prevent duplicates in the UI
         const uniqueEntries = Array.from(
           new Map((result.data || []).map((entry) => [entry.id, entry])).values(),
@@ -634,10 +632,8 @@ export function useBankReconciliation(selectedReconciliation) {
       )
 
       const result = await response.json()
-      console.log('Journal entries by COA response:', result)
       if (result.success) {
         const entries = result.data || []
-        console.log('First COA journal entry sample:', entries[0])
         if (entries.length === 0 && allowFallback && start && end) {
           console.warn(
             'No COA-specific journal entries found, falling back to all journal entries in range',
@@ -2254,7 +2250,7 @@ export function useBankReconciliation(selectedReconciliation) {
   // Respect the direction/type field: "less" should subtract, "add" should add
   const bookCardAdjustmentsTotal = bookAdjustments.reduce((sum, adj) => {
     const amount = parseFloat(adj.amount) || 0
-    console.log('Book adjustment:', adj)
+
     // If direction is "less" or type indicates subtraction, subtract the amount
     if (
       adj.direction === 'less' ||
@@ -2301,19 +2297,6 @@ export function useBankReconciliation(selectedReconciliation) {
     adjustedBankBalance = bankStatementEndingBalance + bankCardAdjustmentsTotal // Target is the ending statement balance plus bank adjustments
   }
 
-  console.log('Balance calculation:', {
-    bankStatementEndingBalance,
-    depositsInTransit,
-    outstandingChecks,
-    bankCardAdjustmentsTotal,
-    endingBookBalance,
-    bookAdditions,
-    bookDeductions,
-    bookCardAdjustmentsTotal,
-    bookAdjustments,
-    adjustedBankBalance,
-    adjustedBookBalance,
-  })
 
   // Net variance: Always show absolute difference between adjusted bank and book balances
   const reconDifference = Math.abs(adjustedBookBalance - adjustedBankBalance)

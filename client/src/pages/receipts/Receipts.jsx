@@ -396,9 +396,7 @@ function ReceiptsContent() {
 
       // Extract the actual receipt data from the response
       const data = result.data || []
-      console.log('PDF Data received:', data)
-      console.log('First receipt items:', data[0]?.items)
-      console.log('First receipt journal:', data[0]?.journal)
+
       if (!Array.isArray(data))
         throw new Error('Invalid data format received from server')
 

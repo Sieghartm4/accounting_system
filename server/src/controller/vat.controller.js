@@ -58,7 +58,7 @@ const getVat = async (req, res, next) => {
       .build()
 
     let vat = await Query(query, [], [Master.vat.prefix_])
-    console.log(vat)
+
     res.status(200).json({
       success: true,
       message: 'VAT entries retrieved successfully',
@@ -200,7 +200,6 @@ const updateVat = async (req, res, next) => {
       sub_type === '' || sub_type === null || sub_type === undefined
         ? null
         : sub_type
-    console.log('body', req.body)
 
     if (
       !id ||

@@ -182,12 +182,6 @@ const getSubscriptionPlans = async (req, res, next) => {
 const getPublicSubscriptionPlans = async (req, res, next) => {
   let connection
   try {
-    console.log('getPublicSubscriptionPlans called')
-    console.log('DB config:', {
-      host: CONFIG[process.env.NODE_ENV].host,
-      user: CONFIG[process.env.NODE_ENV].username,
-      database: CONFIG[process.env.NODE_ENV].database,
-    })
 
     connection = await adminPool.getConnection()
     console.log('Connected to database')

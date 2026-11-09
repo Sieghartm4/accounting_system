@@ -83,7 +83,6 @@ const logout = async (req, res, next) => {
 
         await sessionCollection.deleteOne({ userId: userId })
         await mongoClient.close()
-        console.log('Session data cleared from MongoDB for user:', userId)
       } catch (mongoError) {
         console.error('MongoDB session clear error:', mongoError)
       }
@@ -221,9 +220,7 @@ const register = async (req, res, next) => {
         )
       }
     } else {
-      console.log(
-        `Database ${dbNameWithPrefix} already exists, skipping database creation`,
-      )
+
     }
 
     res.status(201).json({
@@ -412,9 +409,7 @@ const registerWithProgress = async (req, res) => {
         })
       }
     } else {
-      console.log(
-        `Database ${dbNameWithPrefix} already exists, skipping database creation`,
-      )
+
       sendProgress({
         step: 'database_exists',
         message: 'Database already exists, skipping...',
@@ -449,14 +444,7 @@ const updateSubscription = async (req, res, next) => {
     payment_reference,
     payment_method,
   } = req.body
-  console.log('Received subscription update request:', {
-    username,
-    subscription_id,
-    subscription_price,
-    subscription_billing_cycle,
-    payment_reference,
-    payment_method,
-  })
+
   try {
     // Resolve the company's tenant database from the username BEFORE writing.
     //
@@ -499,10 +487,7 @@ const updateSubscription = async (req, res, next) => {
         dbName: tenantDb,
         currentUsers: 1,
       })
-      console.log(
-        `Company subscription recorded for ${tenantDb}:`,
-        JSON.stringify(result),
-      )
+
     } catch (planError) {
       // Reported rather than swallowed: the payment went through, so the company
       // must not be left silently locked out of the modules it just paid for.
@@ -519,7 +504,6 @@ const updateSubscription = async (req, res, next) => {
 
     // Save subscription history after updating subscription
     try {
-      console.log('Attempting to save subscription history for username:', username)
 
       // Get user ID from username
       const userQuery = sql
@@ -528,15 +512,12 @@ const updateSubscription = async (req, res, next) => {
         .where(Master.master_user.selectOptionColumns.username)
         .build()
 
-      console.log('User query:', userQuery)
 
       const users = await Query(userQuery, [username], [Master.master_user.prefix_])
 
-      console.log('User query result:', users)
 
       if (users.length > 0) {
         const userId = users[0].id
-        console.log('User ID found:', userId)
 
         // Check if subscription history already exists for this user and subscription
         const checkHistoryQuery = sql
@@ -557,7 +538,6 @@ const updateSubscription = async (req, res, next) => {
             h.sh_subscription_id === subscription_id && h.sh_status === 'active',
         )
 
-        console.log('Existing subscription history:', filteredHistory)
 
         // Only save if no active history exists for this subscription
         if (filteredHistory.length === 0) {
@@ -578,8 +558,6 @@ const updateSubscription = async (req, res, next) => {
           const formattedBillingCycle = convertBillingCycle(
             subscription_billing_cycle,
           )
-          console.log('Original billing cycle:', subscription_billing_cycle)
-          console.log('Formatted billing cycle:', formattedBillingCycle)
 
           // Calculate end date based on billing cycle
           let endDate = null
@@ -616,7 +594,6 @@ const updateSubscription = async (req, res, next) => {
             ])
             .build()
 
-          console.log('History insert query:', historyInsertQuery)
 
           await Query(
             historyInsertQuery,
@@ -639,11 +616,8 @@ const updateSubscription = async (req, res, next) => {
             [Master.subscription_history.prefix_],
           )
 
-          console.log('Subscription history saved after update for user:', username)
         } else {
-          console.log(
-            'Subscription history already exists for this user and subscription, skipping',
-          )
+
         }
       } else {
         console.log('User not found for username:', username)
@@ -674,7 +648,6 @@ const updateSubscription = async (req, res, next) => {
 const getUserUsedFreeTrials = async (req, res, next) => {
   const { username } = req.query
   try {
-    console.log('Fetching used free trials for username:', username)
 
     // Get user ID from username
     const userQuery = sql
@@ -693,7 +666,6 @@ const getUserUsedFreeTrials = async (req, res, next) => {
     }
 
     const userId = users[0].id
-    console.log('User ID found:', userId)
 
     // Get subscription history for this user with free trial (price = 0)
     const historyQuery = sql
@@ -708,7 +680,6 @@ const getUserUsedFreeTrials = async (req, res, next) => {
       [Master.subscription_history.prefix_],
     )
 
-    console.log('User subscription history:', history)
 
     // Filter for free trials (price = 0 or '0')
     // Handle both prefixed and non-prefixed column names
@@ -795,7 +766,6 @@ const login = async (req, res, next) => {
       }
 
       if (password !== decryptedPassword) {
-        console.log('Invalid password')
         return res.status(401).json({
           success: false,
           message: 'Invalid password',
@@ -869,7 +839,6 @@ const login = async (req, res, next) => {
         )
 
         await mongoClient.close()
-        console.log('Session data saved to MongoDB')
       } catch (mongoError) {
         console.error('MongoDB session save error:', mongoError)
       }
@@ -888,7 +857,6 @@ const login = async (req, res, next) => {
           },
         )
 
-        console.log('Main server response:', mainServerResponse.data)
 
         if (mainServerResponse.data && mainServerResponse.data.data) {
           // Use tenant database user data from main server response
@@ -936,7 +904,6 @@ const login = async (req, res, next) => {
           }
         }
 
-        console.log('Credentials sent to main server successfully')
       } catch (mainServerError) {
         console.error('Main server authentication error:', mainServerError)
         if (mainServerError.response) {
@@ -1095,17 +1062,9 @@ const saveSubscriptionHistory = async (req, res) => {
       payment_reference,
     } = req.body
 
-    console.log('saveSubscriptionHistory called with:', {
-      username,
-      subscription_id,
-      price,
-      billing_cycle,
-      payment_method,
-      payment_reference,
-    })
+
 
     if (!username || !subscription_id) {
-      console.log('Missing required fields:', { username, subscription_id })
       return res.status(400).json({
         success: false,
         message: 'Username and subscription_id are required',
@@ -1121,10 +1080,8 @@ const saveSubscriptionHistory = async (req, res) => {
 
     const users = await Query(userQuery, [username], [Master.master_user.prefix_])
 
-    console.log('User query result:', users)
 
     if (users.length === 0) {
-      console.log('User not found for username:', username)
       return res.status(404).json({
         success: false,
         message: 'User not found',
@@ -1132,8 +1089,7 @@ const saveSubscriptionHistory = async (req, res) => {
     }
 
     const userId = users[0].mu_id
-    console.log('User ID:', userId)
-
+  
     // Calculate end date based on billing cycle
     let endDate = null
     if (billing_cycle) {
@@ -1144,7 +1100,6 @@ const saveSubscriptionHistory = async (req, res) => {
         endDate.setDate(endDate.getDate() + cycleDays)
       }
     }
-    console.log('End date:', endDate)
 
     // Insert subscription history
     const insertQuery = sql
@@ -1165,8 +1120,6 @@ const saveSubscriptionHistory = async (req, res) => {
       ])
       .build()
 
-    console.log('Insert query:', insertQuery)
-
     await Query(
       insertQuery,
       [
@@ -1183,7 +1136,6 @@ const saveSubscriptionHistory = async (req, res) => {
       [Master.subscription_history.prefix_],
     )
 
-    console.log('Subscription history saved successfully')
     return res.status(200).json({
       success: true,
       message: 'Subscription history saved successfully',
@@ -1203,13 +1155,9 @@ const saveSubscriptionHistory = async (req, res) => {
 
 const expireSubscriptions = async (req, res, next) => {
   try {
-    console.log(
-      '[Subscription Expiry] Manual trigger - Running subscription expiry check...',
-    )
+
     await Query('CALL expire_subscriptions()')
-    console.log(
-      '[Subscription Expiry] Manual trigger - Subscription expiry check completed successfully',
-    )
+
     res.json({ success: true, message: 'Subscription expiry check completed' })
   } catch (error) {
     console.error('[Subscription Expiry] Manual trigger - Error:', error)

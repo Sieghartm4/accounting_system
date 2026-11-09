@@ -408,7 +408,6 @@ export default function AdjustmentsForm({
   }, [])
   useEffect(() => {
     if ((isViewMode || isEditMode) && adjustmentData) {
-      console.log('Populating form with adjustment data:', adjustmentData)
 
       // Populate basic adjustment info
       if (adjustmentData.data && adjustmentData.data.length > 0) {
@@ -437,17 +436,8 @@ export default function AdjustmentsForm({
 
       // Populate attachments
       if (adjustmentData.attachments && adjustmentData.attachments.length > 0) {
-        console.log('Processing attachments:', adjustmentData.attachments)
         const attachments = adjustmentData.attachments.map((att) => {
-          console.log(
-            'Processing attachment:',
-            att.id,
-            att.name,
-            'File data type:',
-            typeof att.file,
-            'File data length:',
-            att.file ? att.file.length : 'null',
-          )
+
           return {
             id: att.id,
             fileName: att.name || '',

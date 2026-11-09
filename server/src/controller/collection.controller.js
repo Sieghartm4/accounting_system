@@ -51,8 +51,6 @@ require('dotenv').config()
 
 const getCollections = async (req, res, next) => {
   try {
-    console.log('GET COLLECTIONS - Request received')
-    console.log('Query params:', req.query)
 
     const query = sql
       .select([
@@ -105,7 +103,6 @@ const getCollections = async (req, res, next) => {
 
       .build()
 
-    console.log('Generated SQL query:', query)
 
     const { offset, limit, dateFrom, dateTo, date_from, date_to } = req.query
     const collectionsDateFrom = dateFrom || date_from
@@ -115,9 +112,6 @@ const getCollections = async (req, res, next) => {
     const limitNum = shouldPaginate
       ? Math.max(1, Math.min(100, parseInt(limit, 10) || 50))
       : null
-
-    console.log('Pagination params:', { shouldPaginate, offsetNum, limitNum })
-    console.log('Date filters:', { collectionsDateFrom, collectionsDateTo })
 
     const collectionDateColumn = `DATE(${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.collection_date})`
     let whereClause = ''
@@ -147,16 +141,12 @@ const getCollections = async (req, res, next) => {
       ? `${queryWithWhere} ORDER BY ${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id} DESC LIMIT ? OFFSET ?`
       : `${queryWithWhere} ORDER BY ${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.id} DESC`
 
-    console.log('Final query:', paginatedQuery)
-    console.log('Query params:', queryParams)
 
     let collections = await Query(paginatedQuery, queryParams, [
       Accounting.collections.prefix_,
       Master.customers.prefix_,
     ])
 
-    console.log('Collections fetched:', collections)
-    console.log('Collections count:', collections ? collections.length : 0)
 
     res.status(200).json({
       success: true,
@@ -241,8 +231,6 @@ const getUncollectedSales = async (req, res, next) => {
       [Accounting.sales.prefix_, Master.customers.prefix_],
     )
 
-    console.log('SALES QUERY', sales)
-
     res.status(200).json({
       success: true,
 
@@ -273,15 +261,11 @@ const getSalesCollection = async (req, res, next) => {
   try {
     const { sales_id } = req.query
 
-    console.log('Sales IDs received:', req.query)
-    console.log('Raw sales_id:', sales_id)
-    console.log('Type of sales_id:', typeof sales_id)
 
     const salesIds = (Array.isArray(sales_id) ? sales_id : [sales_id]).filter(
       (id) => id !== undefined && id !== null && id !== '',
     )
 
-    console.log('Processed salesIds:', salesIds)
 
     if (salesIds.length === 0) {
       return res.status(400).json({
@@ -350,13 +334,9 @@ const getSalesCollection = async (req, res, next) => {
 
       .build()
 
-    console.log('Generated SQL query:', query)
-    console.log('Query params:', salesIds)
-    
+
     const sales = await Query(query, salesIds)
     
-    console.log('Sales data fetched:', sales)
-    console.log('Sales data length:', sales ? sales.length : 0)
 
     res.status(200).json({
       success: true,
@@ -388,7 +368,6 @@ const getSalesItemsCollection = async (req, res, next) => {
   try {
     const { sales_id } = req.query
 
-    console.log('Sales IDs received:', req.query)
 
     const salesIds = (Array.isArray(sales_id) ? sales_id : [sales_id]).filter(
       (id) => id !== undefined && id !== null && id !== '',
@@ -532,8 +511,6 @@ const getSalesItemsCollection = async (req, res, next) => {
       ],
     )
 
-    console.log('Sales items fetched:', salesItems, 'rows')
-
     res.status(200).json({
       success: true,
 
@@ -563,12 +540,7 @@ const getSalesItemsCollection = async (req, res, next) => {
 const getAllCollections = async (req, res, next) => {
   const { collection_id } = req.params
 
-  console.log(
-    'Received collection_id:',
-    collection_id,
-    'type:',
-    typeof collection_id,
-  )
+
 
   if (!collection_id) {
     return res.status(400).json({
@@ -830,13 +802,6 @@ const getAllCollections = async (req, res, next) => {
       [Accounting.collection_attachments.prefix_],
     )
 
-    console.log(
-      collection,
-      collection_items,
-      collection_journal,
-      collection_attachments,
-    )
-
     res.status(200).json({
       success: true,
 
@@ -898,7 +863,6 @@ const createCollection = async (req, res, next) => {
       attachments,
     } = req.body
 
-    console.log(req.body)
 
     if (!customer_id || !mode_of_payment || !collection_date || !created_by) {
       return res.status(400).json({
@@ -1271,8 +1235,6 @@ const updateCollectionState = async (req, res, next) => {
   try {
     const { updates } = req.body
 
-    console.log('body', req.body)
-
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({
         success: false,
@@ -1365,14 +1327,11 @@ const updateCollectionState = async (req, res, next) => {
             id,
           ])
 
-          console.log('collection_items', collection_items)
-
           // Get unique sales_ids directly from collection_items
           const uniqueSalesIds = [
             ...new Set(collection_items.map((item) => item.sales_id)),
           ].filter((id) => id !== null && id !== undefined)
 
-          console.log('uniqueSalesIds', uniqueSalesIds)
 
           if (uniqueSalesIds.length > 0) {
             // Recalculate each sale status from all approved collection items for partial payment support
@@ -1423,9 +1382,7 @@ const updateCollectionState = async (req, res, next) => {
                 `
 
                 const [result] = await connection.execute(updateSalesQuery, [newStatus, salesId])
-                console.log(
-                  `Updated sales ID ${salesId} status to ${newStatus}, paid amount: ${totalPaid}, affected rows: ${result.affectedRows}`,
-                )
+
               }
             }
           }
@@ -1687,14 +1644,7 @@ const getPrintCollections = async (req, res, next) => {
     .map((id) => id.trim())
     .filter((id) => id !== '')
 
-  console.log(
-    'Converted collection_ids:',
-    collectionIds,
-    'type:',
-    typeof collectionIds,
-  )
 
-  console.log('Copy type:', copyType)
 
   if (collectionIds.length === 0) {
     return res.status(400).json({
@@ -1965,8 +1915,6 @@ const getPrintCollections = async (req, res, next) => {
       [Accounting.journal_entries.prefix_],
     )
 
-    console.log('Raw journal data:', collection_journal)
-
     // Fetch attachments
 
     const collection_attachments_query = sql
@@ -2091,11 +2039,6 @@ const getPrintCollections = async (req, res, next) => {
       const mappedJournal = collectionJournal.map((entry) => {
         const isDebit = entry.type === 'DEBIT'
 
-        console.log('Processing journal entry:', {
-          type: entry.type,
-          amount: entry.amount,
-          isDebit,
-        })
 
         const mapped = {
           id: entry.id,
@@ -2109,7 +2052,6 @@ const getPrintCollections = async (req, res, next) => {
           credit: !isDebit ? parseFloat(entry.amount || 0) : 0,
         }
 
-        console.log('Mapped journal entry:', mapped)
 
         return mapped
       })
@@ -2129,7 +2071,6 @@ const getPrintCollections = async (req, res, next) => {
       }
     })
 
-    console.log('Grouped collections data:', groupedData)
 
     res.status(200).json({
       success: true,
@@ -2163,12 +2104,6 @@ const getPrintCollections = async (req, res, next) => {
 const updateCollection = async (req, res, next) => {
   const { collection_id } = req.params
 
-  console.log(
-    'Updating collection_id:',
-    collection_id,
-    'type:',
-    typeof collection_id,
-  )
 
   try {
     const {
@@ -2197,13 +2132,11 @@ const updateCollection = async (req, res, next) => {
       attachments,
     } = req.body
 
-    console.log('Update data:', req.body)
 
     // Convert customer name to customer ID if needed
     let actualCustomerId = customer_id
     if (customer_id && isNaN(Number(customer_id))) {
       // customer_id is a name, need to find the actual ID
-      console.log('Looking up customer by name:', customer_id)
 
       const customerQuery = sql
         .select([
@@ -2214,33 +2147,21 @@ const updateCollection = async (req, res, next) => {
         .where(Master.customers.selectOptionColumns.name)
         .build()
 
-      console.log('Customer query SQL:', customerQuery)
       const [customerResult] = await Query(
         customerQuery,
         [customer_id],
         [Master.customers.prefix_],
       )
-      console.log('Customer lookup result:', customerResult)
 
       if (customerResult && customerResult.length > 0) {
         actualCustomerId = customerResult[0].id
-        console.log(
-          'Converted customer name to ID:',
-          customer_id,
-          '→',
-          actualCustomerId,
-        )
+
       } else {
         // Customer was found but the result structure is different
         // Check if customerResult itself contains the customer data
         if (customerResult && customerResult.id) {
           actualCustomerId = customerResult.id
-          console.log(
-            'Found customer in result object:',
-            customer_id,
-            '→',
-            actualCustomerId,
-          )
+
         } else {
           return res.status(400).json({
             success: false,
@@ -2504,9 +2425,6 @@ const updateCollection = async (req, res, next) => {
 
       await connection.execute(updateMainQuery, updateMainValues)
 
-      // Skip collection items updates during edit mode
-      // Collection items should not be modifiable after collection is created
-      console.log('Skipping collection items updates - not allowed in edit mode')
 
       if (journal_entries && journal_entries.length > 0) {
         const existingEntriesQuery = sql
@@ -2787,20 +2705,6 @@ const updateCollection = async (req, res, next) => {
       const normalizeNumber = (val) =>
         val === null || val === undefined ? 0 : parseFloat(val)
 
-      console.log('DEBUG: Current collection data:', currentCollectionData)
-      console.log('DEBUG: Request body data:', {
-        customer_id,
-        document_reference,
-        mode_of_payment,
-        bank_name,
-        check_number,
-        collection_date,
-        remarks,
-      })
-      console.log('DEBUG: Collection items data:', collection_items)
-      console.log('DEBUG: Journal entries data:', journal_entries)
-      console.log('DEBUG: Attachments data:', attachments)
-
       if (currentCollectionData.length > 0) {
         const current = currentCollectionData[0]
 
@@ -2812,11 +2716,7 @@ const updateCollection = async (req, res, next) => {
 
         const currentDocRef = normalizeValue(current.document_reference)
         const newDocRef = normalizeValue(document_reference)
-        console.log('DEBUG: Doc Ref comparison:', {
-          current: currentDocRef,
-          new: newDocRef,
-          changed: currentDocRef !== newDocRef,
-        })
+
         if (currentDocRef !== newDocRef) {
           auditChanges.push(
             `Doc Ref: ${currentDocRef || 'NULL'} → ${newDocRef || 'NULL'}`,
@@ -2825,11 +2725,7 @@ const updateCollection = async (req, res, next) => {
 
         const currentModeOfPayment = normalizeValue(current.mode_of_payment)
         const newModeOfPayment = normalizeValue(mode_of_payment)
-        console.log('DEBUG: Mode of payment comparison:', {
-          current: currentModeOfPayment,
-          new: newModeOfPayment,
-          changed: currentModeOfPayment !== newModeOfPayment,
-        })
+
         if (currentModeOfPayment !== newModeOfPayment) {
           auditChanges.push(
             `Mode of Payment: ${currentModeOfPayment || 'NULL'} → ${newModeOfPayment || 'NULL'}`,
@@ -2862,11 +2758,7 @@ const updateCollection = async (req, res, next) => {
 
         const currentRemarks = normalizeValue(current.remarks)
         const newRemarks = normalizeValue(remarks)
-        console.log('DEBUG: Remarks comparison:', {
-          current: currentRemarks,
-          new: newRemarks,
-          changed: currentRemarks !== newRemarks,
-        })
+
         if (currentRemarks !== newRemarks) {
           auditChanges.push(
             `Remarks: ${currentRemarks || 'NULL'} → ${newRemarks || 'NULL'}`,
@@ -2874,12 +2766,9 @@ const updateCollection = async (req, res, next) => {
         }
       }
 
-      // Track collection items changes using data fetched earlier
-      console.log('DEBUG: Current items data from DB:', currentItemsData)
       if (collection_items && collection_items.length > 0) {
         for (let i = 0; i < collection_items.length; i++) {
           const item = collection_items[i]
-          console.log('DEBUG: Processing item:', item)
           let currentItem = null
 
           if (item.id) {
@@ -2887,18 +2776,12 @@ const updateCollection = async (req, res, next) => {
             currentItem = currentItemsData[0]?.find((i) => i.id === item.id)
           }
 
-          console.log('DEBUG: Found current item:', currentItem)
           if (currentItem) {
             // Only compare amount if it's provided in the request (not undefined/null)
             if (item.amount !== undefined && item.amount !== null) {
               const currentAmount = normalizeNumber(currentItem.amount)
               const newAmount = normalizeNumber(item.amount)
-              console.log('DEBUG: Item amount comparison:', {
-                itemId: currentItem.id,
-                current: currentAmount,
-                new: newAmount,
-                changed: currentAmount !== newAmount,
-              })
+
               if (currentAmount !== newAmount) {
                 auditChanges.push(
                   `Collection Item ${currentItem.id} Amount: ${currentAmount} → ${newAmount}`,
@@ -2915,13 +2798,9 @@ const updateCollection = async (req, res, next) => {
           }
         }
       }
-
-      // Track journal entries changes using data fetched earlier
-      console.log('DEBUG: Current journal data from DB:', currentJournalData)
       if (journal_entries && journal_entries.length > 0) {
         for (let i = 0; i < journal_entries.length; i++) {
           const entry = journal_entries[i]
-          console.log('DEBUG: Processing journal entry:', entry)
           const type = entry.debit > 0 ? 'debit' : 'credit'
           const amount = entry.debit > 0 ? entry.debit : entry.credit
           let currentEntry = null
@@ -2958,18 +2837,12 @@ const updateCollection = async (req, res, next) => {
             }
           }
 
-          console.log('DEBUG: Found current journal entry:', currentEntry)
           if (currentEntry) {
             const currentRespCenter = normalizeValue(
               currentEntry.responsibility_center,
             )
             const newRespCenter = normalizeValue(entry.responsibility_center)
-            console.log('DEBUG: Journal resp center comparison:', {
-              entryId: currentEntry.id,
-              current: currentRespCenter,
-              new: newRespCenter,
-              changed: currentRespCenter !== newRespCenter,
-            })
+
             if (currentRespCenter !== newRespCenter) {
               auditChanges.push(
                 `Journal ${currentEntry.id} Resp Center: ${currentRespCenter || 'NULL'} → ${newRespCenter || 'NULL'}`,
@@ -2999,8 +2872,6 @@ const updateCollection = async (req, res, next) => {
       }
 
       // Track attachment changes
-      console.log('DEBUG: Current attachments data from DB:', currentAttachmentsData)
-      console.log('DEBUG: Request attachments data:', attachments)
 
       // Get existing attachments for comparison
       const existingAttachmentsQuery = sql
@@ -3018,7 +2889,6 @@ const updateCollection = async (req, res, next) => {
         (attachment) => attachment.id,
       )
 
-      console.log('DEBUG: Existing attachment IDs:', existingAttachmentIds)
 
       if (attachments && attachments.length > 0) {
         // Filter out attachments with invalid IDs (null, undefined, 'null', 'undefined', empty string)
@@ -3034,21 +2904,17 @@ const updateCollection = async (req, res, next) => {
         const payloadAttachmentIds = validAttachments.map(
           (attachment) => attachment.id,
         )
-        console.log('DEBUG: Valid payload attachments:', validAttachments)
-        console.log('DEBUG: Payload attachment IDs:', payloadAttachmentIds)
 
         // Find deleted attachments - IDs in DB but not in valid payload
         const deletedAttachmentIds = existingAttachmentIds.filter(
           (id) => !payloadAttachmentIds.includes(id),
         )
-        console.log('DEBUG: Deleted attachment IDs:', deletedAttachmentIds)
         if (deletedAttachmentIds.length > 0) {
           for (const deletedId of deletedAttachmentIds) {
             // Fix: Access currentAttachmentsData[0] since connection.execute returns array
             const deletedAttachment = currentAttachmentsData[0]?.find(
               (a) => a.id === deletedId,
             )
-            console.log('DEBUG: Found deleted attachment:', deletedAttachment)
             if (deletedAttachment) {
               auditChanges.push(
                 `Deleted attachment: ${normalizeValue(deletedAttachment.name) || 'Unknown'} (ID: ${deletedId})`,
@@ -3058,13 +2924,7 @@ const updateCollection = async (req, res, next) => {
         }
 
         for (const attachment of attachments) {
-          console.log('DEBUG: Processing attachment:', attachment)
-          console.log(
-            'DEBUG: Attachment ID:',
-            attachment.id,
-            'Type:',
-            typeof attachment.id,
-          )
+
 
           // Check if ID is valid (not null, undefined, empty string, or string 'null')
           const hasValidId =
@@ -3075,26 +2935,18 @@ const updateCollection = async (req, res, next) => {
             attachment.id !== 'null' &&
             attachment.id !== 'undefined'
 
-          console.log('DEBUG: Has valid ID:', hasValidId)
 
           if (hasValidId) {
-            console.log('DEBUG: Attachment has valid ID, checking for updates...')
             // Fix: Access currentAttachmentsData[0] since connection.execute returns array
             const currentAttachment = currentAttachmentsData[0]?.find(
               (a) => a.id === attachment.id,
             )
-            console.log('DEBUG: Found current attachment:', currentAttachment)
             if (currentAttachment) {
               // Only compare remarks if it's provided in the request (not undefined)
               if (attachment.remarks !== undefined) {
                 const currentRemarks = normalizeValue(currentAttachment.remarks)
                 const newRemarks = normalizeValue(attachment.remarks)
-                console.log('DEBUG: Attachment remarks comparison:', {
-                  attachmentId: attachment.id,
-                  current: currentRemarks,
-                  new: newRemarks,
-                  changed: currentRemarks !== newRemarks,
-                })
+
                 if (currentRemarks !== newRemarks) {
                   auditChanges.push(
                     `Attachment ${attachment.id} Remarks: ${currentRemarks || 'NULL'} → ${newRemarks || 'NULL'}`,
@@ -3102,36 +2954,25 @@ const updateCollection = async (req, res, next) => {
                 }
               }
             } else {
-              console.log(
-                'DEBUG: Attachment ID not found in current data, treating as new',
-              )
+
               auditChanges.push(
                 `Added new attachment: ${normalizeValue(attachment.name) || normalizeValue(attachment.fileName) || 'Unknown'}`,
               )
             }
           } else {
-            console.log('DEBUG: No valid attachment ID, treating as new attachment')
-            console.log(
-              'DEBUG: Attachment name:',
-              attachment.name,
-              'fileName:',
-              attachment.fileName,
-            )
+
             auditChanges.push(
               `Added new attachment: ${normalizeValue(attachment.name) || normalizeValue(attachment.fileName) || 'Unknown'}`,
             )
           }
         }
       } else {
-        console.log('DEBUG: No attachments in payload, checking for deletions')
-        // All attachments were deleted
         if (existingAttachmentIds.length > 0) {
           for (const existingId of existingAttachmentIds) {
             // Fix: Access currentAttachmentsData[0] since connection.execute returns array
             const deletedAttachment = currentAttachmentsData[0]?.find(
               (a) => a.id === existingId,
             )
-            console.log('DEBUG: Found deleted attachment (all):', deletedAttachment)
             if (deletedAttachment) {
               auditChanges.push(
                 `Deleted attachment: ${normalizeValue(deletedAttachment.name) || 'Unknown'} (ID: ${existingId})`,

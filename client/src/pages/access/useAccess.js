@@ -10,9 +10,7 @@ const useAccess = () => {
     const [routeAccessLoading, setRouteAccessLoading] = useState(false);
 
     const handleAccessRowClick = async (access_id, userData) => {
-        console.log('Access clicked!');
-        console.log('Access ID:', access_id);
-        console.log('Full user data:', userData);
+
         
         if (selectedAccessId === access_id) {
             setSelectedAccessId(null);

@@ -203,26 +203,6 @@ export default function BankReconciliationDetail({
     const glType = (glEntry.type || '').toUpperCase()
     const glAmount = parseFloat(glEntry.amount || 0) || 0
     
-    console.log('isValidDebitCreditMatch detailed:', {
-      bankItem: { 
-        id: bankItem.id, 
-        description: bankItem.description,
-        debit: bankDebit, 
-        credit: bankCredit,
-        amount: bankAmount,
-        bri_debit: bankItem.bri_debit,
-        bri_credit: bankItem.bri_credit
-      },
-      glEntry: { 
-        id: glEntry.id, 
-        db_name: glEntry.db_name,
-        type: glType, 
-        amount: glAmount,
-        check_number: glEntry.check_number,
-        debit: glEntry.debit,
-        credit: glEntry.credit
-      }
-    })
     
     // Determine bank item direction from debit/credit fields first, then amount
     let bankIsCredit = false
@@ -243,8 +223,7 @@ export default function BankReconciliationDetail({
     const glIsCredit = glType === 'CREDIT'
     
     const isValid = (bankIsCredit && glIsDebit) || (bankIsDebit && glIsCredit)
-    console.log('isValidDebitCreditMatch result:', { bankIsCredit, glIsDebit, bankIsDebit, glIsCredit, isValid })
-    
+
     // Valid if: bank credit (positive amount/deposit) + GL debit (receipt) OR bank debit (negative amount/withdrawal) + GL credit (payment)
     return isValid
   }
@@ -264,28 +243,21 @@ export default function BankReconciliationDetail({
     const glEntry = journalEntries.find(entry => entry.id === ledgerId)
     
     if (!glEntry) {
-      console.log('isSelectionValidForMatching: No GL entry found for ledgerId', ledgerId)
       return false
     }
-    
-    console.log('isSelectionValidForMatching check:', { selectedStmtIds, selectedBookIds, glEntry })
-    
+
     // Check all selected bank items against the GL entry
     for (const bankItemId of selectedStmtIds) {
       const bankItem = items.find(item => item.id === bankItemId)
-      console.log('Bank item validation:', { bankItemId, bankItem, found: !!bankItem })
       if (!bankItem) {
-        console.log('Bank item not found')
         return false
       }
       const isValid = isValidDebitCreditMatch(bankItem, glEntry)
-      console.log('Bank item validation result:', { bankItemId, isValid })
       if (!isValid) {
         return false
       }
     }
     
-    console.log('isSelectionValidForMatching: returning true')
     return true
   }, [selectedStmtIds, selectedBookIds, items, journalEntries])
 
@@ -373,8 +345,6 @@ export default function BankReconciliationDetail({
     const unmatchedStmts = items.filter(i => i.ledger_id === null || i.ledger_id === undefined)
     const unmatchedBooks = journalEntries.filter(entry => !items.some(item => item.ledger_id === entry.id))
 
-    console.log('Auto-match starting:', { unmatchedStmtsCount: unmatchedStmts.length, unmatchedBooksCount: unmatchedBooks.length })
-
     // Collect all matches first, then execute them
     const matchesToMake = []
 
@@ -398,32 +368,20 @@ export default function BankReconciliationDetail({
       }
     }
 
-    console.log('After reference matching:', { matchesFound: matchesToMake.length, remainingStmts: unmatchedStmts.length, remainingBooks: unmatchedBooks.length })
-
     // Then try exact amount matching with opposite debit/credit directions
     // Compare absolute amounts for matching
     // Iterate in reverse to safely splice during iteration
     for (let i = unmatchedStmts.length - 1; i >= 0; i--) {
       const stmt = unmatchedStmts[i]
       const stmtAmount = Math.abs(getItemAmount(stmt))
-      console.log('Checking bank item for amount match:', { 
-        stmtId: stmt.id, 
-        stmtAmount, 
-        stmtDescription: stmt.description 
-      })
+
       
       const matchingBook = unmatchedBooks.find(
         b => {
           const bookAmount = Math.abs(parseFloat(b.amount) || 0)
           const amountMatch = Math.abs(bookAmount - stmtAmount) < 0.01
           const debitCreditMatch = isValidDebitCreditMatch(stmt, b)
-          console.log('  Checking GL entry:', { 
-            bookId: b.id, 
-            bookAmount, 
-            amountMatch, 
-            debitCreditMatch,
-            bookDescription: b.description 
-          })
+
           return amountMatch && debitCreditMatch
         }
       )
@@ -433,13 +391,9 @@ export default function BankReconciliationDetail({
         unmatchedStmts.splice(i, 1)
         const bookIndex = unmatchedBooks.indexOf(matchingBook)
         if (bookIndex > -1) unmatchedBooks.splice(bookIndex, 1)
-        console.log('  Match found and added:', { stmtId: stmt.id, bookId: matchingBook.id })
       } else {
-        console.log('  No match found for bank item:', stmt.id)
       }
     }
-
-    console.log('After amount matching:', { totalMatches: matchesToMake.length, matches: matchesToMake })
 
     // Execute all matches (skip refresh during bulk matching)
     for (const match of matchesToMake) {

@@ -222,10 +222,6 @@ const getJournalEntries = async (req, res, next) => {
 
     sqlQuery += ` ORDER BY ${Accounting.journal_entries.selectOptionColumns.date} DESC`
 
-    console.log('SQL Query:', sqlQuery)
-    console.log('Values:', values)
-    console.log('Start date:', start_date)
-    console.log('End date:', end_date)
 
     const journalEntries = await Query(sqlQuery, values, [
       Accounting.journal_entries.prefix_,
@@ -241,10 +237,6 @@ const getJournalEntries = async (req, res, next) => {
       Master.vendors.prefix_,
     ])
 
-    console.log(
-      'Journal entries with payee data:',
-      JSON.stringify(journalEntries.slice(0, 3), null, 2),
-    )
     res.status(200).json({
       success: true,
       message: 'Journal entries retrieved successfully',
@@ -345,11 +337,6 @@ const getJournalEntriesByCoaId = async (req, res, next) => {
     const { coa_id } = req.params
     const { start_date, end_date } = req.query
 
-    console.log('=== getJournalEntriesByCoaId Debug ===')
-    console.log('COA ID from params:', coa_id)
-    console.log('Start Date:', start_date)
-    console.log('End Date:', end_date)
-
     if (!coa_id) {
       return res.status(400).json({
         success: false,
@@ -358,7 +345,6 @@ const getJournalEntriesByCoaId = async (req, res, next) => {
     }
 
     const coaIdNum = Number(coa_id)
-    console.log('Converted COA ID:', coaIdNum, 'Type:', typeof coaIdNum)
 
     if (!Number.isInteger(coaIdNum) || coaIdNum <= 0) {
       return res.status(400).json({
@@ -371,9 +357,6 @@ const getJournalEntriesByCoaId = async (req, res, next) => {
       `${Accounting.journal_entries.selectOptionColumns.coa_id} = ?`,
     ]
     let values = [coaIdNum]
-
-    console.log('Initial where condition:', whereConditions[0])
-    console.log('Initial values:', values)
 
     const dateColumn = `DATE(${Accounting.journal_entries.selectOptionColumns.date})`
 
@@ -455,12 +438,6 @@ const getJournalEntriesByCoaId = async (req, res, next) => {
                    WHERE ${whereConditions.join(' AND ')}
                    ORDER BY ${Accounting.journal_entries.selectOptionColumns.date} ASC`
 
-    console.log('SQL Query:', sqlQuery)
-    console.log('Query values:', values)
-    console.log('Prefixes used:', [
-      Accounting.journal_entries.prefix_,
-      Master.charts_of_accounts.prefix_,
-    ])
 
     const journalEntries = await Query(sqlQuery, values, [
       Accounting.journal_entries.prefix_,
@@ -475,15 +452,6 @@ const getJournalEntriesByCoaId = async (req, res, next) => {
       Master.vendors.prefix_,
     ])
 
-    console.log(
-      'Journal entries by COA with payee data:',
-      JSON.stringify(journalEntries.slice(0, 3), null, 2),
-    )
-
-    console.log(
-      `Fetched ${journalEntries.length} journal entries for COA ID ${coaIdNum}`,
-    )
-    // console.log('Raw result:', JSON.stringify(journalEntries, null, 2))
 
     let totalDebit = 0
     let totalCredit = 0
@@ -534,9 +502,7 @@ const createJournalEntries = async (req, res, next) => {
     else if (req.body && req.body.entries) payload = [req.body.entries]
     else if (req.body && Object.keys(req.body).length > 0) payload = [req.body]
 
-    console.log('Received payload for creating journal entries:', req.body)
     if (!payload || payload.length === 0) {
-      console.log('No journal entry data provided')
       return res.status(400).json({
         success: false,
         message: 'No journal entry data provided',
@@ -552,7 +518,6 @@ const createJournalEntries = async (req, res, next) => {
       // 🟢 ADDED: Parse and validate amount right away. If it's 0, skip this item entirely.
       const parsedAmount = entry.amount != null ? parseFloat(entry.amount) : 0
       if (parsedAmount === 0) {
-        console.log('Skipping entry with zero amount:', entry)
         continue // Skips COA resolution and DB insertion, moving to the next item
       }
 
@@ -581,9 +546,7 @@ const createJournalEntries = async (req, res, next) => {
           coaId = coaRows[0].id
         } else {
           await connection.rollback()
-          console.log(
-            `Unable to resolve coa_id from charts of accounts: ${entry.coa_id}`,
-          )
+
           return res.status(400).json({
             success: false,
             message: `Unable to resolve coa_id from charts of accounts: ${entry.coa_id}`,

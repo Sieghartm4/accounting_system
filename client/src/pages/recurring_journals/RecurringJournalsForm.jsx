@@ -542,9 +542,6 @@ export default function RecurringJournalsForm({
         journal_entries: preparedJournalEntries,
       }
 
-      console.log('📤 Sending template payload:', templatePayload)
-      console.log('📤 Journal entries count:', preparedJournalEntries.length)
-      console.log('📤 Journal entries data:', preparedJournalEntries)
 
       const url = isEditMode && templateData
         ? API.recurringJournalsById(templateData.data[0].id)

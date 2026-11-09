@@ -57,9 +57,6 @@ const useVendorTransactionDetail = (vendorId) => {
           ? purchasesResult.data
           : []
 
-        console.log('All disbursements:', allDisbursements)
-        console.log('All purchases:', allPurchases)
-        console.log('Vendor ID:', vendorId)
 
         // Filter by vendor ID or vendor name and approved state
         const vendorDisbursements = allDisbursements.filter(
@@ -77,8 +74,6 @@ const useVendorTransactionDetail = (vendorId) => {
             String(p.state || p.status || '').toLowerCase() === 'approved',
         )
 
-        console.log('Filtered disbursements:', vendorDisbursements)
-        console.log('Filtered purchases:', vendorPurchases)
 
         setDisbursements(vendorDisbursements)
         setPurchases(vendorPurchases)

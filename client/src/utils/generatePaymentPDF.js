@@ -22,8 +22,6 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
     return parts.join('-')
   }
 
-  // Debug logging
-  console.log('[PDF Generator] Received payments:', payments)
 
   // Create a single PDF document with multiple pages
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' })

@@ -658,10 +658,6 @@ const getPurchase = async (req, res, next) => {
 
       whereClause += ` AND ${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'`
 
-
-
-      console.log('Payments filter whereClause:', whereClause)
-
     }
 
 
@@ -815,10 +811,6 @@ const getAllPurchase = async (req, res, next) => {
 
 
   const purchaseId = String(id)
-
-
-
-  console.log('Fetching purchase_id:', purchaseId, 'type:', typeof purchaseId)
 
 
 
@@ -1368,9 +1360,6 @@ const getAllPurchase = async (req, res, next) => {
 
 
 
-    console.log(purchases, purchase_items, purchase_journal, purchase_attachments)
-
-
 
     res.status(200).json({
 
@@ -1496,9 +1485,6 @@ const createPurchase = async (req, res, next) => {
 
     } = req.body
 
-
-
-    console.log(req.body)
 
 
 
@@ -1815,15 +1801,10 @@ const createPurchase = async (req, res, next) => {
 
           if (!attachment.file && !attachment.name) {
 
-            console.log('Skipping empty attachment row in create')
-
             continue
 
           }
 
-
-
-          console.log('Inserting attachment:', attachment.name)
 
 
 
@@ -2753,10 +2734,6 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-  console.log('Updating purchase_id:', purchaseId, 'type:', typeof purchaseId)
-
-
-
   try {
 
     const {
@@ -2804,10 +2781,6 @@ const updatePurchase = async (req, res, next) => {
       attachments,
 
     } = req.body
-
-
-
-    console.log('Update data:', req.body)
 
 
 
@@ -4217,8 +4190,6 @@ const updatePurchase = async (req, res, next) => {
 
           if (!attachment.file && !attachment.name) {
 
-            console.log('Skipping empty attachment row')
-
             continue
 
           }
@@ -4242,9 +4213,6 @@ const updatePurchase = async (req, res, next) => {
 
 
           if (isValidDbId) {
-
-            console.log('Updating existing attachment ID:', attachment.id)
-
 
 
             const updateAttachmentQuery = sql
@@ -4316,8 +4284,6 @@ const updatePurchase = async (req, res, next) => {
             await connection.execute(updateAttachmentQuery, updateAttachmentValues)
 
           } else {
-
-            console.log('Inserting new attachment (invalid or no ID provided)')
 
 
 
@@ -4428,35 +4394,6 @@ const updatePurchase = async (req, res, next) => {
         val === null || val === undefined ? 0 : parseFloat(val)
 
 
-
-      console.log('DEBUG: Current purchase data:', currentPurchaseData)
-
-      console.log('DEBUG: Request body data:', {
-
-        vendor_id,
-
-        document_reference,
-
-        terms,
-
-        date_delivered,
-
-        date_due,
-
-        remarks,
-
-        total_amount_due,
-
-      })
-
-      console.log('DEBUG: Purchase items data:', purchase_items)
-
-      console.log('DEBUG: Journal entries data:', journal_entries)
-
-      console.log('DEBUG: Attachments data:', attachments)
-
-
-
       if (currentPurchaseData.length > 0) {
 
         const current = currentPurchaseData[0]
@@ -4475,16 +4412,6 @@ const updatePurchase = async (req, res, next) => {
 
         const newDocRef = normalizeValue(document_reference)
 
-        console.log('DEBUG: Doc Ref comparison:', {
-
-          current: currentDocRef,
-
-          new: newDocRef,
-
-          changed: currentDocRef !== newDocRef,
-
-        })
-
         if (currentDocRef !== newDocRef) {
 
           auditChanges.push(
@@ -4501,15 +4428,7 @@ const updatePurchase = async (req, res, next) => {
 
         const newTerms = normalizeValue(terms)
 
-        console.log('DEBUG: Terms comparison:', {
 
-          current: currentTerms,
-
-          new: newTerms,
-
-          changed: currentTerms !== newTerms,
-
-        })
 
         if (currentTerms !== newTerms) {
 
@@ -4559,15 +4478,7 @@ const updatePurchase = async (req, res, next) => {
 
         const newRemarks = normalizeValue(remarks)
 
-        console.log('DEBUG: Remarks comparison:', {
 
-          current: currentRemarks,
-
-          new: newRemarks,
-
-          changed: currentRemarks !== newRemarks,
-
-        })
 
         if (currentRemarks !== newRemarks) {
 
@@ -4603,15 +4514,12 @@ const updatePurchase = async (req, res, next) => {
 
       // Track purchase items changes using data fetched earlier
 
-      console.log('DEBUG: Current items data from DB:', currentItemsData)
-
       if (purchase_items && purchase_items.length > 0) {
 
         for (let i = 0; i < purchase_items.length; i++) {
 
           const item = purchase_items[i]
 
-          console.log('DEBUG: Processing item:', item)
 
           let currentItem = null
 
@@ -4653,7 +4561,6 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-          console.log('DEBUG: Found current item:', currentItem)
 
           if (currentItem) {
 
@@ -4665,17 +4572,7 @@ const updatePurchase = async (req, res, next) => {
 
               const newQty = normalizeNumber(item.qty)
 
-              console.log('DEBUG: Item qty comparison:', {
 
-                itemId: currentItem.id,
-
-                current: currentQty,
-
-                new: newQty,
-
-                changed: currentQty !== newQty,
-
-              })
 
               if (currentQty !== newQty) {
 
@@ -4699,17 +4596,7 @@ const updatePurchase = async (req, res, next) => {
 
               const newPrice = normalizeNumber(item.price)
 
-              console.log('DEBUG: Item price comparison:', {
 
-                itemId: currentItem.id,
-
-                current: currentPrice,
-
-                new: newPrice,
-
-                changed: currentPrice !== newPrice,
-
-              })
 
               if (currentPrice !== newPrice) {
 
@@ -4733,17 +4620,6 @@ const updatePurchase = async (req, res, next) => {
 
               const newDesc = normalizeValue(item.description)
 
-              console.log('DEBUG: Item desc comparison:', {
-
-                itemId: currentItem.id,
-
-                current: currentDesc,
-
-                new: newDesc,
-
-                changed: currentDesc !== newDesc,
-
-              })
 
               if (currentDesc !== newDesc) {
 
@@ -4771,17 +4647,7 @@ const updatePurchase = async (req, res, next) => {
 
               const newRespCenter = normalizeValue(item.responsibility_center)
 
-              console.log('DEBUG: Item resp center comparison:', {
 
-                itemId: currentItem.id,
-
-                current: currentRespCenter,
-
-                new: newRespCenter,
-
-                changed: currentRespCenter !== newRespCenter,
-
-              })
 
               if (currentRespCenter !== newRespCenter) {
 
@@ -4811,17 +4677,12 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-      // Track journal entries changes using data fetched earlier
-
-      console.log('DEBUG: Current journal data from DB:', currentJournalData)
 
       if (journal_entries && journal_entries.length > 0) {
 
         for (let i = 0; i < journal_entries.length; i++) {
 
           const entry = journal_entries[i]
-
-          console.log('DEBUG: Processing journal entry:', entry)
 
           const type = entry.debit > 0 ? 'debit' : 'credit'
 
@@ -4894,9 +4755,6 @@ const updatePurchase = async (req, res, next) => {
           }
 
 
-
-          console.log('DEBUG: Found current journal entry:', currentEntry)
-
           if (currentEntry) {
 
             const currentRespCenter = normalizeValue(
@@ -4907,17 +4765,7 @@ const updatePurchase = async (req, res, next) => {
 
             const newRespCenter = normalizeValue(entry.responsibility_center)
 
-            console.log('DEBUG: Journal resp center comparison:', {
 
-              entryId: currentEntry.id,
-
-              current: currentRespCenter,
-
-              new: newRespCenter,
-
-              changed: currentRespCenter !== newRespCenter,
-
-            })
 
             if (currentRespCenter !== newRespCenter) {
 
@@ -4975,13 +4823,6 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-      // Track attachment changes
-
-      console.log('DEBUG: Current attachments data from DB:', currentAttachmentsData)
-
-      console.log('DEBUG: Request attachments data:', attachments)
-
-
 
       // Get existing attachments for comparison
 
@@ -5014,11 +4855,6 @@ const updatePurchase = async (req, res, next) => {
       )
 
 
-
-      console.log('DEBUG: Existing attachment IDs:', existingAttachmentIds)
-
-
-
       if (attachments && attachments.length > 0) {
 
         // Filter out attachments with invalid IDs (null, undefined, 'null', 'undefined', empty string)
@@ -5047,11 +4883,6 @@ const updatePurchase = async (req, res, next) => {
 
         )
 
-        console.log('DEBUG: Valid payload attachments:', validAttachments)
-
-        console.log('DEBUG: Payload attachment IDs:', payloadAttachmentIds)
-
-
 
         // Find deleted attachments - IDs in DB but not in valid payload
 
@@ -5060,8 +4891,6 @@ const updatePurchase = async (req, res, next) => {
           (id) => !payloadAttachmentIds.includes(id),
 
         )
-
-        console.log('DEBUG: Deleted attachment IDs:', deletedAttachmentIds)
 
         if (deletedAttachmentIds.length > 0) {
 
@@ -5072,8 +4901,6 @@ const updatePurchase = async (req, res, next) => {
               (a) => a.id === deletedId,
 
             )
-
-            console.log('DEBUG: Found deleted attachment:', deletedAttachment)
 
             if (deletedAttachment) {
 
@@ -5093,23 +4920,7 @@ const updatePurchase = async (req, res, next) => {
 
         for (const attachment of attachments) {
 
-          console.log('DEBUG: Processing attachment:', attachment)
-
-          console.log(
-
-            'DEBUG: Attachment ID:',
-
-            attachment.id,
-
-            'Type:',
-
-            typeof attachment.id,
-
-          )
-
-
-
-          // Check if ID is valid (not null, undefined, empty string, or string 'null')
+         // Check if ID is valid (not null, undefined, empty string, or string 'null')
 
           const hasValidId =
 
@@ -5126,14 +4937,8 @@ const updatePurchase = async (req, res, next) => {
             attachment.id !== 'undefined'
 
 
-
-          console.log('DEBUG: Has valid ID:', hasValidId)
-
-
-
           if (hasValidId) {
 
-            console.log('DEBUG: Attachment has valid ID, checking for updates...')
 
             const currentAttachment = currentAttachmentsData[0]?.find(
 
@@ -5141,7 +4946,6 @@ const updatePurchase = async (req, res, next) => {
 
             )
 
-            console.log('DEBUG: Found current attachment:', currentAttachment)
 
             if (currentAttachment) {
 
@@ -5153,17 +4957,7 @@ const updatePurchase = async (req, res, next) => {
 
                 const newRemarks = normalizeValue(attachment.remarks)
 
-                console.log('DEBUG: Attachment remarks comparison:', {
 
-                  attachmentId: attachment.id,
-
-                  current: currentRemarks,
-
-                  new: newRemarks,
-
-                  changed: currentRemarks !== newRemarks,
-
-                })
 
                 if (currentRemarks !== newRemarks) {
 
@@ -5179,11 +4973,7 @@ const updatePurchase = async (req, res, next) => {
 
             } else {
 
-              console.log(
-
-                'DEBUG: Attachment ID not found in current data, treating as new',
-
-              )
+  
 
               auditChanges.push(
 
@@ -5195,19 +4985,7 @@ const updatePurchase = async (req, res, next) => {
 
           } else {
 
-            console.log('DEBUG: No valid attachment ID, treating as new attachment')
 
-            console.log(
-
-              'DEBUG: Attachment name:',
-
-              attachment.name,
-
-              'fileName:',
-
-              attachment.fileName,
-
-            )
 
             auditChanges.push(
 
@@ -5221,7 +4999,6 @@ const updatePurchase = async (req, res, next) => {
 
       } else {
 
-        console.log('DEBUG: No attachments in payload, checking for deletions')
 
         // All attachments were deleted
 
@@ -5234,8 +5011,6 @@ const updatePurchase = async (req, res, next) => {
               (a) => a.id === existingId,
 
             )
-
-            console.log('DEBUG: Found deleted attachment (all):', deletedAttachment)
 
             if (deletedAttachment) {
 
@@ -5419,14 +5194,6 @@ const getPrintPurchases = async (req, res, next) => {
     .map((id) => id.trim())
 
     .filter((id) => id)
-
-
-
-  console.log('Converted purchase_ids:', purchaseIds, 'type:', typeof purchaseIds)
-
-
-
-  console.log('Copy type:', copyType)
 
 
 
@@ -6040,10 +5807,6 @@ const getPrintPurchases = async (req, res, next) => {
 
 
 
-    console.log('Raw journal data:', purchase_journal)
-
-
-
     // Fetch attachments
 
 
@@ -6355,17 +6118,6 @@ const getPrintPurchases = async (req, res, next) => {
 
 
 
-        console.log('Processing journal entry:', {
-
-          type: entry.type,
-
-          amount: entry.amount,
-
-          isDebit,
-
-        })
-
-
 
         const mapped = {
 
@@ -6388,12 +6140,6 @@ const getPrintPurchases = async (req, res, next) => {
           credit: !isDebit ? parseFloat(entry.amount || 0) : 0,
 
         }
-
-
-
-        console.log('Mapped journal entry:', mapped)
-
-
 
         return mapped
 
@@ -6428,10 +6174,6 @@ const getPrintPurchases = async (req, res, next) => {
       }
 
     })
-
-
-
-    console.log('Grouped purchases data:', groupedData)
 
 
 

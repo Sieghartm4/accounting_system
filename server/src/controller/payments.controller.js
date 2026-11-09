@@ -176,15 +176,9 @@ const getPurchasePayment = async (req, res, next) => {
   try {
     const { purchase_id } = req.query
 
-    console.log('Purchase IDs received:', req.query)
-    console.log('Raw purchase_id:', purchase_id)
-    console.log('Type of purchase_id:', typeof purchase_id)
-
     const purchaseIds = (Array.isArray(purchase_id) ? purchase_id : [purchase_id]).filter(
       (id) => id !== undefined && id !== null && id !== '',
     )
-
-    console.log('Processed purchaseIds:', purchaseIds)
 
     if (purchaseIds.length === 0) {
       return res.status(400).json({
@@ -253,16 +247,12 @@ const getPurchasePayment = async (req, res, next) => {
 
       .build()
 
-    console.log('Generated SQL query:', query)
-    console.log('Query params:', purchaseIds)
-    
+
     const purchases = await Query(query, purchaseIds, [
       Accounting.purchase.prefix_,
       Master.vendors.prefix_,
     ])
     
-    console.log('Purchases data fetched:', purchases)
-    console.log('Purchases data length:', purchases ? purchases.length : 0)
 
     res.status(200).json({
       success: true,
@@ -293,8 +283,6 @@ const getPurchasePayment = async (req, res, next) => {
 const getPurchaseItemsPayment = async (req, res, next) => {
   try {
     const { purchase_id } = req.query
-
-    console.log('Purchase IDs received:', req.query)
 
     const purchaseIds = (
       Array.isArray(purchase_id) ? purchase_id : [purchase_id]
@@ -447,8 +435,6 @@ const getPurchaseItemsPayment = async (req, res, next) => {
       ],
     )
 
-    console.log('Purchase items fetched:', purchaseItems, 'rows')
-
     res.status(200).json({
       success: true,
 
@@ -478,7 +464,6 @@ const getPurchaseItemsPayment = async (req, res, next) => {
 const getAllPayments = async (req, res, next) => {
   const { payment_id } = req.params
 
-  console.log('Received payment_id:', payment_id, 'type:', typeof payment_id)
 
   if (!payment_id) {
     return res.status(400).json({
@@ -698,8 +683,6 @@ const getAllPayments = async (req, res, next) => {
       [Accounting.payment_items.prefix_],
     )
 
-    console.log('PAYMENT ITEMS QUERY', payment_items_query)
-
     const payment_journal_query = sql
       .select([
         { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
@@ -775,8 +758,6 @@ const getAllPayments = async (req, res, next) => {
       [Accounting.payment_attachments.prefix_],
     )
 
-    console.log(payment, payment_items, payment_journal, payment_attachments)
-
     res.status(200).json({
       success: true,
 
@@ -838,7 +819,6 @@ const createPayment = async (req, res, next) => {
       attachments,
     } = req.body
 
-    console.log(req.body)
 
     if (!vendor_id || !mode_of_payment || !payment_date || !created_by) {
       return res.status(400).json({
@@ -870,7 +850,6 @@ const createPayment = async (req, res, next) => {
       [Master.vendors.prefix_],
     )
 
-    console.log('Vendor validation result:', vendorResult)
 
     if (!vendorResult || vendorResult.length === 0) {
       return res.status(400).json({
@@ -1202,8 +1181,6 @@ const updatePaymentState = async (req, res, next) => {
   try {
     const { updates } = req.body
 
-    console.log('body', req.body)
-
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({
         success: false,
@@ -1304,8 +1281,6 @@ const updatePaymentState = async (req, res, next) => {
             [Accounting.payment_items.prefix_],
           )
 
-          console.log('payment_items', payment_items)
-
           // Group by purchase_id and sum amounts
           const purchaseAmounts = {}
           payment_items.forEach((item) => {
@@ -1315,8 +1290,6 @@ const updatePaymentState = async (req, res, next) => {
               purchaseAmounts[purchaseId] = (purchaseAmounts[purchaseId] || 0) + amount
             }
           })
-
-          console.log('purchaseAmounts', purchaseAmounts)
 
           // Update each purchase's paid_amount and status
           for (const [purchaseId, amountToAdd] of Object.entries(purchaseAmounts)) {
@@ -1331,7 +1304,6 @@ const updatePaymentState = async (req, res, next) => {
             `
             const [paidResult] = await connection.execute(paidAmountQuery, [purchaseId])
             const totalPaid = parseFloat(paidResult[0]?.total_paid || 0)
-            console.log(`Purchase ID ${purchaseId}: totalPaid from query = ${totalPaid}, amountToAdd = ${amountToAdd}`)
 
             // Get total amount due for this purchase
             const purchaseQuery = sql
@@ -1352,7 +1324,6 @@ const updatePaymentState = async (req, res, next) => {
 
             if (purchaseData && purchaseData.length > 0) {
               const totalDue = parseFloat(purchaseData[0].total_amount_due) || 0
-              console.log(`Purchase ID ${purchaseId}: totalDue = ${totalDue}`)
 
               // Determine new status based on payment progress
               let newStatus = 'UNPAID'
@@ -1361,7 +1332,6 @@ const updatePaymentState = async (req, res, next) => {
               } else if (totalPaid > 0) {
                 newStatus = 'PARTIALLY PAID'
               }
-              console.log(`Purchase ID ${purchaseId}: newStatus = ${newStatus}`)
 
               // Update purchase with recalculated paid_amount and status
               const updatePurchaseQuery = sql
@@ -1379,9 +1349,7 @@ const updatePaymentState = async (req, res, next) => {
                 updatePurchaseQuery,
                 updatePurchaseValues,
               )
-              console.log(
-                `Updated purchase ID ${purchaseId}: paid_amount=${totalPaid}, status=${newStatus}, affected rows: ${result.affectedRows}`,
-              )
+
             }
           }
 
@@ -1638,9 +1606,6 @@ const getPrintPayments = async (req, res, next) => {
     .map((id) => id.trim())
     .filter((id) => id !== '')
 
-  console.log('Converted payment_ids:', paymentIds, 'type:', typeof paymentIds)
-
-  console.log('Copy type:', copyType)
 
   if (paymentIds.length === 0) {
     return res.status(400).json({
@@ -1931,8 +1896,6 @@ const getPrintPayments = async (req, res, next) => {
       [Accounting.journal_entries.prefix_],
     )
 
-    console.log('Raw journal data:', payment_journal)
-
     // Fetch attachments
 
     const payment_attachments_query = sql
@@ -2088,11 +2051,7 @@ const getPrintPayments = async (req, res, next) => {
       const mappedJournal = paymentJournal.map((entry) => {
         const isDebit = entry.type === 'DEBIT'
 
-        console.log('Processing journal entry:', {
-          type: entry.type,
-          amount: entry.amount,
-          isDebit,
-        })
+
 
         const mapped = {
           id: entry.id,
@@ -2105,8 +2064,6 @@ const getPrintPayments = async (req, res, next) => {
 
           credit: !isDebit ? parseFloat(entry.amount || 0) : 0,
         }
-
-        console.log('Mapped journal entry:', mapped)
 
         return mapped
       })
@@ -2126,7 +2083,6 @@ const getPrintPayments = async (req, res, next) => {
       }
     })
 
-    console.log('Grouped payments data:', groupedData)
 
     res.status(200).json({
       success: true,
@@ -2160,7 +2116,6 @@ const getPrintPayments = async (req, res, next) => {
 const updatePayment = async (req, res, next) => {
   const { payment_id } = req.params
 
-  console.log('Updating payment_id:', payment_id, 'type:', typeof payment_id)
 
   try {
     const {
@@ -2189,8 +2144,6 @@ const updatePayment = async (req, res, next) => {
       attachments,
     } = req.body
 
-    console.log('Update data:', req.body)
-
     // Convert vendor name to vendor ID if needed
 
     let actualVendorId = vendor_id
@@ -2198,7 +2151,6 @@ const updatePayment = async (req, res, next) => {
     if (vendor_id && isNaN(Number(vendor_id))) {
       // vendor_id is a name, need to find actual ID
 
-      console.log('Looking up vendor by name:', vendor_id)
 
       const vendorQuery = sql
         .select([
@@ -2213,7 +2165,6 @@ const updatePayment = async (req, res, next) => {
 
         .build()
 
-      console.log('Vendor query SQL:', vendorQuery)
 
       const [vendorResult] = await Query(
         vendorQuery,
@@ -2221,12 +2172,9 @@ const updatePayment = async (req, res, next) => {
         [Master.vendors.prefix_],
       )
 
-      console.log('Vendor lookup result:', vendorResult)
-
       if (vendorResult && vendorResult.length > 0) {
         actualVendorId = vendorResult[0].id
 
-        console.log('Converted vendor name to ID:', vendor_id, '→', actualVendorId)
       } else {
         // Vendor was found but result structure is different
 
@@ -2235,12 +2183,6 @@ const updatePayment = async (req, res, next) => {
         if (vendorResult && vendorResult.id) {
           actualVendorId = vendorResult.id
 
-          console.log(
-            'Found vendor in result object:',
-            vendor_id,
-            '→',
-            actualVendorId,
-          )
         } else {
           return res.status(400).json({
             success: false,
@@ -2504,10 +2446,6 @@ const updatePayment = async (req, res, next) => {
 
       // Payment items should not be modifiable after payment is created
 
-      console.log('Skipping payment items updates - not allowed in edit mode')
-
-      console.log('DEBUG: Server received journal_entries:', journal_entries)
-      console.log('DEBUG: Journal entries length:', journal_entries?.length || 0)
 
       if (journal_entries && journal_entries.length > 0) {
         const existingEntriesQuery = sql
@@ -2796,23 +2734,6 @@ const updatePayment = async (req, res, next) => {
       const normalizeNumber = (val) =>
         val === null || val === undefined ? 0 : parseFloat(val)
 
-      console.log('DEBUG: Current payment data:', currentPaymentData)
-
-      console.log('DEBUG: Request body data:', {
-        vendor_id,
-        document_reference,
-        mode_of_payment,
-        bank_name,
-        check_number,
-        payment_date,
-        remarks,
-      })
-
-      console.log('DEBUG: Payment items data:', payment_items)
-
-      console.log('DEBUG: Journal entries data:', journal_entries)
-
-      console.log('DEBUG: Attachments data:', attachments)
 
       if (currentPaymentData.length > 0) {
         const current = currentPaymentData[0]
@@ -2825,11 +2746,6 @@ const updatePayment = async (req, res, next) => {
 
         const newDocRef = normalizeValue(document_reference)
 
-        console.log('DEBUG: Doc Ref comparison:', {
-          current: currentDocRef,
-          new: newDocRef,
-          changed: currentDocRef !== newDocRef,
-        })
 
         if (currentDocRef !== newDocRef) {
           auditChanges.push(
@@ -2841,11 +2757,6 @@ const updatePayment = async (req, res, next) => {
 
         const newModeOfPayment = normalizeValue(mode_of_payment)
 
-        console.log('DEBUG: Mode of payment comparison:', {
-          current: currentModeOfPayment,
-          new: newModeOfPayment,
-          changed: currentModeOfPayment !== newModeOfPayment,
-        })
 
         if (currentModeOfPayment !== newModeOfPayment) {
           auditChanges.push(
@@ -2887,11 +2798,7 @@ const updatePayment = async (req, res, next) => {
 
         const newRemarks = normalizeValue(remarks)
 
-        console.log('DEBUG: Remarks comparison:', {
-          current: currentRemarks,
-          new: newRemarks,
-          changed: currentRemarks !== newRemarks,
-        })
+
 
         if (currentRemarks !== newRemarks) {
           auditChanges.push(
@@ -2900,11 +2807,6 @@ const updatePayment = async (req, res, next) => {
         }
       }
 
-      // Track payment items changes using data fetched earlier
-
-      console.log('DEBUG: Current items data from DB:', currentItemsData)
-
-      console.log('DEBUG: Payment items in request:', payment_items)
 
       // Only process payment items audit if there are actual changes to payment items
 
@@ -2919,13 +2821,10 @@ const updatePayment = async (req, res, next) => {
             (item.amount !== undefined && item.amount !== null), // Existing items with amount changes
         )
 
-      console.log('DEBUG: Has payment items changes:', hasPaymentItemsChanges)
-
       if (hasPaymentItemsChanges) {
         for (let i = 0; i < payment_items.length; i++) {
           const item = payment_items[i]
 
-          console.log('DEBUG: Processing item:', item)
 
           let currentItem = null
 
@@ -2935,7 +2834,6 @@ const updatePayment = async (req, res, next) => {
             currentItem = currentItemsData[0]?.find((i) => i.id === item.id)
           }
 
-          console.log('DEBUG: Found current item:', currentItem)
 
           if (currentItem) {
             // This is an existing item being updated, not a new item
@@ -2947,12 +2845,7 @@ const updatePayment = async (req, res, next) => {
 
               const newAmount = normalizeNumber(item.amount)
 
-              console.log('DEBUG: Item amount comparison:', {
-                itemId: currentItem.id,
-                current: currentAmount,
-                new: newAmount,
-                changed: currentAmount !== newAmount,
-              })
+
 
               if (currentAmount !== newAmount) {
                 auditChanges.push(
@@ -2976,15 +2869,6 @@ const updatePayment = async (req, res, next) => {
         }
       }
 
-      // Track journal entries changes using data fetched earlier
-
-      console.log('DEBUG: Current journal data from DB:', currentJournalData)
-
-      console.log('DEBUG: Journal entries in request:', journal_entries)
-
-      // Only process journal entries audit if there are actual changes to journal entries
-
-      // Skip if journal_entries is empty, null, or contains only existing entries with no changes
 
       const hasJournalChanges =
         journal_entries &&
@@ -2999,13 +2883,11 @@ const updatePayment = async (req, res, next) => {
               entry.responsibility_center !== ''), // Existing entries with responsibility center changes
         )
 
-      console.log('DEBUG: Has journal changes:', hasJournalChanges)
 
       if (hasJournalChanges) {
         for (let i = 0; i < journal_entries.length; i++) {
           const entry = journal_entries[i]
 
-          console.log('DEBUG: Processing journal entry:', entry)
 
           const type = entry.debit > 0 ? 'debit' : 'credit'
 
@@ -3049,7 +2931,6 @@ const updatePayment = async (req, res, next) => {
             }
           }
 
-          console.log('DEBUG: Found current journal entry:', currentEntry)
 
           if (currentEntry) {
             const currentRespCenter = normalizeValue(
@@ -3057,13 +2938,6 @@ const updatePayment = async (req, res, next) => {
             )
 
             const newRespCenter = normalizeValue(entry.responsibility_center)
-
-            console.log('DEBUG: Journal resp center comparison:', {
-              entryId: currentEntry.id,
-              current: currentRespCenter,
-              new: newRespCenter,
-              changed: currentRespCenter !== newRespCenter,
-            })
 
             if (currentRespCenter !== newRespCenter) {
               auditChanges.push(
@@ -3108,13 +2982,6 @@ const updatePayment = async (req, res, next) => {
         }
       }
 
-      // Track attachment changes
-
-      console.log('DEBUG: Current attachments data from DB:', currentAttachmentsData)
-
-      console.log('DEBUG: Request attachments data:', attachments)
-
-      // Get existing attachments for comparison
 
       const existingAttachmentsQuery = sql
         .select([Accounting.payment_attachments.selectOptionColumns.id])
@@ -3135,7 +3002,6 @@ const updatePayment = async (req, res, next) => {
         (attachment) => attachment.id,
       )
 
-      console.log('DEBUG: Existing attachment IDs:', existingAttachmentIds)
 
       if (attachments && attachments.length > 0) {
         // Filter out attachments with valid numeric IDs (existing attachments from database)
@@ -3153,12 +3019,6 @@ const updatePayment = async (req, res, next) => {
           (attachment) => attachment.id,
         )
 
-        console.log(
-          'DEBUG: Valid payload attachments:',
-          existingAttachmentsInPayload,
-        )
-
-        console.log('DEBUG: Payload attachment IDs:', payloadAttachmentIds)
 
         // Find deleted attachments - IDs in DB but not in valid payload
 
@@ -3166,7 +3026,6 @@ const updatePayment = async (req, res, next) => {
           (id) => !payloadAttachmentIds.includes(id),
         )
 
-        console.log('DEBUG: Deleted attachment IDs:', deletedAttachmentIds)
 
         if (deletedAttachmentIds.length > 0) {
           for (const deletedId of deletedAttachmentIds) {
@@ -3176,7 +3035,6 @@ const updatePayment = async (req, res, next) => {
               (a) => a.id === deletedId,
             )
 
-            console.log('DEBUG: Found deleted attachment:', deletedAttachment)
 
             if (deletedAttachment) {
               auditChanges.push(
@@ -3187,14 +3045,7 @@ const updatePayment = async (req, res, next) => {
         }
 
         for (const attachment of attachments) {
-          console.log('DEBUG: Processing attachment:', attachment)
 
-          console.log(
-            'DEBUG: Attachment ID:',
-            attachment.id,
-            'Type:',
-            typeof attachment.id,
-          )
 
           // Check if ID is a valid numeric ID (existing attachment from database)
 
@@ -3205,10 +3056,8 @@ const updatePayment = async (req, res, next) => {
             typeof attachment.id === 'number' &&
             !isNaN(attachment.id)
 
-          console.log('DEBUG: Is existing attachment:', isExistingAttachment)
 
           if (isExistingAttachment) {
-            console.log('DEBUG: Attachment has valid ID, checking for updates...')
 
             // Fix: Access currentAttachmentsData[0] since connection.execute returns array
 
@@ -3216,7 +3065,6 @@ const updatePayment = async (req, res, next) => {
               (a) => a.id === attachment.id,
             )
 
-            console.log('DEBUG: Found current attachment:', currentAttachment)
 
             if (currentAttachment) {
               // Only compare remarks if it's provided in the request (not undefined)
@@ -3226,12 +3074,7 @@ const updatePayment = async (req, res, next) => {
 
                 const newRemarks = normalizeValue(attachment.remarks)
 
-                console.log('DEBUG: Attachment remarks comparison:', {
-                  attachmentId: attachment.id,
-                  current: currentRemarks,
-                  new: newRemarks,
-                  changed: currentRemarks !== newRemarks,
-                })
+
 
                 if (currentRemarks !== newRemarks) {
                   auditChanges.push(
@@ -3240,23 +3083,14 @@ const updatePayment = async (req, res, next) => {
                 }
               }
             } else {
-              console.log(
-                'DEBUG: Attachment ID not found in current data, treating as new',
-              )
+
 
               auditChanges.push(
                 `Attachment: ${normalizeValue(attachment.name) || normalizeValue(attachment.fileName) || 'Unknown'} (NEW)`,
               )
             }
           } else {
-            console.log('DEBUG: No valid attachment ID, treating as new attachment')
 
-            console.log(
-              'DEBUG: Attachment name:',
-              attachment.name,
-              'fileName:',
-              attachment.fileName,
-            )
 
             auditChanges.push(
               `Attachment: ${normalizeValue(attachment.name) || normalizeValue(attachment.fileName) || 'Unknown'} (NEW)`,
@@ -3264,7 +3098,6 @@ const updatePayment = async (req, res, next) => {
           }
         }
       } else {
-        console.log('DEBUG: No attachments in payload, checking for deletions')
 
         // All attachments were deleted
 
@@ -3276,7 +3109,6 @@ const updatePayment = async (req, res, next) => {
               (a) => a.id === existingId,
             )
 
-            console.log('DEBUG: Found deleted attachment (all):', deletedAttachment)
 
             if (deletedAttachment) {
               auditChanges.push(

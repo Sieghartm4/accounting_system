@@ -531,7 +531,6 @@ function AdjustmentsContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  console.log('Viewing adjustment:', row)
 
                   const token = sessionStorage.getItem('authenticated')
                   if (!token) {
@@ -557,7 +556,6 @@ function AdjustmentsContent() {
                     )
                   }
 
-                  console.log('Adjustment details fetched:', result)
                   setViewingAdjustment(result)
                   setIsViewing(true)
                   markReadForDocument('adjustments', [row.id])
@@ -574,7 +572,6 @@ function AdjustmentsContent() {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  console.log('Editing adjustment:', row)
 
                   setIsPostedEdit(isPostedDocument(row.status))
 
@@ -602,7 +599,6 @@ function AdjustmentsContent() {
                     )
                   }
 
-                  console.log('Adjustment details fetched for editing:', result)
                   setViewingAdjustment(result)
                   setIsEditing(true)
                   setIsAdding(true)
@@ -693,7 +689,6 @@ function AdjustmentsContent() {
                   isOpen: true,
                   onConfirm: async () => {
                     try {
-                      console.log('Approving adjustments:', approvableRows)
 
                       const token = sessionStorage.getItem('authenticated')
                       if (!token) {
@@ -771,7 +766,6 @@ function AdjustmentsContent() {
                   isOpen: true,
                   onConfirm: async () => {
                     try {
-                      console.log('Cancelling adjustments:', cancellableRows)
 
                       const token = sessionStorage.getItem('authenticated')
                       if (!token) {

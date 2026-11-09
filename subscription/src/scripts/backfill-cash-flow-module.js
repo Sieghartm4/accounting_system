@@ -28,7 +28,6 @@ const MODULE = 'cash_flow_statement'
 const run = async () => {
   const [plans] = await pool.query('SELECT sp_id, sp_name FROM subscription_plans')
   if (!plans.length) {
-    console.log('No subscription plans found - nothing to backfill.')
     return
   }
 
@@ -41,7 +40,6 @@ const run = async () => {
       [plan.sp_id, MODULE],
     )
     if (exists.length) {
-      console.log(`  = plan ${plan.sp_id} (${plan.sp_name}): already granted`)
       continue
     }
     await pool.query(
@@ -49,9 +47,7 @@ const run = async () => {
       [plan.sp_id, MODULE],
     )
     inserted++
-    console.log(`  + plan ${plan.sp_id} (${plan.sp_name}): granted`)
   }
-  console.log(`Backfill complete. ${inserted} plan(s) updated out of ${plans.length}.`)
   return inserted
 }
 

@@ -124,8 +124,7 @@ const useAdjustments = () => {
   }, [])
 
   const handleAdjustmentRowClick = async (adjustment_id) => {
-    console.log('Adjustment clicked!')
-    console.log('Adjustment ID:', adjustment_id)
+
 
     if (selectedAdjustmentId === adjustment_id) {
       setSelectedAdjustmentId(null)

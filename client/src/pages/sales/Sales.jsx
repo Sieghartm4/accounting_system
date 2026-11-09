@@ -217,7 +217,6 @@ function SalesContent() {
         throw new Error(result.message || 'Failed to fetch sales for printing')
 
       const data = result.data || []
-      console.log('PDF Data received:', data)
       if (!Array.isArray(data))
         throw new Error('Invalid data format received from server')
 
@@ -256,7 +255,6 @@ function SalesContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                console.log('Approving sales:', validRows)
 
                 const token = sessionStorage.getItem('authenticated')
                 if (!token) {
@@ -332,7 +330,6 @@ function SalesContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                console.log('Cancelling sales:', validRows)
 
                 const token = sessionStorage.getItem('authenticated')
                 if (!token) {
@@ -678,7 +675,6 @@ function SalesContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  console.log('View sales:', row)
 
                   const token = sessionStorage.getItem('authenticated')
                   if (!token) {
@@ -704,8 +700,6 @@ function SalesContent() {
                     )
                   }
 
-                  console.log('Sales details:', result)
-
                   // Set sales data for viewing
                   setViewingSales(result)
                   setIsViewing(true)
@@ -723,7 +717,6 @@ function SalesContent() {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  console.log('Editing sales:', row)
 
                   setIsPostedEdit(isPostedDocument(row.state))
 
@@ -750,8 +743,6 @@ function SalesContent() {
                       result.message || 'Failed to fetch sales details',
                     )
                   }
-
-                  console.log('Sales details for editing:', result)
 
                   // Set sales data for editing
                   setEditingSales(result)

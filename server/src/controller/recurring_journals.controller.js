@@ -320,9 +320,7 @@ const createRecurringJournal = async (req, res, next) => {
   let connection
   try {
     const payload = req.body && req.body.data ? req.body.data : req.body
-    console.log('📥 Received create payload:', payload)
-    console.log('📥 Journal entries in payload:', payload.journal_entries || payload.items)
-    
+
     const header = normalizeTemplateHeader(payload)
 
     connection = await getTenantPool().getConnection()
@@ -331,7 +329,6 @@ const createRecurringJournal = async (req, res, next) => {
     header.reference = await generateTemplateReference(connection)
 
     const items = await normalizeItems(connection, payload.journal_entries || payload.items)
-    console.log('📥 Normalized items:', items)
 
     const headerQuery = sql
       .insert(Accounting.recurring_journals.tablename, {

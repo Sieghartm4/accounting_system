@@ -1141,7 +1141,6 @@ export default function PurchaseForm({
   // Populate form data when purchaseData is provided
   useEffect(() => {
     if (purchaseData) {
-      console.log('Populating purchase form with data:', purchaseData)
 
       // Handle the API response structure
       const mainData = purchaseData.data ? purchaseData.data[0] : purchaseData
@@ -1179,7 +1178,6 @@ export default function PurchaseForm({
 
       // Populate purchase items
       if (itemsData && itemsData.length > 0) {
-        console.log('Processing purchase items:', itemsData)
         const items = itemsData.map((item) => ({
           id: item.id,
           productId: item.product_service_id,
@@ -1224,13 +1222,11 @@ export default function PurchaseForm({
           isOther: false,
           isNew: false,
         }))
-        console.log('Final purchase items array:', items)
         setPurchaseItems(items)
       }
 
       // Populate journal entries
       if (journalData && journalData.length > 0) {
-        console.log('Processing journal entries:', journalData)
         const entries = journalData.map((entry) => ({
           id: entry.id,
           account: entry.charts_of_accounts_id || entry.charts_of_accounts_name,
@@ -1240,28 +1236,17 @@ export default function PurchaseForm({
           credit: entry.type === 'CREDIT' ? parseFloat(entry.amount) || 0 : 0,
           isManual: false,
         }))
-        console.log('Final journal entries array:', entries)
         setJournalEntries(entries)
       }
 
       // Populate attachments
       if (attachmentsData && attachmentsData.length > 0) {
-        console.log('Processing attachments:', attachmentsData)
         const attachments = attachmentsData.map((att) => {
-          console.log(
-            'Processing attachment:',
-            att.id,
-            att.name,
-            'File data type:',
-            typeof att.file,
-            'File data length:',
-            att.file ? att.file.length : 'null',
-          )
+
 
           // Check if base64 data is properly formatted
           let fileData = att.file || null
           if (fileData && typeof fileData === 'string') {
-            console.log('Base64 data starts with:', fileData.substring(0, 50))
 
             // Check if base64 data is complete
             if (fileData.includes('...')) {
@@ -1278,7 +1263,6 @@ export default function PurchaseForm({
             date: att.uploaded_date || new Date().toLocaleDateString(),
           }
         })
-        console.log('Final attachments array:', attachments)
         setAttachments(attachments)
       }
       // Note: Don't create empty attachment row - let user add manually

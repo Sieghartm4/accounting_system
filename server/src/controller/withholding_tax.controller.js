@@ -62,7 +62,7 @@ const getWithholdingTax = async (req, res, next) => {
       .build()
 
     let withholdingTax = await Query(query, [], [Master.withholding_tax.prefix_])
-    console.log(withholdingTax)
+
     res.status(200).json({
       success: true,
       message: 'Withholding Tax entries retrieved successfully',
@@ -187,7 +187,6 @@ const updateWithholdingTax = async (req, res, next) => {
   try {
     const { id, code, name, rate, tax_account, description, status } = req.body
     const normalizedCode = String(code || '').trim()
-    console.log('body', req.body)
 
     if (
       !id ||

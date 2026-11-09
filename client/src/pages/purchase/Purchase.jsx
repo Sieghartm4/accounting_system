@@ -60,9 +60,7 @@ function PurchaseContent() {
   )
   const [searchParams, setSearchParams] = useSearchParams()
 
-  console.log('PurchaseContent - purchases:', purchases)
-  console.log('PurchaseContent - loading:', loading)
-  console.log('PurchaseContent - error:', error)
+
   const [isAdding, setIsAdding] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isPostedEdit, setIsPostedEdit] = useState(false)
@@ -216,7 +214,6 @@ function PurchaseContent() {
         throw new Error(result.message || 'Failed to fetch purchases for printing')
 
       const data = result.data || []
-      console.log('PDF Data received:', data)
       if (!Array.isArray(data))
         throw new Error('Invalid data format received from server')
 
@@ -275,8 +272,6 @@ function PurchaseContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                console.log('Approving purchases:', approvableRows)
-
                 const approveToken = sessionStorage.getItem('authenticated')
                 if (!approveToken) {
                   throw new Error('No authentication token found')
@@ -350,7 +345,6 @@ function PurchaseContent() {
             isOpen: true,
             onConfirm: async () => {
               try {
-                console.log('Cancelling purchases:', cancellableRows)
 
                 const cancelToken = sessionStorage.getItem('authenticated')
                 if (!cancelToken) {
@@ -680,7 +674,6 @@ function PurchaseContent() {
         transition={{ delay: 0.3 }}
         className="flex-1 min-h-0 bg-white rounded-2xl shadow-xl shadow-black/5 overflow-hidden border border-gray-100"
       >
-        {console.log('About to render DynamicTable with data:', purchases)}
         <DynamicTable
           data={filteredPurchases}
           title="Purchase Ledger"
@@ -702,7 +695,6 @@ function PurchaseContent() {
               label: 'View',
               onClick: async (row) => {
                 try {
-                  console.log('View purchase:', row)
 
                   const authToken = sessionStorage.getItem('authenticated')
                   if (!authToken) {
@@ -728,8 +720,6 @@ function PurchaseContent() {
                     )
                   }
 
-                  console.log('Purchase details:', viewResult)
-
                   // Set purchase data for viewing
                   setViewingPurchase(viewResult)
                   setIsViewing(true)
@@ -747,7 +737,6 @@ function PurchaseContent() {
               label: 'Edit',
               onClick: async (row) => {
                 try {
-                  console.log('Editing purchase:', row)
 
                   setIsPostedEdit(isPostedDocument(row.state))
 
@@ -774,8 +763,6 @@ function PurchaseContent() {
                       editResult.message || 'Failed to fetch purchase details',
                     )
                   }
-
-                  console.log('Purchase details for editing:', editResult)
 
                   // Set purchase data for editing
                   setEditingPurchase(editResult)

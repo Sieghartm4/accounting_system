@@ -390,14 +390,7 @@ const getDashboardData = async (req, res, next) => {
       collectionsRate = ((totalCollections / totalSales) * 100).toFixed(1)
     }
 
-    // Debug logging
-    console.log('Collections Rate Debug:', {
-      totalCollections,
-      totalSales,
-      collectionsRate,
-      startDate,
-      endDate,
-    })
+
 
     // Total Disbursements this period.
     const disbursements_query = sql

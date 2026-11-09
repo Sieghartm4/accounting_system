@@ -143,8 +143,6 @@ const getBankReconciliations = async (req, res, next) => {
 
     let reconciliations = await Query(query)
 
-    console.log(`Fetched ${JSON.stringify(reconciliations)} bank reconciliations`)
-
     res.status(200).json({
       success: true,
 
@@ -178,8 +176,6 @@ const getBankReconciliationDetail = async (req, res, next) => {
   const { start_date, end_date } = req.query
 
   const reconciliationId = Number(id)
-
-  console.log(`Fetching bank reconciliation detail for id=${reconciliationId}`)
 
   if (!Number.isInteger(reconciliationId) || reconciliationId <= 0) {
     return res.status(400).json({
@@ -394,7 +390,6 @@ const getBankReconciliationDetail = async (req, res, next) => {
 
     const items = await Query(itemsQuery, itemValues)
 
-    console.log(`Fetched ${items.length} bank reconciliation items`)
 
     res.status(200).json({
       success: true,
@@ -1282,9 +1277,7 @@ const getAdjustmentBalances = async (req, res, next) => {
 
   const reconciliationId = Number(id)
 
-  console.log(
-    `Fetching adjustment balances for reconciliation id=${reconciliationId}`,
-  )
+
 
   if (!Number.isInteger(reconciliationId) || reconciliationId <= 0) {
     return res.status(400).json({
@@ -1394,8 +1387,6 @@ const getAdjustmentBalances = async (req, res, next) => {
       .build()
 
     const adjustments = await Query(adjustmentsQuery, values)
-
-    console.log(`Fetched ${adjustments.length} adjustment balances`)
 
     res.status(200).json({
       success: true,

@@ -39,7 +39,6 @@ const updateRouteAccess = async (req, res, next) => {
     const {
       updates
     } = req.body;
-    console.log("body", req.body);
 
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({

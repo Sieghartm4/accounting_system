@@ -443,26 +443,8 @@ export default function BankReconciliation() {
               return sum + credit - debit
             }, 0)
 
-          console.log('Bank statement ending balance calculation:', {
-            bankStatementEndingBalance,
-            bankSectionItems: bankSectionItems.map((i) => ({
-              id: i.id,
-              debit: i.bri_debit || i.debit,
-              credit: i.bri_credit || i.credit,
-              amount: i.amount,
-            })),
-          })
 
-          console.log('Adjusted balance calculation:', {
-            bankStatementEndingBalance,
-            depositsInTransit,
-            outstandingChecks,
-            bankCardAdjustmentsTotal,
-            endingBookBalance,
-            bookAdditions,
-            bookDeductions,
-            bookCardAdjustmentsTotal,
-          })
+
 
           // Apply the same zero-bank guard as the detail worksheet.
           // If the bank statement has no balance yet, timing items should not inflate the bank side.

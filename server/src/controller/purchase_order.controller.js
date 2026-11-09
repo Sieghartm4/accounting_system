@@ -66,12 +66,7 @@ const fetchJsonFromUrl = (url, headers = {}, body = null, method = 'POST') => {
       }
     }
 
-    console.log('[fetchJsonFromUrl] request details', {
-      url: parsedUrl.toString(),
-      method,
-      headers: options.headers,
-      body: requestBody,
-    })
+
 
     const request = client.request(parsedUrl, options, (response) => {
       let responseBody = ''
@@ -286,7 +281,7 @@ const getPurchaseOrderById = async (req, res, next) => {
 const createPurchaseOrder = async (req, res, next) => {
   try {
     const purchaseOrdersPayload = Array.isArray(req.body) ? req.body : [req.body]
-    console.log('Received purchase order payload:', purchaseOrdersPayload)
+
     if (!purchaseOrdersPayload.length) {
       return res.status(400).json({
         success: false,
@@ -338,7 +333,6 @@ const createPurchaseOrder = async (req, res, next) => {
           })
         }
 
-        console.log('Found product', foundProduct)
         validatedPurchaseOrders.push({
           product: foundProduct.id,
           productCode: foundProduct.code,
@@ -363,7 +357,6 @@ const createPurchaseOrder = async (req, res, next) => {
         })
         .build()
 
-      console.log('Purchase order', validatedPurchaseOrders)
       for (const purchaseOrder of validatedPurchaseOrders) {
         const mainValues = [
           purchaseOrder.procurementId,
@@ -576,12 +569,7 @@ const updatePurchaseOrder = async (req, res, next) => {
 
         try {
           const webhookUrl = new URL(endpoint, inventoryProductUrl).toString()
-          console.log(`[PurchaseOrder] calling external ${actionLabel} webhook`, {
-            inventoryProductUrl,
-            webhookUrl,
-            procurementId: updatedProcurementId,
-            inventoryApiKeySet: Boolean(inventoryApiKey),
-          })
+
 
           const webhookResponse = await fetchJsonFromUrl(
             webhookUrl,
@@ -596,10 +584,7 @@ const updatePurchaseOrder = async (req, res, next) => {
             },
           )
 
-          console.log(
-            `[PurchaseOrder] external ${actionLabel} webhook response`,
-            webhookResponse,
-          )
+
         } catch (webhookError) {
           console.error(`External ${actionLabel} API call failed:`, webhookError)
         }

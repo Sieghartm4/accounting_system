@@ -72,13 +72,11 @@ const testUsers = {
 
 // Test function to verify access control
 export function runAccessControlTests() {
-  console.log('=== Running Access Control Tests ===');
-  
+
   const testRoutes = ['dashboard', 'receipts', 'sales', 'collections', 'disbursements', 'access', 'users'];
   
   Object.entries(testUsers).forEach(([userType, user]) => {
-    console.log(`\n--- Testing ${userType.toUpperCase()} User ---`);
-    
+
     testRoutes.forEach(route => {
       const hasAccess = hasRouteAccess(route, user);
       const fullAccess = hasFullAccess(route, user);
@@ -86,74 +84,56 @@ export function runAccessControlTests() {
       const approveAccess = hasApproveAccess(route, user);
       const canCreate = canCreateEdit(route, user);
       const accessLevel = getAccessLevel(route, user);
-      
-      console.log(`Route: ${route}`);
-      console.log(`  - Has Access: ${hasAccess}`);
-      console.log(`  - Full Access: ${fullAccess}`);
-      console.log(`  - Check Access: ${checkAccess}`);
-      console.log(`  - Approve Access: ${approveAccess}`);
-      console.log(`  - Can Create/Edit: ${canCreate}`);
-      console.log(`  - Access Level: ${accessLevel}`);
+
     });
   });
   
-  console.log('\n=== Access Control Tests Complete ===');
 }
 
 // Test specific scenarios
 export function testSpecificScenarios() {
-  console.log('\n=== Testing Specific Scenarios ===');
-  
+
   // Test 1: Admin should have full access to everything
   const admin = testUsers.admin;
   const adminHasFullAccess = admin.route_access.every(route => 
     hasFullAccess(route.name, admin)
   );
-  console.log(`Admin has full access to all routes: ${adminHasFullAccess}`);
-  
+
   // Test 2: Checker should not be able to create/edit
   const checker = testUsers.checker;
   const checkerCannotCreate = checker.route_access.every(route => 
     !canCreateEdit(route.name, checker)
   );
-  console.log(`Checker cannot create/edit on any route: ${checkerCannotCreate}`);
-  
+
   // Test 3: Approver should not be able to create/edit
   const approver = testUsers.approver;
   const approverCannotCreate = approver.route_access.every(route => 
     !canCreateEdit(route.name, approver)
   );
-  console.log(`Approver cannot create/edit on any route: ${approverCannotCreate}`);
-  
+
   // Test 4: No access user should not have access to any route
   const noAccessUser = testUsers.noAccess;
   const noAccessToRoutes = noAccessUser.route_access.every(route => 
     !hasRouteAccess(route.name, noAccessUser)
   );
-  console.log(`No access user has no access to routes: ${noAccessToRoutes}`);
-  
-  console.log('=== Specific Scenarios Test Complete ===');
+
 }
 
 // Mock localStorage for testing
 export function mockLocalStorageTest() {
-  console.log('\n=== Testing localStorage Integration ===');
-  
+
   // Test setting and getting user data
   Object.entries(testUsers).forEach(([userType, user]) => {
     localStorage.setItem('user', JSON.stringify(user));
     
     const storedUser = JSON.parse(sessionStorage.getItem('auth_user'));
     const isSameUser = storedUser.username === user.username;
-    console.log(`${userType} user stored/retrieved correctly: ${isSameUser}`);
-    
+
     // Test access functions with stored user
     const hasAccessToDashboard = hasRouteAccess('dashboard', storedUser);
-    console.log(`${userType} has access to dashboard: ${hasAccessToDashboard}`);
   });
   
   localStorage.removeItem('user');
-  console.log('=== localStorage Integration Test Complete ===');
 }
 
 // Run all tests

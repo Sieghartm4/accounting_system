@@ -678,50 +678,23 @@ export default function PaymentsForm({
       !isEditMode &&
       vendors.length > 0
     ) {
-      console.log('=== AUTO-FILL DEBUG ===')
-      console.log(
-        'preSelectedPurchases:',
-        JSON.stringify(preSelectedPurchases, null, 2),
-      )
-      console.log('preSelectedPurchaseItems:', preSelectedPurchaseItems)
-      console.log('Available vendors:', JSON.stringify(vendors, null, 2))
 
       // Set vendor from first purchase - find matching vendor by name to get ID
       const firstPurchase = preSelectedPurchases[0]
-      console.log('First purchase:', JSON.stringify(firstPurchase, null, 2))
-
       const vendorName = firstPurchase.vendor_name || firstPurchase.vendor || ''
       const vendorId = firstPurchase.vendor_id || ''
-      console.log('Extracted vendorName:', vendorName)
-      console.log('Extracted vendorId:', vendorId)
 
-      console.log('Searching for vendor match...')
-      console.log('Checking vendor.name === vendorName for each vendor:')
       vendors.forEach((v) => {
-        console.log(
-          `  - Vendor ID: ${v.id}, Name: "${v.name}" matches? ${v.name === vendorName}`,
-        )
+
       })
 
       const matchingVendor = vendors.find(
         (v) => v.name === vendorName || v.id === vendorId,
       )
       if (matchingVendor) {
-        console.log('✓ Found matching vendor:', matchingVendor)
-        setSelectedVendor(matchingVendor.id)
-        setVendorSearch(matchingVendor.name) // Also set the display value
       } else {
-        console.log('✗ No matching vendor found')
-        console.log(
-          'Available vendor names:',
-          vendors.map((v) => v.name),
-        )
-        console.log(
-          'Available vendor IDs:',
-          vendors.map((v) => v.id),
-        )
+
         if (vendors.length > 0) {
-          console.log('Using first vendor as fallback:', vendors[0])
           setSelectedVendor(vendors[0].id)
           setVendorSearch(vendors[0].name) // Also set the display value
         }
@@ -729,14 +702,13 @@ export default function PaymentsForm({
 
       // Use fetched purchase data if available, otherwise create placeholder items
       if (preSelectedPurchaseItems && preSelectedPurchaseItems.length > 0) {
-        console.log('Using fetched purchase data')
+
         const items = preSelectedPurchaseItems.map((item, index) => {
-          console.log('Processing purchase data:', item)
+
           const totalDue = parseFloat(item.amount_due) || 0
           const paidAmount = parseFloat(item.paid_amount) || 0
           const pendingPayments = parseFloat(item.pending_payments) || 0
           const remainingBalance = totalDue - paidAmount - pendingPayments
-          console.log('Calculated - totalDue:', totalDue, 'paidAmount:', paidAmount, 'pendingPayments:', pendingPayments, 'remainingBalance:', remainingBalance)
 
           return {
             id: `auto-${index}`,
@@ -757,10 +729,8 @@ export default function PaymentsForm({
             isOther: false,
           }
         })
-        console.log('Auto-filled payment items from fetched purchase data:', items)
         setPaymentItems(items)
       } else {
-        console.log('No fetched items, using placeholder')
         // Fallback to placeholder items
         const items = preSelectedPurchases.map((purchase, index) => ({
           id: `auto-${index}`,
@@ -783,7 +753,6 @@ export default function PaymentsForm({
             parseFloat(purchase.amount_due) || parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || 0,
           isOther: false,
         }))
-        console.log('Auto-filled payment items from placeholder data:', items)
         setPaymentItems(items)
       }
     }
@@ -797,49 +766,24 @@ export default function PaymentsForm({
 
   // Populate form with payment data when in view or edit mode
   useEffect(() => {
-    console.log(
-      'useEffect triggered - isViewMode:',
-      isViewMode,
-      'isEditMode:',
-      isEditMode,
-      'paymentData:',
-      paymentData,
-    )
+
     if ((isViewMode || isEditMode) && paymentData) {
       // Set loading flag to prevent useEffect from interfering
       isLoadingData.current = true
-      console.log('Populating form with payment data:', paymentData)
-      console.log('paymentData structure:', Object.keys(paymentData))
 
-      // Populate basic payment info - handle different data structures
       let payment = null
       if (paymentData.data && paymentData.data.length > 0) {
         payment = paymentData.data[0]
-        console.log('Using paymentData.data[0]:', payment)
       } else if (paymentData.data && paymentData.data.id) {
-        payment = paymentData.data
-        console.log('Using paymentData.data directly:', payment)
+        payment = paymentData.fileData
       } else if (paymentData.id) {
         payment = paymentData
-        console.log('Using paymentData directly:', payment)
       } else if (typeof paymentData === 'object' && paymentData !== null) {
         payment = paymentData
-        console.log('Using paymentData as direct object:', payment)
       }
 
       if (payment) {
-        console.log('Setting payment fields:', {
-          vendor: payment.vendor,
-          doc_ref: payment.doc_ref,
-          mode_of_payment: payment.mode_of_payment,
-          bank_name: payment.bank_name,
-          check_number: payment.check_number,
-          payment_date: payment.payment_date,
-          remarks: payment.remarks,
-          id: payment.id,
-        })
 
-        // Note: Vendor lookup is now handled in a separate useEffect
         setDocumentReference(payment.doc_ref || '')
         setModeOfPayment(payment.mode_of_payment || '')
         setModeSearch(payment.mode_of_payment || '')
@@ -849,12 +793,10 @@ export default function PaymentsForm({
         setRemarks(payment.remarks || '')
         setCreatedBy(payment.created_by || '')
       } else {
-        console.warn('No payment data found in expected structure')
       }
 
       // Populate payment items
       if (paymentData.items && paymentData.items.length > 0) {
-        console.log('Populating payment items:', paymentData.items)
         const items = paymentData.items.map((item, index) => ({
           id: item.id,
           purchaseItemId: item.purchase_item_id,
@@ -871,10 +813,8 @@ export default function PaymentsForm({
           amount: parseFloat(item.amount) || 0,
           isOther: false,
         }))
-        console.log('Setting payment items:', items)
         setPaymentItems(items)
       } else {
-        console.log('No payment items found or empty array')
       }
 
       // Populate journal entries
@@ -882,7 +822,6 @@ export default function PaymentsForm({
       const journalData = paymentData.journal || paymentData.journal_entries || []
 
       if (journalData && journalData.length > 0) {
-        console.log('DEBUG: Loading journal entries from data:', journalData)
         const journal = journalData.map((entry, index) => ({
           id: entry.id,
           account: entry.charts_of_accounts_name,
@@ -892,32 +831,16 @@ export default function PaymentsForm({
           credit: entry.type === 'CREDIT' ? parseFloat(entry.amount) || 0 : 0,
           isManual: false,
         }))
-        console.log('DEBUG: Setting journal entries in edit mode:', journal)
         setJournalEntries(journal)
       } else {
-        console.log('DEBUG: No journal entries found or empty array')
-        console.log('DEBUG: paymentData structure:', Object.keys(paymentData))
-        console.log('DEBUG: paymentData.journal:', paymentData.journal)
-        console.log(
-          'DEBUG: paymentData.journal_entries:',
-          paymentData.journal_entries,
-        )
+
       }
 
       // Populate attachments - handle both direct attachments property and nested structure
       const attachmentsData = paymentData.attachments || []
-      console.log('Processing attachments:', attachmentsData)
       if (attachmentsData && attachmentsData.length > 0) {
         const attachments = attachmentsData.map((att) => {
-          console.log(
-            'Processing attachment:',
-            att.id,
-            att.name,
-            'File data type:',
-            typeof att.file,
-            'File data length:',
-            att.file ? att.file.length : 'null',
-          )
+
           return {
             id: att.id,
             fileName: att.name || '', // Server now correctly sends name as filename
@@ -927,10 +850,8 @@ export default function PaymentsForm({
             date: att.uploaded_date || new Date().toLocaleDateString(),
           }
         })
-        console.log('Final attachments array:', attachments)
         setAttachments(attachments)
       } else {
-        console.log('No attachments found or empty array, clearing attachments')
         setAttachments([]) // Explicitly set to empty array to prevent empty rows
       }
     }
@@ -954,10 +875,8 @@ export default function PaymentsForm({
       if (payment) {
         // Find vendor ID from vendor name when in edit mode
         const vendorName = payment.vendor || ''
-        console.log('Looking up vendor:', vendorName, 'Available vendors:', vendors)
         const vendor = vendors.find((v) => (v.name || v.v_name) === vendorName)
         const vendorId = vendor ? vendor.id : ''
-        console.log('Found vendor:', vendor, 'Vendor ID:', vendorId)
 
         setSelectedVendor(vendorId)
         setVendorSearch(vendorName)
@@ -966,7 +885,6 @@ export default function PaymentsForm({
       // Clear loading flag when data loading is complete
       setTimeout(() => {
         isLoadingData.current = false
-        console.log('DEBUG: Data loading complete, loading flag cleared')
       }, 100) // Small delay to ensure all state updates are complete
     }
   }, [isViewMode, isEditMode, paymentData, vendors])
@@ -1019,15 +937,10 @@ export default function PaymentsForm({
       //  For partial payments, we now work with purchase records directly
       //  The user can specify how much to apply to each purchase invoice
       const newItems = result.data.map((s) => {
-        console.log('Processing purchase item:', s)
-        console.log('total_amount_due:', s.total_amount_due)
-        console.log('paid_amount:', s.paid_amount)
-        console.log('pending_payments:', s.pending_payments)
         const totalDue = parseFloat(s.total_amount_due) || 0
         const paidAmount = parseFloat(s.paid_amount) || 0
         const pendingPayments = parseFloat(s.pending_payments) || 0
         const remainingBalance = totalDue - paidAmount - pendingPayments
-        console.log('Calculated - totalDue:', totalDue, 'paidAmount:', paidAmount, 'pendingPayments:', pendingPayments, 'remainingBalance:', remainingBalance)
 
         return {
           id: Date.now() + Math.random(),
@@ -1067,8 +980,6 @@ export default function PaymentsForm({
 
   // ── Journal entry helpers ─────────────────────────────────────────────────
   const addJournalEntry = () => {
-    console.log('DEBUG: addJournalEntry called')
-    console.log('DEBUG: Current journalEntries before adding:', journalEntries)
     const newEntry = {
       id: Date.now(),
       account: '',
@@ -1078,27 +989,23 @@ export default function PaymentsForm({
       credit: 0,
       isManual: true,
     }
-    console.log('DEBUG: New entry to add:', newEntry)
     setJournalEntries((prev) => {
       const updated = [...prev, newEntry]
-      console.log('DEBUG: Journal entries after adding:', updated)
       return updated
     })
   }
   const removeJournalEntry = (id) =>
     setJournalEntries((prev) => prev.filter((e) => e.id !== id))
   const updateJournalEntry = (id, field, value) => {
-    console.log('DEBUG: updateJournalEntry called', { id, field, value })
     setJournalEntries((prev) => {
       const updated = prev.map((e) => (e.id === id ? { ...e, [field]: value } : e))
-      console.log('DEBUG: Journal entries after update:', updated)
+
       return updated
     })
   }
 
   // ── Attachment helpers ────────────────────────────────────────────────────
   const addAttachment = () => {
-    console.log('addAttachment called, current attachments:', attachments)
     // Generate a unique ID that won't conflict with existing server IDs
     // Use negative timestamp to distinguish from server IDs (which are positive)
     const newAttachment = {
@@ -1109,40 +1016,24 @@ export default function PaymentsForm({
       uploadedBy: 'Current User',
       date: new Date().toLocaleDateString(),
     }
-    console.log('Adding new attachment:', newAttachment)
     setAttachments((prev) => {
       const updated = [...prev, newAttachment]
-      console.log('Updated attachments after add:', updated)
       return updated
     })
   }
   const removeAttachment = (id) => {
-    console.log(
-      'removeAttachment called with id:',
-      id,
-      'current attachments:',
-      attachments,
-    )
+
     setAttachments((prev) => {
       const updated = prev.filter((a) => a.id !== id)
-      console.log('Updated attachments after remove:', updated)
       return updated
     })
   }
   const updateAttachment = (id, field, value) => {
-    console.log(
-      'updateAttachment called with id:',
-      id,
-      'field:',
-      field,
-      'value:',
-      value,
-    )
+
     setAttachments((prev) => {
       const updated = prev.map((att) =>
         att.id === id ? { ...att, [field]: value } : att,
       )
-      console.log('Updated attachments after update:', updated)
       return updated
     })
   }
@@ -1277,32 +1168,12 @@ export default function PaymentsForm({
   const isLoadingData = useRef(false)
 
   useEffect(() => {
-    // Auto-generate journal entries logic:
-    // 1. Never in view mode
-    // 2. Always auto-generate when paymentItems, modeOfPayment, bankName, or bulkResponsibilityCenter changes
-    // 3. Skip auto-generation while loading data to prevent overwriting existing entries
 
-    console.log(
-      'DEBUG: useEffect running - isEditMode:',
-      isEditMode,
-      'paymentItems.length:',
-      paymentItems.length,
-      'modeOfPayment:',
-      modeOfPayment,
-      'isLoadingData:',
-      isLoadingData.current,
-    )
 
     if (!isViewMode && !isLoadingData.current) {
-      console.log('DEBUG: Auto-generating journal entries')
       generateJournalEntries()
     } else {
-      console.log(
-        'DEBUG: NOT auto-generating - isViewMode:',
-        isViewMode,
-        'isLoadingData:',
-        isLoadingData.current,
-      )
+
     }
   }, [
     paymentItems,
@@ -1320,7 +1191,6 @@ export default function PaymentsForm({
     if (isEditMode && journalEntries.length > 0) {
       const hasManualEntries = journalEntries.some((entry) => entry.isManual)
       if (hasManualEntries) {
-        console.log('Manual entries detected, preserving them')
       }
     }
   }, [journalEntries, isEditMode])
@@ -1432,9 +1302,6 @@ export default function PaymentsForm({
           id: entry.id || null,
         }
       })
-
-      console.log('DEBUG: Journal entries being sent:', preparedJournalEntries)
-      console.log('DEBUG: Journal entries count:', preparedJournalEntries.length)
 
       const preparedAttachments = await Promise.all(
         attachments.map(async (att) => {

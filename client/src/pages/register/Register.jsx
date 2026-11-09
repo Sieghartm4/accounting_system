@@ -64,17 +64,11 @@ export default function Register() {
     // Restore selected plan from sessionStorage if it exists
     if (typeof window !== 'undefined') {
       const storedPlanId = sessionStorage.getItem('selectedPlanId');
-      console.log('Stored plan ID:', storedPlanId);
-      console.log('Available plans:', plans.map(p => ({ id: p.sp_id, name: p.sp_name })));
-      console.log('Current selectedPlan:', selectedPlan);
-      
+
       if (storedPlanId && plans.length > 0) {
         // Convert stored ID to number for comparison with plan IDs
         const matchedPlan = plans.find(p => p.sp_id === parseInt(storedPlanId));
-        console.log('Matched plan:', matchedPlan);
-        console.log('Matched plan ID type:', typeof matchedPlan?.sp_id);
-        console.log('Stored ID type:', typeof storedPlanId);
-        
+
         if (matchedPlan) {
           setSelectedPlan(matchedPlan);
           setFormData(prev => ({
@@ -175,7 +169,6 @@ export default function Register() {
         // Check if we've already processed this payment
         const paymentProcessed = sessionStorage.getItem('paymentProcessed');
         if (paymentProcessed) {
-          console.log('Payment already processed, skipping');
           return;
         }
         
@@ -185,17 +178,11 @@ export default function Register() {
         // After successful payment, update user's subscription_id
         const updateSubscription = async () => {
           try {
-            console.log('Payment success detected, updating subscription...');
             const pendingUser = sessionStorage.getItem('pendingUser');
             const storedPlanId = sessionStorage.getItem('selectedPlanId');
             const sessionId = sessionStorage.getItem('paymongoSessionId') || queryParams.get('session_id');
             const paymentReference = queryParams.get('payment_id') || queryParams.get('source_id') || queryParams.get('payment_intent');
-            
-            console.log('Pending user:', pendingUser);
-            console.log('Stored plan ID:', storedPlanId);
-            console.log('Session ID:', sessionId);
-            console.log('Payment reference:', paymentReference);
-            
+
             let username = null;
             if (pendingUser) {
               const userData = JSON.parse(pendingUser);
@@ -203,8 +190,6 @@ export default function Register() {
             } else {
               username = sessionStorage.getItem('registeredUsername');
             }
-            
-            console.log('Username for subscription update:', username);
 
             // Initialize variables for subscription history
             let paymentMethod = 'paymongo';
@@ -216,10 +201,8 @@ export default function Register() {
             
             if (sessionId && sessionId !== '{CHECKOUT_SESSION_ID}') {
               try {
-                console.log('Fetching payment details from PayMongo for session:', sessionId);
                 const paymentDetailsResponse = await fetch(SUBSCRIPTION_API.subscriptionPlansPaymentDetails(sessionId));
                 const paymentDetailsData = await paymentDetailsResponse.json();
-                console.log('Payment details from PayMongo:', paymentDetailsData);
                 
                 if (paymentDetailsData.success && paymentDetailsData.data) {
                   paymentMethod = paymentDetailsData.data.payment_method || 'paymongo';
@@ -227,13 +210,10 @@ export default function Register() {
                   // Use amount and billing cycle from payment details if available
                   if (paymentDetailsData.data.amount) {
                     planPrice = paymentDetailsData.data.amount;
-                    console.log('Using price from payment details:', planPrice);
                   }
                   if (paymentDetailsData.data.billing_cycle) {
                     billingCycleDays = paymentDetailsData.data.billing_cycle;
-                    console.log('Using billing cycle from payment details:', billingCycleDays);
                   }
-                  console.log('Payment method:', paymentMethod, 'Reference:', actualPaymentReference);
                 } else {
                   console.error('Payment details fetch failed:', paymentDetailsData.message);
                 }
@@ -241,13 +221,10 @@ export default function Register() {
                 console.error('Error fetching payment details:', error);
               }
             } else {
-              console.log('No valid session_id found in URL, using default payment method');
             }
             
             if (username && storedPlanId) {
               
-              // Fetch plan details to get price and billing cycle
-              console.log('Fetching plan details for subscription history...');
               let storedPlan = null;
               
               // Retry fetching plans if initial attempt fails
@@ -256,13 +233,10 @@ export default function Register() {
                 try {
                   const plansResponse = await fetch(SUBSCRIPTION_API.subscriptionPlans());
                   const plansData = await plansResponse.json();
-                  console.log(`Fetched plans data (attempt ${retryCount + 1}):`, plansData);
-                  console.log('Plans data array:', plansData.data);
                   if (plansData.data && plansData.data.length > 0) {
-                    console.log('First plan structure:', plansData.data[0]);
                   }
                   storedPlan = plansData.data?.find(p => p.sp_id === parseInt(storedPlanId));
-                  console.log('Found stored plan:', storedPlan);
+
                 } catch (fetchError) {
                   console.error(`Error fetching plans (attempt ${retryCount + 1}):`, fetchError);
                   retryCount++;
@@ -276,9 +250,7 @@ export default function Register() {
                 // Only use plan price if payment details didn't provide one
                 if (planPrice === 0 || planPrice === null) {
                   planPrice = storedPlan.sp_price || 0;
-                  console.log('Plan sp_price:', planPrice);
                 } else {
-                  console.log('Using price from payment details:', planPrice);
                 }
                 
                 // Only use plan billing cycle if payment details didn't provide one
@@ -287,21 +259,13 @@ export default function Register() {
                     const billingCycleItem = storedPlan.items.find(item => item.spi_type === 'BILLING_CYCLE');
                     if (billingCycleItem) {
                       billingCycleDays = parseInt(billingCycleItem.spi_details);
-                      console.log('Billing cycle from items:', billingCycleDays);
                     }
                   }
                 } else {
-                  console.log('Using billing cycle from payment details:', billingCycleDays);
                 }
-                
-                console.log('Final plan price:', planPrice, 'Final billing cycle:', billingCycleDays);
               } else {
-                console.log('Plan not found after retries, using payment details values');
               }
               
-              // Update subscription with history details
-              console.log('Updating subscription for user:', username, 'with plan:', storedPlanId);
-              console.log('Sending to backend - planPrice:', planPrice, 'billingCycleDays:', billingCycleDays, 'paymentMethod:', paymentMethod, 'actualPaymentReference:', actualPaymentReference);
               await fetch(SUBSCRIPTION_API.credentialsSubscription(), {
                 method: 'PUT',
                 headers: {
@@ -317,9 +281,7 @@ export default function Register() {
                 }),
               });
               
-              console.log('Subscription updated successfully');
             } else {
-              console.log('Missing username or storedPlanId');
             }
           } catch (error) {
             console.error('Error updating subscription:', error);
@@ -485,9 +447,6 @@ export default function Register() {
       return true;
     });
 
-    console.log('All plans:', plans.map(p => ({ id: p.sp_id, name: p.sp_name, price: p.price })));
-    console.log('Used free trials:', usedFreeTrials);
-    console.log('Filtered plans (excluding used free trials):', filtered.map(p => ({ id: p.sp_id, name: p.sp_name, price: p.price })));
     setFilteredPlans(filtered);
 
     // Update selected plan if it was filtered out
@@ -591,11 +550,9 @@ export default function Register() {
     try {
       const response = await fetch(SUBSCRIPTION_API.credentialsUsedFreeTrials(username));
       const data = await response.json();
-      console.log('Used free trials data:', data);
       
       if (data.success) {
         setUsedFreeTrials(data.data);
-        console.log('Used free trial subscription IDs:', data.data);
       }
     } catch (error) {
       console.error('Error fetching used free trials:', error);
@@ -638,8 +595,6 @@ export default function Register() {
 
     // Check if plan is free (₱0)
     const planPrice = calculatePrice(selectedPlan);
-    console.log('handlePayment - Plan price:', planPrice, 'Type:', typeof planPrice);
-    console.log('handlePayment - Selected plan:', selectedPlan);
     
     if (planPrice === 0 || planPrice === '0') {
       // For free plans, skip PayMongo and directly update subscription

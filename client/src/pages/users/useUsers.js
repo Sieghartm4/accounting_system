@@ -7,10 +7,7 @@ const useUsers = () => {
   const [error, setError] = useState(null)
 
   const handleUserRowClick = (username, userData) => {
-    // console.log('Row clicked!');
-    // console.log('Username:', username);
-    // console.log('Full user data:', userData);
-    // alert(`User clicked: ${username}`);
+
   }
 
   const fetchUsers = async () => {

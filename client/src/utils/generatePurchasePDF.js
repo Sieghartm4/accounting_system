@@ -22,8 +22,6 @@ export async function generatePurchasePDF(purchaseData, copyType = 'internal') {
     return parts.join('-')
   }
 
-  // Debug logging
-  console.log('[PDF Generator] Received purchases:', purchases)
 
   // Create a single PDF document with multiple pages
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' })

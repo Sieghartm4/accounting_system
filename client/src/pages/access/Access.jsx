@@ -157,7 +157,6 @@ function AccessContent() {
         { value: 'Approve Access', label: 'Approve Access' },
       ],
       onChange: async (selectedRows, selectedValue) => {
-        console.log(`Setting access to "${selectedValue}" for:`, selectedRows)
 
         try {
           // Prepare data for bulk update - updates array at root level
