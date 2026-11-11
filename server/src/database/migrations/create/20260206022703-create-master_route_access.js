@@ -24,7 +24,10 @@ module.exports = {
         allowNull: false
       },
       mra_status: {
-        type: Sequelize.JSON,
+        // Plain varchar, not JSON: every existing tenant stores the string
+        // 'Full Access' here (app writes, seeders, and the client all treat
+        // this as a plain string), and MySQL rejects 'Full Access' as JSON.
+        type: Sequelize.STRING(300),
         allowNull: false,
       }
     });
