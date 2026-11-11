@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { API } from '../../api/endpoints'
 
 const EMPTY_CREATE_FORM = {
@@ -40,7 +40,7 @@ const useUsers = () => {
 
   const handleUserRowClick = () => {}
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true)
       const token = sessionStorage.getItem('authenticated')
@@ -74,7 +74,7 @@ const useUsers = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   const fetchAccessOptions = async () => {
     try {
@@ -114,6 +114,12 @@ const useUsers = () => {
   useEffect(() => {
     fetchAccessOptions()
   }, [])
+
+  // Load the user list on mount. Without this the page showed the loading
+  // screen forever because nothing ever fetched the users.
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers])
 
   const openCreateForm = () => {
     setFormError('')
