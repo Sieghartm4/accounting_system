@@ -13,7 +13,7 @@ import {
   ChevronDown,
   ChevronRight
 } from 'lucide-react'
-import LoadingScreen from '../../components/LoadingScreen'
+import { LoadingScreen } from '../../components/ui'
 import { currentReportPeriod } from '../../utils/reportPeriod'
 import { API } from '../../api/endpoints'
 

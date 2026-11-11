@@ -1,12 +1,8 @@
-import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ListStart, PlusSquare, Download, Edit2 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
-import LoadingScreen from '../../components/LoadingScreen'
-import DynamicToast from '../../components/DynamicToast'
-import SequenceSettingsModal from '../../components/SequenceSettingsModal'
+import { DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
+import { ProtectedAction, RouteProtection } from '../../components/access'
+import { SequenceSettingsModal } from '../../components/modals'
 import useSequenceSettings, {
   SEQUENCE_MODULES,
   moduleLabel,
@@ -26,64 +22,19 @@ const fadeInUp = {
 }
 
 function SequenceSettingsContent() {
-  const { settings, loading, error, fetchSequenceSettings } = useSequenceSettings()
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingModule, setEditingModule] = useState(null)
-  const [toast, setToast] = useState(null)
-
-  const handleModalClosed = () => {
-    setIsModalOpen(false)
-    setEditingModule(null)
-    fetchSequenceSettings()
-  }
-
-  const handleModalSaved = () => {
-    setToast({ type: 'success', message: 'Sequence saved successfully!' })
-  }
-
-  const handleExportSequences = () => {
-    try {
-      if (settings.length === 0) {
-        setToast({ type: 'error', message: 'No sequences to export' })
-        return
-      }
-
-      const rows = settings.map((row) => ({ ...row, module: moduleLabel(row.module) }))
-      const headers = Object.keys(rows[0] || {}).filter((h) => !['id', 'action'].includes(h))
-
-      const csvRows = [headers.join(',')]
-      rows.forEach((row) => {
-        const values = headers.map((h) => {
-          let val = row[h]
-          if (val === null || val === undefined) return ''
-          if (typeof val === 'object') {
-            try {
-              val = JSON.stringify(val)
-            } catch {
-              val = String(val)
-            }
-          }
-          const escaped = String(val).replace(/"/g, '""')
-          return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped
-        })
-        csvRows.push(values.join(','))
-      })
-
-      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `sequence_settings_${Date.now()}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      setToast({ type: 'success', message: 'Export started' })
-    } catch {
-      setToast({ type: 'error', message: 'Failed to export CSV' })
-    }
-  }
+  const {
+    settings,
+    loading,
+    error,
+    isModalOpen,
+    editingModule,
+    toast,
+    openSequenceModal,
+    handleModalClosed,
+    handleModalSaved,
+    handleExportSequences,
+    closeToast,
+  } = useSequenceSettings()
 
   if (loading) {
     return <LoadingScreen label="Loading Sequence Settings..." />
@@ -131,10 +82,7 @@ function SequenceSettingsContent() {
             </button>
             <ProtectedAction routeName="sequence_settings">
               <button
-                onClick={() => {
-                  setEditingModule(null)
-                  setIsModalOpen(true)
-                }}
+                onClick={() => openSequenceModal(null)}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
                 <PlusSquare size={14} />
@@ -181,8 +129,7 @@ function SequenceSettingsContent() {
             {
               label: 'Edit',
               onClick: (row) => {
-                setEditingModule(row._code || row.module)
-                setIsModalOpen(true)
+                openSequenceModal(row._code || row.module)
               },
               icon: <Edit2 size={16} />,
             },
@@ -203,7 +150,7 @@ function SequenceSettingsContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={() => setToast(null)}
+          onClose={closeToast}
           duration={4000}
         />
       )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
   Truck,
@@ -11,287 +11,34 @@ import {
   Edit2,
   Upload,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import RightSideModal from '../../components/RightSideModal'
-import DynamicToast from '../../components/DynamicToast'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
-import LoadingScreen from '../../components/LoadingScreen'
+import { DynamicTable, DynamicToast, LoadingScreen, RightSideModal, SummaryTile } from '../../components/ui'
+import { ProtectedAction, RouteProtection } from '../../components/access'
 import useVendors from './useVendors'
-import SummaryTile from '../../components/SummaryTile'
 
 function VendorsContent() {
-  const { vendors, loading, error, createVendor, updateVendor, importVendors } = useVendors()
-
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingVendor, setEditingVendor] = useState(null)
-  const [formData, setFormData] = useState({
-    code: '',
-    name: '',
-    category: '',
-    type: '',
-    address: '',
-    tin: '',
-    details: '',
-    contact: '',
-    status: 'active',
-  })
-  const [toast, setToast] = useState(null)
-  const [importing, setImporting] = useState(false)
+  const {
+    vendors,
+    loading,
+    error,
+    isModalOpen,
+    editingVendor,
+    formData,
+    toast,
+    importing,
+    openModal,
+    closeModal,
+    handleInputChange,
+    handleTinChange,
+    handleContactChange,
+    handleExportVendors,
+    handleImportVendors,
+    handleSubmit,
+    closeToast,
+  } = useVendors()
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-  }
-
-  const handleAddVendorClick = () => {
-    setEditingVendor(null)
-    setFormData({
-      code: '',
-      name: '',
-      category: '',
-      type: '',
-      address: '',
-      tin: '',
-      details: '',
-      contact: '',
-      status: 'active',
-    })
-    setIsModalOpen(true)
-  }
-
-  const handleEditVendorClick = (row) => {
-    setEditingVendor(row)
-    setFormData({
-      code: row.code || '',
-      name: row.name || '',
-      category: row.category || '',
-      type: row.type || '',
-      address: row.address || '',
-      tin: formatTinInput(row.tin || ''),
-      details: row.details || '',
-      contact: row.contact || '',
-      status:
-        row.status?.toLowerCase() === 'inactive'
-          ? 'inactive'
-          : row.status?.toLowerCase() === 'active'
-            ? 'active'
-            : 'active',
-    })
-    setIsModalOpen(true)
-  }
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
-    setEditingVendor(null)
-  }
-
-  const handleToastClose = () => {
-    setToast(null)
-  }
-
-  const formatTinInput = (value) => {
-    const digits = String(value || '')
-      .replace(/\D/g, '')
-      .slice(0, 14)
-
-    if (digits.length === 0) return ''
-    if (digits.length <= 3) return digits
-
-    const parts = []
-    // 3-3-3-5 format
-    parts.push(digits.slice(0, 3))
-    if (digits.length > 3) parts.push(digits.slice(3, 6))
-    if (digits.length > 6) parts.push(digits.slice(6, 9))
-    if (digits.length > 9) parts.push(digits.slice(9, 14))
-
-    return parts.join('-')
-  }
-
-  const handleExportVendors = () => {
-    try {
-      if (!vendors || vendors.length === 0) {
-        setToast({ type: 'error', message: 'No vendors to export' })
-        return
-      }
-
-      const headers = ['id', 'code', 'name', 'category', 'type', 'address', 'tin', 'details', 'contact', 'status']
-      const csvRows = []
-      csvRows.push(headers.join(','))
-
-      vendors.forEach((row) => {
-        const values = headers.map((h) => {
-          let val = row[h]
-          if (val === null || val === undefined) return ''
-          if (typeof val === 'object') {
-            try {
-              val = JSON.stringify(val)
-            } catch (e) {
-              val = String(val)
-            }
-          }
-          const escaped = String(val).replace(/"/g, '""')
-          return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped
-        })
-        csvRows.push(values.join(','))
-      })
-
-      const csvContent = csvRows.join('\n')
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `vendors_${Date.now()}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      setToast({ type: 'success', message: 'Export started' })
-    } catch (err) {
-      setToast({ type: 'error', message: 'Failed to export CSV' })
-    }
-  }
-
-  const parseCSV = (csvText) => {
-    const lines = csvText.trim().split('\n')
-    if (lines.length < 2) return []
-
-    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
-    const exclude = new Set(['id', '_id', 'action'])
-    const validHeaders = headers.filter((h) => !exclude.has(h))
-
-    const vendorsList = []
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseCSVLine(lines[i])
-      if (values.length !== headers.length) continue
-
-      const vendor = {}
-      validHeaders.forEach((header, index) => {
-        vendor[header] = values[index]
-      })
-      vendorsList.push(vendor)
-    }
-
-    return vendorsList
-  }
-
-  const parseCSVLine = (line) => {
-    const result = []
-    let current = ''
-    let inQuotes = false
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i]
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"'
-          i++
-        } else {
-          inQuotes = !inQuotes
-        }
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim())
-        current = ''
-      } else {
-        current += char
-      }
-    }
-    result.push(current.trim())
-    return result
-  }
-
-  const handleImportVendors = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-      setToast({ type: 'error', message: 'Please select a CSV file' })
-      return
-    }
-
-    setImporting(true)
-    try {
-      const text = await file.text()
-      const vendorsList = parseCSV(text)
-
-      if (vendorsList.length === 0) {
-        setToast({ type: 'error', message: 'No valid vendors found in CSV' })
-        return
-      }
-
-      const result = await importVendors(vendorsList)
-
-      if (result.success) {
-        const { created, updated, errors } = result.data
-        setToast({
-          type: 'success',
-          message: `Import completed: ${created.length} created, ${updated.length} updated${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
-        })
-      } else {
-        setToast({
-          type: 'error',
-          message: result.message || 'Failed to import vendors',
-        })
-      }
-    } catch (err) {
-      console.error('Import error:', err)
-      setToast({ type: 'error', message: 'Failed to read CSV file' })
-    } finally {
-      setImporting(false)
-      e.target.value = ''
-    }
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    try {
-      const sanitizedTin = formData.tin.replace(/\D/g, '')
-      const result = editingVendor
-        ? await updateVendor(
-            editingVendor.id,
-            formData.code,
-            formData.name,
-            formData.category,
-            formData.type,
-            formData.address,
-            sanitizedTin,
-            formData.details,
-            formData.contact,
-            formData.status,
-          )
-        : await createVendor(
-            formData.code,
-            formData.name,
-            formData.category,
-            formData.type,
-            formData.address,
-            sanitizedTin,
-            formData.details,
-            formData.contact,
-          )
-
-      if (result.success) {
-        setToast({
-          type: 'success',
-          message: `Vendor "${formData.name}" ${editingVendor ? 'updated' : 'created'} successfully!`,
-        })
-        setIsModalOpen(false)
-        setEditingVendor(null)
-      } else {
-        setToast({
-          type: 'error',
-          message:
-            result.message ||
-            `Failed to ${editingVendor ? 'update' : 'create'} vendor`,
-        })
-      }
-    } catch (error) {
-      setToast({
-        type: 'error',
-        message: `Network error occurred while ${editingVendor ? 'updating' : 'creating'} vendor`,
-      })
-    }
   }
 
   if (loading) {
@@ -313,12 +60,6 @@ function VendorsContent() {
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
-        {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          <span>Directory</span>
-          <ArrowRight size={10} />
-          <span className="text-black">Vendor Masterlist</span>
-        </nav> */}
-
         <motion.div
           initial="hidden"
           animate="visible"
@@ -334,9 +75,6 @@ function VendorsContent() {
                 Vendor <span className="text-red-600 italic">Registry</span>
               </h1>
             </div>
-            {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
-              Manage supply chain partners and corporate service providers.
-            </p> */}
           </div>
 
           <div className="flex gap-3">
@@ -362,7 +100,7 @@ function VendorsContent() {
             </ProtectedAction>
             <ProtectedAction routeName="vendors">
               <button
-                onClick={handleAddVendorClick}
+                onClick={() => openModal()}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all uppercase tracking-widest"
               >
                 <PackagePlus size={14} />
@@ -416,7 +154,7 @@ function VendorsContent() {
           actionButtons={[
             {
               label: 'Edit',
-              onClick: (row) => handleEditVendorClick(row),
+              onClick: (row) => openModal(row),
               icon: <Edit2 size={16} />,
             },
           ]}
@@ -436,7 +174,7 @@ function VendorsContent() {
       {/* Add Vendor Modal */}
       <RightSideModal
         isOpen={isModalOpen}
-        onClose={handleCloseModal}
+        onClose={closeModal}
         title={editingVendor ? 'Edit Vendor' : 'Create New Vendor'}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -447,8 +185,9 @@ function VendorsContent() {
               </label>
               <input
                 type="text"
+                name="code"
                 value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter vendor code..."
                 required
@@ -461,8 +200,9 @@ function VendorsContent() {
               </label>
               <input
                 type="text"
+                name="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter vendor name..."
                 required
@@ -475,10 +215,9 @@ function VendorsContent() {
               </label>
               <input
                 type="text"
+                name="category"
                 value={formData.category}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter category..."
               />
@@ -489,8 +228,9 @@ function VendorsContent() {
                 Type
               </label>
               <select
+                name="type"
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
               >
                 <option value="">Select type...</option>
@@ -508,10 +248,9 @@ function VendorsContent() {
               </label>
               <input
                 type="text"
+                name="address"
                 value={formData.address}
-                onChange={(e) =>
-                  setFormData({ ...formData, address: e.target.value })
-                }
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter address..."
                 required
@@ -526,9 +265,7 @@ function VendorsContent() {
               <input
                 type="text"
                 value={formData.tin}
-                onChange={(e) =>
-                  setFormData({ ...formData, tin: formatTinInput(e.target.value) })
-                }
+                onChange={handleTinChange}
                 inputMode="numeric"
                 maxLength={18}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
@@ -542,10 +279,9 @@ function VendorsContent() {
                 Details
               </label>
               <textarea
+                name="details"
                 value={formData.details}
-                onChange={(e) =>
-                  setFormData({ ...formData, details: e.target.value })
-                }
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all min-h-[120px]"
                 placeholder="Enter additional details..."
               />
@@ -559,9 +295,7 @@ function VendorsContent() {
               <input
                 type="text"
                 value={formData.contact}
-                onChange={(e) =>
-                  setFormData({ ...formData, contact: e.target.value.slice(0, 15) })
-                }
+                onChange={handleContactChange}
                 maxLength={15}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter contact number..."
@@ -574,10 +308,9 @@ function VendorsContent() {
                   Status <span className="text-red-600">*</span>
                 </label>
                 <select
+                  name="status"
                   value={formData.status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, status: e.target.value })
-                  }
+                  onChange={handleInputChange}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                   required
                 >
@@ -591,7 +324,7 @@ function VendorsContent() {
           <div className="flex gap-3 pt-4">
             <button
               type="button"
-              onClick={handleCloseModal}
+              onClick={closeModal}
               className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 text-xs font-black rounded-xl hover:bg-gray-200 transition-all uppercase tracking-widest"
             >
               Cancel
@@ -612,7 +345,7 @@ function VendorsContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={handleToastClose}
+          onClose={closeToast}
           duration={4000}
         />
       )}

@@ -16,7 +16,7 @@ import {
 import * as XLSX from 'xlsx'
 import useCompany from '../company/useCompany'
 import { renderPDFCompanyHeader } from '../../utils/pdfCompanyHeader'
-import LoadingScreen from '../../components/LoadingScreen'
+import { LoadingScreen } from '../../components/ui'
 import { currentReportPeriod } from '../../utils/reportPeriod'
 import { API } from '../../api/endpoints'
 

@@ -18,7 +18,7 @@ import {
   Calendar,
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
-import DynamicToast from '../../components/DynamicToast'
+import { DynamicToast } from '../../components/ui'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 import { API } from '../../api/endpoints'
 

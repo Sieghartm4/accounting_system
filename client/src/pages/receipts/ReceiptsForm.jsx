@@ -19,8 +19,7 @@ import {
   Divide,
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
-import DynamicToast from '../../components/DynamicToast'
-import RightSideModal from '../../components/RightSideModal'
+import { DynamicToast, RightSideModal } from '../../components/ui'
 import { useReceiptsForm, useDragToScroll, fmt } from './useReceipts'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 import { filterActiveMasterRows } from '../../utils/activeMasterFilter'

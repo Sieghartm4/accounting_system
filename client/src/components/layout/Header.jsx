@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useNotificationsState } from './NotificationContext'
-import { NotificationList } from '../NotificationList'
+import { NotificationList } from './NotificationList'
 import {
   Menu,
   Search,
@@ -41,10 +41,9 @@ import {
   Building2,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import RightSideModal from '../RightSideModal'
+import { LoadingScreen, RightSideModal } from '../ui'
 import { hasRouteAccess, getAccessibleRoutes, ROUTE_CONFIG } from '../../utils/routeProtection'
 import { API, SUBSCRIPTION_API } from '../../api/endpoints'
-import LoadingScreen from '../LoadingScreen'
 
 const SEARCH_ROUTE_DOCUMENT_TYPE_MAP = {
   sales: 'Sales',
@@ -861,7 +860,7 @@ export default function Header({ isCollapsed, onToggleSidebar }) {
             <button
               onClick={() => setShowBell((open) => !open)}
               aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
-              className={`p-2 rounded-full transition-colors relative ${showBell ? 'bg-gray-100 text-gray-800 cursor-pointer ' : 'cursor-pointer hover:bg-gray-100 text-gray-500'
+              className={`p-2 rounded-full transition-colors relative bg-gray-200 ${showBell ? ' text-gray-800 cursor-pointer ' : 'cursor-pointer hover:bg-gray-300 text-gray-500'
                 }`}
             >
               <Bell size={20} />

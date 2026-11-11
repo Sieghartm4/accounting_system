@@ -39,6 +39,69 @@ const normalizeFiscalYear = (f = {}) => ({
 const normalizeFiscalYears = (rows = []) =>
   (Array.isArray(rows) ? rows : []).map(normalizeFiscalYear)
 
+// --- Constants shared with the page UI ---
+
+export const STATUS_ACTIONS = {
+  OPEN: ['soft_close', 'close', 'lock'],
+  SOFT_CLOSED: ['close', 'lock', 'reopen'],
+  CLOSED: ['lock', 'reopen'],
+  LOCKED: ['reopen'],
+}
+
+export const STATUS_BADGES = {
+  OPEN: 'green',
+  SOFT_CLOSED: 'yellow',
+  CLOSED: 'orange',
+  LOCKED: 'red',
+}
+
+export const ACTION_PAST = {
+  soft_close: 'soft closed',
+  close: 'closed',
+  lock: 'locked',
+  reopen: 'reopened',
+}
+
+// Status action metadata (labels + confirmation copy). Icons live in the JSX.
+export const ACTION_META = {
+  soft_close: {
+    label: 'Soft Close',
+    color: 'text-amber-600 hover:bg-amber-50 border-amber-200',
+    message:
+      'The period can still be reopened later, but further posting will be blocked until then.',
+  },
+  close: {
+    label: 'Close',
+    color: 'text-red-600 hover:bg-red-50 border-red-200',
+    message:
+      'A closed period is final and should only be reopened with a documented reason.',
+  },
+  lock: {
+    label: 'Lock',
+    color: 'text-purple-600 hover:bg-purple-50 border-purple-200',
+    message: 'A locked period is immutable. Reopening will require a clear reason.',
+  },
+  reopen: {
+    label: 'Reopen',
+    color: 'text-blue-600 hover:bg-blue-50 border-blue-200',
+  },
+}
+
+export const formatDate = (value) => {
+  if (!value) return ''
+  const stringValue = String(value)
+  return stringValue.length >= 10 ? stringValue.slice(0, 10) : stringValue
+}
+
+const EMPTY_FORM = {
+  code: '',
+  name: '',
+  start_date: '',
+  end_date: '',
+  status: 'ACTIVE',
+  is_current: false,
+}
+
 const useAccountingPeriods = () => {
   const [fiscalYears, setFiscalYears] = useState([])
   const [periods, setPeriods] = useState([])
@@ -50,6 +113,131 @@ const useAccountingPeriods = () => {
   const [error, setError] = useState(null)
   const [periodsError, setPeriodsError] = useState(null)
   const selectedFiscalYearRef = useRef('')
+
+  const [toast, setToast] = useState(null)
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    onConfirm: null,
+    title: '',
+    message: '',
+    type: 'warning',
+  })
+  const [reopenModal, setReopenModal] = useState({
+    isOpen: false,
+    period: null,
+  })
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [form, setForm] = useState(EMPTY_FORM)
+
+  const showToast = (type, message) => setToast({ type, message })
+
+  const refreshAll = () => {
+    fetchFiscalYears()
+    fetchPeriods()
+    fetchCurrentPeriod()
+  }
+
+  const runStatusAction = async (row, action, reopenReason = '') => {
+    try {
+      const result = await updatePeriodStatus(row.period_id, action, reopenReason)
+      showToast(
+        'success',
+        result.message ||
+          `Period ${row.period} successfully ${ACTION_PAST[action]}.`,
+      )
+      fetchPeriods()
+      fetchCurrentPeriod()
+      return true
+    } catch (err) {
+      showToast(
+        'error',
+        err.message || `Failed to ${action.replace(/_/g, ' ')} period`,
+      )
+      return false
+    }
+  }
+
+  const handleAction = (row, action) => {
+    if (action === 'reopen') {
+      setReopenModal({ isOpen: true, period: row })
+      return
+    }
+    const meta = ACTION_META[action]
+    setConfirmModal({
+      isOpen: true,
+      title: `${meta.label} Period ${row.period}`,
+      message: `Are you sure you want to ${meta.label.toLowerCase()} accounting period ${row.period}? ${meta.message || ''
+        }`,
+      type: action === 'close' ? 'danger' : 'warning',
+      onConfirm: () => runStatusAction(row, action),
+    })
+  }
+
+  // Reopen modal wiring.
+  const closeReopenModal = () => setReopenModal({ isOpen: false, period: null })
+
+  const handleReopen = async (reason) => {
+    const ok = await runStatusAction(reopenModal.period, 'reopen', reason)
+    if (ok) closeReopenModal()
+  }
+
+  // Create fiscal-year modal wiring.
+  const openCreateModal = () => setIsCreateOpen(true)
+  const closeCreateModal = () => setIsCreateOpen(false)
+
+  const handleFormChange = (name, value) => {
+    setForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleCreateFiscalYear = async (e) => {
+    e.preventDefault()
+    if (
+      !form.code.trim() ||
+      !form.name.trim() ||
+      !form.start_date ||
+      !form.end_date
+    ) {
+      setToast({
+        type: 'warning',
+        message: 'Code, Name, Start Date and End Date are required',
+      })
+      return
+    }
+    if (form.end_date < form.start_date) {
+      setToast({
+        type: 'warning',
+        message: 'End date must be on or after the start date',
+      })
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      const result = await createFiscalYear({
+        code: form.code.trim(),
+        name: form.name.trim(),
+        start_date: form.start_date,
+        end_date: form.end_date,
+        status: form.status,
+        is_current: form.is_current,
+      })
+      showToast('success', result.message || 'Fiscal year created successfully')
+      closeCreateModal()
+      setForm(EMPTY_FORM)
+      refreshAll()
+    } catch (err) {
+      showToast('error', err.message || 'Failed to create fiscal year')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const openPeriodCount = periods.filter(
+    (p) => String(p.status || '').toUpperCase() === 'OPEN',
+  ).length
+  const lockedPeriodCount = periods.filter(
+    (p) => String(p.status || '').toUpperCase() === 'LOCKED',
+  ).length
 
   useEffect(() => {
     selectedFiscalYearRef.current = selectedFiscalYearId
@@ -210,6 +398,25 @@ const useAccountingPeriods = () => {
     fetchCurrentPeriod,
     createFiscalYear,
     updatePeriodStatus,
+    toast,
+    refreshAll,
+    closeToast: () => setToast(null),
+    confirmModal,
+    closeConfirmModal: () =>
+      setConfirmModal((m) => ({ ...m, isOpen: false })),
+    handleAction,
+    reopenModal,
+    closeReopenModal,
+    handleReopen,
+    isCreateOpen,
+    openCreateModal,
+    closeCreateModal,
+    isSubmitting,
+    form,
+    handleFormChange,
+    handleCreateFiscalYear,
+    openPeriodCount,
+    lockedPeriodCount,
   }
 }
 

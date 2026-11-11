@@ -1,5 +1,5 @@
 import React from 'react'
-import { canCreateEdit } from '../utils/routeProtection'
+import { canCreateEdit } from '../../utils/routeProtection'
 
 const ProtectedAction = ({ children, routeName, fallback = null, user = null }) => {
   const currentUser =

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Search, Filter, Columns, Plus, X, Maximize2, Eye, Edit, RotateCcw, Trash2, Zap } from 'lucide-react'
-import { getAccessLevel } from '../utils/routeProtection'
+import { getAccessLevel } from '../../utils/routeProtection'
 
 /** Floating unread-notification chip for one table row.
  *

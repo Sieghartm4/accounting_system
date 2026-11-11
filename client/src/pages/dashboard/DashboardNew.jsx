@@ -22,8 +22,8 @@ import {
   ShieldCheck,
   ChevronRight,
 } from 'lucide-react'
-import RouteProtection from '../../components/RouteProtection'
-import LoadingScreen from '../../components/LoadingScreen'
+import { RouteProtection } from '../../components/access'
+import { LoadingScreen } from '../../components/ui'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 import { API } from '../../api/endpoints'
 

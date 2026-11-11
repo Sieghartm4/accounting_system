@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { API } from '../../api/endpoints'
+import { downloadCsv, objectsToCsv } from '../../utils/csv'
 
 const authHeaders = () => {
   const token = sessionStorage.getItem('authenticated')
@@ -63,6 +64,12 @@ const useSequenceSettings = (moduleCode) => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingModule, setEditingModule] = useState(null)
+  const [toast, setToast] = useState(null)
+
+  const showToast = (type, message) => setToast({ type, message })
+  const closeToast = () => setToast(null)
 
   const fetchSequenceSettings = useCallback(async () => {
     try {
@@ -142,7 +149,55 @@ const useSequenceSettings = (moduleCode) => {
     [settings, fetchSequenceSettings],
   )
 
-  return { settings, loading, saving, error, fetchSequenceSettings, getSettingForModule, saveForModule }
+  // Masters page: modal + export wiring.
+  const openSequenceModal = (module = null) => {
+    setEditingModule(module)
+    setIsModalOpen(true)
+  }
+
+  const handleModalClosed = () => {
+    setIsModalOpen(false)
+    setEditingModule(null)
+    fetchSequenceSettings()
+  }
+
+  const handleModalSaved = () => {
+    showToast('success', 'Sequence saved successfully!')
+  }
+
+  const handleExportSequences = () => {
+    try {
+      if (settings.length === 0) {
+        showToast('error', 'No sequences to export')
+        return
+      }
+
+      const rows = settings.map((row) => ({ ...row, module: moduleLabel(row.module) }))
+      const csvContent = objectsToCsv(rows)
+      downloadCsv(csvContent, `sequence_settings_${Date.now()}.csv`)
+      showToast('success', 'Export started')
+    } catch {
+      showToast('error', 'Failed to export CSV')
+    }
+  }
+
+  return {
+    settings,
+    loading,
+    saving,
+    error,
+    fetchSequenceSettings,
+    getSettingForModule,
+    saveForModule,
+    isModalOpen,
+    editingModule,
+    toast,
+    openSequenceModal,
+    handleModalClosed,
+    handleModalSaved,
+    handleExportSequences,
+    closeToast,
+  }
 }
 
 export default useSequenceSettings

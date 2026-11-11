@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import LoadingScreen from './LoadingScreen'
-import { hasRouteAccess, getAccessLevel } from '../utils/routeProtection'
+import { LoadingScreen } from '../ui'
+import { hasRouteAccess, getAccessLevel } from '../../utils/routeProtection'
 
 const RouteProtection = ({ children, routeName }) => {
   const navigate = useNavigate()

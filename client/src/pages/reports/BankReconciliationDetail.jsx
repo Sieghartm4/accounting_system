@@ -49,8 +49,7 @@ import {
   Settings,
   Unlock,
 } from 'lucide-react'
-import DynamicToast from '../../components/DynamicToast'
-import RightSideModal from '../../components/RightSideModal'
+import { DynamicToast, RightSideModal } from '../../components/ui'
 
 import {
   useBankReconciliation,

@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Clock3, TrendingUp, Download, RefreshCw, Printer, FileText, X, Eye, DollarSign, Filter, RotateCw } from 'lucide-react'
-import RouteProtection from '../../components/RouteProtection'
+import { RouteProtection } from '../../components/access'
 import useAgeingReceivables from './useAgeingReceivables'
-import LoadingScreen from '../../components/LoadingScreen'
+import { LoadingScreen } from '../../components/ui'
 import { formatDate, decimalFormat, formatCurrency, handlePrint, handleExportCSV } from './utils'
 
 export default function AgeingReceivables() {

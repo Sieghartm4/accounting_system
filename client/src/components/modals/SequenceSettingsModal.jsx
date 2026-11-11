@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import RightSideModal from './RightSideModal'
+import { RightSideModal } from '../ui'
 import {
   SEQUENCE_MODULES,
   SEQUENCE_DATE_FORMATS,
   moduleLabel,
   buildSequencePreview,
-} from '../pages/sequence_settings/useSequenceSettings'
-import useSequenceSettings from '../pages/sequence_settings/useSequenceSettings'
+} from '../../pages/sequence_settings/useSequenceSettings'
+import useSequenceSettings from '../../pages/sequence_settings/useSequenceSettings'
 
 /**
  * The add/edit sequence modal, shared by the Masters sequence page and the

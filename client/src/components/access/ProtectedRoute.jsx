@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
-import { hasRouteAccess, getAccessibleRoutes } from '../utils/routeProtection'
+import { hasRouteAccess, getAccessibleRoutes } from '../../utils/routeProtection'
 import ModuleUpsell from './ModuleUpsell'
-import useEntitlement from '../hooks/useEntitlement'
-import { useModuleLockout } from '../utils/moduleLockout'
+import useEntitlement from '../../hooks/useEntitlement'
+import { useModuleLockout } from '../../utils/moduleLockout'
 
 /**
  * Gate for a module page.

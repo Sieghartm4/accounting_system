@@ -1,281 +1,44 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
-  FileText,
-  Percent,
   ShieldCheck,
   Clock,
-  ArrowRight,
   Download,
   Plus,
-  X,
   Edit2,
-  Save,
   Receipt,
   Upload,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
-import RightSideModal from '../../components/RightSideModal'
-import DynamicToast from '../../components/DynamicToast'
-import LoadingScreen from '../../components/LoadingScreen'
-import useWithholdingTax from './useWithholdingTax'
+import { DynamicTable, DynamicToast, LoadingScreen, RightSideModal } from '../../components/ui'
+import { ProtectedAction, RouteProtection } from '../../components/access'
+import useWithholdingTax, {
+  WITHHOLDING_TAX_STATUSES,
+  formatRate,
+} from './useWithholdingTax'
 
 function WithholdingTaxContent() {
   const {
     withholdingTax,
     loading,
     error,
-    createWithholdingTaxEntry,
-    updateWithholdingTaxEntry,
-    refreshWithholdingTax,
-    importWithholdingTax,
+    isModalOpen,
+    editingWithholdingTax,
+    formData,
+    toast,
+    isSubmitting,
+    importing,
+    openModal,
+    closeModal,
+    handleInputChange,
+    handleSubmit,
+    handleExportWithholdingTax,
+    handleImportWithholdingTax,
+    closeToast,
   } = useWithholdingTax()
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-  }
-
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingWithholdingTax, setEditingWithholdingTax] = useState(null)
-  const [formData, setFormData] = useState({
-    id: '',
-    code: '',
-    name: '',
-    rate: '',
-    tax_account: '',
-    description: '',
-    status: 'ACTIVE',
-  })
-  const [toast, setToast] = useState(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [importing, setImporting] = useState(false)
-
-  const handleExportWithholdingTax = () => {
-    try {
-      if (!Array.isArray(withholdingTax) || withholdingTax.length === 0) {
-        setToast({ type: 'error', message: 'No withholding tax data to export' })
-        return
-      }
-
-      const exclude = new Set(['id', '_id', 'action'])
-      const rawHeaders = Object.keys(withholdingTax[0] || {})
-      const headers = rawHeaders.filter((h) => !exclude.has(h))
-
-      const csvRows = []
-      csvRows.push(headers.join(','))
-
-      withholdingTax.forEach((row) => {
-        const values = headers.map((h) => {
-          let val = row[h]
-          if (val === null || val === undefined) return ''
-          if (typeof val === 'object') {
-            try {
-              val = JSON.stringify(val)
-            } catch (e) {
-              val = String(val)
-            }
-          }
-          const escaped = String(val).replace(/"/g, '""')
-          return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped
-        })
-        csvRows.push(values.join(','))
-      })
-
-      const csvContent = csvRows.join('\n')
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `withholding_tax_${Date.now()}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      setToast({ type: 'success', message: 'Export started' })
-    } catch (err) {
-      setToast({ type: 'error', message: 'Failed to export withholding tax data' })
-    }
-  }
-
-  const parseCSV = (csvText) => {
-    const lines = csvText.trim().split('\n')
-    if (lines.length < 2) return []
-
-    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
-    const exclude = new Set(['id', '_id', 'action'])
-    const validHeaders = headers.filter((h) => !exclude.has(h))
-
-    const taxes = []
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseCSVLine(lines[i])
-      if (values.length !== headers.length) continue
-
-      const tax = {}
-      validHeaders.forEach((header, index) => {
-        tax[header] = values[index]
-      })
-      taxes.push(tax)
-    }
-
-    return taxes
-  }
-
-  const parseCSVLine = (line) => {
-    const result = []
-    let current = ''
-    let inQuotes = false
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i]
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"'
-          i++
-        } else {
-          inQuotes = !inQuotes
-        }
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim())
-        current = ''
-      } else {
-        current += char
-      }
-    }
-    result.push(current.trim())
-    return result
-  }
-
-  const handleImportWithholdingTax = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-      setToast({ type: 'error', message: 'Please select a CSV file' })
-      return
-    }
-
-    setImporting(true)
-    try {
-      const text = await file.text()
-      const taxes = parseCSV(text)
-
-      if (taxes.length === 0) {
-        setToast({ type: 'error', message: 'No valid tax entries found in CSV' })
-        return
-      }
-
-      const result = await importWithholdingTax(taxes)
-
-      if (result.success) {
-        const { created, updated, errors } = result.data
-        setToast({
-          type: 'success',
-          message: `Import completed: ${created.length} created, ${updated.length} updated${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
-        })
-      } else {
-        setToast({
-          type: 'error',
-          message: result.message || 'Failed to import withholding tax entries',
-        })
-      }
-    } catch (err) {
-      console.error('Import error:', err)
-      setToast({ type: 'error', message: 'Failed to read CSV file' })
-    } finally {
-      setImporting(false)
-      e.target.value = ''
-    }
-  }
-
-  const withholdingTaxStatuses = ['ACTIVE', 'INACTIVE']
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-
-    let result
-    if (editingWithholdingTax) {
-      result = await updateWithholdingTaxEntry(editingWithholdingTax.id, formData)
-    } else {
-      result = await createWithholdingTaxEntry(formData)
-    }
-
-    if (result.success) {
-      setToast({
-        type: 'success',
-        message: `Withholding Tax entry ${editingWithholdingTax ? 'updated' : 'created'} successfully!`,
-      })
-      setFormData({
-        id: '',
-        code: '',
-        name: '',
-        rate: '',
-        tax_account: '',
-        description: '',
-        status: 'ACTIVE',
-      })
-      setEditingWithholdingTax(null)
-      setIsModalOpen(false)
-    } else {
-      setToast({
-        type: 'error',
-        message:
-          result.error ||
-          `Failed to ${editingWithholdingTax ? 'update' : 'create'} Withholding Tax entry`,
-      })
-    }
-
-    setIsSubmitting(false)
-  }
-
-  const openModal = (withholdingTaxData = null) => {
-    if (withholdingTaxData) {
-      setEditingWithholdingTax(withholdingTaxData)
-      setFormData({
-        id: withholdingTaxData.id || '',
-        code: withholdingTaxData.code || '',
-        name: withholdingTaxData.name || '',
-        rate: withholdingTaxData.rate || '',
-        tax_account: withholdingTaxData.tax_account || '',
-        description: withholdingTaxData.description || '',
-        status: withholdingTaxData.status || 'ACTIVE',
-      })
-    } else {
-      setEditingWithholdingTax(null)
-      setFormData({
-        id: '',
-        code: '',
-        name: '',
-        rate: '',
-        tax_account: '',
-        description: '',
-        status: 'ACTIVE',
-      })
-    }
-    setIsModalOpen(true)
-  }
-
-  const formatRate = (rate) => {
-    return `${rate}%`
-  }
-
-  const getStatusBadge = (status) => {
-    const baseClasses = 'px-2 py-1 text-xs font-bold rounded-full'
-    return status === 'ACTIVE'
-      ? `${baseClasses} bg-green-100 text-green-800`
-      : `${baseClasses} bg-red-100 text-red-800`
   }
 
   if (loading) {
@@ -412,7 +175,7 @@ function WithholdingTaxContent() {
       {/* Right Side Modal for Creating/Editing Withholding Tax Entry */}
       <RightSideModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={closeModal}
         title={
           editingWithholdingTax
             ? 'Edit Withholding Tax Entry'
@@ -509,7 +272,7 @@ function WithholdingTaxContent() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
               required
             >
-              {withholdingTaxStatuses.map((status) => (
+              {WITHHOLDING_TAX_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {status}
                 </option>
@@ -520,7 +283,7 @@ function WithholdingTaxContent() {
           <div className="flex gap-3 pt-4">
             <button
               type="button"
-              onClick={() => setIsModalOpen(false)}
+              onClick={closeModal}
               className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-50 transition-colors"
             >
               CANCEL
@@ -545,7 +308,7 @@ function WithholdingTaxContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={() => setToast(null)}
+          onClose={closeToast}
         />
       )}
     </div>

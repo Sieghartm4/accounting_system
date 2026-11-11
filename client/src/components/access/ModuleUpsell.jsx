@@ -10,9 +10,9 @@ import {
   Users,
   LayoutGrid,
 } from 'lucide-react'
-import { ROUTE_CONFIG } from '../utils/routeProtection'
-import { fetchWithAuth } from '../utils/api'
-import { API } from '../api/endpoints'
+import { ROUTE_CONFIG } from '../../utils/routeProtection'
+import { fetchWithAuth } from '../../utils/api'
+import { API } from '../../api/endpoints'
 
 /**
  * Display name for a module code, from the same registry the nav uses.

@@ -1,12 +1,10 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Users, Download, ShieldCheck, Wallet } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import RouteProtection from '../../components/RouteProtection'
-import LoadingScreen from '../../components/LoadingScreen'
+import { DynamicTable, LoadingScreen, SummaryTile } from '../../components/ui'
+import { RouteProtection } from '../../components/access'
 import useCustomerTransactions from './useCustomerTransactions'
 import CustomerTransactionDetail from './CustomerTransactionDetail'
-import SummaryTile from '../../components/SummaryTile'
 
 const formatCurrency = (value) =>
   Number(value || 0).toLocaleString('en-PH', {

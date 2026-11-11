@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
   FilePlus,
@@ -7,9 +6,7 @@ import {
   CheckCircle,
   ShieldCheck,
   Wallet,
-  ArrowRight,
   Download,
-  Plus,
   FileText,
   Building,
   XCircle,
@@ -17,22 +14,11 @@ import {
   Clock3,
   ListStart,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import DynamicToast from '../../components/DynamicToast'
-import DynamicConfirmModal from '../../components/DynamicConfirmModal'
-import SequenceSettingsModal from '../../components/SequenceSettingsModal'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
+import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
+import { SequenceSettingsModal } from '../../components/modals'
+import { ProtectedAction, RouteProtection } from '../../components/access'
 import usePayments from './usePayments'
 import PaymentsForm from './PaymentsForm'
-import { getAccessLevel } from '../../utils/routeProtection'
-import { generatePaymentPDF } from '../../utils/generatePaymentPDF'
-import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
-import LoadingScreen from '../../components/LoadingScreen'
-import connectRealtime from '../../utils/realtimeSocket'
-import { API } from '../../api/endpoints'
-import { useNotificationsState } from '../../components/layout/NotificationContext'
-import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Payments() {
   return (
@@ -49,469 +35,73 @@ function PaymentsContent() {
     loadingMore,
     hasMore,
     error,
-    refetchPayments,
+    isAdding,
+    isEditing,
+    isViewing,
+    isPostedEdit,
+    viewingPayment,
+    closeForm,
+    handleFormSuccess,
+    closeViewing,
+    selectedPurchases,
+    selectedPurchaseItems,
+    toast,
+    closeToast,
+    isSequenceModalOpen,
+    openSequenceModal,
+    closeSequenceModal,
+    handleSequenceSaved,
+    pendingDateFrom,
+    pendingDateTo,
+    setPendingDateFrom,
+    setPendingDateTo,
+    activeDateFrom,
+    activeDateTo,
+    applyDateFilters,
+    clearDateFilters,
+    confirmModal,
+    closeConfirmModal,
+    confirmAndClose,
+    unreadRowMap,
+    enableCheckboxes,
+    activeFilter,
+    setActiveFilter,
+    activeTab,
+    setActiveTab,
+    toBePaidData,
+    loadingToBePaid,
+    expandedVendor,
+    toggleVendorExpansion,
+    handleVendorCheckboxChange,
+    handlePurchaseCheckboxChange,
+    sameVendorOnlyCondition,
+    sameVendorPurchaseCondition,
+    handlePaySelectedVendors,
+    startPayForPurchases,
+    filteredPayments,
+    filteredTotalPaidAmount,
+    fetchAndDownloadPDF,
+    handleApproveSelected,
+    handleCancelSelected,
+    handleViewPayment,
+    handleEditPayment,
+    handleReversePayment,
     loadMore,
-    prependPayment,
   } = usePayments()
-  const { markReadForDocument, items: notificationItems } = useNotificationsState()
-  const unreadRowMap = useMemo(
-    () => buildUnreadDocCounts(notificationItems, 'payments'),
-    [notificationItems],
-  )
-  const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const [isAdding, setIsAdding] = useState(false)
-  const [isViewing, setIsViewing] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isPostedEdit, setIsPostedEdit] = useState(false)
-  const [viewingPayment, setViewingPayment] = useState(null)
-  const [toast, setToast] = useState(null)
-  const [isSequenceModalOpen, setIsSequenceModalOpen] = useState(false)
-  const [pendingDateFrom, setPendingDateFrom] = useState('')
-  const [pendingDateTo, setPendingDateTo] = useState('')
-  const [activeDateFrom, setActiveDateFrom] = useState(null)
-  const [activeDateTo, setActiveDateTo] = useState(null)
-  const [confirmModal, setConfirmModal] = useState({
-    isOpen: false,
-    onConfirm: null,
-    title: '',
-    message: '',
-  })
-  const [activeFilter, setActiveFilter] = useState(null)
-  const [activeTab, setActiveTab] = useState('payments') // 'payments' or 'toBePaid'
-  const [selectedPurchases, setSelectedPurchases] = useState([])
-  const [toBePaidData, setToBePaidData] = useState([])
-  const [loadingToBePaid, setLoadingToBePaid] = useState(false)
-  const [expandedVendor, setExpandedVendor] = useState(null) // Track which vendor is expanded
-  const [selectedPurchaseItems, setSelectedPurchaseItems] = useState([]) // Store fetched purchase items
-
-  // Fetch purchase items for selected purchases
-  const fetchPurchaseItems = async (purchaseIds) => {
-    try {
-      const token = sessionStorage.getItem('authenticated')
-      if (!token) throw new Error('No authentication token found')
-
-      const queryParams = new URLSearchParams()
-      purchaseIds.forEach(id => queryParams.append('purchase_id', id))
-
-      const response = await fetch(
-        `${API.paymentsPurchasePayment()}?${queryParams.toString()}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.message || 'Failed to fetch purchase data')
-
-      return result.data || []
-    } catch (error) {
-      console.error('Error fetching purchase data:', error)
-      setToast({
-        type: 'error',
-        message: error.message || 'Failed to fetch purchase data'
-      })
-      return []
-    }
-  }
-
-  // Fetch unpaid purchases for To Be Paid tab
-  const fetchToBePaid = async (filters = {}) => {
-    try {
-      setLoadingToBePaid(true)
-      const token = sessionStorage.getItem('authenticated')
-      if (!token) throw new Error('No authorization token found')
-
-      const queryParams = new URLSearchParams()
-      queryParams.append('forPayments', 'true')
-      if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom)
-      if (filters.dateTo) queryParams.append('dateTo', filters.dateTo)
-
-      const response = await fetch(
-        `${API.purchase()}?${queryParams.toString()}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.message || 'Failed to fetch unpaid purchases')
-
-      // Backend now handles filtering based on payments sum vs amount due
-      const unpaidPurchases = result.data || []
-
-      // Group by unique vendors
-      const vendorMap = new Map()
-      unpaidPurchases.forEach(purchase => {
-        const vendorId = purchase.vendor_id || purchase.id // Use vendor_id from API
-        const vendorName = purchase.vendor || purchase.vendor_name // Use vendor name from API
-
-        if (!vendorMap.has(vendorId)) {
-          vendorMap.set(vendorId, {
-            vendorId,
-            vendorName,
-            totalUnpaid: 0,
-            purchases: []
-          })
-        }
-        const vendor = vendorMap.get(vendorId)
-        const totalAmount = parseFloat(purchase.total_amount) || parseFloat(purchase.amount) || parseFloat(purchase.amount_due) || 0
-        const paidAmount = parseFloat(purchase.paid_amount) || 0
-        const unpaidAmount = totalAmount - paidAmount
-        vendor.totalUnpaid += unpaidAmount
-        vendor.purchases.push({
-          ...purchase,
-        })
-      })
-
-      const vendors = Array.from(vendorMap.values())
-
-      setToBePaidData(vendors)
-    } catch (error) {
-      console.error('Error fetching to be paid:', error)
-      setToast({
-        type: 'error',
-        message: error.message || 'Failed to fetch unpaid purchases'
-      })
-    } finally {
-      setLoadingToBePaid(false)
-    }
-  }
-
-  // Fetch to be paid data when tab switches to toBePaid
-  useEffect(() => {
-    if (activeTab === 'toBePaid') {
-      fetchToBePaid()
-    }
-  }, [activeTab])
-
-  const applyDateFilters = async () => {
-    const from = pendingDateFrom || null
-    const to = pendingDateTo || null
-    setActiveDateFrom(from)
-    setActiveDateTo(to)
-    await refetchPayments({ dateFrom: from, dateTo: to })
-  }
-
-  const clearDateFilters = async () => {
-    setPendingDateFrom('')
-    setPendingDateTo('')
-    setActiveDateFrom(null)
-    setActiveDateTo(null)
-    await refetchPayments({ dateFrom: null, dateTo: null })
-  }
-
-  const applyToBePaidDateFilters = async () => {
-    const from = pendingDateFrom || null
-    const to = pendingDateTo || null
-    setActiveDateFrom(from)
-    setActiveDateTo(to)
-    await fetchToBePaid({ dateFrom: from, dateTo: to })
-  }
-
-  const clearToBePaidDateFilters = async () => {
-    setPendingDateFrom('')
-    setPendingDateTo('')
-    setActiveDateFrom(null)
-    setActiveDateTo(null)
-    await fetchToBePaid({ dateFrom: null, dateTo: null })
-  }
-
-  // WebSocket subscription for live payment updates
-  useEffect(() => {
-    const close = connectRealtime({
-      onMessage: (type, data) => {
-        if (type === 'payment_created' && data?.payment) {
-          prependPayment(data.payment)
-        }
-      },
-      onError: (err) => console.error('Payment realtime error', err),
-    })
-
-    return close
-  }, [prependPayment])
-
-  useEffect(() => {
-    const id = searchParams.get('id')
-    if (!id) return
-
-    const fetchPayment = async () => {
-      try {
-        const token = sessionStorage.getItem('authenticated')
-        if (!token) throw new Error('No authentication token found')
-
-        const response = await fetch(
-          API.paymentsById(encodeURIComponent(id)),
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        )
-
-        const result = await response.json()
-        if (!response.ok)
-          throw new Error(result.message || 'Failed to fetch payment details')
-
-        setViewingPayment(result)
-        setIsViewing(true)
-        markReadForDocument('payments', [id])
-        setSearchParams(
-          (prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('id')
-            return next
-          },
-          { replace: true },
-        )
-      } catch (err) {
-        setToast({
-          type: 'error',
-          message: err.message || 'Failed to fetch payment details',
-        })
-      }
-    }
-
-    fetchPayment()
-  }, [searchParams, setSearchParams])
-
-  // Check if user has access to enable checkboxes
-  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
-  const accessLevel = getAccessLevel('payments', user)
-  const enableCheckboxes =
-    accessLevel === 'Check Access' ||
-    accessLevel === 'Approve Access' ||
-    accessLevel === 'Edit Access' ||
-    accessLevel === 'Full Access'
 
   const checkboxCondition = null // Always show checkboxes (match other pages)
-
-  // Filter payments based on active card filter
-  const getFilteredPayments = () => {
-    if (!activeFilter) return payments
-
-    switch (activeFilter) {
-      case 'PREPARED':
-        return payments?.filter((p) => p.state === 'PREPARED') || []
-      case 'CHECKED':
-        return payments?.filter((p) => p.state === 'CHECKED') || []
-      case 'CANCELLED':
-        return payments?.filter((p) => p.state === 'CANCELLED') || []
-      case 'APPROVED':
-        return payments?.filter((p) => p.state === 'APPROVED') || []
-      default:
-        return payments
-    }
-  }
-
-  const filteredPayments = getFilteredPayments()
-
-  // Calculate totals based on filtered data
-  const getFilteredTotalPaidAmount = () => {
-    return filteredPayments?.reduce((sum, p) => sum + (parseFloat(p.paid_amount) || 0), 0) || 0
-  }
-
-  // ─── Helper: fetch full payment data then download as PDF ─────────────────
-  const fetchAndDownloadPDF = async (selectedRows, copyType) => {
-    try {
-      const token = sessionStorage.getItem('authenticated')
-      if (!token) throw new Error('No authentication token found')
-
-      const paymentIds = selectedRows
-        .map((row) => encodeURIComponent(String(row.id)))
-        .join(',')
-
-      const response = await fetch(
-        `${API.paymentsPrint(paymentIds)}?copyType=${copyType}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      const result = await response.json()
-      if (!response.ok)
-        throw new Error(result.message || 'Failed to fetch payments for printing')
-
-      const data = result.data || []
-      if (!Array.isArray(data))
-        throw new Error('Invalid data format received from server')
-
-      await generatePaymentPDF(data, copyType)
-
-      setToast({
-        type: 'success',
-        message: `${data.length} payment PDF(s) downloaded (${copyType === 'customer' ? 'Vendor' : 'Internal'} Copy)`,
-      })
-    } catch (error) {
-      console.error('Error generating payment PDF:', error)
-      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' })
-    }
-  }
 
   // Function to filter checkbox actions based on selected rows
   const getFilteredCheckboxActions = (selectedRows) => {
     const allActions = [
       {
         label: 'Approve Selected',
-        onClick: async (selectedRows) => {
-          const approvableRows = selectedRows.filter(
-            (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
-          )
-
-          if (approvableRows.length === 0) {
-            setToast({
-              type: 'error',
-              message: 'No payments are eligible for approval',
-            })
-            return
-          }
-
-          setConfirmModal({
-            isOpen: true,
-            onConfirm: async () => {
-              try {
-
-                const token = sessionStorage.getItem('authenticated')
-                if (!token) {
-                  throw new Error('No authentication token found')
-                }
-
-                const updates = approvableRows.map((row) => ({
-                  id: row.id,
-                  currentState: row.state,
-                }))
-
-                const response = await fetch(
-                  API.paymentsState(),
-                  {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ updates }),
-                  },
-                )
-
-                const result = await response.json()
-
-                if (!response.ok) {
-                  throw new Error(result.message || 'Failed to approve payments')
-                }
-
-                await refetchPayments()
-
-                setToast({
-                  type: 'success',
-                  message:
-                    result.message ||
-                    `${approvableRows.length} payment(s) approved successfully`,
-                })
-                markReadForDocument(
-                  'payments',
-                  approvableRows.map((row) => row.id),
-                )
-              } catch (error) {
-                console.error('Error approving payments:', error)
-                setToast({
-                  type: 'error',
-                  message: error.message || 'Failed to approve payments',
-                })
-              }
-            },
-            title: 'Approve Payments',
-            message: `Are you sure you want to approve ${approvableRows.length} payment(s)?`,
-          })
-        },
+        onClick: handleApproveSelected,
       },
       {
         label: 'Cancel Selected',
         style: 'orange',
-        onClick: async (selectedRows) => {
-          const cancellableRows = selectedRows.filter(
-            (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
-          )
-
-          if (cancellableRows.length === 0) {
-            setToast({
-              type: 'error',
-              message: 'No payments are eligible for cancellation',
-            })
-            return
-          }
-
-          setConfirmModal({
-            isOpen: true,
-            onConfirm: async () => {
-              try {
-
-                const token = sessionStorage.getItem('authenticated')
-                if (!token) {
-                  throw new Error('No authentication token found')
-                }
-
-                const updates = cancellableRows.map((row) => ({
-                  id: row.id,
-                  currentState: row.state,
-                }))
-
-                const response = await fetch(
-                  API.paymentsCancelState(),
-                  {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ updates }),
-                  },
-                )
-
-                const result = await response.json()
-
-                if (!response.ok) {
-                  throw new Error(result.message || 'Failed to cancel payments')
-                }
-
-                await refetchPayments()
-
-                setToast({
-                  type: 'success',
-                  message:
-                    result.message ||
-                    `${cancellableRows.length} payment(s) cancelled successfully`,
-                })
-                markReadForDocument(
-                  'payments',
-                  cancellableRows.map((row) => row.id),
-                )
-              } catch (error) {
-                console.error('Error cancelling payments:', error)
-                setToast({
-                  type: 'error',
-                  message: error.message || 'Failed to cancel payments',
-                })
-              }
-            },
-            title: 'Cancel Payments',
-            message: `Are you sure you want to cancel ${cancellableRows.length} payment(s)?`,
-            type: 'danger',
-          })
-        },
+        onClick: handleCancelSelected,
       },
       {
         separator: true,
@@ -560,29 +150,8 @@ function PaymentsContent() {
           paymentData={viewingPayment}
           preSelectedPurchases={selectedPurchases}
           preSelectedPurchaseItems={selectedPurchaseItems}
-          onBack={() => {
-            setIsAdding(false)
-            setIsEditing(false)
-            setIsViewing(false)
-            setIsPostedEdit(false)
-            setViewingPayment(null)
-            setSelectedPurchases([])
-            setSelectedPurchaseItems([])
-          }}
-          onSuccess={async (nextToast) => {
-            if (nextToast) setToast(nextToast)
-            await refetchPayments()
-            if (activeTab === 'toBePaid') {
-              await fetchToBePaid()
-            }
-            setIsAdding(false)
-            setIsEditing(false)
-            setIsViewing(false)
-            setIsPostedEdit(false)
-            setViewingPayment(null)
-            setSelectedPurchases([])
-            setSelectedPurchaseItems([])
-          }}
+          onBack={closeForm}
+          onSuccess={handleFormSuccess}
         />
       </RouteProtection>
     )
@@ -593,10 +162,7 @@ function PaymentsContent() {
         <PaymentsForm
           isViewMode={true}
           paymentData={viewingPayment}
-          onBack={() => {
-            setIsViewing(false)
-            setViewingPayment(null)
-          }}
+          onBack={closeViewing}
         />
       </RouteProtection>
     )
@@ -671,18 +237,13 @@ function PaymentsContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={() => setToast(null)}
+          onClose={closeToast}
         />
       )}
       <DynamicConfirmModal
         isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-        onConfirm={() => {
-          if (confirmModal.onConfirm) {
-            confirmModal.onConfirm()
-          }
-          setConfirmModal({ ...confirmModal, isOpen: false })
-        }}
+        onClose={closeConfirmModal}
+        onConfirm={confirmAndClose}
         title={confirmModal.title}
         message={confirmModal.message}
         type="warning"
@@ -690,9 +251,9 @@ function PaymentsContent() {
 
       <SequenceSettingsModal
         isOpen={isSequenceModalOpen}
-        onClose={() => setIsSequenceModalOpen(false)}
+        onClose={closeSequenceModal}
         module="payments"
-        onSaved={() => setToast({ type: 'success', message: 'Sequence updated. New documents will use it.' })}
+        onSaved={handleSequenceSaved}
       />
 
       {/* --- HEADER SECTION --- */}
@@ -719,7 +280,7 @@ function PaymentsContent() {
 
               <div className="flex flex-col md:flex-row md:items-center gap-3">
                 <button
-                  onClick={() => setIsSequenceModalOpen(true)}
+                  onClick={openSequenceModal}
                   className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm"
                 >
                   <ListStart size={14} />
@@ -806,7 +367,7 @@ function PaymentsContent() {
               />
               <SummaryTile
                 label="Total Paid"
-                value={`₱ ${getFilteredTotalPaidAmount().toLocaleString('en-PH', {
+                value={`₱ ${filteredTotalPaidAmount.toLocaleString('en-PH', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   }) || '0.00'}`}
@@ -840,7 +401,7 @@ function PaymentsContent() {
 
               <div className="flex flex-col md:flex-row md:items-center gap-3">
                 <button
-                  onClick={() => setIsSequenceModalOpen(true)}
+                  onClick={openSequenceModal}
                   className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm"
                 >
                   <ListStart size={14} />
@@ -944,128 +505,15 @@ function PaymentsContent() {
             actionButtons={[
               {
                 label: 'View',
-                onClick: async (row) => {
-                  try {
-
-                    const token = sessionStorage.getItem('authenticated')
-                    if (!token) {
-                      throw new Error('No authentication token found')
-                    }
-
-                    const response = await fetch(
-                      API.paymentsById(row.id),
-                      {
-                        method: 'GET',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          Authorization: `Bearer ${token}`,
-                        },
-                      },
-                    )
-
-                    const result = await response.json()
-
-                    if (!response.ok) {
-                      throw new Error(
-                        result.message || 'Failed to fetch payment details',
-                      )
-                    }
-
-                    setViewingPayment(result)
-                    setIsViewing(true)
-                    markReadForDocument('payments', [row.id])
-                  } catch (error) {
-                    console.error('Error fetching payment details:', error)
-                    setToast({
-                      type: 'error',
-                      message: error.message || 'Failed to fetch payment details',
-                    })
-                  }
-                },
+                onClick: handleViewPayment,
               },
               {
                 label: 'Edit',
-                onClick: async (row) => {
-                  try {
-
-                    setIsPostedEdit(isPostedDocument(row.state))
-
-                    const token = sessionStorage.getItem('authenticated')
-                    if (!token) {
-                      throw new Error('No authentication token found')
-                    }
-
-                    const response = await fetch(
-                      API.paymentsById(row.id),
-                      {
-                        method: 'GET',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          Authorization: `Bearer ${token}`,
-                        },
-                      },
-                    )
-
-                    const result = await response.json()
-
-                    if (!response.ok) {
-                      throw new Error(
-                        result.message || 'Failed to fetch payment details',
-                      )
-                    }
-
-                    setViewingPayment(result)
-                    setIsEditing(true)
-                    markReadForDocument('payments', [row.id])
-                  } catch (error) {
-                    console.error('Error fetching payment details for editing:', error)
-                    setToast({
-                      type: 'error',
-                      message: error.message || 'Failed to fetch payment details',
-                    })
-                  }
-                },
+                onClick: handleEditPayment,
               },
               {
                 label: 'Reverse',
-                onClick: (row) => {
-                  if (!isPostedDocument(row.state)) {
-                    setToast({
-                      type: 'error',
-                      message: `Only APPROVED/POSTED transactions can be reversed (current: ${row.state}).`,
-                    })
-                    return
-                  }
-
-                  setConfirmModal({
-                    isOpen: true,
-                    onConfirm: async () => {
-                      try {
-                        const reversed = await createReversal({
-                          dbName: 'payments',
-                          dbId: row.id,
-                          remarks: 'Reversal initiated from the Payments module',
-                        })
-                        setToast({
-                          type: 'success',
-                          message: reversed.message || 'Reversal created',
-                        })
-                        markReadForDocument('payments', [row.id])
-                        navigate('/adjustments')
-                        await refetchPayments()
-                      } catch (error) {
-                        console.error('Error creating payment reversal:', error)
-                        setToast({
-                          type: 'error',
-                          message: error.message || 'Failed to create reversal',
-                        })
-                      }
-                    },
-                    title: 'Reverse Payment',
-                    message: `Create a REVERSAL for PAYMENT ${row.id}? The original transaction stays unchanged; the reversal (DR/CR mirrored) is created as a PREPARED adjustment and must be approved before it posts to the general journal.`,
-                    type: 'danger',
-                  })
-                },
+                onClick: handleReversePayment,
               },
             ]}
             badgeColumns={[
@@ -1131,29 +579,14 @@ function PaymentsContent() {
                   enableActionColumn={true}
                   enableRowClick={true}
                   returnColumn="vendorId"
-                  onRowClick={(vendorId, row) => setExpandedVendor(expandedVendor === vendorId ? null : vendorId)}
+                  onRowClick={toggleVendorExpansion}
                   checkboxColumn="vendorId"
-                  checkboxCondition={(row) => {
-                    // Only allow selecting from same vendor
-                    if (selectedPurchases.length === 0) return true
-                    return selectedPurchases[0].vendor_id === row.vendorId
-                  }}
-                  onCheckboxChange={(selectedIds) => {
-                    const selectedVendors = toBePaidData.filter(row => selectedIds.includes(row.vendorId))
-                    const allPurchases = selectedVendors.flatMap(v => v.purchases)
-                    setSelectedPurchases(allPurchases)
-                  }}
+                  checkboxCondition={sameVendorOnlyCondition}
+                  onCheckboxChange={handleVendorCheckboxChange}
                   checkboxActions={[
                     {
                       label: 'Pay Selected',
-                      onClick: async (selectedRows) => {
-                        const allPurchases = selectedRows.flatMap(v => v.purchases)
-                        const purchaseIds = allPurchases.map(p => p.id)
-                        const items = await fetchPurchaseItems(purchaseIds)
-                        setSelectedPurchases(allPurchases)
-                        setSelectedPurchaseItems(items)
-                        setIsAdding(true)
-                      },
+                      onClick: handlePaySelectedVendors,
                       style: 'red',
                     },
                   ]}
@@ -1161,13 +594,7 @@ function PaymentsContent() {
                     {
                       label: 'Pay',
                       icon: <Layers size={14} />,
-                      onClick: async (row) => {
-                        const purchaseIds = row.purchases.map(p => p.id)
-                        const items = await fetchPurchaseItems(purchaseIds)
-                        setSelectedPurchases(row.purchases)
-                        setSelectedPurchaseItems(items)
-                        setIsAdding(true)
-                      },
+                      onClick: (row) => startPayForPurchases(row.purchases),
                     },
                   ]}
                   columns={[
@@ -1202,27 +629,12 @@ function PaymentsContent() {
                   enableCheckbox={true}
                   enableActionColumn={false}
                   checkboxColumn="id"
-                  checkboxCondition={(row) => {
-                    if (selectedPurchases.length === 0) return true
-                    return selectedPurchases[0].vendor_id === row.vendor_id
-                  }}
-                  onCheckboxChange={(selectedIds) => {
-                    const vendorData = toBePaidData.find(v => v.vendorId === expandedVendor)
-                    if (vendorData) {
-                      const selectedPurchasesData = vendorData.purchases.filter(p => selectedIds.includes(p.id))
-                      setSelectedPurchases(selectedPurchasesData)
-                    }
-                  }}
+                  checkboxCondition={sameVendorPurchaseCondition}
+                  onCheckboxChange={handlePurchaseCheckboxChange}
                   checkboxActions={[
                     {
                       label: 'Pay Selected',
-                      onClick: async (selectedRows) => {
-                        const purchaseIds = selectedRows.map(p => p.id)
-                        const items = await fetchPurchaseItems(purchaseIds)
-                        setSelectedPurchases(selectedRows)
-                        setSelectedPurchaseItems(items)
-                        setIsAdding(true)
-                      },
+                      onClick: startPayForPurchases,
                       style: 'red',
                     },
                   ]}

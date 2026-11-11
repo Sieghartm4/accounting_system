@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, ClipboardCheck, ShieldCheck, Clock, ArrowRight, Download, Plus, X, Edit2, Upload } from 'lucide-react';
-import DynamicTable from '../../components/DynamicTable';
-import RouteProtection from '../../components/RouteProtection';
-import ProtectedAction from '../../components/ProtectedAction';
-import RightSideModal from '../../components/RightSideModal';
-import DynamicToast from '../../components/DynamicToast';
+import { DynamicTable, DynamicToast, LoadingScreen, RightSideModal } from '../../components/ui';
+import { ProtectedAction, RouteProtection } from '../../components/access';
 import useProforma from './useProforma';
-import LoadingScreen from '../../components/LoadingScreen';
 
 function ProformaContent() {
   const { proforma, loading, error, chartsOfAccounts, coaLoading, createProformaEntry, updateProformaEntry, importProformaEntries } = useProforma();

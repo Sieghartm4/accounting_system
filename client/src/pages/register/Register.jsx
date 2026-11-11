@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import useRegister from './useRegister';
 import { REQUIRED_MODULES, moduleLabel } from '../../constants/modules';
-import DynamicToast from '../../components/DynamicToast';
+import { DynamicToast } from '../../components/ui';
 import { SUBSCRIPTION_API } from '../../api/endpoints';
 
 export default function Register() {
@@ -593,7 +593,7 @@ export default function Register() {
     setPaymentLoading(true);
     setPaymentError(null);
 
-    // Check if plan is free (₱0)
+    // Check if plan is free (â‚±0)
     const planPrice = calculatePrice(selectedPlan);
     
     if (planPrice === 0 || planPrice === '0') {
@@ -875,7 +875,7 @@ export default function Register() {
                         value={formData.password}
                         onChange={handleChange}
                         required 
-                        placeholder="••••••••" 
+                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" 
                         className="w-full pl-10 pr-10 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-black placeholder-slate-400 text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 font-medium transition-all"
                       />
                       <button
@@ -1006,7 +1006,7 @@ export default function Register() {
                           <p className="text-slate-500 text-base mt-3 leading-relaxed">{plan.sp_description}</p>
                           
                           <div className="mt-8 flex items-baseline">
-                            <span className="text-5xl font-black text-black">₱{price.toLocaleString()}</span>
+                            <span className="text-5xl font-black text-black">â‚±{price.toLocaleString()}</span>
                             <span className="ml-2 text-base text-slate-500">/ {plan.billingCycle.toLowerCase()}</span>
                           </div>
 
@@ -1076,7 +1076,7 @@ export default function Register() {
                     <h2 className="text-2xl font-black text-black mt-0.5">{selectedPlan?.sp_name}</h2>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-black text-black">₱{calculatePrice(selectedPlan).toLocaleString()}</span>
+                    <span className="text-2xl font-black text-black">â‚±{calculatePrice(selectedPlan).toLocaleString()}</span>
                     <span className="text-xs text-slate-500 block">per {selectedPlan?.billingCycle?.toLowerCase() || billingCycle}</span>
                   </div>
                 </div>

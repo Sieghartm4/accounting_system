@@ -1,24 +1,17 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
   ShieldCheck,
   Lock,
   Key,
-  ArrowRight,
   ShieldAlert,
   Fingerprint,
-  X,
   Plus,
-  Trash2,
   ShieldOff,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import RightSideModal from '../../components/RightSideModal'
-import DynamicToast from '../../components/DynamicToast'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
-import LoadingScreen from '../../components/LoadingScreen'
-import useAccess from './useAccess'
+import { DynamicTable, DynamicToast, LoadingScreen, RightSideModal } from '../../components/ui'
+import { ProtectedAction, RouteProtection } from '../../components/access'
+import useAccess, { ROUTE_ACCESS_OPTIONS } from './useAccess'
 
 export default function Access() {
   return (
@@ -37,107 +30,21 @@ function AccessContent() {
     selectedAccessId,
     routeAccessData,
     routeAccessLoading,
-    createAccess,
-    updateRouteAccess,
-    updateSingleRouteAccess,
+    isModalOpen,
+    formData,
+    toast,
+    openNewRoleModal,
+    closeModal,
+    closeToast,
+    handleInputChange,
+    handleRouteStatusChange,
+    bulkSetRouteStatus,
+    handleSubmit,
   } = useAccess()
-
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [formData, setFormData] = useState({
-    access_name: '',
-    status: 'Full Access',
-  })
-  const [toast, setToast] = useState(null)
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-  }
-
-  const handleNewRoleClick = () => {
-    setFormData({ access_name: '', status: 'active' })
-    setIsModalOpen(true)
-  }
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
-  }
-
-  const handleToastClose = () => {
-    setToast(null)
-  }
-
-  // Define select options for route access
-  const routeAccessOptions = [
-    { value: 'Full Access', label: 'Full Access' },
-    { value: 'No Access', label: 'No Access' },
-    { value: 'Add Access', label: 'Add Access' },
-    { value: 'View Access', label: 'View Access' },
-    { value: 'Edit Access', label: 'Edit Access' },
-    { value: 'Check Access', label: 'Check Access' },
-    { value: 'Approve Access', label: 'Approve Access' },
-  ]
-
-  // Handle individual row status change
-  const handleRouteStatusChange = async (routeId, newStatus, row) => {
-    try {
-      // Prepare single update data
-      const route_access_Data = {
-        updates: [
-          {
-            id: row.id, // Use the actual row.id from the data
-            access_id: selectedAccessId,
-            status: newStatus,
-          },
-        ],
-      }
-
-      // Call the API with single update
-      const result = await updateRouteAccess(route_access_Data)
-
-      if (result.success) {
-        setToast({
-          type: 'success',
-          message: `Route access updated to "${newStatus}"`,
-        })
-      } else {
-        setToast({
-          type: 'error',
-          message: result.message || 'Failed to update route access',
-        })
-      }
-    } catch (error) {
-      console.error('Error updating single route access:', error)
-      setToast({
-        type: 'error',
-        message: 'Network error occurred while updating route access',
-      })
-    }
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    try {
-      const result = await createAccess(formData.access_name, formData.status)
-
-      if (result.success) {
-        setToast({
-          type: 'success',
-          message: `Access role "${formData.access_name}" created successfully!`,
-        })
-        setIsModalOpen(false)
-      } else {
-        setToast({
-          type: 'error',
-          message: result.message || 'Failed to create access role',
-        })
-      }
-    } catch (error) {
-      setToast({
-        type: 'error',
-        message: 'Network error occurred while creating access role',
-      })
-    }
   }
 
   // --- CHECKBOX ACTIONS for Route Privileges table ---
@@ -147,49 +54,8 @@ function AccessContent() {
       label: 'Set Access',
       icon: <ShieldOff size={12} />,
       type: 'dropdown',
-      options: [
-        { value: 'Full Access', label: 'Full Access' },
-        { value: 'No Access', label: 'No Access' },
-        { value: 'Add Access', label: 'Add Access' },
-        { value: 'View Access', label: 'View Access' },
-        { value: 'Edit Access', label: 'Edit Access' },
-        { value: 'Check Access', label: 'Check Access' },
-        { value: 'Approve Access', label: 'Approve Access' },
-      ],
-      onChange: async (selectedRows, selectedValue) => {
-
-        try {
-          // Prepare data for bulk update - updates array at root level
-          const route_access_Data = {
-            updates: selectedRows.map((row) => ({
-              id: row.id, // Use correct id field
-              access_id: selectedAccessId,
-              status: selectedValue,
-            })),
-          }
-
-          // Call the API once with all updates
-          const result = await updateRouteAccess(route_access_Data)
-
-          if (result.success) {
-            setToast({
-              type: 'success',
-              message: `Access set to "${selectedValue}" for ${selectedRows.length} route(s).`,
-            })
-          } else {
-            setToast({
-              type: 'error',
-              message: result.message || 'Failed to update route access',
-            })
-          }
-        } catch (error) {
-          console.error('Error updating route access:', error)
-          setToast({
-            type: 'error',
-            message: 'Network error occurred while updating route access',
-          })
-        }
-      },
+      options: ROUTE_ACCESS_OPTIONS,
+      onChange: bulkSetRouteStatus,
     },
   ]
 
@@ -236,7 +102,7 @@ function AccessContent() {
           <div className="flex gap-3">
             <ProtectedAction routeName="access">
               <button
-                onClick={handleNewRoleClick}
+                onClick={openNewRoleModal}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
                 <Lock size={14} />
@@ -325,7 +191,7 @@ function AccessContent() {
                   enableAddButton={false}
                   optionColumns={new Set(['status'])}
                   onOptionChange={handleRouteStatusChange}
-                  selectOptions={routeAccessOptions}
+                  selectOptions={ROUTE_ACCESS_OPTIONS}
                   enableCheckbox={true}
                   checkboxColumn="route_id"
                   checkboxActions={routeCheckboxActions}
@@ -352,7 +218,7 @@ function AccessContent() {
       {/* Add Role Modal */}
       <RightSideModal
         isOpen={isModalOpen}
-        onClose={handleCloseModal}
+        onClose={closeModal}
         title="Create New Role"
       >
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -363,10 +229,9 @@ function AccessContent() {
               </label>
               <input
                 type="text"
+                name="access_name"
                 value={formData.access_name}
-                onChange={(e) =>
-                  setFormData({ ...formData, access_name: e.target.value })
-                }
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter role name..."
                 required
@@ -378,10 +243,9 @@ function AccessContent() {
                 Status <span className="text-red-600">*</span>
               </label>
               <select
+                name="status"
                 value={formData.status}
-                onChange={(e) =>
-                  setFormData({ ...formData, status: e.target.value })
-                }
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
@@ -394,7 +258,7 @@ function AccessContent() {
           <div className="flex gap-3 pt-4">
             <button
               type="button"
-              onClick={handleCloseModal}
+              onClick={closeModal}
               className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 text-xs font-black rounded-xl hover:bg-gray-200 transition-all uppercase tracking-widest"
             >
               Cancel
@@ -415,7 +279,7 @@ function AccessContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={handleToastClose}
+          onClose={closeToast}
           duration={4000}
         />
       )}

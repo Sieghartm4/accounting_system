@@ -1,6 +1,19 @@
 import { useState, useEffect } from "react";
 import { API } from '../../api/endpoints';
 
+// Select options for route access status dropdowns.
+export const ROUTE_ACCESS_OPTIONS = [
+    { value: 'Full Access', label: 'Full Access' },
+    { value: 'No Access', label: 'No Access' },
+    { value: 'Add Access', label: 'Add Access' },
+    { value: 'View Access', label: 'View Access' },
+    { value: 'Edit Access', label: 'Edit Access' },
+    { value: 'Check Access', label: 'Check Access' },
+    { value: 'Approve Access', label: 'Approve Access' },
+];
+
+const EMPTY_FORM = { access_name: '', status: 'Full Access' };
+
 const useAccess = () => {
     const [access, setAccess] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -9,7 +22,100 @@ const useAccess = () => {
     const [routeAccessData, setRouteAccessData] = useState([]);
     const [routeAccessLoading, setRouteAccessLoading] = useState(false);
 
-    const handleAccessRowClick = async (access_id, userData) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [formData, setFormData] = useState(EMPTY_FORM);
+    const [toast, setToast] = useState(null);
+
+    const showToast = (type, message) => setToast({ type, message });
+    const closeToast = () => setToast(null);
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const openNewRoleModal = () => {
+        setFormData(EMPTY_FORM);
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+    };
+
+    // Individual route-status change from the option column.
+    const handleRouteStatusChange = async (routeId, newStatus, row) => {
+        try {
+            const route_access_Data = {
+                updates: [
+                    {
+                        id: row.id,
+                        access_id: selectedAccessId,
+                        status: newStatus,
+                    },
+                ],
+            };
+
+            const result = await updateRouteAccess(route_access_Data);
+
+            if (result.success) {
+                showToast('success', `Route access updated to "${newStatus}"`);
+            } else {
+                showToast('error', result.message || 'Failed to update route access');
+            }
+        } catch (error) {
+            console.error('Error updating single route access:', error);
+            showToast('error', 'Network error occurred while updating route access');
+        }
+    };
+
+    // Bulk route-status change from checkbox actions (DynamicTable).
+    const bulkSetRouteStatus = async (selectedRows, selectedValue) => {
+        try {
+            const route_access_Data = {
+                updates: selectedRows.map((row) => ({
+                    id: row.id,
+                    access_id: selectedAccessId,
+                    status: selectedValue,
+                })),
+            };
+
+            const result = await updateRouteAccess(route_access_Data);
+
+            if (result.success) {
+                showToast(
+                    'success',
+                    `Access set to "${selectedValue}" for ${selectedRows.length} route(s).`,
+                );
+            } else {
+                showToast('error', result.message || 'Failed to update route access');
+            }
+        } catch (error) {
+            console.error('Error updating route access:', error);
+            showToast('error', 'Network error occurred while updating route access');
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const result = await createAccess(formData.access_name, formData.status);
+
+            if (result.success) {
+                showToast(
+                    'success',
+                    `Access role "${formData.access_name}" created successfully!`,
+                );
+                setIsModalOpen(false);
+            } else {
+                showToast('error', result.message || 'Failed to create access role');
+            }
+        } catch {
+            showToast('error', 'Network error occurred while creating access role');
+        }
+    };
+
+    const handleAccessRowClick = async (access_id) => {
 
         
         if (selectedAccessId === access_id) {
@@ -237,7 +343,17 @@ const useAccess = () => {
         createAccess,
         updateRouteAccess,
         updateSingleRouteAccess,
-        fetchRouteAccess
+        fetchRouteAccess,
+        isModalOpen,
+        formData,
+        toast,
+        openNewRoleModal,
+        closeModal,
+        closeToast,
+        handleInputChange,
+        handleRouteStatusChange,
+        bulkSetRouteStatus,
+        handleSubmit,
     };
 };
 

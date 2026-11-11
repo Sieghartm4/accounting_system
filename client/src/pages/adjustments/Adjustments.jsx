@@ -1,41 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
   FilePlus,
-  ArrowLeft,
-  Plus,
-  Eye,
-  Edit,
-  Trash2,
-  FileText,
   Download,
   CheckCircle,
   XCircle,
-  Clock,
-  AlertCircle,
   Layers,
   ShieldCheck,
-  ArrowRight,
   ClipboardList,
   Wallet,
   ListStart,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import DynamicToast from '../../components/DynamicToast'
-import DynamicConfirmModal from '../../components/DynamicConfirmModal'
-import SequenceSettingsModal from '../../components/SequenceSettingsModal'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
+import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
+import { SequenceSettingsModal } from '../../components/modals'
+import { ProtectedAction, RouteProtection } from '../../components/access'
 import useAdjustments from './useAdjustments'
 import AdjustmentsForm from './AdjustmentsForm'
-import { getAccessLevel } from '../../utils/routeProtection'
-import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
-import LoadingScreen from '../../components/LoadingScreen'
-import connectRealtime from '../../utils/realtimeSocket'
-import { API } from '../../api/endpoints'
-import { useNotificationsState } from '../../components/layout/NotificationContext'
-import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Adjustments() {
   return (
@@ -52,259 +32,51 @@ function AdjustmentsContent() {
     loadingMore,
     error,
     hasMore,
-    refetchAdjustments,
+    isAdding,
+    startAdding,
+    isViewing,
+    isEditing,
+    isPostedEdit,
+    viewingAdjustment,
+    initialJournalEntries,
+    handleBack,
+    handleFormSuccess,
+    closeViewing,
+    toast,
+    closeToast,
+    isSequenceModalOpen,
+    openSequenceModal,
+    closeSequenceModal,
+    handleSequenceSaved,
+    pendingDateFrom,
+    pendingDateTo,
+    setPendingDateFrom,
+    setPendingDateTo,
+    activeDateFrom,
+    activeDateTo,
+    applyDateFilters,
+    clearDateFilters,
+    confirmModal,
+    closeConfirmModal,
+    confirmAndClose,
+    unreadRowMap,
+    enableCheckboxes,
+    checkboxCondition,
+    activeFilter,
+    setActiveFilter,
+    filteredAdjustments,
+    filteredTotalAmount,
+    handleApproveSelected,
+    handleCancelSelected,
+    handleViewAdjustment,
+    handleEditAdjustment,
+    handleReverseAdjustment,
     loadMore,
-    prependAdjustment,
   } = useAdjustments()
-  const { markReadForDocument, items: notificationItems } = useNotificationsState()
-  const unreadRowMap = useMemo(
-    () => buildUnreadDocCounts(notificationItems, 'adjustments'),
-    [notificationItems],
-  )
-  const [searchParams, setSearchParams] = useSearchParams()
-  const location = useLocation()
-  const navigate = useNavigate()
-  const [isAdding, setIsAdding] = useState(false)
-  const [isViewing, setIsViewing] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isPostedEdit, setIsPostedEdit] = useState(false)
-  const [viewingAdjustment, setViewingAdjustment] = useState(null)
-  const [initialJournalEntries, setInitialJournalEntries] = useState([])
-  const [toast, setToast] = useState(null)
-  const [isSequenceModalOpen, setIsSequenceModalOpen] = useState(false)
-  const [pendingDateFrom, setPendingDateFrom] = useState('')
-  const [pendingDateTo, setPendingDateTo] = useState('')
-  const [activeDateFrom, setActiveDateFrom] = useState(null)
-  const [activeDateTo, setActiveDateTo] = useState(null)
-  const [activeFilter, setActiveFilter] = useState(null)
-  const [confirmModal, setConfirmModal] = useState({
-    isOpen: false,
-    onConfirm: null,
-    title: '',
-    message: '',
-  })
-
-  const applyDateFilters = async () => {
-    const from = pendingDateFrom || null
-    const to = pendingDateTo || null
-    setActiveDateFrom(from)
-    setActiveDateTo(to)
-    await refetchAdjustments({ dateFrom: from, dateTo: to })
-  }
-
-  const clearDateFilters = async () => {
-    setPendingDateFrom('')
-    setPendingDateTo('')
-    setActiveDateFrom(null)
-    setActiveDateTo(null)
-    await refetchAdjustments({ dateFrom: null, dateTo: null })
-  }
-
-  useEffect(() => {
-    const id = searchParams.get('id')
-    if (!id) return
-
-    const fetchAdjustment = async () => {
-      try {
-        const token = sessionStorage.getItem('authenticated')
-        if (!token) throw new Error('No authentication token found')
-
-        const response = await fetch(
-          API.adjustmentsById(encodeURIComponent(id)),
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        )
-
-        const result = await response.json()
-        if (!response.ok)
-          throw new Error(result.message || 'Failed to fetch adjustment details')
-
-        setViewingAdjustment(result)
-        setIsViewing(true)
-        markReadForDocument('adjustments', [id])
-        setSearchParams(
-          (prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('id')
-            return next
-          },
-          { replace: true },
-        )
-      } catch (err) {
-        setToast({
-          type: 'error',
-          message: err.message || 'Failed to fetch adjustment details',
-        })
-      }
-    }
-
-    fetchAdjustment()
-  }, [searchParams, setSearchParams])
-
-  useEffect(() => {
-    const selectedAdvanceJournalEntries =
-      location.state?.selectedAdvanceJournalEntries || []
-
-    if (selectedAdvanceJournalEntries.length > 0) {
-      setInitialJournalEntries(selectedAdvanceJournalEntries)
-      setIsAdding(true)
-      navigate(location.pathname, { replace: true, state: {} })
-    }
-  }, [location.state, navigate, location.pathname])
-
-  useEffect(() => {
-    const close = connectRealtime({
-      onMessage: (type, data) => {
-        if (type === 'adjustment_created' && data?.adjustment) {
-          prependAdjustment(data.adjustment)
-        }
-      },
-      onError: (err) => console.error('Adjustment realtime error', err),
-    })
-
-    return close
-  }, [prependAdjustment, refetchAdjustments])
-
-  // Check if user has access to enable checkboxes
-  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
-  const accessLevel = getAccessLevel('adjustments', user)
-  const enableCheckboxes =
-    accessLevel === 'Check Access' ||
-    accessLevel === 'Approve Access' ||
-    accessLevel === 'Edit Access' ||
-    accessLevel === 'Full Access'
-
-  // Determine checkbox condition based on access level
-  const checkboxCondition = enableCheckboxes
-    ? accessLevel === 'Full Access'
-      ? { column: 'status', value: 'APPROVED', exclude: true } // Exclude APPROVED state for Full Access
-      : {
-          column: 'status',
-          value:
-            accessLevel === 'Check Access'
-              ? 'PREPARED'
-              : accessLevel === 'Approve Access'
-                ? 'CHECKED'
-                : 'CHECKED',
-        }
-    : null
-
-  // Filter adjustments based on active card filter
-  const getFilteredAdjustments = () => {
-    if (!activeFilter) return adjustments
-
-    switch (activeFilter) {
-      case 'PREPARED':
-        return adjustments?.filter((a) => a.status === 'PREPARED') || []
-      case 'CHECKED':
-        return adjustments?.filter((a) => a.status === 'CHECKED') || []
-      case 'CANCELLED':
-        return adjustments?.filter((a) => a.status === 'CANCELLED') || []
-      case 'APPROVED':
-        return adjustments?.filter((a) => a.status === 'APPROVED') || []
-      case 'REJECTED':
-        return adjustments?.filter((a) => a.status === 'REJECTED') || []
-      default:
-        return adjustments
-    }
-  }
-
-  const filteredAdjustments = getFilteredAdjustments()
-
-  // Calculate totals based on filtered data
-  const getFilteredTotalAmount = () => {
-    return filteredAdjustments?.reduce((sum, a) => sum + (parseFloat(a.total_amount) || 0), 0) || 0
-  }
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-  }
-
-  const actionButtons = [
-    {
-      label: 'View',
-      icon: Eye,
-      onClick: (adjustment) => {
-        setViewingAdjustment(adjustment)
-        setIsViewing(true)
-      },
-    },
-    {
-      label: 'Edit',
-      icon: Edit,
-      onClick: (adjustment) => {
-        setViewingAdjustment(adjustment)
-        setIsAdding(true)
-      },
-    },
-    {
-      label: 'Delete',
-      icon: Trash2,
-      onClick: (adjustment) => {
-        // Handle delete
-        setToast({
-          type: 'warning',
-          message: 'Delete functionality not implemented yet',
-        })
-      },
-    },
-  ]
-
-  const badgeColumns = [
-    {
-      column: 'status',
-      values: {
-        PREPARED: 'yellow',
-        CHECKED: 'blue',
-        APPROVED: 'green',
-        REJECTED: 'red',
-        CANCELLED: 'orange',
-      },
-    },
-  ]
-
-  const checkboxActions = [
-    {
-      label: 'Approve',
-      icon: CheckCircle,
-      onClick: async (selectedIds) => {
-        setToast({
-          type: 'success',
-          message: `${selectedIds.length} adjustment(s) approved`,
-        })
-        refetchAdjustments()
-      },
-      color: 'text-green-600 hover:bg-green-50',
-      condition: accessLevel === 'Full Access',
-    },
-    {
-      label: 'Reject',
-      icon: XCircle,
-      onClick: async (selectedIds) => {
-        setToast({
-          type: 'warning',
-          message: `${selectedIds.length} adjustment(s) rejected`,
-        })
-        refetchAdjustments()
-      },
-      color: 'text-red-600 hover:bg-red-50',
-      condition: accessLevel === 'Full Access',
-    },
-  ]
-
-  const handleBack = () => {
-    setIsAdding(false)
-    setIsViewing(false)
-    setIsEditing(false)
-    setIsPostedEdit(false)
-    setViewingAdjustment(null)
-    setInitialJournalEntries([])
   }
 
   if (isAdding)
@@ -316,11 +88,7 @@ function AdjustmentsContent() {
           adjustmentData={isEditing ? viewingAdjustment : null}
           initialJournalEntries={initialJournalEntries}
           onBack={handleBack}
-          onSuccess={async (nextToast) => {
-            if (nextToast) setToast(nextToast)
-            await refetchAdjustments()
-            handleBack()
-          }}
+          onSuccess={handleFormSuccess}
         />
       </RouteProtection>
     )
@@ -331,10 +99,7 @@ function AdjustmentsContent() {
         <AdjustmentsForm
           isViewMode={true}
           adjustmentData={viewingAdjustment}
-          onBack={() => {
-            setIsViewing(false)
-            setViewingAdjustment(null)
-          }}
+          onBack={closeViewing}
         />
       </RouteProtection>
     )
@@ -360,18 +125,13 @@ function AdjustmentsContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={() => setToast(null)}
+          onClose={closeToast}
         />
       )}
       <DynamicConfirmModal
         isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-        onConfirm={() => {
-          if (confirmModal.onConfirm) {
-            confirmModal.onConfirm()
-          }
-          setConfirmModal({ ...confirmModal, isOpen: false })
-        }}
+        onClose={closeConfirmModal}
+        onConfirm={confirmAndClose}
         title={confirmModal.title}
         message={confirmModal.message}
         type="warning"
@@ -379,9 +139,9 @@ function AdjustmentsContent() {
 
       <SequenceSettingsModal
         isOpen={isSequenceModalOpen}
-        onClose={() => setIsSequenceModalOpen(false)}
+        onClose={closeSequenceModal}
         module="adjustments"
-        onSaved={() => setToast({ type: 'success', message: 'Sequence updated. New documents will use it.' })}
+        onSaved={handleSequenceSaved}
       />
 
       {/* --- HEADER SECTION --- */}
@@ -405,7 +165,7 @@ function AdjustmentsContent() {
 
           <div className="flex flex-col md:flex-row md:items-center gap-3">
             <button
-              onClick={() => setIsSequenceModalOpen(true)}
+              onClick={openSequenceModal}
               className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm"
             >
               <ListStart size={14} />
@@ -417,7 +177,7 @@ function AdjustmentsContent() {
             </button>
             <ProtectedAction routeName="adjustments">
               <button
-                onClick={() => setIsAdding(true)}
+                onClick={startAdding}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
                 <FilePlus size={14} />
@@ -492,7 +252,7 @@ function AdjustmentsContent() {
   />
   <SummaryTile
     label="Total Amount"
-    value={`₱ ${getFilteredTotalAmount().toLocaleString('en-PH', {
+    value={`₱ ${filteredTotalAmount.toLocaleString('en-PH', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }) || '0.00'}`}
@@ -529,132 +289,15 @@ function AdjustmentsContent() {
           actionButtons={[
             {
               label: 'View',
-              onClick: async (row) => {
-                try {
-
-                  const token = sessionStorage.getItem('authenticated')
-                  if (!token) {
-                    throw new Error('No authentication token found')
-                  }
-
-                  const response = await fetch(
-                    API.adjustmentsById(row.id),
-                    {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                    },
-                  )
-
-                  const result = await response.json()
-
-                  if (!response.ok) {
-                    throw new Error(
-                      result.message || 'Failed to fetch adjustment details',
-                    )
-                  }
-
-                  setViewingAdjustment(result)
-                  setIsViewing(true)
-                  markReadForDocument('adjustments', [row.id])
-                } catch (error) {
-                  console.error('Error fetching adjustment details:', error)
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch adjustment details',
-                  })
-                }
-              },
+              onClick: handleViewAdjustment,
             },
             {
               label: 'Edit',
-              onClick: async (row) => {
-                try {
-
-                  setIsPostedEdit(isPostedDocument(row.status))
-
-                  const token = sessionStorage.getItem('authenticated')
-                  if (!token) {
-                    throw new Error('No authentication token found')
-                  }
-
-                  const response = await fetch(
-                    API.adjustmentsById(row.id),
-                    {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                    },
-                  )
-
-                  const result = await response.json()
-
-                  if (!response.ok) {
-                    throw new Error(
-                      result.message || 'Failed to fetch adjustment details',
-                    )
-                  }
-
-                  setViewingAdjustment(result)
-                  setIsEditing(true)
-                  setIsAdding(true)
-                  markReadForDocument('adjustments', [row.id])
-                } catch (error) {
-                  console.error(
-                    'Error fetching adjustment details for editing:',
-                    error,
-                  )
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch adjustment details',
-                  })
-                }
-              },
+              onClick: handleEditAdjustment,
             },
             {
               label: 'Reverse',
-              onClick: (row) => {
-                if (!isPostedDocument(row.status)) {
-                  setToast({
-                    type: 'error',
-                    message: `Only APPROVED/POSTED adjustments can be reversed (current: ${row.status}).`,
-                  })
-                  return
-                }
-
-                setConfirmModal({
-                  isOpen: true,
-                  onConfirm: async () => {
-                    try {
-                      const reversed = await createReversal({
-                        dbName: 'adjustments',
-                        dbId: row.id,
-                        remarks: 'Reversal initiated from the Adjustments module',
-                      })
-                      setToast({
-                        type: 'success',
-                        message: reversed.message || 'Reversal created',
-                      })
-                      markReadForDocument('adjustments', [row.id])
-                      navigate('/adjustments')
-                      await refetchAdjustments()
-                    } catch (error) {
-                      console.error('Error creating adjustment reversal:', error)
-                      setToast({
-                        type: 'error',
-                        message: error.message || 'Failed to create reversal',
-                      })
-                    }
-                  },
-                  title: 'Reverse Adjustment',
-                  message: `Create a REVERSAL against ADJUSTMENT ${row.id}? The original transaction stays unchanged; the reversal (DR/CR mirrored) is created as a PREPARED adjustment and must be approved before it posts to the general journal.`,
-                  type: 'danger',
-                })
-              },
+              onClick: handleReverseAdjustment,
             },
           ]}
           badgeColumns={[
@@ -672,157 +315,12 @@ function AdjustmentsContent() {
           checkboxActions={[
             {
               label: 'Approve Selected',
-              onClick: async (selectedRows) => {
-                const approvableRows = selectedRows.filter(
-                  (row) => row.status === 'PREPARED' || row.status === 'CHECKED',
-                )
-
-                if (approvableRows.length === 0) {
-                  setToast({
-                    type: 'error',
-                    message: 'No adjustments are eligible for approval',
-                  })
-                  return
-                }
-
-                setConfirmModal({
-                  isOpen: true,
-                  onConfirm: async () => {
-                    try {
-
-                      const token = sessionStorage.getItem('authenticated')
-                      if (!token) {
-                        throw new Error('No authentication token found')
-                      }
-
-                      const updates = approvableRows.map((row) => ({
-                        id: row.id,
-                        currentState: row.status,
-                      }))
-
-                      const response = await fetch(
-                        API.adjustmentsState(),
-                        {
-                          method: 'PUT',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: `Bearer ${token}`,
-                          },
-                          body: JSON.stringify({ updates }),
-                        },
-                      )
-
-                      const result = await response.json()
-
-                      if (!response.ok) {
-                        throw new Error(
-                          result.message || 'Failed to approve adjustments',
-                        )
-                      }
-
-                      // Refresh adjustments data
-                      await refetchAdjustments()
-
-                      setToast({
-                        type: 'success',
-                        message:
-                          result.message ||
-                          `                          ${approvableRows.length} adjustment(s) approved successfully`,
-                      })
-                      markReadForDocument(
-                        'adjustments',
-                        approvableRows.map((row) => row.id),
-                      )
-                    } catch (error) {
-                      console.error('Error approving adjustments:', error)
-                      setToast({
-                        type: 'error',
-                        message: error.message || 'Failed to approve adjustments',
-                      })
-                    }
-                  },
-                  title: 'Approve Adjustments',
-                  message: `Are you sure you want to approve ${approvableRows.length} adjustment(s)?`,
-                })
-              },
+              onClick: handleApproveSelected,
             },
             {
               label: 'Cancel Selected',
               style: 'orange',
-              onClick: async (selectedRows) => {
-                const cancellableRows = selectedRows.filter(
-                  (row) => row.status !== 'CANCELLED' && row.status !== 'REJECTED' && row.status !== 'APPROVED',
-                )
-
-                if (cancellableRows.length === 0) {
-                  setToast({
-                    type: 'error',
-                    message: 'No adjustments are eligible for cancellation',
-                  })
-                  return
-                }
-
-                setConfirmModal({
-                  isOpen: true,
-                  onConfirm: async () => {
-                    try {
-
-                      const token = sessionStorage.getItem('authenticated')
-                      if (!token) {
-                        throw new Error('No authentication token found')
-                      }
-
-                      const updates = cancellableRows.map((row) => ({
-                        id: row.id,
-                        currentState: row.status,
-                      }))
-
-                      const response = await fetch(
-                        API.adjustmentsCancelState(),
-                        {
-                          method: 'PUT',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: `Bearer ${token}`,
-                          },
-                          body: JSON.stringify({ updates }),
-                        },
-                      )
-
-                      const result = await response.json()
-
-                      if (!response.ok) {
-                        throw new Error(
-                          result.message || 'Failed to cancel adjustments',
-                        )
-                      }
-
-                      // Refresh adjustments data
-                      await refetchAdjustments()
-
-                      setToast({
-                        type: 'success',
-                        message:
-                          result.message ||
-                          `                          ${cancellableRows.length} adjustment(s) cancelled successfully`,
-                      })
-                      markReadForDocument(
-                        'adjustments',
-                        cancellableRows.map((row) => row.id),
-                      )
-                    } catch (error) {
-                      console.error('Error cancelling adjustments:', error)
-                      setToast({
-                        type: 'error',
-                        message: error.message || 'Failed to cancel adjustments',
-                      })
-                    }
-                  },
-                  title: 'Cancel Adjustments',
-                  message: `Are you sure you want to cancel ${cancellableRows.length} adjustment(s)?`,
-                  type: 'danger',
-                })
-              },
+              onClick: handleCancelSelected,
             },
           ]}
           enableInfiniteScroll={true}

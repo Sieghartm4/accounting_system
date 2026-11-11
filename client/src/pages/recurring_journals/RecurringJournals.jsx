@@ -1,38 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
   FilePlus,
-  ArrowLeft,
-  Plus,
-  Eye,
-  Edit,
-  Trash2,
-  FileText,
   Download,
   CheckCircle,
-  XCircle,
-  Clock,
-  AlertCircle,
-  Layers,
-  ShieldCheck,
-  Wallet,
-  ArrowRight,
   Repeat,
   Calendar,
   Play,
   Zap,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import DynamicToast from '../../components/DynamicToast'
-import DynamicConfirmModal from '../../components/DynamicConfirmModal'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
+import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
+import { ProtectedAction, RouteProtection } from '../../components/access'
 import useRecurringJournals from './useRecurringJournals'
 import RecurringJournalsForm from './RecurringJournalsForm'
-import { getAccessLevel } from '../../utils/routeProtection'
-import LoadingScreen from '../../components/LoadingScreen'
-import connectRealtime from '../../utils/realtimeSocket'
 
 export default function RecurringJournals() {
   return (
@@ -49,70 +29,32 @@ function RecurringJournalsContent() {
     loadingMore,
     error,
     hasMore,
-    fetchTemplateById,
-    createTemplate,
-    updateTemplate,
-    deleteTemplate,
-    generateTemplate,
-    generateAllDue,
-    prependTemplate,
-    refetchTemplates,
+    isAdding,
+    startAdding,
+    isViewing,
+    isEditing,
+    viewingTemplate,
+    handleBack,
+    handleFormSuccess,
+    closeViewing,
+    toast,
+    closeToast,
+    confirmModal,
+    closeConfirmModal,
+    confirmAndClose,
+    activeTemplates,
+    dueTemplates,
+    handleGenerateAllDue,
+    handleViewTemplate,
+    handleEditTemplate,
+    handleGenerateTemplate,
+    handleDeleteTemplate,
     loadMore,
   } = useRecurringJournals()
-  const location = useLocation()
-  const navigate = useNavigate()
-  const [isAdding, setIsAdding] = useState(false)
-  const [isViewing, setIsViewing] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [viewingTemplate, setViewingTemplate] = useState(null)
-  const [toast, setToast] = useState(null)
-  const [confirmModal, setConfirmModal] = useState({
-    isOpen: false,
-    onConfirm: null,
-    title: '',
-    message: '',
-  })
-
-  useEffect(() => {
-    const close = connectRealtime({
-      onMessage: (type) => {
-        // Recurring journals generate adjustments, and the scheduler reports
-        // both, so either event means the template list is stale.
-        if (type === 'adjustment_created' || type === 'recurring_journal_generated') {
-          refetchTemplates()
-        }
-      },
-      onError: (err) => console.error('Recurring journal realtime error', err),
-    })
-
-    return close
-  }, [refetchTemplates])
-
-  // Check if user has access to enable checkboxes
-  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
-  const accessLevel = getAccessLevel('recurring_journals', user)
-  const enableCheckboxes =
-    accessLevel === 'Check Access' ||
-    accessLevel === 'Approve Access' ||
-    accessLevel === 'Edit Access' ||
-    accessLevel === 'Full Access'
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-  }
-
-  const handleBack = () => {
-    setIsAdding(false)
-    setIsViewing(false)
-    setIsEditing(false)
-    setViewingTemplate(null)
-  }
-
-  const handleSuccess = (toastMessage) => {
-    setToast(toastMessage)
-    handleBack()
-    refetchTemplates()
   }
 
   if (isAdding)
@@ -122,10 +64,7 @@ function RecurringJournalsContent() {
           isEditMode={isEditing}
           templateData={isEditing ? viewingTemplate : null}
           onBack={handleBack}
-          onSuccess={async (nextToast) => {
-            if (nextToast) setToast(nextToast)
-            await refetchTemplates()
-          }}
+          onSuccess={handleFormSuccess}
         />
       </RouteProtection>
     )
@@ -136,10 +75,7 @@ function RecurringJournalsContent() {
         <RecurringJournalsForm
           isViewMode={true}
           templateData={viewingTemplate}
-          onBack={() => {
-            setIsViewing(false)
-            setViewingTemplate(null)
-          }}
+          onBack={closeViewing}
         />
       </RouteProtection>
     )
@@ -159,29 +95,19 @@ function RecurringJournalsContent() {
     )
   }
 
-  const activeTemplates = templates.filter((t) => t.status === 'ACTIVE')
-  const dueTemplates = templates.filter(
-    (t) => t.status === 'ACTIVE' && t.next_due_date && new Date(t.next_due_date) <= new Date(),
-  )
-
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
       {toast && (
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={() => setToast(null)}
+          onClose={closeToast}
         />
       )}
       <DynamicConfirmModal
         isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-        onConfirm={() => {
-          if (confirmModal.onConfirm) {
-            confirmModal.onConfirm()
-          }
-          setConfirmModal({ ...confirmModal, isOpen: false })
-        }}
+        onClose={closeConfirmModal}
+        onConfirm={confirmAndClose}
         title={confirmModal.title}
         message={confirmModal.message}
         type="warning"
@@ -208,21 +134,7 @@ function RecurringJournalsContent() {
 
           <div className="flex flex-col md:flex-row md:items-center gap-3">
             <button
-              onClick={async () => {
-                try {
-                  const result = await generateAllDue()
-                  setToast({
-                    type: 'success',
-                    message: result.message || 'Generated all due recurring journals',
-                  })
-                  refetchTemplates()
-                } catch (error) {
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to generate due journals',
-                  })
-                }
-              }}
+              onClick={handleGenerateAllDue}
               className="flex items-center gap-2 px-5 py-3 bg-blue-600 border border-blue-700 text-xs font-bold text-white rounded-xl hover:bg-blue-700 transition-all shadow-sm"
             >
               <Play size={14} />
@@ -234,7 +146,7 @@ function RecurringJournalsContent() {
             </button>
             <ProtectedAction routeName="recurring_journals">
               <button
-                onClick={() => setIsAdding(true)}
+                onClick={startAdding}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
                 <FilePlus size={14} />
@@ -297,84 +209,21 @@ function RecurringJournalsContent() {
           actionButtons={[
             {
               label: 'View',
-              icon: Eye,
-              onClick: async (row) => {
-                try {
-                  const result = await fetchTemplateById(row.id)
-                  setViewingTemplate(result)
-                  setIsViewing(true)
-                } catch (error) {
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch template details',
-                  })
-                }
-              },
+              onClick: handleViewTemplate,
             },
             {
               label: 'Edit',
-              icon: Edit,
-              onClick: async (row) => {
-                try {
-                  const result = await fetchTemplateById(row.id)
-                  setViewingTemplate(result)
-                  setIsEditing(true)
-                  setIsAdding(true)
-                } catch (error) {
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch template details',
-                  })
-                }
-              },
+              onClick: handleEditTemplate,
             },
             {
               label: 'Generate',
-              icon: Zap,
               color: 'text-blue-600 hover:bg-blue-50',
-              onClick: async (row) => {
-                try {
-                  const result = await generateTemplate(row.id)
-                  setToast({
-                    type: 'success',
-                    message: result.message || 'Generated occurrences successfully',
-                  })
-                  refetchTemplates()
-                } catch (error) {
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to generate occurrences',
-                  })
-                }
-              },
+              onClick: handleGenerateTemplate,
             },
             {
               label: 'Delete',
-              icon: Trash2,
               color: 'text-red-600 hover:bg-red-50',
-              onClick: (row) => {
-                setConfirmModal({
-                  isOpen: true,
-                  onConfirm: async () => {
-                    try {
-                      await deleteTemplate(row.id)
-                      setToast({
-                        type: 'success',
-                        message: 'Template deleted successfully',
-                      })
-                      refetchTemplates()
-                    } catch (error) {
-                      setToast({
-                        type: 'error',
-                        message: error.message || 'Failed to delete template',
-                      })
-                    }
-                  },
-                  title: 'Delete Template',
-                  message: `Are you sure you want to delete template "${row.name}"? This will also delete all associated items and generation history.`,
-                  type: 'danger',
-                })
-              },
+              onClick: handleDeleteTemplate,
             },
           ]}
           badgeColumns={[

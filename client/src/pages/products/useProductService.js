@@ -1,10 +1,35 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { API } from '../../api/endpoints'
+import { objectsToCsv, downloadCsv } from '../../utils/csv'
+
+const EMPTY_FORM = {
+  code: '',
+  name: '',
+  type: '',
+  category: '',
+  sales_price: '',
+  purchase_price: '',
+  unit: '',
+}
 
 const useProductService = () => {
   const [productService, setProductService] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingProductService, setEditingProductService] = useState(null)
+  const [formData, setFormData] = useState(EMPTY_FORM)
+  const [toast, setToast] = useState(null)
+  const [syncModalOpen, setSyncModalOpen] = useState(false)
+  const [syncPreviewItems, setSyncPreviewItems] = useState([])
+  const [syncCategories, setSyncCategories] = useState([])
+  const [selectedCategoryKeys, setSelectedCategoryKeys] = useState(new Set())
+  const [selectedSyncItems, setSelectedSyncItems] = useState(new Set())
+  const [syncSearchTerm, setSyncSearchTerm] = useState('')
+  const [syncPreviewLoading, setSyncPreviewLoading] = useState(false)
+
+  const showToast = (type, message) => setToast({ type, message })
 
   const fetchProductService = async () => {
     try {
@@ -283,6 +308,238 @@ const useProductService = () => {
     }
   }
 
+  // Inventory-sync preview wiring.
+  const loadSyncPreview = async () => {
+    try {
+      setSyncPreviewLoading(true)
+      const result = await previewProductServiceSync()
+      if (result.success) {
+        setSyncPreviewItems(result.data || [])
+        setSyncCategories(result.categories || [])
+        setSelectedCategoryKeys(new Set())
+        setSelectedSyncItems(new Set())
+        setSyncSearchTerm('')
+        setSyncModalOpen(true)
+      } else {
+        showToast('error', result.message || 'Failed to load inventory preview')
+      }
+    } catch (err) {
+      showToast('error', err.message || 'Failed to load inventory preview')
+    } finally {
+      setSyncPreviewLoading(false)
+    }
+  }
+
+  const closeSyncModal = () => setSyncModalOpen(false)
+
+  const handleSyncImport = async () => {
+    const selected = syncPreviewItems.filter((item) =>
+      selectedSyncItems.has(String(item.code)),
+    )
+    if (selected.length === 0) {
+      showToast('error', 'Select at least one item to import')
+      return
+    }
+
+    const result = await importProductService(selected)
+    if (result.success) {
+      showToast(
+        'success',
+        result.message || 'Selected inventory items imported successfully',
+      )
+      setSyncModalOpen(false)
+      setSelectedSyncItems(new Set())
+      setSelectedCategoryKeys(new Set())
+      setSyncPreviewItems([])
+    } else {
+      showToast('error', result.message || 'Failed to import selected items')
+    }
+  }
+
+  // Sync-preview filtering and selection.
+  const filteredSyncPreviewItems = useMemo(() => {
+    const term = syncSearchTerm.trim().toLowerCase()
+    return syncPreviewItems.filter((item) => {
+      if (!term) return true
+      return [item.code, item.name, item.category, item.sourceCompanyName]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term))
+    })
+  }, [syncPreviewItems, syncSearchTerm])
+
+  const visibleSyncItems = useMemo(
+    () =>
+      filteredSyncPreviewItems.filter(
+        (item) =>
+          selectedCategoryKeys.size === 0 ||
+          selectedCategoryKeys.has(item.category),
+      ),
+    [filteredSyncPreviewItems, selectedCategoryKeys],
+  )
+
+  const allVisibleSyncKeys = useMemo(
+    () => visibleSyncItems.map((item) => String(item.code)),
+    [visibleSyncItems],
+  )
+
+  const allSyncChecked =
+    allVisibleSyncKeys.length > 0 &&
+    allVisibleSyncKeys.every((key) => selectedSyncItems.has(key))
+
+  const someSyncChecked = allVisibleSyncKeys.some((key) =>
+    selectedSyncItems.has(key),
+  )
+
+  const handleToggleAllVisibleRows = () => {
+    setSelectedSyncItems((prev) => {
+      const next = new Set(prev)
+      if (allSyncChecked) {
+        allVisibleSyncKeys.forEach((key) => next.delete(key))
+      } else {
+        allVisibleSyncKeys.forEach((key) => next.add(key))
+      }
+      return next
+    })
+  }
+
+  const isCategorySelected = (category) => selectedCategoryKeys.has(category)
+
+  const toggleCategorySelection = (category) => {
+    const nextCategories = new Set(selectedCategoryKeys)
+    const shouldSelect = !nextCategories.has(category)
+    if (shouldSelect) {
+      nextCategories.add(category)
+    } else {
+      nextCategories.delete(category)
+    }
+    setSelectedCategoryKeys(nextCategories)
+
+    setSelectedSyncItems((prev) => {
+      const nextSelected = new Set(prev)
+      syncPreviewItems.forEach((item) => {
+        if (item.category === category) {
+          const key = String(item.code)
+          if (shouldSelect) {
+            nextSelected.add(key)
+          } else {
+            nextSelected.delete(key)
+          }
+        }
+      })
+      return nextSelected
+    })
+  }
+
+  const togglePreviewRow = (item) => {
+    const key = String(item.code)
+    setSelectedSyncItems((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const setSyncSearch = (value) => setSyncSearchTerm(value)
+
+  // Modal + form wiring.
+  const openModal = (productData = null) => {
+    if (productData) {
+      setEditingProductService(productData)
+      setFormData({
+        code: productData.code || '',
+        name: productData.name || '',
+        type: productData.type ? String(productData.type).toLowerCase() : '',
+        category: productData.category || '',
+        sales_price:
+          productData.sales_price !== undefined && productData.sales_price !== null
+            ? productData.sales_price
+            : '',
+        purchase_price:
+          productData.purchase_price !== undefined &&
+          productData.purchase_price !== null
+            ? productData.purchase_price
+            : '',
+        unit: productData.unit || '',
+      })
+    } else {
+      setEditingProductService(null)
+      setFormData(EMPTY_FORM)
+    }
+    setIsModalOpen(true)
+  }
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    setEditingProductService(null)
+  }
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  // Catalog export.
+  const exportCatalog = () => {
+    try {
+      if (!Array.isArray(productService) || productService.length === 0) {
+        showToast('error', 'No products/services to export')
+        return
+      }
+
+      const csvContent = objectsToCsv(productService)
+      downloadCsv(csvContent, `product_catalog_${Date.now()}.csv`)
+      showToast('success', 'Export started')
+    } catch {
+      showToast('error', 'Failed to export CSV')
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      const result = editingProductService
+        ? await updateProductService(
+            editingProductService.id,
+            formData.code,
+            formData.name,
+            formData.type,
+            formData.category,
+            formData.sales_price,
+            formData.purchase_price,
+            formData.unit,
+          )
+        : await createProductService(
+            formData.code,
+            formData.name,
+            formData.type,
+            formData.category,
+            formData.sales_price,
+            formData.purchase_price,
+            formData.unit,
+          )
+
+      if (result.success) {
+        showToast(
+          'success',
+          `Product/Service "${formData.name}" ${editingProductService ? 'updated' : 'created'} successfully!`,
+        )
+        closeModal()
+      } else {
+        showToast(
+          'error',
+          result.message ||
+            `Failed to ${editingProductService ? 'update' : 'create'} product/service`,
+        )
+      }
+    } catch {
+      showToast(
+        'error',
+        `Network error occurred while ${editingProductService ? 'updating' : 'creating'} product/service`,
+      )
+    }
+  }
+
   return {
     productService,
     loading,
@@ -292,6 +549,34 @@ const useProductService = () => {
     syncProductService,
     previewProductServiceSync,
     importProductService,
+    isModalOpen,
+    editingProductService,
+    formData,
+    toast,
+    openModal,
+    closeModal,
+    handleInputChange,
+    exportCatalog,
+    handleSubmit,
+    closeToast: () => setToast(null),
+    syncModalOpen,
+    syncPreviewItems,
+    syncCategories,
+    selectedCategoryKeys,
+    selectedSyncItems,
+    syncSearchTerm,
+    syncPreviewLoading,
+    filteredSyncPreviewItems,
+    allSyncChecked,
+    someSyncChecked,
+    loadSyncPreview,
+    closeSyncModal,
+    setSyncSearch,
+    toggleCategorySelection,
+    togglePreviewRow,
+    isCategorySelected,
+    handleToggleAllVisibleRows,
+    handleSyncImport,
   }
 }
 

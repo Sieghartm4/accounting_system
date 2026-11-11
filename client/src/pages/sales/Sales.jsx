@@ -1,13 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
   FilePlus,
   TrendingUp,
   ShoppingBag,
   ShieldCheck,
-  Zap,
-  ArrowRight,
   Download,
   FileText,
   Building,
@@ -17,22 +14,11 @@ import {
   Wallet,
   ListStart,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import DynamicToast from '../../components/DynamicToast'
-import DynamicConfirmModal from '../../components/DynamicConfirmModal'
-import SequenceSettingsModal from '../../components/SequenceSettingsModal'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
+import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
+import { SequenceSettingsModal } from '../../components/modals'
+import { ProtectedAction, RouteProtection } from '../../components/access'
 import { useSales } from './useSales'
 import SalesForm from './SalesForm'
-import { getAccessLevel } from '../../utils/routeProtection'
-import { generateSalesPDF } from '../../utils/generateSalesPDF'
-import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
-import LoadingScreen from '../../components/LoadingScreen'
-import connectRealtime from '../../utils/realtimeSocket'
-import { API } from '../../api/endpoints'
-import { useNotificationsState } from '../../components/layout/NotificationContext'
-import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Sales() {
   return (
@@ -49,341 +35,62 @@ function SalesContent() {
     loadingMore,
     hasMore,
     error,
-    refetchSales,
+    isAdding,
+    startAdding,
+    closeAdding,
+    isEditing,
+    editingSales,
+    isPostedEdit,
+    closeEditing,
+    isViewing,
+    viewingSales,
+    closeViewing,
+    handleFormSuccess,
+    toast,
+    closeToast,
+    isSequenceModalOpen,
+    openSequenceModal,
+    closeSequenceModal,
+    handleSequenceSaved,
+    pendingDateFrom,
+    pendingDateTo,
+    setPendingDateFrom,
+    setPendingDateTo,
+    activeDateFrom,
+    activeDateTo,
+    applyDateFilters,
+    clearDateFilters,
+    confirmModal,
+    closeConfirmModal,
+    confirmAndClose,
+    unreadRowMap,
+    enableCheckboxes,
+    activeFilter,
+    setActiveFilter,
+    filteredSales,
+    filteredTotalAmount,
+    fetchAndDownloadPDF,
+    handleApproveSelected,
+    handleCancelSelected,
+    handleViewSales,
+    handleEditSales,
+    handleReverseSales,
     loadMore,
-    prependSales,
   } = useSales()
-  const { markReadForDocument, items: notificationItems } = useNotificationsState()
-  const unreadRowMap = useMemo(
-    () => buildUnreadDocCounts(notificationItems, 'sales'),
-    [notificationItems],
-  )
-  const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const [isAdding, setIsAdding] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isPostedEdit, setIsPostedEdit] = useState(false)
-  const [editingSales, setEditingSales] = useState(null)
-  const [isViewing, setIsViewing] = useState(false)
-  const [viewingSales, setViewingSales] = useState(null)
-  const [toast, setToast] = useState(null)
-  const [isSequenceModalOpen, setIsSequenceModalOpen] = useState(false)
-  const [pendingDateFrom, setPendingDateFrom] = useState('')
-  const [pendingDateTo, setPendingDateTo] = useState('')
-  const [activeDateFrom, setActiveDateFrom] = useState(null)
-  const [activeDateTo, setActiveDateTo] = useState(null)
-  const [confirmModal, setConfirmModal] = useState({
-    isOpen: false,
-    onConfirm: null,
-    title: '',
-    message: '',
-  })
-  const [activeFilter, setActiveFilter] = useState(null)
-
-  useEffect(() => {
-    const id = searchParams.get('id')
-    if (!id) return
-
-    const fetchSales = async () => {
-      try {
-        const token = sessionStorage.getItem('authenticated')
-        if (!token) throw new Error('No authentication token found')
-
-        const response = await fetch(
-          API.salesById(id),
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        )
-
-        const result = await response.json()
-        if (!response.ok)
-          throw new Error(result.message || 'Failed to fetch sales details')
-
-        setViewingSales(result)
-        setIsViewing(true)
-        markReadForDocument('sales', [id])
-        setSearchParams(
-          (prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('id')
-            return next
-          },
-          { replace: true },
-        )
-      } catch (err) {
-        setToast({
-          type: 'error',
-          message: err.message || 'Failed to fetch sales details',
-        })
-      }
-    }
-
-    fetchSales()
-  }, [searchParams, setSearchParams])
-
-  useEffect(() => {
-    const close = connectRealtime({
-      onMessage: (type, data) => {
-        if (type === 'sales_created' && data?.sale) {
-          prependSales(data.sale)
-        }
-      },
-      onError: (err) => console.error('Sales realtime error', err),
-    })
-
-    return close
-  }, [prependSales])
-
-  // Check if user has access to enable checkboxes
-  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
-  const accessLevel = getAccessLevel('sales', user)
-  const enableCheckboxes =
-    accessLevel === 'Check Access' ||
-    accessLevel === 'Approve Access' ||
-    accessLevel === 'Edit Access' ||
-    accessLevel === 'Full Access'
 
   const checkboxCondition = null // Always show checkboxes (match Receipts behavior)
-
-  // Filter sales based on active card filter
-  const getFilteredSales = () => {
-    if (!activeFilter) return sales
-
-    switch (activeFilter) {
-      case 'PREPARED':
-        return sales?.filter((s) => s.state === 'PREPARED') || []
-      case 'CHECKED':
-        return sales?.filter((s) => s.state === 'CHECKED') || []
-      case 'CANCELLED':
-        return sales?.filter((s) => s.state === 'CANCELLED') || []
-      case 'APPROVED':
-        return sales?.filter((s) => s.state === 'APPROVED') || []
-      default:
-        return sales
-    }
-  }
-
-  const filteredSales = getFilteredSales()
-
-  // Calculate totals based on filtered data
-  const getFilteredTotalAmount = () => {
-    return filteredSales?.reduce((sum, s) => sum + (parseFloat(s.amount_due) || 0), 0) || 0
-  }
-
-  const applyDateFilters = async () => {
-    const from = pendingDateFrom || null
-    const to = pendingDateTo || null
-    setActiveDateFrom(from)
-    setActiveDateTo(to)
-    await refetchSales({ dateFrom: from, dateTo: to })
-  }
-
-  const clearDateFilters = async () => {
-    setPendingDateFrom('')
-    setPendingDateTo('')
-    setActiveDateFrom(null)
-    setActiveDateTo(null)
-    await refetchSales({ dateFrom: null, dateTo: null })
-  }
-
-  // ─── Helper: fetch full sales data then download as PDF ─────────────────
-  const fetchAndDownloadPDF = async (selectedRows, copyType) => {
-    try {
-      const token = sessionStorage.getItem('authenticated')
-      if (!token) throw new Error('No authentication token found')
-
-      const salesIds = selectedRows
-        .map((row) => encodeURIComponent(String(row.id)))
-        .join(',')
-
-      const response = await fetch(
-        `${API.salesPrint(salesIds)}?copyType=${copyType}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      const result = await response.json()
-      if (!response.ok)
-        throw new Error(result.message || 'Failed to fetch sales for printing')
-
-      const data = result.data || []
-      if (!Array.isArray(data))
-        throw new Error('Invalid data format received from server')
-
-      await generateSalesPDF(data, copyType)
-
-      setToast({
-        type: 'success',
-        message: `${data.length} sales PDF(s) downloaded (${copyType === 'customer' ? 'Customer' : 'Internal'} Copy)`,
-      })
-    } catch (error) {
-      console.error('Error generating sales PDF:', error)
-      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' })
-    }
-  }
 
   // Function to filter checkbox actions based on selected rows
   const getFilteredCheckboxActions = (selectedRows) => {
     const allActions = [
       {
         label: 'Approve Selected',
-        onClick: async (selectedRows) => {
-          const validRows = selectedRows.filter(
-            (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
-          )
-
-          if (validRows.length === 0) {
-            setToast({
-              type: 'warning',
-              message:
-                'Only PREPARED or CHECKED sales can be bulk approved. Please select valid rows.',
-            })
-            return
-          }
-
-          setConfirmModal({
-            isOpen: true,
-            onConfirm: async () => {
-              try {
-
-                const token = sessionStorage.getItem('authenticated')
-                if (!token) {
-                  throw new Error('No authentication token found')
-                }
-
-                const updates = validRows.map((row) => ({
-                  id: row.id,
-                  currentState: row.state,
-                }))
-
-                const response = await fetch(
-                  API.salesState(),
-                  {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ updates }),
-                  },
-                )
-
-                const result = await response.json()
-
-                if (!response.ok) {
-                  throw new Error(result.message || 'Failed to approve sales')
-                }
-
-                await refetchSales()
-
-                setToast({
-                  type: 'success',
-                  message:
-                    result.message ||
-                    `${validRows.length} sale(s) approved successfully`,
-                })
-                markReadForDocument(
-                  'sales',
-                  validRows.map((row) => row.id),
-                )
-              } catch (error) {
-                console.error('Error approving sales:', error)
-                setToast({
-                  type: 'error',
-                  message: error.message || 'Failed to approve sales',
-                })
-              }
-            },
-            title: 'Approve Sales',
-            message: `Are you sure you want to approve ${validRows.length} sale(s)?`,
-          })
-        },
+        onClick: handleApproveSelected,
       },
       {
         label: 'Cancel Selected',
         style: 'orange',
-        onClick: async (selectedRows) => {
-          const validRows = selectedRows.filter(
-            (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
-          )
-
-          if (validRows.length === 0) {
-            setToast({
-              type: 'warning',
-              message:
-                'Only sales not already CANCELLED, REJECTED or APPROVED can be cancelled. Please select valid rows.',
-            })
-            return
-          }
-
-          setConfirmModal({
-            isOpen: true,
-            onConfirm: async () => {
-              try {
-
-                const token = sessionStorage.getItem('authenticated')
-                if (!token) {
-                  throw new Error('No authentication token found')
-                }
-
-                const updates = validRows.map((row) => ({
-                  id: row.id,
-                  currentState: row.state,
-                }))
-
-                const response = await fetch(
-                  API.salesCancelState(),
-                  {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ updates }),
-                  },
-                )
-
-                const result = await response.json()
-
-                if (!response.ok) {
-                  throw new Error(result.message || 'Failed to cancel sales')
-                }
-
-                await refetchSales()
-
-                setToast({
-                  type: 'success',
-                  message:
-                    result.message ||
-                    `${validRows.length} sale(s) cancelled successfully`,
-                })
-                markReadForDocument(
-                  'sales',
-                  validRows.map((row) => row.id),
-                )
-              } catch (error) {
-                console.error('Error cancelling sales:', error)
-                setToast({
-                  type: 'error',
-                  message: error.message || 'Failed to cancel sales',
-                })
-              }
-            },
-            title: 'Cancel Sales',
-            message: `Are you sure you want to cancel ${validRows.length} sale(s)?`,
-            type: 'danger',
-          })
-        },
+        onClick: handleCancelSelected,
       },
       {
         separator: true,
@@ -426,12 +133,8 @@ function SalesContent() {
     return (
       <RouteProtection routeName="sales">
         <SalesForm
-          onBack={() => setIsAdding(false)}
-          onSuccess={async (nextToast) => {
-            if (nextToast) setToast(nextToast)
-            await refetchSales()
-            setIsAdding(false)
-          }}
+          onBack={closeAdding}
+          onSuccess={handleFormSuccess}
         />
       </RouteProtection>
     )
@@ -444,16 +147,8 @@ function SalesContent() {
           isEditMode={true}
           isPostedLocked={isPostedEdit}
           salesData={editingSales}
-          onBack={() => {
-            setIsEditing(false)
-            setIsPostedEdit(false)
-          }}
-          onSuccess={async (nextToast) => {
-            if (nextToast) setToast(nextToast)
-            await refetchSales()
-            setIsEditing(false)
-            setIsPostedEdit(false)
-          }}
+          onBack={closeEditing}
+          onSuccess={handleFormSuccess}
         />
       </RouteProtection>
     )
@@ -464,12 +159,8 @@ function SalesContent() {
         <SalesForm
           isViewMode={true}
           salesData={viewingSales}
-          onBack={() => setIsViewing(false)}
-          onSuccess={async (nextToast) => {
-            if (nextToast) setToast(nextToast)
-            await refetchSales()
-            setIsViewing(false)
-          }}
+          onBack={closeViewing}
+          onSuccess={handleFormSuccess}
         />
       </RouteProtection>
     )
@@ -495,18 +186,13 @@ function SalesContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={() => setToast(null)}
+          onClose={closeToast}
         />
       )}
       <DynamicConfirmModal
         isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-        onConfirm={() => {
-          if (confirmModal.onConfirm) {
-            confirmModal.onConfirm()
-          }
-          setConfirmModal({ ...confirmModal, isOpen: false })
-        }}
+        onClose={closeConfirmModal}
+        onConfirm={confirmAndClose}
         title={confirmModal.title}
         message={confirmModal.message}
         type="warning"
@@ -514,19 +200,13 @@ function SalesContent() {
 
       <SequenceSettingsModal
         isOpen={isSequenceModalOpen}
-        onClose={() => setIsSequenceModalOpen(false)}
+        onClose={closeSequenceModal}
         module="sales"
-        onSaved={() => setToast({ type: 'success', message: 'Sequence updated. New documents will use it.' })}
+        onSaved={handleSequenceSaved}
       />
 
       {/* --- HEADER SECTION --- */}
       <div className="shrink-0">
-        {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          <span>Commerce</span>
-          <ArrowRight size={10} />
-          <span className="text-black">Sales Performance</span>
-        </nav> */}
-
         <motion.div
           initial="hidden"
           animate="visible"
@@ -542,14 +222,11 @@ function SalesContent() {
                 Sales <span className="text-red-600 italic">Order</span>
               </h1>
             </div>
-            {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
-              Monitor real-time sales transactions and commercial volume.
-            </p> */}
           </div>
 
           <div className="flex flex-col md:flex-row md:items-center gap-3">
             <button
-              onClick={() => setIsSequenceModalOpen(true)}
+              onClick={openSequenceModal}
               className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm"
             >
               <ListStart size={14} />
@@ -561,7 +238,7 @@ function SalesContent() {
             </button>
             <ProtectedAction routeName="sales">
               <button
-                onClick={() => setIsAdding(true)}
+                onClick={startAdding}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
                 <FilePlus size={14} />
@@ -636,7 +313,7 @@ function SalesContent() {
           />
           <SummaryTile
             label="Total Amount Due"
-            value={`₱ ${getFilteredTotalAmount().toLocaleString('en-PH', {
+            value={`₱ ${filteredTotalAmount.toLocaleString('en-PH', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               }) || '0.00'}`}
@@ -673,130 +350,15 @@ function SalesContent() {
           actionButtons={[
             {
               label: 'View',
-              onClick: async (row) => {
-                try {
-
-                  const token = sessionStorage.getItem('authenticated')
-                  if (!token) {
-                    throw new Error('No authentication token found')
-                  }
-
-                  const response = await fetch(
-                    API.salesById(row.id),
-                    {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                    },
-                  )
-
-                  const result = await response.json()
-
-                  if (!response.ok) {
-                    throw new Error(
-                      result.message || 'Failed to fetch sales details',
-                    )
-                  }
-
-                  // Set sales data for viewing
-                  setViewingSales(result)
-                  setIsViewing(true)
-                  markReadForDocument('sales', [row.id])
-                } catch (error) {
-                  console.error('Error fetching sales details:', error)
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch sales details',
-                  })
-                }
-              },
+              onClick: handleViewSales,
             },
             {
               label: 'Edit',
-              onClick: async (row) => {
-                try {
-
-                  setIsPostedEdit(isPostedDocument(row.state))
-
-                  const token = sessionStorage.getItem('authenticated')
-                  if (!token) {
-                    throw new Error('No authentication token found')
-                  }
-
-                  const response = await fetch(
-                    API.salesById(row.id),
-                    {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                    },
-                  )
-
-                  const result = await response.json()
-
-                  if (!response.ok) {
-                    throw new Error(
-                      result.message || 'Failed to fetch sales details',
-                    )
-                  }
-
-                  // Set sales data for editing
-                  setEditingSales(result)
-                  setIsEditing(true)
-                  markReadForDocument('sales', [row.id])
-                } catch (error) {
-                  console.error('Error fetching sales details for editing:', error)
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch sales details',
-                  })
-                }
-              },
+              onClick: handleEditSales,
             },
             {
               label: 'Reverse',
-              onClick: (row) => {
-                if (!isPostedDocument(row.state)) {
-                  setToast({
-                    type: 'error',
-                    message: `Only APPROVED/POSTED transactions can be reversed (current: ${row.state}).`,
-                  })
-                  return
-                }
-
-                setConfirmModal({
-                  isOpen: true,
-                  onConfirm: async () => {
-                    try {
-                      const reversed = await createReversal({
-                        dbName: 'sales',
-                        dbId: row.id,
-                        remarks: 'Reversal initiated from the Sales module',
-                      })
-                      setToast({
-                        type: 'success',
-                        message: reversed.message || 'Reversal created',
-                      })
-                      markReadForDocument('sales', [row.id])
-                      navigate('/adjustments')
-                      await refetchSales()
-                    } catch (error) {
-                      console.error('Error creating sales reversal:', error)
-                      setToast({
-                        type: 'error',
-                        message: error.message || 'Failed to create reversal',
-                      })
-                    }
-                  },
-                  title: 'Reverse Sales',
-                  message: `Create a REVERSAL for SALES ${row.id}? The original transaction stays unchanged; the reversal (DR/CR mirrored) is created as a PREPARED adjustment and must be approved before it posts to the general journal.`,
-                  type: 'danger',
-                })
-              },
+              onClick: handleReverseSales,
             },
           ]}
           badgeColumns={[

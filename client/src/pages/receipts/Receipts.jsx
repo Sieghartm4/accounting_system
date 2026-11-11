@@ -1,40 +1,24 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
   Receipt,
   FilePlus,
   ShieldCheck,
-  ArrowRight,
   Download,
   Check,
   FileText,
   Building,
-  Layers,
-  Calendar,
   Wallet,
   CheckCircle,
   XCircle,
   ClipboardList,
   ListStart,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import DynamicToast from '../../components/DynamicToast'
-import DynamicConfirmModal from '../../components/DynamicConfirmModal'
-import SequenceSettingsModal from '../../components/SequenceSettingsModal'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
+import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen, SummaryTile } from '../../components/ui'
+import { SequenceSettingsModal } from '../../components/modals'
+import { ProtectedAction, RouteProtection } from '../../components/access'
 import useReceipts from './useReceipts'
 import ReceiptsForm from './ReceiptsForm'
-import { hasRouteAccess, getAccessLevel } from '../../utils/routeProtection'
-import { generateReceiptPDF } from '../../utils/generateReceiptPDF' // <-- import PDF util
-import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
-import LoadingScreen from '../../components/LoadingScreen'
-import connectRealtime from '../../utils/realtimeSocket'
-import SummaryTile from '../../components/SummaryTile'
-import { API } from '../../api/endpoints'
-import { useNotificationsState } from '../../components/layout/NotificationContext'
-import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Receipts() {
   return (
@@ -51,144 +35,47 @@ function ReceiptsContent() {
     loadingMore,
     error,
     hasMore,
-    refetchReceipts,
+    isAdding,
+    startAdding,
+    closeAdding,
+    viewingReceipt,
+    isEditMode,
+    isPostedEdit,
+    closeViewing,
+    handleFormSuccess,
+    toast,
+    closeToast,
+    isSequenceModalOpen,
+    openSequenceModal,
+    closeSequenceModal,
+    handleSequenceSaved,
+    pendingDateFrom,
+    pendingDateTo,
+    setPendingDateFrom,
+    setPendingDateTo,
+    activeDateFrom,
+    activeDateTo,
+    applyDateFilters,
+    clearDateFilters,
+    confirmModal,
+    closeConfirmModal,
+    confirmAndClose,
+    unreadRowMap,
+    enableCheckboxes,
+    activeFilter,
+    setActiveFilter,
+    filteredReceipts,
+    filteredTotalAmount,
+    handleViewReceipt,
+    handleEditReceipt,
+    handleReverseReceipt,
+    handleApproveSelected,
+    handleCancelSelected,
+    fetchAndDownloadPDF,
     loadMore,
-    prependReceipt,
   } = useReceipts()
-  const { markReadForDocument, items: notificationItems } = useNotificationsState()
-  const unreadRowMap = useMemo(
-    () => buildUnreadDocCounts(notificationItems, 'receipts'),
-    [notificationItems],
-  )
-  const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const [isAdding, setIsAdding] = useState(false)
-  const [viewingReceipt, setViewingReceipt] = useState(null)
-  const [isEditMode, setIsEditMode] = useState(false)
-  const [isPostedEdit, setIsPostedEdit] = useState(false)
-  const [toast, setToast] = useState(null)
-  const [isSequenceModalOpen, setIsSequenceModalOpen] = useState(false)
-  const [pendingDateFrom, setPendingDateFrom] = useState('')
-  const [pendingDateTo, setPendingDateTo] = useState('')
-  const [activeDateFrom, setActiveDateFrom] = useState(null)
-  const [activeDateTo, setActiveDateTo] = useState(null)
-  const [confirmModal, setConfirmModal] = useState({
-    isOpen: false,
-    onConfirm: null,
-    title: '',
-    message: '',
-  })
-  const [activeFilter, setActiveFilter] = useState(null)
-
-  const applyDateFilters = async () => {
-    const from = pendingDateFrom || null
-    const to = pendingDateTo || null
-    setActiveDateFrom(from)
-    setActiveDateTo(to)
-    await refetchReceipts({ dateFrom: from, dateTo: to })
-  }
-
-  const clearDateFilters = async () => {
-    setPendingDateFrom('')
-    setPendingDateTo('')
-    setActiveDateFrom(null)
-    setActiveDateTo(null)
-    await refetchReceipts({ dateFrom: null, dateTo: null })
-  }
-
-  useEffect(() => {
-    const id = searchParams.get('id')
-    if (!id) return
-
-    const fetchReceipt = async () => {
-      try {
-        const token = sessionStorage.getItem('authenticated')
-        if (!token) throw new Error('No authentication token found')
-
-        const response = await fetch(
-          API.receiptById(id),
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        )
-
-        const result = await response.json()
-        if (!response.ok)
-          throw new Error(result.message || 'Failed to fetch receipt details')
-
-        setViewingReceipt(result)
-        setIsEditMode(false)
-        markReadForDocument('receipts', [id])
-        setSearchParams(
-          (prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('id')
-            return next
-          },
-          { replace: true },
-        )
-      } catch (err) {
-        setToast({
-          type: 'error',
-          message: err.message || 'Failed to fetch receipt details',
-        })
-      }
-    }
-
-    fetchReceipt()
-  }, [searchParams, setSearchParams])
-
-  useEffect(() => {
-    const close = connectRealtime({
-      onMessage: (type, data) => {
-        if (type === 'receipt_created' && data?.receipt) {
-          prependReceipt(data.receipt)
-        }
-      },
-      onError: (err) => console.error('Receipt realtime error', err),
-    })
-
-    return close
-  }, [prependReceipt])
-
-  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
-  const accessLevel = getAccessLevel('receipts', user)
-  const enableCheckboxes =
-    accessLevel === 'Check Access' ||
-    accessLevel === 'Approve Access' ||
-    accessLevel === 'Edit Access' ||
-    accessLevel === 'Full Access'
 
   const checkboxCondition = null // Always show checkboxes
-
-  // Filter receipts based on active card filter
-  const getFilteredReceipts = () => {
-    if (!activeFilter) return receipts
-
-    switch (activeFilter) {
-      case 'PREPARED':
-        return receipts?.filter((r) => r.state === 'PREPARED') || []
-      case 'CHECKED':
-        return receipts?.filter((r) => r.state === 'CHECKED') || []
-      case 'CANCELLED':
-        return receipts?.filter((r) => r.state === 'CANCELLED') || []
-      case 'APPROVED':
-        return receipts?.filter((r) => r.state === 'APPROVED') || []
-      default:
-        return receipts
-    }
-  }
-
-  const filteredReceipts = getFilteredReceipts()
-
-  // Calculate totals based on filtered data
-  const getFilteredTotalAmount = () => {
-    return filteredReceipts?.reduce((sum, r) => sum + (parseFloat(r.amount_due) || 0), 0) || 0
-  }
 
   // Function to filter checkbox actions based on selected rows' states
   const getFilteredCheckboxActions = (selectedRows) => {
@@ -196,137 +83,12 @@ function ReceiptsContent() {
       {
         label: 'Approve Selected',
         icon: <Check size={14} />,
-        onClick: async (selectedRows) => {
-          const approvableRows = selectedRows.filter(
-            (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
-          )
-
-          if (approvableRows.length === 0) {
-            setToast({
-              type: 'error',
-              message: 'No receipts are eligible for approval',
-            })
-            return
-          }
-
-          setConfirmModal({
-            isOpen: true,
-            onConfirm: async () => {
-              try {
-                const token = sessionStorage.getItem('authenticated')
-                if (!token) throw new Error('No authentication token found')
-
-                const updates = approvableRows.map((row) => ({
-                  id: row.id,
-                  currentState: row.state,
-                }))
-
-                const response = await fetch(
-                  API.receiptState(),
-                  {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ updates }),
-                  },
-                )
-
-                const result = await response.json()
-                if (!response.ok)
-                  throw new Error(result.message || 'Failed to approve receipts')
-
-                await refetchReceipts()
-                setToast({
-                  type: 'success',
-                  message:
-                    result.message ||
-                    `${approvableRows.length} receipt(s) approved successfully`,
-                })
-                markReadForDocument(
-                  'receipts',
-                  approvableRows.map((row) => row.id),
-                )
-              } catch (error) {
-                setToast({
-                  type: 'error',
-                  message: error.message || 'Failed to approve receipts',
-                })
-              }
-            },
-            title: 'Approve Receipts',
-            message: `Are you sure you want to approve ${approvableRows.length} receipt(s)?`,
-          })
-        },
+        onClick: handleApproveSelected,
       },
       {
         label: 'Cancel Selected',
         style: 'orange',
-        onClick: async (selectedRows) => {
-          const cancellableRows = selectedRows.filter(
-            (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
-          )
-
-          if (cancellableRows.length === 0) {
-            setToast({
-              type: 'error',
-              message: 'No receipts are eligible for cancellation',
-            })
-            return
-          }
-
-          setConfirmModal({
-            isOpen: true,
-            onConfirm: async () => {
-              try {
-                const token = sessionStorage.getItem('authenticated')
-                if (!token) throw new Error('No authentication token found')
-
-                const updates = cancellableRows.map((row) => ({
-                  id: row.id,
-                  currentState: row.state,
-                }))
-
-                const response = await fetch(
-                  API.receiptCancelState(),
-                  {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ updates }),
-                  },
-                )
-
-                const result = await response.json()
-                if (!response.ok)
-                  throw new Error(result.message || 'Failed to cancel receipts')
-
-                await refetchReceipts()
-                setToast({
-                  type: 'success',
-                  message:
-                    result.message ||
-                    `${cancellableRows.length} receipt(s) cancelled successfully`,
-                })
-                markReadForDocument(
-                  'receipts',
-                  cancellableRows.map((row) => row.id),
-                )
-              } catch (error) {
-                setToast({
-                  type: 'error',
-                  message: error.message || 'Failed to cancel receipts',
-                })
-              }
-            },
-            title: 'Cancel Receipts',
-            message: `Are you sure you want to cancel ${cancellableRows.length} receipt(s)?`,
-            type: 'danger',
-          })
-        },
+        onClick: handleCancelSelected,
       },
       {
         separator: true,
@@ -369,60 +131,12 @@ function ReceiptsContent() {
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
   }
 
-  // ─── Helper: fetch full receipt data then download as PDF ─────────────────
-  const fetchAndDownloadPDF = async (selectedRows, copyType) => {
-    try {
-      const token = sessionStorage.getItem('authenticated')
-      if (!token) throw new Error('No authentication token found')
-
-      const receiptIds = selectedRows
-        .map((row) => encodeURIComponent(String(row.id)))
-        .join(',')
-
-      const response = await fetch(
-        `${API.receiptPrint(receiptIds)}?copyType=${copyType}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      const result = await response.json()
-      if (!response.ok)
-        throw new Error(result.message || 'Failed to fetch receipts for printing')
-
-      // Extract the actual receipt data from the response
-      const data = result.data || []
-
-      if (!Array.isArray(data))
-        throw new Error('Invalid data format received from server')
-
-      // Generate & auto-download PDFs (one per receipt)
-      await generateReceiptPDF(data, copyType)
-
-      setToast({
-        type: 'success',
-        message: `${data.length} receipt PDF(s) downloaded (${copyType === 'customer' ? 'Customer' : 'Internal'} Copy)`,
-      })
-    } catch (error) {
-      console.error('Error generating receipt PDF:', error)
-      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' })
-    }
-  }
-
   if (isAdding)
     return (
       <RouteProtection routeName="receipts">
         <ReceiptsForm
-          onBack={() => setIsAdding(false)}
-          onSuccess={async (nextToast) => {
-            if (nextToast) setToast(nextToast)
-            await refetchReceipts()
-            setIsAdding(false)
-          }}
+          onBack={closeAdding}
+          onSuccess={handleFormSuccess}
         />
       </RouteProtection>
     )
@@ -435,18 +149,8 @@ function ReceiptsContent() {
           isEditMode={isEditMode}
           isPostedLocked={isPostedEdit}
           receiptData={viewingReceipt}
-          onBack={() => {
-            setViewingReceipt(null)
-            setIsEditMode(false)
-            setIsPostedEdit(false)
-          }}
-          onSuccess={async (nextToast) => {
-            if (nextToast) setToast(nextToast)
-            await refetchReceipts()
-            setViewingReceipt(null)
-            setIsEditMode(false)
-            setIsPostedEdit(false)
-          }}
+          onBack={closeViewing}
+          onSuccess={handleFormSuccess}
         />
       </RouteProtection>
     )
@@ -472,18 +176,13 @@ function ReceiptsContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={() => setToast(null)}
+          onClose={closeToast}
         />
       )}
       <DynamicConfirmModal
         isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-        onConfirm={() => {
-          if (confirmModal.onConfirm) {
-            confirmModal.onConfirm()
-          }
-          setConfirmModal({ ...confirmModal, isOpen: false })
-        }}
+        onClose={closeConfirmModal}
+        onConfirm={confirmAndClose}
         title={confirmModal.title}
         message={confirmModal.message}
         type="warning"
@@ -491,9 +190,9 @@ function ReceiptsContent() {
 
       <SequenceSettingsModal
         isOpen={isSequenceModalOpen}
-        onClose={() => setIsSequenceModalOpen(false)}
+        onClose={closeSequenceModal}
         module="receipts"
-        onSaved={() => setToast({ type: 'success', message: 'Sequence updated. New documents will use it.' })}
+        onSaved={handleSequenceSaved}
       />
 
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
@@ -517,7 +216,7 @@ function ReceiptsContent() {
 
           <div className="flex flex-col md:flex-row md:items-center gap-3">
             <button
-              onClick={() => setIsSequenceModalOpen(true)}
+              onClick={openSequenceModal}
               className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm"
             >
               <ListStart size={14} />
@@ -529,7 +228,7 @@ function ReceiptsContent() {
             </button>
             <ProtectedAction routeName="receipts">
               <button
-                onClick={() => setIsAdding(true)}
+                onClick={startAdding}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
                 <FilePlus size={14} />
@@ -604,7 +303,7 @@ function ReceiptsContent() {
   />
   <SummaryTile
     label="Total Amount Due"
-    value={`₱ ${getFilteredTotalAmount().toLocaleString('en-PH', {
+    value={`₱ ${filteredTotalAmount.toLocaleString('en-PH', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }) || '0.00'}`}
@@ -659,117 +358,15 @@ function ReceiptsContent() {
           actionButtons={[
             {
               label: 'View',
-              onClick: async (row) => {
-                try {
-                  const token = sessionStorage.getItem('authenticated')
-                  if (!token) throw new Error('No authentication token found')
-
-                  const response = await fetch(
-                    API.receiptById(row.id),
-                    {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                    },
-                  )
-
-                  const result = await response.json()
-                  if (!response.ok)
-                    throw new Error(
-                      result.message || 'Failed to fetch receipt details',
-                    )
-
-                  setViewingReceipt(result)
-                  setIsEditMode(false)
-                  markReadForDocument('receipts', [row.id])
-                } catch (error) {
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch receipt details',
-                  })
-                }
-              },
+              onClick: handleViewReceipt,
             },
             {
               label: 'Edit',
-              onClick: async (row) => {
-                try {
-                  const posted = isPostedDocument(row.state)
-                  setIsPostedEdit(posted)
-
-                  const token = sessionStorage.getItem('authenticated')
-                  if (!token) throw new Error('No authentication token found')
-
-                  const response = await fetch(
-                    API.receiptById(row.id),
-                    {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                    },
-                  )
-
-                  const result = await response.json()
-                  if (!response.ok)
-                    throw new Error(
-                      result.message || 'Failed to fetch receipt details',
-                    )
-
-                  setViewingReceipt(result)
-                  setIsEditMode(true)
-                  markReadForDocument('receipts', [row.id])
-                } catch (error) {
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch receipt details',
-                  })
-                }
-              },
+              onClick: handleEditReceipt,
             },
             {
               label: 'Reverse',
-              onClick: (row) => {
-                if (!isPostedDocument(row.state)) {
-                  setToast({
-                    type: 'error',
-                    message: `Only APPROVED/POSTED transactions can be reversed (current: ${row.state}).`,
-                  })
-                  return
-                }
-
-                setConfirmModal({
-                  isOpen: true,
-                  onConfirm: async () => {
-                    try {
-                      const reversed = await createReversal({
-                        dbName: 'receipts',
-                        dbId: row.id,
-                        remarks: 'Reversal initiated from the Receipts module',
-                      })
-                      setToast({
-                        type: 'success',
-                        message: reversed.message || 'Reversal created',
-                      })
-                      markReadForDocument('receipts', [row.id])
-                      navigate('/adjustments')
-                      await refetchReceipts()
-                    } catch (error) {
-                      console.error('Error creating receipt reversal:', error)
-                      setToast({
-                        type: 'error',
-                        message: error.message || 'Failed to create reversal',
-                      })
-                    }
-                  },
-                  title: 'Reverse Receipt',
-                  message: `Create a REVERSAL for RECEIPT ${row.id}? The original transaction stays unchanged; the reversal (DR/CR mirrored) is created as a PREPARED adjustment and must be approved before it posts to the general journal.`,
-                  type: 'danger',
-                })
-              },
+              onClick: handleReverseReceipt,
             },
           ]}
           checkboxActions={getFilteredCheckboxActions([])}

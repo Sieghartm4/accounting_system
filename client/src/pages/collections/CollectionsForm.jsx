@@ -40,9 +40,8 @@ import {
 
 import ReactDOM from 'react-dom'
 
-import DynamicToast from '../../components/DynamicToast'
+import { DynamicToast, RightSideModal } from '../../components/ui'
 
-import RightSideModal from '../../components/RightSideModal'
 
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 

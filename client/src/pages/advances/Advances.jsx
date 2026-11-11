@@ -1,9 +1,7 @@
-import React, { useMemo, useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
-  Download,
   RefreshCcw,
   Hash,
   Calendar,
@@ -12,169 +10,36 @@ import {
   Wallet,
   ClipboardList,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import RouteProtection from '../../components/RouteProtection'
-import useAdvances from './useAdvances'
-import LoadingScreen from '../../components/LoadingScreen'
-import DynamicToast from '../../components/DynamicToast'
-import connectRealtime from '../../utils/realtimeSocket'
-
-const fmt = (value) =>
-  new Intl.NumberFormat('en-PH', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value || 0)
-
-const formatDate = (value) => {
-  if (!value) return ''
-  const date = new Date(value)
-  return date.toLocaleDateString('en-PH', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-  })
-}
+import { DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
+import { RouteProtection } from '../../components/access'
+import useAdvances, { fmt, formatDate } from './useAdvances'
 
 function AdvancesContent() {
-  const [filterStartDate, setFilterStartDate] = useState('')
-  const [filterEndDate, setFilterEndDate] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [expandedGroups, setExpandedGroups] = useState([]) // Group keys open in the detail table.
-  // This was a single key, so opening a second group replaced the first and the
-  // detail table only ever showed the last one clicked. It holds every open key
-  // so several groups stack in the table below.
-  const [selectedAdvances, setSelectedAdvances] = useState([]) // Store selected advances for adjustment
-  const [selectedGroups, setSelectedGroups] = useState([]) // Store selected groups for bulk adjustment
-  const [toast, setToast] = useState(null)
-  const navigate = useNavigate()
   const {
     advances,
+    groupedAdvances,
+    expandedAdvances,
+    expandedGroups,
+    totalDebit,
+    totalCredit,
     loading,
-    loadingMore,
     error,
-    hasMore,
     refreshAdvances,
-    loadMore,
-  } = useAdvances(startDate, endDate)
-
-  // 🟢 ADDED: Socket listener for journal entries creation (use WSS when page is secure)
-  useEffect(() => {
-    const close = connectRealtime({
-      onMessage: (type) => {
-        if (type === 'journal_entries_created') {
-          refreshAdvances()
-        }
-      },
-      onError: (err) => console.error('Advances realtime error', err),
-    })
-
-    return close
-  }, [refreshAdvances])
-
-  const totalDebit = advances.reduce(
-    (sum, entry) => (entry.type === 'DEBIT' ? sum + Number(entry.amount || 0) : sum),
-    0,
-  )
-  const totalCredit = advances.reduce(
-    (sum, entry) =>
-      entry.type === 'CREDIT' ? sum + Number(entry.amount || 0) : sum,
-    0,
-  )
-
-  // Group advances by date and type
-  const groupedAdvances = useMemo(() => {
-    const groups = new Map()
-
-    advances.forEach((advance) => {
-      const dateKey = formatDate(advance.date)
-      const typeKey = advance.type
-      const groupKey = `${dateKey}-${typeKey}`
-
-      if (!groups.has(groupKey)) {
-        groups.set(groupKey, {
-          groupKey,
-          date: dateKey,
-          type: typeKey,
-          totalAmount: 0,
-          advances: []
-        })
-      }
-
-      const group = groups.get(groupKey)
-      group.totalAmount += Number(advance.amount || 0)
-      group.advances.push(advance)
-    })
-
-    return Array.from(groups.values()).sort((a, b) => {
-      // Sort by date descending, then by type
-      const dateA = new Date(a.date)
-      const dateB = new Date(b.date)
-      if (dateA.getTime() !== dateB.getTime()) {
-        return dateB.getTime() - dateA.getTime()
-      }
-      return a.type.localeCompare(b.type)
-    })
-  }, [advances])
-
-  // Every advance belonging to every open group, in the order the groups are
-  // listed. Selecting two groups shows both sets of rows rather than the second
-  // replacing the first.
-  const expandedAdvances = useMemo(
-    () =>
-      groupedAdvances
-        .filter((group) => expandedGroups.includes(group.groupKey))
-        .flatMap((group) => group.advances),
-    [groupedAdvances, expandedGroups],
-  )
-
-  const tableData = advances.map((entry) => ({
-    ...entry,
-    amount_raw: entry.amount,
-    amount: `₱${fmt(entry.amount)}`,
-    date: formatDate(entry.date),
-  }))
-
-  const handleCreateAdjustment = (selectedRows) => {
-    const selectedAdvanceJournalEntries = selectedRows.map((row) => ({
-      ...row,
-      amount: row.amount_raw ?? row.amount,
-    }))
-
-    navigate('/adjustments', {
-      state: {
-        selectedAdvanceJournalEntries,
-      },
-    })
-  }
-
-  const handleBulkCreateAdjustment = (group) => {
-    const selectedAdvanceJournalEntries = group.advances.map((advance) => ({
-      ...advance,
-      amount: Number(advance.amount),
-    }))
-
-    navigate('/adjustments', {
-      state: {
-        selectedAdvanceJournalEntries,
-      },
-    })
-  }
-
-  const handleBulkCreateAdjustmentFromGroups = (selectedGroups) => {
-    const selectedAdvanceJournalEntries = selectedGroups.flatMap((group) =>
-      group.advances.map((advance) => ({
-        ...advance,
-        amount: Number(advance.amount),
-      }))
-    )
-
-    navigate('/adjustments', {
-      state: {
-        selectedAdvanceJournalEntries,
-      },
-    })
-  }
+    filterStartDate,
+    setFilterStartDate,
+    filterEndDate,
+    setFilterEndDate,
+    applyDateFilters,
+    clearDateFilters,
+    toggleGroup,
+    handleGroupsCheckboxChange,
+    handleAdvancesCheckboxChange,
+    handleCreateAdjustment,
+    handleBulkCreateAdjustment,
+    handleBulkCreateAdjustmentFromGroups,
+    toast,
+    closeToast,
+  } = useAdvances()
 
   if (loading)
     return <LoadingScreen label="Loading Advances..." />
@@ -202,7 +67,7 @@ function AdvancesContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={() => setToast(null)}
+          onClose={closeToast}
         />
       )}
       <div className="flex-shrink-0">
@@ -247,21 +112,13 @@ function AdvancesContent() {
               />
             </div>
             <button
-              onClick={() => {
-                setStartDate(filterStartDate)
-                setEndDate(filterEndDate)
-              }}
+              onClick={applyDateFilters}
               className="h-10 px-4 bg-red-600 text-white font-black rounded-xl hover:bg-red-700 tracking-widest"
             >
               Submit
             </button>
             <button
-              onClick={() => {
-                setFilterStartDate('')
-                setFilterEndDate('')
-                setStartDate('')
-                setEndDate('')
-              }}
+              onClick={clearDateFilters}
               className="h-10 px-4 bg-white border border-gray-200 text-[11px] font-black text-black rounded-xl hover:bg-gray-50 uppercase tracking-widest"
             >
               Clear
@@ -330,23 +187,13 @@ function AdvancesContent() {
             enableRowClick={true}
             isLoading={loading}
             returnColumn="groupKey"
-            onRowClick={(groupKey, row) => {
-              const key = row?.groupKey ?? groupKey
-              setExpandedGroups((current) =>
-                current.includes(key)
-                  ? current.filter((k) => k !== key)
-                  : [...current, key],
-              )
-            }}
+            onRowClick={toggleGroup}
             checkboxColumn="groupKey"
-            onCheckboxChange={(selectedIds) => {
-              const selectedRows = groupedAdvances.filter(row => selectedIds.includes(row.groupKey))
-              setSelectedGroups(selectedRows)
-            }}
+            onCheckboxChange={handleGroupsCheckboxChange}
             checkboxActions={[
               {
                 label: 'Create Adjustment',
-                onClick: (selectedRows) => handleBulkCreateAdjustmentFromGroups(selectedRows),
+                onClick: handleBulkCreateAdjustmentFromGroups,
                 style: 'red',
               },
             ]}
@@ -354,7 +201,7 @@ function AdvancesContent() {
               {
                 label: 'Create Adjustment',
                 icon: <ArrowRight size={14} />,
-                onClick: (row) => handleBulkCreateAdjustment(row),
+                onClick: handleBulkCreateAdjustment,
                 style: 'red',
               },
             ]}
@@ -391,19 +238,11 @@ function AdvancesContent() {
             enableActionColumn={false}
             isLoading={loading}
             checkboxColumn="id"
-            onCheckboxChange={(selectedIds) => {
-              // Scoped to the rows actually on screen, so a tick only ever
-              // selects from the open groups - picking one group cannot pick an
-              // advance belonging to another.
-              const selectedRows = expandedAdvances.filter((row) =>
-                selectedIds.includes(row.id),
-              )
-              setSelectedAdvances(selectedRows)
-            }}
+            onCheckboxChange={handleAdvancesCheckboxChange}
             checkboxActions={[
               {
                 label: 'Create Adjustment',
-                onClick: (selectedRows) => handleCreateAdjustment(selectedRows),
+                onClick: handleCreateAdjustment,
                 style: 'red',
               },
             ]}

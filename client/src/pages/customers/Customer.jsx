@@ -1,298 +1,43 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
   Users,
   UserPlus,
   ShieldCheck,
   Search,
-  ArrowRight,
   Download,
-  X,
   Plus,
   Edit2,
   Upload,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import RightSideModal from '../../components/RightSideModal'
-import DynamicToast from '../../components/DynamicToast'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
-import LoadingScreen from '../../components/LoadingScreen'
+import { DynamicTable, DynamicToast, LoadingScreen, RightSideModal, SummaryTile } from '../../components/ui'
+import { ProtectedAction, RouteProtection } from '../../components/access'
 import useCustomer from './useCustomer'
-import SummaryTile from '../../components/SummaryTile'
 
 function CustomerContent() {
-  const { customers, loading, error, createCustomer, updateCustomer, importCustomers } = useCustomer()
-
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingCustomer, setEditingCustomer] = useState(null)
-  const [formData, setFormData] = useState({
-    code: '',
-    name: '',
-    category: '',
-    type: '',
-    address: '',
-    tin: '',
-    details: '',
-    contact: '',
-    status: 'active',
-  })
-  const [toast, setToast] = useState(null)
-  const [importing, setImporting] = useState(false)
+  const {
+    customers,
+    loading,
+    error,
+    isModalOpen,
+    editingCustomer,
+    formData,
+    toast,
+    importing,
+    openModal,
+    closeModal,
+    handleInputChange,
+    handleTinChange,
+    handleContactChange,
+    exportCustomers,
+    importCustomersFromFile,
+    handleSubmit,
+    closeToast,
+  } = useCustomer()
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-  }
-
-  const handleAddCustomerClick = () => {
-    setEditingCustomer(null)
-    setFormData({
-      code: '',
-      name: '',
-      category: '',
-      type: '',
-      address: '',
-      tin: '',
-      details: '',
-      contact: '',
-      status: 'active',
-    })
-    setIsModalOpen(true)
-  }
-
-  const handleEditCustomerClick = (row) => {
-    setEditingCustomer(row)
-    setFormData({
-      code: row.code || '',
-      name: row.name || '',
-      category: row.category || '',
-      type: row.type || '',
-      address: row.address || '',
-      tin: formatTinInput(row.tin || ''),
-      details: row.details || '',
-      contact: row.contact || '',
-      status:
-        row.status?.toLowerCase() === 'inactive'
-          ? 'inactive'
-          : row.status?.toLowerCase() === 'active'
-            ? 'active'
-            : 'active',
-    })
-    setIsModalOpen(true)
-  }
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
-    setEditingCustomer(null)
-  }
-
-  const handleToastClose = () => {
-    setToast(null)
-  }
-
-  const formatTinInput = (value) => {
-    const digits = String(value || '')
-      .replace(/\D/g, '')
-      .slice(0, 14)
-
-    if (digits.length === 0) return ''
-    if (digits.length <= 3) return digits
-
-    const parts = []
-    // 3-3-3-5 format
-    parts.push(digits.slice(0, 3))
-    if (digits.length > 3) parts.push(digits.slice(3, 6))
-    if (digits.length > 6) parts.push(digits.slice(6, 9))
-    if (digits.length > 9) parts.push(digits.slice(9, 14))
-
-    return parts.join('-')
-  }
-
-  const handleExportCustomers = () => {
-    try {
-      if (!customers || customers.length === 0) {
-        setToast({ type: 'error', message: 'No customers to export' })
-        return
-      }
-
-      const headers = ['id', 'code', 'name', 'category', 'type', 'address', 'tin', 'details', 'contact', 'status']
-      const csvRows = []
-      csvRows.push(headers.join(','))
-
-      customers.forEach((row) => {
-        const values = headers.map((h) => {
-          let val = row[h]
-          if (val === null || val === undefined) return ''
-          if (typeof val === 'object') {
-            try {
-              val = JSON.stringify(val)
-            } catch (e) {
-              val = String(val)
-            }
-          }
-          const escaped = String(val).replace(/"/g, '""')
-          return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped
-        })
-        csvRows.push(values.join(','))
-      })
-
-      const csvContent = csvRows.join('\n')
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `customers_${Date.now()}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      setToast({ type: 'success', message: 'Export started' })
-    } catch (err) {
-      setToast({ type: 'error', message: 'Failed to export CSV' })
-    }
-  }
-
-  const parseCSV = (csvText) => {
-    const lines = csvText.trim().split('\n')
-    if (lines.length < 2) return []
-
-    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
-    const exclude = new Set(['id', '_id', 'action'])
-    const validHeaders = headers.filter((h) => !exclude.has(h))
-
-    const customersList = []
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseCSVLine(lines[i])
-      if (values.length !== headers.length) continue
-
-      const customer = {}
-      validHeaders.forEach((header, index) => {
-        customer[header] = values[index]
-      })
-      customersList.push(customer)
-    }
-
-    return customersList
-  }
-
-  const parseCSVLine = (line) => {
-    const result = []
-    let current = ''
-    let inQuotes = false
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i]
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"'
-          i++
-        } else {
-          inQuotes = !inQuotes
-        }
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim())
-        current = ''
-      } else {
-        current += char
-      }
-    }
-    result.push(current.trim())
-    return result
-  }
-
-  const handleImportCustomers = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-      setToast({ type: 'error', message: 'Please select a CSV file' })
-      return
-    }
-
-    setImporting(true)
-    try {
-      const text = await file.text()
-      const customersList = parseCSV(text)
-
-      if (customersList.length === 0) {
-        setToast({ type: 'error', message: 'No valid customers found in CSV' })
-        return
-      }
-
-      const result = await importCustomers(customersList)
-
-      if (result.success) {
-        const { created, updated, errors } = result.data
-        setToast({
-          type: 'success',
-          message: `Import completed: ${created.length} created, ${updated.length} updated${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
-        })
-      } else {
-        setToast({
-          type: 'error',
-          message: result.message || 'Failed to import customers',
-        })
-      }
-    } catch (err) {
-      console.error('Import error:', err)
-      setToast({ type: 'error', message: 'Failed to read CSV file' })
-    } finally {
-      setImporting(false)
-      e.target.value = ''
-    }
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    try {
-      const sanitizedTin = formData.tin.replace(/\D/g, '')
-      const result = editingCustomer
-        ? await updateCustomer(
-            editingCustomer.id,
-            formData.code,
-            formData.name,
-            formData.category,
-            formData.type,
-            formData.address,
-            sanitizedTin,
-            formData.details,
-            formData.contact,
-            formData.status,
-          )
-        : await createCustomer(
-            formData.code,
-            formData.name,
-            formData.category,
-            formData.type,
-            formData.address,
-            sanitizedTin,
-            formData.details,
-            formData.contact,
-          )
-
-      if (result.success) {
-        setToast({
-          type: 'success',
-          message: `Customer "${formData.name}" ${editingCustomer ? 'updated' : 'created'} successfully!`,
-        })
-        setIsModalOpen(false)
-        setEditingCustomer(null)
-      } else {
-        setToast({
-          type: 'error',
-          message:
-            result.message ||
-            `Failed to ${editingCustomer ? 'update' : 'create'} customer`,
-        })
-      }
-    } catch (error) {
-      setToast({
-        type: 'error',
-        message: `Network error occurred while ${editingCustomer ? 'updating' : 'creating'} customer`,
-      })
-    }
   }
 
   if (loading) {
@@ -314,12 +59,6 @@ function CustomerContent() {
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
       {/* --- HEADER SECTION (Fixed height) --- */}
       <div className="flex-shrink-0">
-        {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          <span>Directory</span>
-          <ArrowRight size={10} />
-          <span className="text-black">Customer Masterlist</span>
-        </nav> */}
-
         <motion.div
           initial="hidden"
           animate="visible"
@@ -339,7 +78,7 @@ function CustomerContent() {
 
           <div className="flex gap-3">
             <button
-              onClick={handleExportCustomers}
+              onClick={exportCustomers}
               className="flex items-center gap-2 px-5 py-3 bg-green-600 text-white text-xs font-bold rounded-xl hover:bg-green-700 transition-all shadow-sm"
             >
               <Download size={14} />
@@ -352,7 +91,7 @@ function CustomerContent() {
                 <input
                   type="file"
                   accept=".csv"
-                  onChange={handleImportCustomers}
+                  onChange={importCustomersFromFile}
                   className="hidden"
                   disabled={importing}
                 />
@@ -360,7 +99,7 @@ function CustomerContent() {
             </ProtectedAction>
             <ProtectedAction routeName="customers">
               <button
-                onClick={handleAddCustomerClick}
+                onClick={() => openModal()}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
                 <UserPlus size={14} />
@@ -414,7 +153,7 @@ function CustomerContent() {
           actionButtons={[
             {
               label: 'Edit',
-              onClick: (row) => handleEditCustomerClick(row),
+              onClick: (row) => openModal(row),
               icon: <Edit2 size={16} />,
             },
           ]}
@@ -434,7 +173,7 @@ function CustomerContent() {
       {/* Add Customer Modal */}
       <RightSideModal
         isOpen={isModalOpen}
-        onClose={handleCloseModal}
+        onClose={closeModal}
         title={editingCustomer ? 'Edit Customer' : 'Create New Customer'}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -445,8 +184,9 @@ function CustomerContent() {
               </label>
               <input
                 type="text"
+                name="code"
                 value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter customer code..."
                 required
@@ -459,8 +199,9 @@ function CustomerContent() {
               </label>
               <input
                 type="text"
+                name="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter customer name..."
                 required
@@ -473,10 +214,9 @@ function CustomerContent() {
               </label>
               <input
                 type="text"
+                name="category"
                 value={formData.category}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter category..."
               />
@@ -487,8 +227,9 @@ function CustomerContent() {
                 Type
               </label>
               <select
+                name="type"
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
               >
                 <option value="">Select type...</option>
@@ -506,10 +247,9 @@ function CustomerContent() {
               </label>
               <input
                 type="text"
+                name="address"
                 value={formData.address}
-                onChange={(e) =>
-                  setFormData({ ...formData, address: e.target.value })
-                }
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter address..."
                 required
@@ -523,10 +263,9 @@ function CustomerContent() {
               </label>
               <input
                 type="text"
+                name="tin"
                 value={formData.tin}
-                onChange={(e) =>
-                  setFormData({ ...formData, tin: formatTinInput(e.target.value) })
-                }
+                onChange={handleTinChange}
                 inputMode="numeric"
                 maxLength={18}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
@@ -540,10 +279,9 @@ function CustomerContent() {
                 Details
               </label>
               <textarea
+                name="details"
                 value={formData.details}
-                onChange={(e) =>
-                  setFormData({ ...formData, details: e.target.value })
-                }
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all min-h-[120px]"
                 placeholder="Enter additional details..."
               />
@@ -556,10 +294,9 @@ function CustomerContent() {
               </label>
               <input
                 type="text"
+                name="contact"
                 value={formData.contact}
-                onChange={(e) =>
-                  setFormData({ ...formData, contact: e.target.value.slice(0, 15) })
-                }
+                onChange={handleContactChange}
                 maxLength={15}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter contact number..."
@@ -572,10 +309,9 @@ function CustomerContent() {
                   Status <span className="text-red-600">*</span>
                 </label>
                 <select
+                  name="status"
                   value={formData.status}
-                  onChange={(e) =>
-                    setFormData({ ...formData, status: e.target.value })
-                  }
+                  onChange={handleInputChange}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                   required
                 >
@@ -589,7 +325,7 @@ function CustomerContent() {
           <div className="flex gap-3 pt-4">
             <button
               type="button"
-              onClick={handleCloseModal}
+              onClick={closeModal}
               className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 text-xs font-black rounded-xl hover:bg-gray-200 transition-all uppercase tracking-widest"
             >
               Cancel
@@ -610,7 +346,7 @@ function CustomerContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={handleToastClose}
+          onClose={closeToast}
           duration={4000}
         />
       )}

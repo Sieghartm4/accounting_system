@@ -24,7 +24,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { fetchWithAuth } from '../../utils/api'
-import LoadingScreen from '../../components/LoadingScreen'
+import { LoadingScreen } from '../../components/ui'
 import { API } from '../../api/endpoints'
 
 /* ------------------------------------------------------------------ */

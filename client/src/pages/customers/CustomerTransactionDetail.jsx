@@ -1,10 +1,8 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Users, ArrowLeft, Calendar } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import RouteProtection from '../../components/RouteProtection'
-import DynamicToast from '../../components/DynamicToast'
-import LoadingScreen from '../../components/LoadingScreen'
+import { DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
+import { RouteProtection } from '../../components/access'
 import useCustomerTransactionDetail from './useCustomerTransactionDetail'
 
 const formatCurrency = (value) =>

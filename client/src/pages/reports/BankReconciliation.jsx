@@ -16,8 +16,7 @@ import {
   Lock,
   Activity,
 } from 'lucide-react'
-import DynamicToast from '../../components/DynamicToast'
-import LoadingScreen from '../../components/LoadingScreen'
+import { DynamicToast, LoadingScreen } from '../../components/ui'
 import BankReconciliationDetail from './BankReconciliationDetail'
 import { getItemSection, getItemMeta } from './useBankReconciliation'
 import { API } from '../../api/endpoints'

@@ -16,15 +16,15 @@ import {
 
 } from 'lucide-react';
 
-import RouteProtection from '../../components/RouteProtection';
+import { RouteProtection } from '../../components/access';
 
-import LoadingScreen from '../../components/LoadingScreen';
+import { LoadingScreen } from '../../components/ui';
 
 import { useDashboard, fmt2 } from './useDashboard';
 
 
 
-/* ─── Skeleton shimmer ───────────────────────────────────────────── */
+/* â”€â”€â”€ Skeleton shimmer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function Skeleton({ className = '' }) {
 
@@ -48,9 +48,9 @@ function Skeleton({ className = '' }) {
 
 
 
-/* ─── Animated counter ───────────────────────────────────────────── */
+/* â”€â”€â”€ Animated counter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-function AnimatedNumber({ value, prefix = '₱', decimals = 2 }) {
+function AnimatedNumber({ value, prefix = 'â‚±', decimals = 2 }) {
 
   const [display, setDisplay] = useState(0);
 
@@ -249,7 +249,7 @@ function DashboardContent() {
 
 
 
-        {/* ── TOP HEADER BAR ─────────────────────────────────── */}
+        {/* â”€â”€ TOP HEADER BAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={0}
 
@@ -309,7 +309,7 @@ function DashboardContent() {
 
                 className="text-[12px] font-semibold text-[#111] outline-none bg-transparent cursor-pointer w-28" />
 
-              <span className="text-[9px] text-gray-400">–</span>
+              <span className="text-[9px] text-gray-400">â€“</span>
 
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
 
@@ -343,7 +343,7 @@ function DashboardContent() {
 
 
 
-        {/* ── TICKER / STATUS BAR ─────────────────────────────── */}
+        {/* â”€â”€ TICKER / STATUS BAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={0.5}
 
@@ -361,33 +361,33 @@ function DashboardContent() {
 
               {[
 
-                `Net Income: ₱${fmt2(fh.netIncome)}`,
+                `Net Income: â‚±${fmt2(fh.netIncome)}`,
 
-                `Cash Position: ₱${fmt2(fh.totalCashPosition)}`,
+                `Cash Position: â‚±${fmt2(fh.totalCashPosition)}`,
 
-                `AR: ₱${fmt2(fh.totalReceivables)}`,
+                `AR: â‚±${fmt2(fh.totalReceivables)}`,
 
-                `AP: ₱${fmt2(fh.totalPayables)}`,
+                `AP: â‚±${fmt2(fh.totalPayables)}`,
 
-                `Collections: ₱${fmt2(cf.totalCollections)}`,
+                `Collections: â‚±${fmt2(cf.totalCollections)}`,
 
-                `Disbursements: ₱${fmt2(cf.totalDisbursements)}`,
+                `Disbursements: â‚±${fmt2(cf.totalDisbursements)}`,
 
                 `Total Txns: ${totalTxn}`,
 
-                `Net Income: ₱${fmt2(fh.netIncome)}`,
+                `Net Income: â‚±${fmt2(fh.netIncome)}`,
 
-                `Cash Position: ₱${fmt2(fh.totalCashPosition)}`,
+                `Cash Position: â‚±${fmt2(fh.totalCashPosition)}`,
 
-                `AR: ₱${fmt2(fh.totalReceivables)}`,
+                `AR: â‚±${fmt2(fh.totalReceivables)}`,
 
-                `AP: ₱${fmt2(fh.totalPayables)}`,
+                `AP: â‚±${fmt2(fh.totalPayables)}`,
 
               ].map((item, i) => (
 
                 <span key={i} className="text-[11px] text-gray-300 font-mono">
 
-                  <span className="text-red-500 mr-1">◆</span>{item}
+                  <span className="text-red-500 mr-1">â—†</span>{item}
 
                 </span>
 
@@ -401,7 +401,7 @@ function DashboardContent() {
 
 
 
-        {/* ── SECTION: FINANCIAL HEALTH KPIs ─────────────────── */}
+        {/* â”€â”€ SECTION: FINANCIAL HEALTH KPIs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
         <Label icon={<Activity size={11} />} text="Financial Health" delay={1} />
 
@@ -425,7 +425,7 @@ function DashboardContent() {
 
               title: 'Cash Position', value: fh.totalCashPosition,
 
-              sub: fh.totalCashPosition < 1000 ? 'Critical — review now' : 'Banks + petty + COH',
+              sub: fh.totalCashPosition < 1000 ? 'Critical â€” review now' : 'Banks + petty + COH',
 
               warn: fh.totalCashPosition < 1000, icon: <Wallet size={14} />,
 
@@ -463,7 +463,7 @@ function DashboardContent() {
 
 
 
-        {/* ── CASH POSITION BREAKDOWN + CASH FLOW ─────────────── */}
+        {/* â”€â”€ CASH POSITION BREAKDOWN + CASH FLOW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
         <Label icon={<Wallet size={11} />} text="Cash Breakdown + Flow" delay={6} />
 
@@ -471,7 +471,7 @@ function DashboardContent() {
 
 
 
-          {/* Cash breakdown — takes 1 col */}
+          {/* Cash breakdown â€” takes 1 col */}
 
           <motion.div variants={fadeUp} initial="hidden" animate="show" custom={7}
 
@@ -495,7 +495,7 @@ function DashboardContent() {
 
 
 
-          {/* Cash flow bars — takes 4 cols */}
+          {/* Cash flow bars â€” takes 4 cols */}
 
           <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-3 gap-4 p-4">
 
@@ -515,7 +515,7 @@ function DashboardContent() {
 
 
 
-        {/* ── TRANSACTION VOLUME + DONUT ───────────────────────── */}
+        {/* â”€â”€ TRANSACTION VOLUME + DONUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
         <Label icon={<PieChart size={11} />} text="Transaction Volume" delay={15} />
 
@@ -617,7 +617,7 @@ function DashboardContent() {
 
 
 
-        {/* ── ALERTS ──────────────────────────────────────────── */}
+        {/* â”€â”€ ALERTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
         <Label icon={<AlertTriangle size={11} />} text="Alerts & Red Flags" delay={21} />
 
@@ -625,11 +625,11 @@ function DashboardContent() {
 
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
 
-          <AlertTile type="error"   title="Trial Balance"      detail={`Diff: ₱${fmt2(al.trialBalance?.difference)}`}     active={!al.trialBalance?.balanced} />
+          <AlertTile type="error"   title="Trial Balance"      detail={`Diff: â‚±${fmt2(al.trialBalance?.difference)}`}     active={!al.trialBalance?.balanced} />
 
-          <AlertTile type="error"   title="Balance Sheet"      detail={`Gap: ₱${fmt2(al.balanceSheet?.difference)}`}       active={!al.balanceSheet?.balanced} />
+          <AlertTile type="error"   title="Balance Sheet"      detail={`Gap: â‚±${fmt2(al.balanceSheet?.difference)}`}       active={!al.balanceSheet?.balanced} />
 
-          <AlertTile type="warning" title="Overdue AR"         detail={`${al.overdueReceivables?.count||0} invoices · ₱${fmt2(al.overdueReceivables?.amount)}`} active={(al.overdueReceivables?.count||0)>0} />
+          <AlertTile type="warning" title="Overdue AR"         detail={`${al.overdueReceivables?.count||0} invoices Â· â‚±${fmt2(al.overdueReceivables?.amount)}`} active={(al.overdueReceivables?.count||0)>0} />
 
           <AlertTile type="info"    title="System Status"      detail="All systems operational"                             active={true} forceGood />
 
@@ -637,7 +637,7 @@ function DashboardContent() {
 
 
 
-        {/* ── TRENDS ──────────────────────────────────────────── */}
+        {/* â”€â”€ TRENDS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
         <Label icon={<BarChart3 size={11} />} text="Period Trends" delay={23} />
 
@@ -747,7 +747,7 @@ function DashboardContent() {
 
                   <div className="text-xs font-black text-white font-mono">
 
-                    {fh.totalPayables ? ((fh.totalReceivables||0)/(fh.totalPayables||1)).toFixed(2) : '—'}x
+                    {fh.totalPayables ? ((fh.totalReceivables||0)/(fh.totalPayables||1)).toFixed(2) : 'â€”'}x
 
                   </div>
 
@@ -771,7 +771,7 @@ function DashboardContent() {
 
 
 
-        {/* ── ADJUSTMENTS COUNT (bottom ribbon) ────────────────── */}
+        {/* â”€â”€ ADJUSTMENTS COUNT (bottom ribbon) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={27}
 
@@ -817,11 +817,11 @@ function DashboardContent() {
 
 
 
-/* ═══════════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
    SUB-COMPONENTS
 
-══════════════════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 
 
@@ -1203,7 +1203,7 @@ function NetCashCard({ value, inflow, outflow, delay }) {
 
             <span className="text-gray-600 font-mono">In</span>
 
-            <span className="font-black text-green-400 font-mono">₱{fmt2(inflow)}</span>
+            <span className="font-black text-green-400 font-mono">â‚±{fmt2(inflow)}</span>
 
           </div>
 
@@ -1211,7 +1211,7 @@ function NetCashCard({ value, inflow, outflow, delay }) {
 
             <span className="text-gray-600 font-mono">Out</span>
 
-            <span className="font-black text-red-400 font-mono">₱{fmt2(outflow)}</span>
+            <span className="font-black text-red-400 font-mono">â‚±{fmt2(outflow)}</span>
 
           </div>
 
@@ -1645,7 +1645,7 @@ function RadialGauge({ value = 0, color = '#22c55e' }) {
 
 
 
-/* ── SKELETON ──────────────────────────────────────────────────────── */
+/* â”€â”€ SKELETON â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function DashboardSkeleton() {
 
@@ -1823,7 +1823,7 @@ function CashBreakdownPieChart({ data }) {
 
             <span className="text-[10px] font-black text-[#111111] font-mono">
 
-              ₱{fmt2(item.value)}
+              â‚±{fmt2(item.value)}
 
             </span>
 

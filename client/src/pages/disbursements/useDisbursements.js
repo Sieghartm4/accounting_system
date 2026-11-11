@@ -1,5 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { API } from '../../api/endpoints'
+import { generateDisbursementPDF } from '../../utils/generateDisbursementPDF'
+import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
+import { getAccessLevel } from '../../utils/routeProtection'
+import connectRealtime from '../../utils/realtimeSocket'
+import { useNotificationsState } from '../../components/layout/NotificationContext'
+import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 import {
   getItemResponsibilityCenter,
   getJournalEntryCenter,
@@ -1262,6 +1269,57 @@ const useDisbursements = () => {
   const filterRef = useRef({ dateFrom: null, dateTo: null })
   const LIMIT = 50
 
+  // List-page state.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [isAdding, setIsAdding] = useState(false)
+  const [viewingDisbursement, setViewingDisbursement] = useState(null)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [isPostedEdit, setIsPostedEdit] = useState(false)
+  const [toast, setToast] = useState(null)
+  const [isSequenceModalOpen, setIsSequenceModalOpen] = useState(false)
+  const [pendingDateFrom, setPendingDateFrom] = useState('')
+  const [pendingDateTo, setPendingDateTo] = useState('')
+  const [activeDateFrom, setActiveDateFrom] = useState(null)
+  const [activeDateTo, setActiveDateTo] = useState(null)
+  const [prefillDisbursementData, setPrefillDisbursementData] = useState(null)
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    onConfirm: null,
+    title: '',
+    message: '',
+  })
+  const [activeFilter, setActiveFilter] = useState(null)
+  const { markReadForDocument, items: notificationItems } = useNotificationsState()
+
+  const showToast = (type, message) => setToast({ type, message })
+  const closeToast = () => setToast(null)
+
+  const unreadRowMap = useMemo(
+    () => buildUnreadDocCounts(notificationItems, 'disbursement'),
+    [notificationItems],
+  )
+
+  const openConfirmModal = ({ onConfirm, title, message, type = 'warning' }) =>
+    setConfirmModal({
+      isOpen: true,
+      onConfirm,
+      title,
+      message,
+      type,
+    })
+
+  const closeConfirmModal = () =>
+    setConfirmModal((prev) => ({ ...prev, isOpen: false }))
+
+  const confirmAndClose = () => {
+    if (confirmModal.onConfirm) {
+      confirmModal.onConfirm()
+    }
+    closeConfirmModal()
+  }
+
   useEffect(() => {
     disbursementsRef.current = disbursements
   }, [disbursements])
@@ -1360,6 +1418,433 @@ const useDisbursements = () => {
     refetchDisbursements()
   }, [refetchDisbursements])
 
+  const loadMore = useCallback(
+    (filters = {}) => fetchDisbursements(true, filters),
+    [fetchDisbursements],
+  )
+
+  // Prefill from navigation state (e.g. payable, purchase order).
+  useEffect(() => {
+    const incomingPrefill = location.state?.prefillDisbursementData
+    if (incomingPrefill) {
+      setPrefillDisbursementData(incomingPrefill)
+      setIsAdding(true)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state, navigate, location.pathname])
+
+  // Date filters.
+  const applyDateFilters = async () => {
+    const from = pendingDateFrom || null
+    const to = pendingDateTo || null
+    setActiveDateFrom(from)
+    setActiveDateTo(to)
+    await refetchDisbursements({ dateFrom: from, dateTo: to })
+  }
+
+  const clearDateFilters = async () => {
+    setPendingDateFrom('')
+    setPendingDateTo('')
+    setActiveDateFrom(null)
+    setActiveDateTo(null)
+    await refetchDisbursements({ dateFrom: null, dateTo: null })
+  }
+
+  // Deep-link to a single disbursement (?id=...).
+  useEffect(() => {
+    const id = searchParams.get('id')
+    if (!id) return
+
+    const fetchDisbursement = async () => {
+      try {
+        const token = sessionStorage.getItem('authenticated')
+        if (!token) throw new Error('No authentication token found')
+
+        const response = await fetch(
+          API.cashDisbursementsById(id),
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        )
+
+        const result = await response.json()
+        if (!response.ok)
+          throw new Error(result.message || 'Failed to fetch disbursement details')
+
+        setViewingDisbursement(result)
+        setIsEditMode(false)
+        markReadForDocument('disbursement', [id])
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('id')
+            return next
+          },
+          { replace: true },
+        )
+      } catch (err) {
+        showToast('error', err.message || 'Failed to fetch disbursement details')
+      }
+    }
+
+    fetchDisbursement()
+  }, [searchParams, setSearchParams, markReadForDocument])
+
+  // WebSocket subscription for live disbursement updates.
+  useEffect(() => {
+    const close = connectRealtime({
+      onMessage: (type, data) => {
+        if (type === 'disbursement_created' && data?.disbursement) {
+          prependDisbursement(data.disbursement)
+        }
+      },
+      onError: (err) => console.error('Disbursement realtime error', err),
+    })
+
+    return close
+  }, [prependDisbursement])
+
+  // Access-gated checkbox visibility.
+  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
+  const accessLevel = getAccessLevel('disbursement', user)
+  const enableCheckboxes =
+    accessLevel === 'Check Access' ||
+    accessLevel === 'Approve Access' ||
+    accessLevel === 'Edit Access' ||
+    accessLevel === 'Full Access'
+
+  // Filtering + totals.
+  const filteredDisbursements = useMemo(() => {
+    if (!activeFilter) return disbursements
+
+    switch (activeFilter) {
+      case 'PREPARED':
+        return disbursements?.filter((d) => d.state === 'PREPARED') || []
+      case 'CHECKED':
+        return disbursements?.filter((d) => d.state === 'CHECKED') || []
+      case 'CANCELLED':
+        return disbursements?.filter((d) => d.state === 'CANCELLED') || []
+      case 'APPROVED':
+        return disbursements?.filter((d) => d.state === 'APPROVED') || []
+      default:
+        return disbursements
+    }
+  }, [disbursements, activeFilter])
+
+  const filteredTotalAmount = useMemo(
+    () =>
+      filteredDisbursements?.reduce(
+        (sum, d) => sum + (parseFloat(d.amount_due) || 0),
+        0,
+      ) || 0,
+    [filteredDisbursements],
+  )
+
+  // Sequence modal wiring.
+  const openSequenceModal = () => setIsSequenceModalOpen(true)
+  const closeSequenceModal = () => setIsSequenceModalOpen(false)
+  const handleSequenceSaved = () =>
+    showToast('success', 'Sequence updated. New documents will use it.')
+
+  // PDF generation helper.
+  const fetchAndDownloadPDF = async (selectedRows, copyType) => {
+    try {
+      const token = sessionStorage.getItem('authenticated')
+      if (!token) throw new Error('No authentication token found')
+
+      const disbursementIds = selectedRows
+        .map((row) => encodeURIComponent(String(row.id)))
+        .join(',')
+
+      const response = await fetch(
+        `${API.cashDisbursementsPrint(disbursementIds)}?copyType=${copyType}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      const result = await response.json()
+      if (!response.ok)
+        throw new Error(
+          result.message || 'Failed to fetch disbursements for printing',
+        )
+
+      // Extract the actual disbursement data from the response
+      const data = result.data || []
+
+      if (!Array.isArray(data))
+        throw new Error('Invalid data format received from server')
+
+      // Generate & auto-download PDFs (one per disbursement)
+      await generateDisbursementPDF(data, copyType)
+
+      showToast(
+        'success',
+        `${data.length} disbursement PDF(s) downloaded (${copyType === 'vendor' ? 'Vendor' : 'Internal'} Copy)`,
+      )
+    } catch (err) {
+      console.error('Error generating disbursement PDF:', err)
+      showToast('error', err.message || 'Failed to generate PDF')
+    }
+  }
+
+  // Bulk checkbox actions.
+  const handleApproveSelected = async (selectedRows) => {
+    // Filter to only include approvable rows (PREPARED or CHECKED)
+    const approvableRows = selectedRows.filter(
+      (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
+    )
+
+    if (approvableRows.length === 0) {
+      showToast('error', 'No disbursements are eligible for approval')
+      return
+    }
+
+    openConfirmModal({
+      onConfirm: async () => {
+        try {
+          const token = sessionStorage.getItem('authenticated')
+          if (!token) throw new Error('No authentication token found')
+
+          const updates = approvableRows.map((row) => ({
+            id: row.id,
+            currentState: row.state,
+          }))
+
+          const response = await fetch(
+            API.cashDisbursementsState(),
+            {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ updates }),
+            },
+          )
+
+          const result = await response.json()
+          if (!response.ok)
+            throw new Error(result.message || 'Failed to approve disbursements')
+
+          await refetchDisbursements()
+          showToast(
+            'success',
+            result.message ||
+              `${approvableRows.length} disbursement(s) approved successfully`,
+          )
+          markReadForDocument(
+            'disbursement',
+            approvableRows.map((row) => row.id),
+          )
+        } catch (err) {
+          showToast('error', err.message || 'Failed to approve disbursements')
+        }
+      },
+      title: 'Approve Disbursements',
+      message: `Are you sure you want to approve ${approvableRows.length} disbursement(s)?`,
+    })
+  }
+
+  const handleCancelSelected = async (selectedRows) => {
+    const cancellableRows = selectedRows.filter(
+      (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
+    )
+
+    if (cancellableRows.length === 0) {
+      showToast('error', 'No disbursements are eligible for cancellation')
+      return
+    }
+
+    openConfirmModal({
+      onConfirm: async () => {
+        try {
+          const token = sessionStorage.getItem('authenticated')
+          if (!token) throw new Error('No authentication token found')
+
+          const updates = cancellableRows.map((row) => ({
+            id: row.id,
+            currentState: row.state,
+          }))
+
+          const response = await fetch(
+            API.cashDisbursementsCancelState(),
+            {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ updates }),
+            },
+          )
+
+          const result = await response.json()
+          if (!response.ok)
+            throw new Error(result.message || 'Failed to cancel disbursements')
+
+          await refetchDisbursements()
+          showToast(
+            'success',
+            result.message ||
+              `${cancellableRows.length} disbursement(s) cancelled successfully`,
+          )
+          markReadForDocument(
+            'disbursement',
+            cancellableRows.map((row) => row.id),
+          )
+        } catch (err) {
+          showToast('error', err.message || 'Failed to cancel disbursements')
+        }
+      },
+      title: 'Cancel Disbursements',
+      message: `Are you sure you want to cancel ${cancellableRows.length} disbursement(s)?`,
+      type: 'danger',
+    })
+  }
+
+  // Row actions.
+  const handleViewDisbursement = async (row) => {
+    try {
+      const token = sessionStorage.getItem('authenticated')
+      if (!token) {
+        throw new Error('No authentication token found')
+      }
+
+      const response = await fetch(
+        API.cashDisbursementsById(row.id),
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          result.message || 'Failed to fetch disbursement details',
+        )
+      }
+      // Set disbursement data for viewing
+      setViewingDisbursement(result)
+      setIsEditMode(false)
+      markReadForDocument('disbursement', [row.id])
+    } catch (err) {
+      console.error('Error fetching disbursement details:', err)
+      showToast('error', err.message || 'Failed to fetch disbursement details')
+    }
+  }
+
+  const handleEditDisbursement = async (row) => {
+    try {
+      setIsPostedEdit(isPostedDocument(row.state))
+
+      const token = sessionStorage.getItem('authenticated')
+      if (!token) {
+        throw new Error('No authentication token found')
+      }
+
+      const response = await fetch(
+        API.cashDisbursementsById(row.id),
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          result.message || 'Failed to fetch disbursement details',
+        )
+      }
+
+      // Set disbursement data for editing (edit mode)
+      setViewingDisbursement(result)
+      setIsEditMode(true)
+      markReadForDocument('disbursement', [row.id])
+    } catch (err) {
+      console.error(
+        'Error fetching disbursement details for editing:',
+        err,
+      )
+      showToast('error', err.message || 'Failed to fetch disbursement details')
+    }
+  }
+
+  const handleReverseDisbursement = (row) => {
+    if (!isPostedDocument(row.state)) {
+      showToast(
+        'error',
+        `Only APPROVED/POSTED transactions can be reversed (current: ${row.state}).`,
+      )
+      return
+    }
+
+    openConfirmModal({
+      onConfirm: async () => {
+        try {
+          const reversed = await createReversal({
+            dbName: 'cash_disbursements',
+            dbId: row.id,
+            remarks: 'Reversal initiated from the Disbursements module',
+          })
+          showToast('success', reversed.message || 'Reversal created')
+          markReadForDocument('disbursement', [row.id])
+          navigate('/adjustments')
+          await refetchDisbursements()
+        } catch (err) {
+          console.error('Error creating disbursement reversal:', err)
+          showToast('error', err.message || 'Failed to create reversal')
+        }
+      },
+      title: 'Reverse Disbursement',
+      message: `Create a REVERSAL for DISBURSEMENT ${row.id}? The original transaction stays unchanged; the reversal (DR/CR mirrored) is created as a PREPARED adjustment and must be approved before it posts to the general journal.`,
+      type: 'danger',
+    })
+  }
+
+  // Form-return wiring.
+  const closeAdding = () => {
+    setIsAdding(false)
+    setPrefillDisbursementData(null)
+  }
+
+  const handleAddFormSuccess = async (nextToast) => {
+    if (nextToast) setToast(nextToast)
+    setPrefillDisbursementData(null)
+    await refetchDisbursements()
+    setIsAdding(false)
+  }
+
+  const closeViewing = () => {
+    setViewingDisbursement(null)
+    setIsEditMode(false)
+    setIsPostedEdit(false)
+  }
+
+  const handleEditFormSuccess = async (nextToast) => {
+    if (nextToast) setToast(nextToast)
+    await refetchDisbursements()
+    closeViewing()
+  }
+
   return {
     disbursements,
     loading,
@@ -1368,7 +1853,46 @@ const useDisbursements = () => {
     hasMore,
     refetchDisbursements,
     prependDisbursement,
-    loadMore: (filters = {}) => fetchDisbursements(true, filters),
+    loadMore,
+    isAdding,
+    startAdding: () => setIsAdding(true),
+    closeAdding,
+    handleAddFormSuccess,
+    prefillDisbursementData,
+    viewingDisbursement,
+    isEditMode,
+    isPostedEdit,
+    closeViewing,
+    handleEditFormSuccess,
+    toast,
+    closeToast,
+    isSequenceModalOpen,
+    openSequenceModal,
+    closeSequenceModal,
+    handleSequenceSaved,
+    pendingDateFrom,
+    pendingDateTo,
+    setPendingDateFrom,
+    setPendingDateTo,
+    activeDateFrom,
+    activeDateTo,
+    applyDateFilters,
+    clearDateFilters,
+    confirmModal,
+    closeConfirmModal,
+    confirmAndClose,
+    unreadRowMap,
+    enableCheckboxes,
+    activeFilter,
+    setActiveFilter,
+    filteredDisbursements,
+    filteredTotalAmount,
+    fetchAndDownloadPDF,
+    handleApproveSelected,
+    handleCancelSelected,
+    handleViewDisbursement,
+    handleEditDisbursement,
+    handleReverseDisbursement,
   }
 }
 

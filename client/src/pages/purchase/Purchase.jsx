@@ -1,13 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
   FilePlus,
   ShoppingCart,
-  Package,
   ShieldCheck,
-  TrendingDown,
-  ArrowRight,
   Download,
   FileText,
   Building,
@@ -17,22 +13,11 @@ import {
   Wallet,
   ListStart,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import DynamicToast from '../../components/DynamicToast'
-import DynamicConfirmModal from '../../components/DynamicConfirmModal'
-import SequenceSettingsModal from '../../components/SequenceSettingsModal'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
+import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
+import { SequenceSettingsModal } from '../../components/modals'
+import { ProtectedAction, RouteProtection } from '../../components/access'
 import usePurchase from './usePurchase'
 import PurchaseForm from './PurchaseForm'
-import { getAccessLevel } from '../../utils/routeProtection'
-import { generatePurchasePDF } from '../../utils/generatePurchasePDF'
-import { isPostedDocument, createReversal } from '../../utils/journalLifecycle'
-import LoadingScreen from '../../components/LoadingScreen'
-import connectRealtime from '../../utils/realtimeSocket'
-import { API } from '../../api/endpoints'
-import { useNotificationsState } from '../../components/layout/NotificationContext'
-import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
 export default function Purchase() {
   return (
@@ -49,356 +34,65 @@ function PurchaseContent() {
     loadingMore,
     hasMore,
     error,
-    refetchPurchases,
+    isAdding,
+    startAdding,
+    closeAdding,
+    handleAddFormSuccess,
+    prefillPurchaseData,
+    isEditing,
+    isPostedEdit,
+    editingPurchase,
+    closeEditing,
+    handleEditFormSuccess,
+    isViewing,
+    viewingPurchase,
+    closeViewing,
+    handleViewFormSuccess,
+    toast,
+    closeToast,
+    isSequenceModalOpen,
+    openSequenceModal,
+    closeSequenceModal,
+    handleSequenceSaved,
+    pendingDateFrom,
+    pendingDateTo,
+    setPendingDateFrom,
+    setPendingDateTo,
+    activeDateFrom,
+    activeDateTo,
+    applyDateFilters,
+    clearDateFilters,
+    confirmModal,
+    closeConfirmModal,
+    confirmAndClose,
+    unreadRowMap,
+    enableCheckboxes,
+    activeFilter,
+    setActiveFilter,
+    filteredPurchases,
+    filteredTotalAmount,
+    fetchAndDownloadPDF,
+    handleApproveSelected,
+    handleCancelSelected,
+    handleViewPurchase,
+    handleEditPurchase,
+    handleReversePurchase,
     loadMore,
-    prependPurchase,
   } = usePurchase()
-  const { markReadForDocument, items: notificationItems } = useNotificationsState()
-  const unreadRowMap = useMemo(
-    () => buildUnreadDocCounts(notificationItems, 'purchase'),
-    [notificationItems],
-  )
-  const [searchParams, setSearchParams] = useSearchParams()
-
-
-  const [isAdding, setIsAdding] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isPostedEdit, setIsPostedEdit] = useState(false)
-  const [editingPurchase, setEditingPurchase] = useState(null)
-  const [isViewing, setIsViewing] = useState(false)
-  const [viewingPurchase, setViewingPurchase] = useState(null)
-  const [toast, setToast] = useState(null)
-  const [isSequenceModalOpen, setIsSequenceModalOpen] = useState(false)
-  const [pendingDateFrom, setPendingDateFrom] = useState('')
-  const [pendingDateTo, setPendingDateTo] = useState('')
-  const [activeDateFrom, setActiveDateFrom] = useState(null)
-  const [activeDateTo, setActiveDateTo] = useState(null)
-  const [prefillPurchaseData, setPrefillPurchaseData] = useState(null)
-  const [confirmModal, setConfirmModal] = useState({
-    isOpen: false,
-    onConfirm: null,
-    title: '',
-    message: '',
-  })
-  const [activeFilter, setActiveFilter] = useState(null)
-  const location = useLocation()
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    const incomingPrefill = location.state?.prefillPurchaseData
-    if (incomingPrefill) {
-      setPrefillPurchaseData(incomingPrefill)
-      setIsAdding(true)
-      navigate(location.pathname, { replace: true, state: {} })
-    }
-  }, [location.state, navigate, location.pathname])
-
-  useEffect(() => {
-    const id = searchParams.get('id')
-    if (!id) return
-
-    const fetchPurchase = async () => {
-      try {
-        const token = sessionStorage.getItem('authenticated')
-        if (!token) throw new Error('No authentication token found')
-
-        const response = await fetch(
-          API.purchaseById(encodeURIComponent(id)),
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        )
-
-        const result = await response.json()
-        if (!response.ok)
-          throw new Error(result.message || 'Failed to fetch purchase details')
-
-        setViewingPurchase(result)
-        setIsViewing(true)
-        markReadForDocument('purchase', [id])
-        setSearchParams(
-          (prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('id')
-            return next
-          },
-          { replace: true },
-        )
-      } catch (err) {
-        setToast({
-          type: 'error',
-          message: err.message || 'Failed to fetch purchase details',
-        })
-      }
-    }
-
-    fetchPurchase()
-  }, [searchParams, setSearchParams])
-
-  useEffect(() => {
-    const close = connectRealtime({
-      onMessage: (type, data) => {
-        if (type === 'purchase_created' && data?.purchase) {
-          prependPurchase(data.purchase)
-        }
-      },
-      onError: (err) => console.error('Purchase realtime error', err),
-    })
-
-    return close
-  }, [prependPurchase])
-
-  // Check if user has access to enable checkboxes
-  const user = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
-  const accessLevel = getAccessLevel('purchase', user)
-  const enableCheckboxes =
-    accessLevel === 'Check Access' ||
-    accessLevel === 'Approve Access' ||
-    accessLevel === 'Edit Access' ||
-    accessLevel === 'Full Access'
 
   const checkboxCondition = null // Always show checkboxes (match other pages)
-
-  // Filter purchases based on active card filter
-  const getFilteredPurchases = () => {
-    if (!activeFilter) return purchases
-
-    switch (activeFilter) {
-      case 'PREPARED':
-        return purchases?.filter((p) => p.state === 'PREPARED') || []
-      case 'CHECKED':
-        return purchases?.filter((p) => p.state === 'CHECKED') || []
-      case 'CANCELLED':
-        return purchases?.filter((p) => p.state === 'CANCELLED') || []
-      case 'APPROVED':
-        return purchases?.filter((p) => p.state === 'APPROVED') || []
-      default:
-        return purchases
-    }
-  }
-
-  const filteredPurchases = getFilteredPurchases()
-
-  // Calculate totals based on filtered data
-  const getFilteredTotalAmount = () => {
-    return filteredPurchases?.reduce((sum, p) => sum + (parseFloat(p.amount_due) || 0), 0) || 0
-  }
-
-  // ─── Helper: fetch full purchase data then download as PDF ─────────────────
-  const fetchAndDownloadPDF = async (selectedRows, copyType) => {
-    try {
-      const token = sessionStorage.getItem('authenticated')
-      if (!token) throw new Error('No authentication token found')
-
-      const purchaseIds = selectedRows
-        .map((row) => encodeURIComponent(String(row.id)))
-        .join(',')
-
-      const response = await fetch(
-        `${API.purchasePrint(purchaseIds)}?copyType=${copyType}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      const result = await response.json()
-      if (!response.ok)
-        throw new Error(result.message || 'Failed to fetch purchases for printing')
-
-      const data = result.data || []
-      if (!Array.isArray(data))
-        throw new Error('Invalid data format received from server')
-
-      await generatePurchasePDF(data, copyType)
-
-      setToast({
-        type: 'success',
-        message: `${data.length} purchase PDF(s) downloaded (${copyType === 'customer' ? 'Vendor' : 'Internal'} Copy)`,
-      })
-    } catch (error) {
-      console.error('Error generating purchase PDF:', error)
-      setToast({ type: 'error', message: error.message || 'Failed to generate PDF' })
-    }
-  }
-
-  // ─── Date Filter Functions ─────────────────────────────────────────────────
-  const applyDateFilters = () => {
-    setActiveDateFrom(pendingDateFrom)
-    setActiveDateTo(pendingDateTo)
-    refetchPurchases({
-      dateFrom: pendingDateFrom,
-      dateTo: pendingDateTo,
-    })
-  }
-
-  const clearDateFilters = () => {
-    setPendingDateFrom('')
-    setPendingDateTo('')
-    setActiveDateFrom(null)
-    setActiveDateTo(null)
-    refetchPurchases({
-      dateFrom: null,
-      dateTo: null,
-    })
-  }
 
   // Function to filter checkbox actions based on selected rows
   const getFilteredCheckboxActions = (selectedRows) => {
     const allActions = [
       {
         label: 'Approve Selected',
-        onClick: async (selectedRows) => {
-          const approvableRows = selectedRows.filter(
-            (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
-          )
-
-          if (approvableRows.length === 0) {
-            setToast({
-              type: 'error',
-              message: 'No purchases are eligible for approval',
-            })
-            return
-          }
-
-          setConfirmModal({
-            isOpen: true,
-            onConfirm: async () => {
-              try {
-                const approveToken = sessionStorage.getItem('authenticated')
-                if (!approveToken) {
-                  throw new Error('No authentication token found')
-                }
-
-                const updates = approvableRows.map((row) => ({
-                  id: row.id,
-                  currentState: row.state,
-                }))
-
-                const approveResponse = await fetch(
-                  API.purchaseState(),
-                  {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${approveToken}`,
-                    },
-                    body: JSON.stringify({ updates }),
-                  },
-                )
-
-                const approveResult = await approveResponse.json()
-
-                if (!approveResponse.ok) {
-                  throw new Error(approveResult.message || 'Failed to approve purchases')
-                }
-
-                await refetchPurchases()
-
-                setToast({
-                  type: 'success',
-                  message:
-                    approveResult.message ||
-                    `${approvableRows.length} purchase(s) approved successfully`,
-                })
-                markReadForDocument(
-                  'purchase',
-                  approvableRows.map((row) => row.id),
-                )
-              } catch (error) {
-                console.error('Error approving purchases:', error)
-                setToast({
-                  type: 'error',
-                  message: error.message || 'Failed to approve purchases',
-                })
-              }
-            },
-            title: 'Approve Purchases',
-            message: `Are you sure you want to approve ${approvableRows.length} purchase(s)?`,
-          })
-        },
+        onClick: handleApproveSelected,
       },
       {
         label: 'Cancel Selected',
         style: 'orange',
-        onClick: async (selectedRows) => {
-          const cancellableRows = selectedRows.filter(
-            (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
-          )
-
-          if (cancellableRows.length === 0) {
-            setToast({
-              type: 'error',
-              message: 'No purchases are eligible for cancellation',
-            })
-            return
-          }
-
-          setConfirmModal({
-            isOpen: true,
-            onConfirm: async () => {
-              try {
-
-                const cancelToken = sessionStorage.getItem('authenticated')
-                if (!cancelToken) {
-                  throw new Error('No authentication token found')
-                }
-
-                const updates = cancellableRows.map((row) => ({
-                  id: row.id,
-                  currentState: row.state,
-                }))
-
-                const cancelResponse = await fetch(
-                  API.purchaseCancelState(),
-                  {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      Authorization: `Bearer ${cancelToken}`,
-                    },
-                    body: JSON.stringify({ updates }),
-                  },
-                )
-
-                const cancelResult = await cancelResponse.json()
-
-                if (!cancelResponse.ok) {
-                  throw new Error(cancelResult.message || 'Failed to cancel purchases')
-                }
-
-                await refetchPurchases()
-
-                setToast({
-                  type: 'success',
-                  message:
-                    cancelResult.message ||
-                    `${cancellableRows.length} purchase(s) cancelled successfully`,
-                })
-                markReadForDocument(
-                  'purchase',
-                  cancellableRows.map((row) => row.id),
-                )
-              } catch (error) {
-                console.error('Error cancelling purchases:', error)
-                setToast({
-                  type: 'error',
-                  message: error.message || 'Failed to cancel purchases',
-                })
-              }
-            },
-            title: 'Cancel Purchases',
-            message: `Are you sure you want to cancel ${cancellableRows.length} purchase(s)?`,
-            type: 'danger',
-          })
-        },
+        onClick: handleCancelSelected,
       },
       {
         separator: true,
@@ -442,16 +136,8 @@ function PurchaseContent() {
       <RouteProtection routeName="purchase">
         <PurchaseForm
           purchaseData={prefillPurchaseData}
-          onBack={() => {
-            setIsAdding(false)
-            setPrefillPurchaseData(null)
-          }}
-          onSuccess={async (nextToast) => {
-            if (nextToast) setToast(nextToast)
-            setPrefillPurchaseData(null)
-            await refetchPurchases()
-            setIsAdding(false)
-          }}
+          onBack={closeAdding}
+          onSuccess={handleAddFormSuccess}
         />
       </RouteProtection>
     )
@@ -464,16 +150,8 @@ function PurchaseContent() {
           isEditMode={true}
           isPostedLocked={isPostedEdit}
           purchaseData={editingPurchase}
-          onBack={() => {
-            setIsEditing(false)
-            setIsPostedEdit(false)
-          }}
-          onSuccess={async (nextToast) => {
-            if (nextToast) setToast(nextToast)
-            await refetchPurchases()
-            setIsEditing(false)
-            setIsPostedEdit(false)
-          }}
+          onBack={closeEditing}
+          onSuccess={handleEditFormSuccess}
         />
       </RouteProtection>
     )
@@ -484,12 +162,8 @@ function PurchaseContent() {
         <PurchaseForm
           isViewMode={true}
           purchaseData={viewingPurchase}
-          onBack={() => setIsViewing(false)}
-          onSuccess={async (nextToast) => {
-            if (nextToast) setToast(nextToast)
-            await refetchPurchases()
-            setIsViewing(false)
-          }}
+          onBack={closeViewing}
+          onSuccess={handleViewFormSuccess}
         />
       </RouteProtection>
     )
@@ -515,18 +189,13 @@ function PurchaseContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={() => setToast(null)}
+          onClose={closeToast}
         />
       )}
       <DynamicConfirmModal
         isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
-        onConfirm={() => {
-          if (confirmModal.onConfirm) {
-            confirmModal.onConfirm()
-          }
-          setConfirmModal({ ...confirmModal, isOpen: false })
-        }}
+        onClose={closeConfirmModal}
+        onConfirm={confirmAndClose}
         title={confirmModal.title}
         message={confirmModal.message}
         type="warning"
@@ -534,9 +203,9 @@ function PurchaseContent() {
 
       <SequenceSettingsModal
         isOpen={isSequenceModalOpen}
-        onClose={() => setIsSequenceModalOpen(false)}
+        onClose={closeSequenceModal}
         module="purchase"
-        onSaved={() => setToast({ type: 'success', message: 'Sequence updated. New documents will use it.' })}
+        onSaved={handleSequenceSaved}
       />
 
       {/* --- HEADER SECTION --- */}
@@ -569,7 +238,7 @@ function PurchaseContent() {
 
           <div className="flex flex-col md:flex-row md:items-center gap-3">
             <button
-              onClick={() => setIsSequenceModalOpen(true)}
+              onClick={openSequenceModal}
               className="flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 text-xs font-bold text-black rounded-xl hover:bg-gray-50 transition-all shadow-sm"
             >
               <ListStart size={14} />
@@ -581,7 +250,7 @@ function PurchaseContent() {
             </button>
             <ProtectedAction routeName="purchase">
               <button
-                onClick={() => setIsAdding(true)}
+                onClick={startAdding}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
                 <FilePlus size={14} />
@@ -656,7 +325,7 @@ function PurchaseContent() {
           />
           <SummaryTile
             label="Total Amount Due"
-            value={`₱ ${getFilteredTotalAmount().toLocaleString('en-PH', {
+            value={`₱ ${filteredTotalAmount.toLocaleString('en-PH', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               }) || '0.00'}`}
@@ -693,133 +362,15 @@ function PurchaseContent() {
           actionButtons={[
             {
               label: 'View',
-              onClick: async (row) => {
-                try {
-
-                  const authToken = sessionStorage.getItem('authenticated')
-                  if (!authToken) {
-                    throw new Error('No authentication token found')
-                  }
-
-                  const viewResponse = await fetch(
-                    API.purchaseById(encodeURIComponent(row.id)),
-                    {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${authToken}`,
-                      },
-                    },
-                  )
-
-                  const viewResult = await viewResponse.json()
-
-                  if (!viewResponse.ok) {
-                    throw new Error(
-                      viewResult.message || 'Failed to fetch purchase details',
-                    )
-                  }
-
-                  // Set purchase data for viewing
-                  setViewingPurchase(viewResult)
-                  setIsViewing(true)
-                  markReadForDocument('purchase', [row.id])
-                } catch (error) {
-                  console.error('Error fetching purchase details:', error)
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch purchase details',
-                  })
-                }
-              },
+              onClick: handleViewPurchase,
             },
             {
               label: 'Edit',
-              onClick: async (row) => {
-                try {
-
-                  setIsPostedEdit(isPostedDocument(row.state))
-
-                  const authToken = sessionStorage.getItem('authenticated')
-                  if (!authToken) {
-                    throw new Error('No authentication token found')
-                  }
-
-                  const editResponse = await fetch(
-                    API.purchaseById(encodeURIComponent(row.id)),
-                    {
-                      method: 'GET',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${authToken}`,
-                      },
-                    },
-                  )
-
-                  const editResult = await editResponse.json()
-
-                  if (!editResponse.ok) {
-                    throw new Error(
-                      editResult.message || 'Failed to fetch purchase details',
-                    )
-                  }
-
-                  // Set purchase data for editing
-                  setEditingPurchase(editResult)
-                  setIsEditing(true)
-                  markReadForDocument('purchase', [row.id])
-                } catch (error) {
-                  console.error(
-                    'Error fetching purchase details for editing:',
-                    error,
-                  )
-                  setToast({
-                    type: 'error',
-                    message: error.message || 'Failed to fetch purchase details',
-                  })
-                }
-              },
+              onClick: handleEditPurchase,
             },
             {
               label: 'Reverse',
-              onClick: (row) => {
-                if (!isPostedDocument(row.state)) {
-                  setToast({
-                    type: 'error',
-                    message: `Only APPROVED/POSTED transactions can be reversed (current: ${row.state}).`,
-                  })
-                  return
-                }
-
-                setConfirmModal({
-                  isOpen: true,
-                  onConfirm: async () => {
-                    try {
-                      const reversed = await createReversal({
-                        dbName: 'purchase',
-                        dbId: row.id,
-                        remarks: 'Reversal initiated from the Purchase module',
-                      })
-                      setToast({
-                        type: 'success',
-                        message: reversed.message || 'Reversal created',
-                      })
-                      markReadForDocument('purchase', [row.id])
-                      navigate('/adjustments')
-                      await refetchPurchases()
-                    } catch (error) {
-                      console.error('Error creating purchase reversal:', error)
-                      setToast({
-                        type: 'error',
-                        message: error.message || 'Failed to create reversal',
-                      })
-                    }
-                  },
-                  title: 'Reverse Purchase',
-                  message: `Create a REVERSAL for PURCHASE ${row.id}? The original transaction stays unchanged; the reversal (DR/CR mirrored) is created as a PREPARED adjustment and must be approved before it posts to the general journal.`,
-                  type: 'danger',
-                })
-              },
+              onClick: handleReversePurchase,
             },
           ]}
           badgeColumns={[

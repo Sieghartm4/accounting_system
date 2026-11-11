@@ -1,263 +1,32 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { MapPin, Plus, Download, Edit2, ShieldCheck, Clock, Upload } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
-import RightSideModal from '../../components/RightSideModal'
-import DynamicToast from '../../components/DynamicToast'
-import LoadingScreen from '../../components/LoadingScreen'
-import useResponsibilityCenter from './useResponsibilityCenter'
+import { DynamicTable, DynamicToast, LoadingScreen, RightSideModal } from '../../components/ui'
+import { ProtectedAction, RouteProtection } from '../../components/access'
+import useResponsibilityCenter, {
+  STATUS_OPTIONS,
+  DEPARTMENT_OPTIONS,
+} from './useResponsibilityCenter'
 
 function ResponsibilityCenterContent() {
   const {
     responsibilityCenters,
     loading,
     error,
-    createResponsibilityCenter,
-    updateResponsibilityCenter,
-    importResponsibilityCenters,
+    isModalOpen,
+    editingCenter,
+    formData,
+    toast,
+    isSubmitting,
+    importing,
+    openModal,
+    closeModal,
+    handleInputChange,
+    handleSubmit,
+    handleExport,
+    handleImportResponsibilityCenter,
+    closeToast,
   } = useResponsibilityCenter()
-
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingCenter, setEditingCenter] = useState(null)
-  const [formData, setFormData] = useState({
-    id: '',
-    code: '',
-    name: '',
-    department: '',
-    status: 'ACTIVE',
-  })
-  const [toast, setToast] = useState(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [importing, setImporting] = useState(false)
-
-  const statusOptions = ['ACTIVE', 'INACTIVE']
-  const departmentOptions = [
-    { label: 'IT', value: 'IT' },
-    { label: 'CABLING', value: 'CABLING' },
-    { label: 'SHELL', value: 'SHELL' },
-    { label: 'FINANCE', value: 'FINANCE' },
-    { label: 'R&D', value: 'R&D' },
-    { label: 'ADMIN', value: 'ADMIN' },
-    { label: 'PERSONAL', value: 'PERSONAL' },
-    { label: 'SALES', value: 'SALES' },
-  ]
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-
-    let result
-    if (editingCenter) {
-      result = await updateResponsibilityCenter(editingCenter.id, formData)
-    } else {
-      result = await createResponsibilityCenter(formData)
-    }
-
-    if (result.success) {
-      setToast({
-        type: 'success',
-        message: `Responsibility center ${editingCenter ? 'updated' : 'created'} successfully`,
-      })
-      setFormData({
-        id: '',
-        code: '',
-        name: '',
-        department: '',
-        status: 'ACTIVE',
-      })
-      setEditingCenter(null)
-      setIsModalOpen(false)
-    } else {
-      setToast({
-        type: 'error',
-        message:
-          result.error ||
-          `Failed to ${editingCenter ? 'update' : 'create'} responsibility center`,
-      })
-    }
-
-    setIsSubmitting(false)
-  }
-
-  const openModal = (center = null) => {
-    if (center) {
-      setEditingCenter(center)
-      setFormData({
-        id: center.id || '',
-        code: center.code || '',
-        name: center.name || '',
-        department: center.department || '',
-        status: center.status || 'ACTIVE',
-      })
-    } else {
-      setEditingCenter(null)
-      setFormData({
-        id: '',
-        code: '',
-        name: '',
-        department: '',
-        status: 'ACTIVE',
-      })
-    }
-    setIsModalOpen(true)
-  }
-
-  const handleExport = () => {
-    try {
-      if (
-        !Array.isArray(responsibilityCenters) ||
-        responsibilityCenters.length === 0
-      ) {
-        setToast({
-          type: 'error',
-          message: 'No responsibility center data to export',
-        })
-        return
-      }
-
-      const exclude = new Set(['id', '_id', 'action'])
-      const rawHeaders = Object.keys(responsibilityCenters[0] || {})
-      const headers = rawHeaders.filter((h) => !exclude.has(h))
-
-      const csvRows = []
-      csvRows.push(headers.join(','))
-
-      responsibilityCenters.forEach((row) => {
-        const values = headers.map((h) => {
-          let val = row[h]
-          if (val === null || val === undefined) return ''
-          if (typeof val === 'object') {
-            try {
-              val = JSON.stringify(val)
-            } catch (e) {
-              val = String(val)
-            }
-          }
-          const escaped = String(val).replace(/"/g, '""')
-          return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped
-        })
-        csvRows.push(values.join(','))
-      })
-
-      const csvContent = csvRows.join('\n')
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `responsibility_center_${Date.now()}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      setToast({ type: 'success', message: 'Export started' })
-    } catch (err) {
-      setToast({
-        type: 'error',
-        message: 'Failed to export responsibility center data',
-      })
-    }
-  }
-
-  const parseCSV = (csvText) => {
-    const lines = csvText.trim().split('\n')
-    if (lines.length < 2) return []
-
-    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
-    const exclude = new Set(['id', '_id', 'action'])
-    const validHeaders = headers.filter((h) => !exclude.has(h))
-
-    const centers = []
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseCSVLine(lines[i])
-      if (values.length !== headers.length) continue
-
-      const center = {}
-      validHeaders.forEach((header, index) => {
-        center[header] = values[index]
-      })
-      centers.push(center)
-    }
-
-    return centers
-  }
-
-  const parseCSVLine = (line) => {
-    const result = []
-    let current = ''
-    let inQuotes = false
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i]
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"'
-          i++
-        } else {
-          inQuotes = !inQuotes
-        }
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim())
-        current = ''
-      } else {
-        current += char
-      }
-    }
-    result.push(current.trim())
-    return result
-  }
-
-  const handleImportResponsibilityCenter = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-      setToast({ type: 'error', message: 'Please select a CSV file' })
-      return
-    }
-
-    setImporting(true)
-    try {
-      const text = await file.text()
-      const centers = parseCSV(text)
-
-      if (centers.length === 0) {
-        setToast({ type: 'error', message: 'No valid centers found in CSV' })
-        return
-      }
-
-      const result = await importResponsibilityCenters(centers)
-
-      if (result.success) {
-        const { created, updated, errors } = result.data
-        setToast({
-          type: 'success',
-          message: `Import completed: ${created.length} created, ${updated.length} updated${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
-        })
-      } else {
-        setToast({
-          type: 'error',
-          message: result.message || 'Failed to import responsibility centers',
-        })
-      }
-    } catch (err) {
-      console.error('Import error:', err)
-      setToast({ type: 'error', message: 'Failed to read CSV file' })
-    } finally {
-      setImporting(false)
-      e.target.value = ''
-    }
-  }
 
   if (loading) {
     return <LoadingScreen label="Loading Responsibility Center Data..." />
@@ -278,16 +47,18 @@ function ResponsibilityCenterContent() {
     ...item,
   }))
 
+  const fadeInUp = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  }
+
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
       <div className="shrink-0">
         <motion.div
           initial="hidden"
           animate="visible"
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-          }}
+          variants={fadeInUp}
           className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-4"
         >
           <div>
@@ -393,7 +164,7 @@ function ResponsibilityCenterContent() {
 
       <RightSideModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={closeModal}
         title={
           editingCenter
             ? 'Edit Responsibility Center'
@@ -442,12 +213,10 @@ function ResponsibilityCenterContent() {
             <SearchableDropdown
               placeholder="Search or select department"
               value={formData.department}
-              options={departmentOptions}
-              onChange={(value) =>
-                setFormData((prev) => ({ ...prev, department: value }))
-              }
+              options={DEPARTMENT_OPTIONS}
+              onChange={(value) => handleInputChange({ target: { name: 'department', value } })}
               onSelect={(option) =>
-                setFormData((prev) => ({ ...prev, department: option.value }))
+                handleInputChange({ target: { name: 'department', value: option.value } })
               }
               emptyText="No matching departments"
             />
@@ -465,7 +234,7 @@ function ResponsibilityCenterContent() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
                 required
               >
-                {statusOptions.map((status) => (
+                {STATUS_OPTIONS.map((status) => (
                   <option key={status} value={status}>
                     {status}
                   </option>
@@ -477,7 +246,7 @@ function ResponsibilityCenterContent() {
           <div className="flex gap-3 pt-4">
             <button
               type="button"
-              onClick={() => setIsModalOpen(false)}
+              onClick={closeModal}
               className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-50 transition-colors"
             >
               CANCEL
@@ -501,7 +270,7 @@ function ResponsibilityCenterContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={() => setToast(null)}
+          onClose={closeToast}
         />
       )}
     </div>

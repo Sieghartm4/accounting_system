@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React from 'react'
 import { motion } from 'framer-motion'
 import {
   Package,
@@ -11,12 +11,8 @@ import {
   Edit2,
   Search,
 } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import RightSideModal from '../../components/RightSideModal'
-import DynamicToast from '../../components/DynamicToast'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
-import LoadingScreen from '../../components/LoadingScreen'
+import { DynamicTable, DynamicToast, LoadingScreen, RightSideModal } from '../../components/ui'
+import { ProtectedAction, RouteProtection } from '../../components/access'
 import useProductService from './useProductService'
 
 export default function ProductService() {
@@ -32,301 +28,38 @@ function ProductServiceContent() {
     productService,
     loading,
     error,
-    createProductService,
-    updateProductService,
-    syncProductService,
-    previewProductServiceSync,
-    importProductService,
+    isModalOpen,
+    editingProductService,
+    formData,
+    toast,
+    openModal,
+    closeModal,
+    handleInputChange,
+    exportCatalog,
+    handleSubmit,
+    closeToast,
+    syncModalOpen,
+    syncCategories,
+    selectedCategoryKeys,
+    selectedSyncItems,
+    syncSearchTerm,
+    syncPreviewLoading,
+    filteredSyncPreviewItems,
+    allSyncChecked,
+    someSyncChecked,
+    loadSyncPreview,
+    closeSyncModal,
+    setSyncSearch,
+    toggleCategorySelection,
+    togglePreviewRow,
+    isCategorySelected,
+    handleToggleAllVisibleRows,
+    handleSyncImport,
   } = useProductService()
-
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingProductService, setEditingProductService] = useState(null)
-  const [formData, setFormData] = useState({
-    code: '',
-    name: '',
-    type: '',
-    category: '',
-    sales_price: '',
-    purchase_price: '',
-    unit: '',
-  })
-  const [toast, setToast] = useState(null)
-  const [syncModalOpen, setSyncModalOpen] = useState(false)
-  const [syncPreviewItems, setSyncPreviewItems] = useState([])
-  const [syncCategories, setSyncCategories] = useState([])
-  const [selectedCategoryKeys, setSelectedCategoryKeys] = useState(new Set())
-  const [selectedSyncItems, setSelectedSyncItems] = useState(new Set())
-  const [syncSearchTerm, setSyncSearchTerm] = useState('')
-  const [syncPreviewLoading, setSyncPreviewLoading] = useState(false)
-
-  const filteredSyncPreviewItems = useMemo(() => {
-    const term = syncSearchTerm.trim().toLowerCase()
-    return syncPreviewItems.filter((item) => {
-      if (!term) return true
-      return [item.code, item.name, item.category, item.sourceCompanyName]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-    })
-  }, [syncPreviewItems, syncSearchTerm])
-
-  const allVisibleSyncKeys = useMemo(
-    () => filteredSyncPreviewItems.map((item) => String(item.code)),
-    [filteredSyncPreviewItems],
-  )
-
-  const allSyncChecked =
-    allVisibleSyncKeys.length > 0 &&
-    allVisibleSyncKeys.every((key) => selectedSyncItems.has(key))
-
-  const someSyncChecked = allVisibleSyncKeys.some((key) =>
-    selectedSyncItems.has(key),
-  )
-
-  const handleToggleAllVisibleRows = () => {
-    setSelectedSyncItems((prev) => {
-      const next = new Set(prev)
-      if (allSyncChecked) {
-        allVisibleSyncKeys.forEach((key) => next.delete(key))
-      } else {
-        allVisibleSyncKeys.forEach((key) => next.add(key))
-      }
-      return next
-    })
-  }
-
-  const toggleCategorySelection = (category) => {
-    const nextCategories = new Set(selectedCategoryKeys)
-    const shouldSelect = !nextCategories.has(category)
-    if (shouldSelect) {
-      nextCategories.add(category)
-    } else {
-      nextCategories.delete(category)
-    }
-    setSelectedCategoryKeys(nextCategories)
-
-    setSelectedSyncItems((prev) => {
-      const nextSelected = new Set(prev)
-      syncPreviewItems.forEach((item) => {
-        if (item.category === category) {
-          const key = String(item.code)
-          if (shouldSelect) {
-            nextSelected.add(key)
-          } else {
-            nextSelected.delete(key)
-          }
-        }
-      })
-      return nextSelected
-    })
-  }
-
-  const togglePreviewRow = (item) => {
-    const key = String(item.code)
-    setSelectedSyncItems((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-
-  const isCategorySelected = (category) => selectedCategoryKeys.has(category)
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-  }
-
-  const handleAddProductClick = () => {
-    setEditingProductService(null)
-    setFormData({
-      code: '',
-      name: '',
-      type: '',
-      category: '',
-      sales_price: '',
-      purchase_price: '',
-      unit: '',
-    })
-    setIsModalOpen(true)
-  }
-
-  const handleEditProductClick = (row) => {
-    setEditingProductService(row)
-    setFormData({
-      code: row.code || '',
-      name: row.name || '',
-      type: row.type ? String(row.type).toLowerCase() : '',
-      category: row.category || '',
-      sales_price:
-        row.sales_price !== undefined && row.sales_price !== null
-          ? row.sales_price
-          : '',
-      purchase_price:
-        row.purchase_price !== undefined && row.purchase_price !== null
-          ? row.purchase_price
-          : '',
-      unit: row.unit || '',
-    })
-    setIsModalOpen(true)
-  }
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
-    setEditingProductService(null)
-  }
-
-  const handleToastClose = () => {
-    setToast(null)
-  }
-
-  const loadSyncPreview = async () => {
-    try {
-      setSyncPreviewLoading(true)
-      const result = await previewProductServiceSync()
-      if (result.success) {
-        setSyncPreviewItems(result.data || [])
-        setSyncCategories(result.categories || [])
-        setSelectedCategoryKeys(new Set())
-        setSelectedSyncItems(new Set())
-        setSyncSearchTerm('')
-        setSyncModalOpen(true)
-      } else {
-        setToast({
-          type: 'error',
-          message: result.message || 'Failed to load inventory preview',
-        })
-      }
-    } catch (err) {
-      setToast({
-        type: 'error',
-        message: err.message || 'Failed to load inventory preview',
-      })
-    } finally {
-      setSyncPreviewLoading(false)
-    }
-  }
-
-  const handleSyncImport = async () => {
-    const selected = syncPreviewItems.filter((item) =>
-      selectedSyncItems.has(String(item.code)),
-    )
-    if (selected.length === 0) {
-      setToast({ type: 'error', message: 'Select at least one item to import' })
-      return
-    }
-
-    const result = await importProductService(selected)
-    if (result.success) {
-      setToast({
-        type: 'success',
-        message: result.message || 'Selected inventory items imported successfully',
-      })
-      setSyncModalOpen(false)
-      setSelectedSyncItems(new Set())
-      setSelectedCategoryKeys(new Set())
-      setSyncPreviewItems([])
-    } else {
-      setToast({
-        type: 'error',
-        message: result.message || 'Failed to import selected items',
-      })
-    }
-  }
-
-  const handleExportCatalog = () => {
-    try {
-      if (!Array.isArray(productService) || productService.length === 0) {
-        setToast({ type: 'error', message: 'No products/services to export' })
-        return
-      }
-
-      const exclude = new Set(['id', '_id', 'action'])
-      const rawHeaders = Object.keys(productService[0] || {})
-      const headers = rawHeaders.filter((h) => !exclude.has(h))
-
-      const csvRows = []
-      csvRows.push(headers.join(','))
-
-      productService.forEach((row) => {
-        const values = headers.map((h) => {
-          let val = row[h]
-          if (val === null || val === undefined) return ''
-          if (typeof val === 'object') {
-            try {
-              val = JSON.stringify(val)
-            } catch (e) {
-              val = String(val)
-            }
-          }
-          const escaped = String(val).replace(/"/g, '""')
-          return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped
-        })
-        csvRows.push(values.join(','))
-      })
-
-      const csvContent = csvRows.join('\n')
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `product_catalog_${Date.now()}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      setToast({ type: 'success', message: 'Export started' })
-    } catch (err) {
-      setToast({ type: 'error', message: 'Failed to export CSV' })
-    }
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    try {
-      const result = editingProductService
-        ? await updateProductService(
-            editingProductService.id,
-            formData.code,
-            formData.name,
-            formData.type,
-            formData.category,
-            formData.sales_price,
-            formData.purchase_price,
-            formData.unit,
-          )
-        : await createProductService(
-            formData.code,
-            formData.name,
-            formData.type,
-            formData.category,
-            formData.sales_price,
-            formData.purchase_price,
-            formData.unit,
-          )
-
-      if (result.success) {
-        setToast({
-          type: 'success',
-          message: `Product/Service "${formData.name}" ${editingProductService ? 'updated' : 'created'} successfully!`,
-        })
-        setIsModalOpen(false)
-        setEditingProductService(null)
-      } else {
-        setToast({
-          type: 'error',
-          message:
-            result.message ||
-            `Failed to ${editingProductService ? 'update' : 'create'} product/service`,
-        })
-      }
-    } catch (error) {
-      setToast({
-        type: 'error',
-        message: `Network error occurred while ${editingProductService ? 'updating' : 'creating'} product/service`,
-      })
-    }
   }
 
   if (loading) {
@@ -348,12 +81,6 @@ function ProductServiceContent() {
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
       {/* --- HEADER SECTION --- */}
       <div className="flex-shrink-0">
-        {/* <nav className="flex items-center gap-2 mb-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          <span>Masters</span>
-          <ArrowRight size={10} />
-          <span className="text-black">Product & Service Masterlist</span>
-        </nav> */}
-
         <motion.div
           initial="hidden"
           animate="visible"
@@ -369,16 +96,11 @@ function ProductServiceContent() {
                 Product & <span className="text-red-600 italic">Service</span>
               </h1>
             </div>
-            {/* <p className="text-xs font-bold text-gray-400 uppercase tracking-tight">
-              Manage your global catalog of physical goods and professional service offerings.
-            </p> */}
           </div>
 
           <div className="flex gap-3">
             <button
-              onClick={async () => {
-                await loadSyncPreview()
-              }}
+              onClick={loadSyncPreview}
               disabled={syncPreviewLoading}
               className="flex items-center gap-2 px-5 py-3 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
@@ -386,7 +108,7 @@ function ProductServiceContent() {
               {syncPreviewLoading ? 'Loading...' : 'Preview Sync'}
             </button>
             <button
-              onClick={handleExportCatalog}
+              onClick={exportCatalog}
               className="flex items-center gap-2 px-5 py-3 bg-green-600 text-white text-xs font-bold rounded-xl hover:bg-green-700 transition-all shadow-sm"
             >
               <Download size={14} />
@@ -394,7 +116,7 @@ function ProductServiceContent() {
             </button>
             <ProtectedAction routeName="product_service">
               <button
-                onClick={handleAddProductClick}
+                onClick={() => openModal()}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg tracking-widest uppercase"
               >
                 <PlusSquare size={14} />
@@ -442,7 +164,7 @@ function ProductServiceContent() {
           actionButtons={[
             {
               label: 'Edit',
-              onClick: (row) => handleEditProductClick(row),
+              onClick: (row) => openModal(row),
               icon: <Edit2 size={16} />,
             },
           ]}
@@ -452,7 +174,7 @@ function ProductServiceContent() {
       {/* Add Product/Service Modal */}
       <RightSideModal
         isOpen={isModalOpen}
-        onClose={handleCloseModal}
+        onClose={closeModal}
         title={
           editingProductService
             ? 'Edit Product/Service'
@@ -467,8 +189,9 @@ function ProductServiceContent() {
               </label>
               <input
                 type="text"
+                name="code"
                 value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter product/service code..."
                 required
@@ -481,8 +204,9 @@ function ProductServiceContent() {
               </label>
               <input
                 type="text"
+                name="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter product/service name..."
                 required
@@ -494,8 +218,9 @@ function ProductServiceContent() {
                 Type <span className="text-red-600">*</span>
               </label>
               <select
+                name="type"
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
                 required
               >
@@ -511,10 +236,9 @@ function ProductServiceContent() {
               </label>
               <input
                 type="text"
+                name="category"
                 value={formData.category}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                 placeholder="Enter category..."
               />
@@ -527,11 +251,10 @@ function ProductServiceContent() {
                 </label>
                 <input
                   type="number"
+                  name="sales_price"
                   step="0.01"
                   value={formData.sales_price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, sales_price: e.target.value })
-                  }
+                  onChange={handleInputChange}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                   placeholder="0.00"
                 />
@@ -543,11 +266,10 @@ function ProductServiceContent() {
                 </label>
                 <input
                   type="number"
+                  name="purchase_price"
                   step="0.01"
                   value={formData.purchase_price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, purchase_price: e.target.value })
-                  }
+                  onChange={handleInputChange}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                   placeholder="0.00"
                 />
@@ -559,8 +281,9 @@ function ProductServiceContent() {
                 Unit
               </label>
               <select
+                name="unit"
                 value={formData.unit}
-                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all appearance-none cursor-pointer"
               >
                 <option value="">Select unit...</option>
@@ -579,7 +302,7 @@ function ProductServiceContent() {
           <div className="flex gap-3 pt-4">
             <button
               type="button"
-              onClick={handleCloseModal}
+              onClick={closeModal}
               className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 text-xs font-black rounded-xl hover:bg-gray-200 transition-all uppercase tracking-widest"
             >
               Cancel
@@ -597,21 +320,11 @@ function ProductServiceContent() {
 
       <RightSideModal
         isOpen={syncModalOpen}
-        onClose={() => setSyncModalOpen(false)}
+        onClose={closeSyncModal}
         title="Preview Inventory Sync"
         size="5xl"
       >
         <div className="space-y-2">
-          {/* <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h3 className="text-lg font-black text-black">Inventory Preview</h3>
-              <p className="text-xs text-gray-500 mt-1">
-                Select which inventory rows should be imported into your
-                product/service catalog.
-              </p>
-            </div>
-          </div> */}
-
           <div className="flex flex-wrap gap-2">
             {syncCategories.map((category) => (
               <button
@@ -636,7 +349,7 @@ function ProductServiceContent() {
                 <input
                   type="text"
                   value={syncSearchTerm}
-                  onChange={(e) => setSyncSearchTerm(e.target.value)}
+                  onChange={(e) => setSyncSearch(e.target.value)}
                   placeholder="Search products, categories, company..."
                   className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                 />
@@ -745,7 +458,7 @@ function ProductServiceContent() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <button
                 type="button"
-                onClick={() => setSyncModalOpen(false)}
+                onClick={closeSyncModal}
                 className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-200 transition-all"
               >
                 Cancel
@@ -767,7 +480,7 @@ function ProductServiceContent() {
         <DynamicToast
           type={toast.type}
           message={toast.message}
-          onClose={handleToastClose}
+          onClose={closeToast}
           duration={4000}
         />
       )}

@@ -1,11 +1,9 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { History, Eye, Download, ArrowRight, ClipboardList, Clock } from 'lucide-react'
-import DynamicTable from '../../components/DynamicTable'
-import DynamicToast from '../../components/DynamicToast'
-import RouteProtection from '../../components/RouteProtection'
+import { DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
+import { RouteProtection } from '../../components/access'
 import useAuditTrail from './useAuditTrail'
-import LoadingScreen from '../../components/LoadingScreen'
 
 function AuditTrailContent() {
   const { auditTrails, loading, loadingMore, error, hasMore, refetch, loadMore } = useAuditTrail()

@@ -11,9 +11,8 @@ import {
   Hash,
   MapPin,
 } from 'lucide-react'
-import RouteProtection from '../../components/RouteProtection'
-import ProtectedAction from '../../components/ProtectedAction'
-import LoadingScreen from '../../components/LoadingScreen'
+import { ProtectedAction, RouteProtection } from '../../components/access'
+import { LoadingScreen } from '../../components/ui'
 import useCompany from './useCompany'
 
 function CompanyContent() {

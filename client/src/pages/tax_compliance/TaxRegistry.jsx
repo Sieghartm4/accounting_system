@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import DynamicToast from '../../components/DynamicToast'
+import { DynamicToast, LoadingScreen } from '../../components/ui'
 import {
   AlertCircle,
   AlertTriangle,
@@ -22,8 +22,7 @@ import {
   ShieldCheck,
   Wallet,
 } from 'lucide-react'
-import LoadingScreen from '../../components/LoadingScreen'
-import ProtectedAction from '../../components/ProtectedAction'
+import { ProtectedAction } from '../../components/access'
 import useTaxRegistry from './useTaxRegistry'
 
 /**

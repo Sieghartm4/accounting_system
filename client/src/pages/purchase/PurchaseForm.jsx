@@ -20,8 +20,7 @@ import {
   ShoppingCart
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
-import DynamicToast from '../../components/DynamicToast'
-import RightSideModal from '../../components/RightSideModal'
+import { DynamicToast, RightSideModal } from '../../components/ui'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDefaults'
 import { computeTotals, findMissingAutoAccounts } from '../../utils/taxCalculations'

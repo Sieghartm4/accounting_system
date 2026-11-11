@@ -1,6 +1,5 @@
 import React from 'react';
-import DynamicTable from '../../components/DynamicTable';
-import LoadingScreen from '../../components/LoadingScreen';
+import { DynamicTable, LoadingScreen } from '../../components/ui';
 import useBranch from './useBranch';
 
 export default function Branch() {

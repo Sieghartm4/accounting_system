@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import ReactDOM from 'react-dom'
 import * as XLSX from 'xlsx'
-import DynamicToast from '../../components/DynamicToast'
+import { DynamicToast } from '../../components/ui'
 import { API } from '../../api/endpoints'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
