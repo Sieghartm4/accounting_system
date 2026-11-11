@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API } from '../../api/endpoints'
 import connectRealtime from '../../utils/realtimeSocket'
@@ -27,7 +27,15 @@ const useAdvances = () => {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(null)
   const [hasMore, setHasMore] = useState(true)
+  const advancesRef = useRef([])
   const LIMIT = 50
+
+  // The offset for "load more" is read from a ref so fetchAdvances does not
+  // depend on `advances`. Depending on the array itself recreated the callback
+  // after every fetch, which re-ran the fetch effect and looped forever.
+  useEffect(() => {
+    advancesRef.current = advances
+  }, [advances])
 
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
@@ -55,7 +63,7 @@ const useAdvances = () => {
         const token = sessionStorage.getItem('authenticated')
         const params = new URLSearchParams()
         const isDateFiltered = Boolean(startDate || endDate)
-        const currentOffset = isLoadMore ? advances.length : 0
+        const currentOffset = isLoadMore ? advancesRef.current.length : 0
 
         if (startDate) params.append('start_date', startDate)
         if (endDate) params.append('end_date', endDate)
@@ -104,7 +112,7 @@ const useAdvances = () => {
         }
       }
     },
-    [startDate, endDate, advances],
+    [startDate, endDate],
   )
 
   useEffect(() => {
