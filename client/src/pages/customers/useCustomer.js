@@ -355,9 +355,16 @@ const useCustomer = () => {
 
       if (result.success) {
         const { created, updated, errors } = result.data
+        // Surface why rows failed: a bare "N errors" count is undiagnosable.
+        const errorDetails = (errors || [])
+          .map((e) => e?.message)
+          .filter(Boolean)
         showToast(
           'success',
-          `Import completed: ${created.length} created, ${updated.length} updated${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
+          `Import completed: ${created.length} created, ${updated.length} updated` +
+            (errors.length > 0
+              ? `, ${errors.length} errors: ${errorDetails.slice(0, 3).join('; ')}`
+              : ''),
         )
       } else {
         showToast('error', result.message || 'Failed to import customers')

@@ -69,13 +69,16 @@ const DynamicTable = ({
   onClearDateFilter = null, // callback when Clear is pressed
   // --- LOADING STATE ---
   isLoading = false, // if true, table is in initial loading state
+  // --- INITIAL SORT ---
+  defaultSortColumn = 'id', // column the table is sorted by on first render
+  defaultSortDirection = 'desc', // 'asc' | 'desc'
 }) => {
   const [searchParams] = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
   const [filterColumn, setFilterColumn] = useState('')
   const [filterValue, setFilterValue] = useState('')
-  const [sortColumn, setSortColumn] = useState('id')
-  const [sortDirection, setSortDirection] = useState('desc')
+  const [sortColumn, setSortColumn] = useState(defaultSortColumn)
+  const [sortDirection, setSortDirection] = useState(defaultSortDirection)
   const [visibleColumns, setVisibleColumns] = useState(new Set())
   const [showColumnDropdown, setShowColumnDropdown] = useState(false)
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' })

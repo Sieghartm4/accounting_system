@@ -93,22 +93,24 @@ const buildVendorInfoInsertQuery = (
   if (columns.includes('vi_address')) {
     cols.push('vi_address')
     placeholders.push('?')
-    values.push(address || null)
+    // vi_address and vi_tin are NOT NULL: pass empty strings through instead
+    // of coercing them to null (which would fail the insert).
+    values.push(address ?? null)
   }
   if (columns.includes('vi_tin')) {
     cols.push('vi_tin')
     placeholders.push('?')
-    values.push(tin || null)
+    values.push(tin ?? null)
   }
   if (columns.includes('vi_details')) {
     cols.push('vi_details')
     placeholders.push('?')
-    values.push(details || null)
+    values.push(details ?? null)
   }
   if (columns.includes('vi_contact')) {
     cols.push('vi_contact')
     placeholders.push('?')
-    values.push(contact || null)
+    values.push(contact ?? null)
   }
 
   if (cols.length === 0) return null
@@ -147,19 +149,19 @@ const buildVendorInfoUpdateQuery = (
   }
   if (columns.includes('vi_address')) {
     sets.push('vi_address = ?')
-    values.push(address || null)
+    values.push(address ?? null)
   }
   if (columns.includes('vi_tin')) {
     sets.push('vi_tin = ?')
-    values.push(tin || null)
+    values.push(tin ?? null)
   }
   if (columns.includes('vi_details')) {
     sets.push('vi_details = ?')
-    values.push(details || null)
+    values.push(details ?? null)
   }
   if (columns.includes('vi_contact')) {
     sets.push('vi_contact = ?')
-    values.push(contact || null)
+    values.push(contact ?? null)
   }
 
   if (sets.length === 0) return null
@@ -666,15 +668,20 @@ const importVendors = async (req, res, next) => {
         const statusUpper = typeof status !== 'undefined' ? String(status).toUpperCase().trim() : ''
         const finalStatus = (statusUpper === 'ACTIVE' || statusUpper === 'INACTIVE') ? statusUpper : 'ACTIVE'
 
-        // Fix field mapping: TIN is in details field, address is in tin field
-        const actualTin = details || tin || ''
-        const actualAddress = tin || address || ''
+        // Values are keyed by the CSV headers, so each field lands where its
+        // header says. (An older client-side CSV parser shifted every column
+        // when a leading `id` was present, and this block used to swap TIN and
+        // address to compensate - that hack is gone now that parsing is fixed.)
+        const actualTin = typeof tin !== 'undefined' && tin !== null ? String(tin).trim() : ''
+        const actualAddress =
+          typeof address !== 'undefined' && address !== null ? String(address).trim() : ''
 
-        // Validate required fields
-        if (!normalizedCode || !name || !actualAddress || !actualTin) {
+        // Validate required fields. TIN and address are optional: the info
+        // columns are NOT NULL, so missing values are stored as empty strings.
+        if (!normalizedCode || !name) {
           results.errors.push({
             vendor,
-            message: 'Missing required fields (code, name, address, tin)',
+            message: 'Missing required fields (code, name)',
           })
           continue
         }

@@ -148,6 +148,8 @@ function CustomerContent() {
         <DynamicTable
           data={customers}
           title="Customers"
+          defaultSortColumn="code"
+          defaultSortDirection="asc"
           enableAddButton={false}
           enableActionColumn={true}
           actionButtons={[

@@ -149,6 +149,8 @@ function VendorsContent() {
         <DynamicTable
           data={vendors}
           title="Vendor table"
+          defaultSortColumn="code"
+          defaultSortDirection="asc"
           enableAddButton={false}
           enableActionColumn={true}
           actionButtons={[

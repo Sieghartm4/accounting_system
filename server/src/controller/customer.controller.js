@@ -90,22 +90,24 @@ const buildCustomerInfoInsertQuery = (
   if (columns.includes('ci_address')) {
     cols.push('ci_address')
     placeholders.push('?')
-    values.push(address || null)
+    // ci_address and ci_tin are NOT NULL: pass empty strings through instead
+    // of coercing them to null (which would fail the insert).
+    values.push(address ?? null)
   }
   if (columns.includes('ci_tin')) {
     cols.push('ci_tin')
     placeholders.push('?')
-    values.push(tin || null)
+    values.push(tin ?? null)
   }
   if (columns.includes('ci_details')) {
     cols.push('ci_details')
     placeholders.push('?')
-    values.push(details || null)
+    values.push(details ?? null)
   }
   if (columns.includes('ci_contact')) {
     cols.push('ci_contact')
     placeholders.push('?')
-    values.push(contact || null)
+    values.push(contact ?? null)
   }
 
   if (cols.length === 0) return null
@@ -144,19 +146,19 @@ const buildCustomerInfoUpdateQuery = (
   }
   if (columns.includes('ci_address')) {
     sets.push('ci_address = ?')
-    values.push(address || null)
+    values.push(address ?? null)
   }
   if (columns.includes('ci_tin')) {
     sets.push('ci_tin = ?')
-    values.push(tin || null)
+    values.push(tin ?? null)
   }
   if (columns.includes('ci_details')) {
     sets.push('ci_details = ?')
-    values.push(details || null)
+    values.push(details ?? null)
   }
   if (columns.includes('ci_contact')) {
     sets.push('ci_contact = ?')
-    values.push(contact || null)
+    values.push(contact ?? null)
   }
 
   if (sets.length === 0) return null
@@ -665,15 +667,20 @@ const importCustomers = async (req, res, next) => {
         const statusUpper = typeof status !== 'undefined' ? String(status).toUpperCase().trim() : ''
         const finalStatus = (statusUpper === 'ACTIVE' || statusUpper === 'INACTIVE') ? statusUpper : 'ACTIVE'
 
-        // Fix field mapping: TIN is in details field, address is in tin field
-        const actualTin = details || tin || ''
-        const actualAddress = tin || address || ''
+        // Values are keyed by the CSV headers, so each field lands where its
+        // header says. (An older client-side CSV parser shifted every column
+        // when a leading `id` was present, and this block used to swap TIN and
+        // address to compensate - that hack is gone now that parsing is fixed.)
+        const actualTin = typeof tin !== 'undefined' && tin !== null ? String(tin).trim() : ''
+        const actualAddress =
+          typeof address !== 'undefined' && address !== null ? String(address).trim() : ''
 
-        // Validate required fields
-        if (!normalizedCode || !name || !actualAddress || !actualTin) {
+        // Validate required fields. TIN and address are optional: the info
+        // columns are NOT NULL, so missing values are stored as empty strings.
+        if (!normalizedCode || !name) {
           results.errors.push({
             customer,
-            message: 'Missing required fields (code, name, address, tin)',
+            message: 'Missing required fields (code, name)',
           })
           continue
         }
