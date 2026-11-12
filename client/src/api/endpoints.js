@@ -154,6 +154,7 @@ export const API = {
   productServiceSync: () => url('/product_service/sync'),
   productServiceSyncPreview: () => url('/product_service/sync/preview'),
   productServiceSyncImport: () => url('/product_service/sync/import'),
+  productServiceImport: () => url('/product_service/import'),
 
   sequenceSettings: () => url('/sequence_settings'),
   sequenceSettingsById: (id) => url(`/sequence_settings/${id}`),

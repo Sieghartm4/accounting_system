@@ -653,6 +653,249 @@ const updateProductService = async (req, res, next) => {
   }
 }
 
+const importProductServiceCatalog = async (req, res, next) => {
+  try {
+    const { products } = req.body
+
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Products array is required',
+      })
+    }
+
+    const results = {
+      created: [],
+      updated: [],
+      errors: [],
+    }
+
+    const now = new Date()
+    const auditQueries = []
+
+    for (const product of products) {
+      try {
+        const { id, code, name, type, category, sales_price, purchase_price, unit } = product
+        const normalizedCode = String(code || '').trim()
+        const normalizedType = String(type || '').trim().toUpperCase()
+
+        // Validate required fields
+        if (!normalizedCode || !name || !normalizedType) {
+          results.errors.push({
+            product,
+            message: 'Missing required fields (code, name, type)',
+          })
+          continue
+        }
+
+        if (normalizedType !== 'PRODUCT' && normalizedType !== 'SERVICE') {
+          results.errors.push({
+            product,
+            message: "Type must be 'product' or 'service'",
+          })
+          continue
+        }
+
+        // Check if product/service exists by ID or code
+        let existingProduct = null
+        if (id) {
+          const existingQuery = sql
+            .select([
+              Master.products_service.selectOptionColumns.id,
+              Master.products_service.selectOptionColumns.code,
+              Master.products_service.selectOptionColumns.name,
+              Master.products_service.selectOptionColumns.type,
+              Master.products_service.selectOptionColumns.category,
+              Master.products_service.selectOptionColumns.sales_price,
+              Master.products_service.selectOptionColumns.purchase_price,
+              Master.products_service.selectOptionColumns.unit,
+            ])
+            .from(Master.products_service.tablename)
+            .where(Master.products_service.selectOptionColumns.id)
+            .build()
+          const existingProducts = await Query(
+            existingQuery,
+            [id],
+            Master.products_service.prefix_,
+          )
+          existingProduct = existingProducts[0] || null
+        }
+
+        // If not found by ID, check by code
+        if (!existingProduct) {
+          const codeQuery = `SELECT ${Master.products_service.selectOptionColumns.id}, ${Master.products_service.selectOptionColumns.code}, ${Master.products_service.selectOptionColumns.name}, ${Master.products_service.selectOptionColumns.type}, ${Master.products_service.selectOptionColumns.category}, ${Master.products_service.selectOptionColumns.sales_price}, ${Master.products_service.selectOptionColumns.purchase_price}, ${Master.products_service.selectOptionColumns.unit} FROM ${Master.products_service.tablename} WHERE UPPER(${Master.products_service.selectOptionColumns.code}) = ? LIMIT 1`
+          const codeResults = await Query(
+            codeQuery,
+            [normalizedCode.toUpperCase()],
+            Master.products_service.prefix_,
+          )
+          existingProduct = codeResults[0] || null
+        }
+
+        if (existingProduct) {
+          // Update existing product/service
+          const updateQuery = sql
+            .update(Master.products_service.tablename)
+            .set([
+              Master.products_service.selectOptionColumns.code,
+              Master.products_service.selectOptionColumns.name,
+              Master.products_service.selectOptionColumns.type,
+              Master.products_service.selectOptionColumns.category,
+              Master.products_service.selectOptionColumns.sales_price,
+              Master.products_service.selectOptionColumns.purchase_price,
+              Master.products_service.selectOptionColumns.unit,
+            ])
+            .where(Master.products_service.selectOptionColumns.id)
+            .build()
+
+          const queries = [
+            {
+              sql: updateQuery,
+              values: [
+                normalizedCode,
+                name,
+                normalizedType,
+                category || null,
+                sales_price || null,
+                purchase_price || null,
+                unit || null,
+                existingProduct.id,
+              ],
+            },
+          ]
+
+          await Transaction(queries)
+
+          // Build change description
+          const changes = []
+          if (existingProduct.code !== normalizedCode) changes.push(`code='${normalizedCode}'`)
+          if (existingProduct.name !== name) changes.push(`name='${name}'`)
+          if (existingProduct.type !== normalizedType) changes.push(`type='${normalizedType}'`)
+          if (existingProduct.category !== category) changes.push(`category='${category}'`)
+          if (existingProduct.sales_price != sales_price)
+            changes.push(`sales_price='${sales_price}'`)
+          if (existingProduct.purchase_price != purchase_price)
+            changes.push(`purchase_price='${purchase_price}'`)
+          if (existingProduct.unit !== unit) changes.push(`unit='${unit}'`)
+          const changeDesc = changes.length > 0 ? changes.join(', ') : 'no changes'
+
+          // Audit trail for update
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              existingProduct.id || null,
+              'PRODUCT_SERVICE',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT UPDATE ID ${existingProduct.id}: ${changeDesc}`,
+            ],
+          })
+
+          results.updated.push({
+            id: existingProduct.id,
+            code: normalizedCode,
+            name,
+          })
+        } else {
+          // Create new product/service
+          const insertQuery = sql
+            .insert(Master.products_service.tablename, {
+              columns: Master.products_service.insertColumns,
+              prefix: Master.products_service.prefix,
+              isTransaction: true,
+            })
+            .build()
+
+          const queries = [
+            {
+              sql: insertQuery,
+              values: [
+                normalizedCode,
+                name,
+                normalizedType,
+                category || null,
+                sales_price || null,
+                purchase_price || null,
+                unit || null,
+              ],
+            },
+          ]
+
+          await Transaction(queries)
+
+          const getIdQuery = `SELECT LAST_INSERT_ID() as insertId`
+          const idResult = await Query(getIdQuery)
+          const newProductId = idResult[0]?.insertId
+
+          if (!newProductId) {
+            throw new Error('Failed to get product/service ID from insertion')
+          }
+
+          // Audit trail for create
+          auditQueries.push({
+            sql: sql
+              .insert(Master.audit_trail.tablename, {
+                columns: Master.audit_trail.insertColumns,
+                prefix: Master.audit_trail.prefix,
+                isTransaction: true,
+              })
+              .build(),
+            values: [
+              newProductId || null,
+              'PRODUCT_SERVICE',
+              req.context?.username || null,
+              now.toISOString().split('T')[0],
+              now.toTimeString().split(' ')[0],
+              `IMPORT CREATE: ID ${newProductId}`,
+            ],
+          })
+
+          results.created.push({
+            id: newProductId,
+            code: normalizedCode,
+            name,
+          })
+        }
+      } catch (error) {
+        console.error('Error processing product/service:', product, error)
+        results.errors.push({
+          product,
+          message: error.message || 'Failed to process product/service',
+        })
+      }
+    }
+
+    // Execute all audit trail queries in a single transaction
+    if (auditQueries.length > 0) {
+      await Transaction(auditQueries)
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.errors.length} errors`,
+      data: results,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error importing products/services:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while importing products/services',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
 module.exports = {
   getProductsService,
   syncProductService,
@@ -660,4 +903,5 @@ module.exports = {
   importProductService,
   createProductService,
   updateProductService,
+  importProductServiceCatalog,
 }

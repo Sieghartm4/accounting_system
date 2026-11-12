@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { API } from '../../api/endpoints'
-import { objectsToCsv, downloadCsv } from '../../utils/csv'
+import { objectsToCsv, downloadCsv, parseCsv } from '../../utils/csv'
 
 const EMPTY_FORM = {
   code: '',
@@ -28,6 +28,7 @@ const useProductService = () => {
   const [selectedSyncItems, setSelectedSyncItems] = useState(new Set())
   const [syncSearchTerm, setSyncSearchTerm] = useState('')
   const [syncPreviewLoading, setSyncPreviewLoading] = useState(false)
+  const [importing, setImporting] = useState(false)
 
   const showToast = (type, message) => setToast({ type, message })
 
@@ -442,6 +443,99 @@ const useProductService = () => {
 
   const setSyncSearch = (value) => setSyncSearchTerm(value)
 
+  // Catalog CSV import (mirrors the withholding tax import flow).
+  const importProductServiceCatalog = async (products) => {
+    try {
+      const token = sessionStorage.getItem('authenticated')
+
+      if (!token) {
+        throw new Error('No authorization token found')
+      }
+
+      const response = await fetch(
+        API.productServiceImport(),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ products }),
+        },
+      )
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || `HTTP error! status: ${response.status}`)
+      }
+
+      if (result.success) {
+        await fetchProductService()
+        return { success: true, data: result.data, message: result.message }
+      }
+
+      return {
+        success: false,
+        message: result.message || 'Failed to import products/services',
+      }
+    } catch (err) {
+      console.error('Error importing products/services:', err.message)
+      return { success: false, message: err.message }
+    }
+  }
+
+  const handleImportCatalog = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+      showToast('error', 'Please select a CSV file')
+      e.target.value = ''
+      return
+    }
+
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const rows = parseCsv(text)
+
+      const products = rows.map((row) => ({
+        code: row.code,
+        name: row.name,
+        type: row.type,
+        category: row.category,
+        sales_price: row.sales_price,
+        purchase_price: row.purchase_price,
+        unit: row.unit,
+      }))
+
+      const importable = products.filter((p) => p.code || p.name || p.type)
+      if (importable.length === 0) {
+        showToast('error', 'No valid product/service entries found in CSV')
+        return
+      }
+
+      const result = await importProductServiceCatalog(importable)
+
+      if (result.success) {
+        const { created, updated, errors } = result.data
+        showToast(
+          'success',
+          `Import completed: ${created.length} created, ${updated.length} updated${errors.length > 0 ? `, ${errors.length} errors` : ''}`,
+        )
+      } else {
+        showToast('error', result.message || 'Failed to import products/services')
+      }
+    } catch (err) {
+      console.error('Import error:', err)
+      showToast('error', 'Failed to read CSV file')
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
+  }
+
   // Modal + form wiring.
   const openModal = (productData = null) => {
     if (productData) {
@@ -557,6 +651,8 @@ const useProductService = () => {
     closeModal,
     handleInputChange,
     exportCatalog,
+    handleImportCatalog,
+    importing,
     handleSubmit,
     closeToast: () => setToast(null),
     syncModalOpen,

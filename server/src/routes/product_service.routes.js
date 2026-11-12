@@ -4,6 +4,7 @@ const {
   syncProductService,
   previewProductServiceSync,
   importProductService,
+  importProductServiceCatalog,
   createProductService,
   updateProductService,
 } = require('../controller/product_service.controller')
@@ -14,6 +15,7 @@ productServiceRouter.get('/', getProductsService)
 productServiceRouter.get('/sync', syncProductService)
 productServiceRouter.get('/sync/preview', previewProductServiceSync)
 productServiceRouter.post('/sync/import', importProductService)
+productServiceRouter.post('/import', importProductServiceCatalog)
 productServiceRouter.post('/', createProductService)
 productServiceRouter.put('/:id', updateProductService)
 

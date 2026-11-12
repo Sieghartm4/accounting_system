@@ -7,6 +7,7 @@ import {
   Layers,
   ArrowRight,
   Download,
+  Upload,
   Plus,
   Edit2,
   Search,
@@ -36,6 +37,8 @@ function ProductServiceContent() {
     closeModal,
     handleInputChange,
     exportCatalog,
+    handleImportCatalog,
+    importing,
     handleSubmit,
     closeToast,
     syncModalOpen,
@@ -114,6 +117,19 @@ function ProductServiceContent() {
               <Download size={14} />
               EXPORT CATALOG
             </button>
+            <ProtectedAction routeName="product_service">
+              <label className="flex items-center gap-2 px-5 py-3 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer">
+                <Upload size={14} />
+                {importing ? 'IMPORTING...' : 'IMPORT CATALOG'}
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImportCatalog}
+                  className="hidden"
+                  disabled={importing}
+                />
+              </label>
+            </ProtectedAction>
             <ProtectedAction routeName="product_service">
               <button
                 onClick={() => openModal()}
