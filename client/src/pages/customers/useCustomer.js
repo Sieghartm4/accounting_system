@@ -33,6 +33,24 @@ const CUSTOMER_EXPORT_HEADERS = [
   'status',
 ]
 
+// Ascending code comparison that understands trailing numbers
+// (CUS-000-00022): the numeric tail is compared as a number when both codes
+// share the same prefix, so unpadded codes still order correctly.
+const compareCodesAscending = (a, b) => {
+  const codeA = String(a?.code || '')
+  const codeB = String(b?.code || '')
+  const tailA = codeA.match(/(\d+)$/)
+  const tailB = codeB.match(/(\d+)$/)
+  if (
+    tailA &&
+    tailB &&
+    codeA.slice(0, -tailA[1].length) === codeB.slice(0, -tailB[1].length)
+  ) {
+    return Number(tailA[1]) - Number(tailB[1])
+  }
+  return codeA.localeCompare(codeB)
+}
+
 const EMPTY_FORM = {
   code: '',
   name: '',
@@ -80,7 +98,10 @@ const useCustomer = () => {
       const result = await response.json()
 
       if (result.success) {
-        setCustomers(result.data)
+        // Order by code ascending: lowest number first.
+        setCustomers(
+          [...(result.data || [])].sort((a, b) => compareCodesAscending(a, b)),
+        )
       } else {
         setError(result.message || 'Failed to fetch customers')
       }
