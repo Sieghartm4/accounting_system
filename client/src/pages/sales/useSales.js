@@ -4,6 +4,7 @@ import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDef
 import {
   computeTotals,
   findMissingAutoAccounts,
+  round2,
 } from '../../utils/taxCalculations'
 import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 import { API } from '../../api/endpoints'
@@ -1224,8 +1225,9 @@ export default function useSalesForm({
     // - AR settles at the discounted total, so the standalone Sales
     //   Discounts debit keeps the entry balanced:
     //   settled + discountBook + wht = grossEx + vat
-    const totalSettled =
-      totals.grossEx + totals.vat - totals.discountBook - totals.wht
+    const totalSettled = round2(
+      totals.grossEx + totals.vat - totals.discountBook - totals.wht,
+    )
 
     // 1. Accounts Receivable (DEBIT) - discounted total net of WHT
     const arAccount = findAccount(['accounts receivable'])

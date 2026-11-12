@@ -5,6 +5,7 @@ import {
   computeTotals,
   findMissingAutoAccounts,
   findMissingPaymentAccount,
+  round2,
 } from '../../utils/taxCalculations'
 import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 import { API } from '../../api/endpoints'
@@ -750,8 +751,9 @@ export function useReceiptsForm({
       // - cash settles at the discounted total, so the standalone Sales
       //   Discounts debit keeps the entry balanced:
       //   settled + discountBook + wht = grossEx + vat
-      const totalSettled =
-        totals.grossEx + totals.vat - totals.discountBook - totals.wht
+      const totalSettled = round2(
+        totals.grossEx + totals.vat - totals.discountBook - totals.wht,
+      )
 
       // 1. Income (CREDIT) - per item at pre-discount tax-exclusive amount
       lines.forEach(({ item, f }) => {

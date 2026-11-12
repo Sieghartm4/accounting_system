@@ -4,7 +4,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Single source of truth so the auto-generated journal entries always balance.
 
-const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100
+// Round to centavos; exported so hooks that derive new amounts from the
+// rounded totals (e.g. settled = grossEx + vat - discountBook - wht) keep
+// them centava-clean instead of producing values like 13800.560000000001.
+export const round2 = (value) =>
+  Math.round((Number(value) + Number.EPSILON) * 100) / 100
 
 // Per-item financial breakdown.
 //

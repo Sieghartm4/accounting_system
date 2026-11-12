@@ -15,6 +15,7 @@ import {
   computeTotals,
   findMissingAutoAccounts,
   findMissingPaymentAccount,
+  round2,
 } from '../../utils/taxCalculations'
 import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 
@@ -857,8 +858,9 @@ export function useDisbursementForm({
       // - cash settles at the discounted total, so the standalone Purchase
       //   Discounts credit keeps the entry balanced:
       //   grossEx + vat = settled + discountBook + wht
-      const totalSettled =
-        totals.grossEx + totals.vat - totals.discountBook - totals.wht
+      const totalSettled = round2(
+        totals.grossEx + totals.vat - totals.discountBook - totals.wht,
+      )
 
       // 1. Expense (DEBIT) - per item at pre-discount tax-exclusive amount
       lines.forEach(({ item, f }) => {

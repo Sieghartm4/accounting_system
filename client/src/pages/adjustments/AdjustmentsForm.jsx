@@ -1202,11 +1202,15 @@ export default function AdjustmentsForm({
                                   inputMode="decimal"
                                   value={formatPriceDisplay(entry.debit ?? '')}
                                   onChange={(e) => {
-                                    const parsed = parsePriceInput(e.target.value)
+                                    // Keep the cleaned STRING in state (like the
+                                    // sales/receipt forms): converting with
+                                    // parseFloat here eats the trailing dot while
+                                    // typing, so "182." becomes "182" and the next
+                                    // digits append as integers ("182.89" -> 18289).
                                     updateJournalEntry(
                                       entry.id,
                                       'debit',
-                                      parsed === '' ? '' : parseFloat(parsed) || 0,
+                                      parsePriceInput(e.target.value),
                                     )
                                   }}
                                 />
@@ -1220,11 +1224,12 @@ export default function AdjustmentsForm({
                                   inputMode="decimal"
                                   value={formatPriceDisplay(entry.credit ?? '')}
                                   onChange={(e) => {
-                                    const parsed = parsePriceInput(e.target.value)
+                                    // Keep the cleaned STRING in state (same
+                                    // reason as the debit field above).
                                     updateJournalEntry(
                                       entry.id,
                                       'credit',
-                                      parsed === '' ? '' : parseFloat(parsed) || 0,
+                                      parsePriceInput(e.target.value),
                                     )
                                   }}
                                 />

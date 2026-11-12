@@ -1640,11 +1640,10 @@ export default function SalesForm({
                                   inputMode="decimal"
                                   value={formatPriceDisplay(entry.debit ?? '')}
                                   onChange={(e) => {
-                                    const parsed = parsePriceInput(e.target.value)
                                     form.updateJournalEntry(
                                       entry.id,
                                       'debit',
-                                      parsed === '' ? '' : parseFloat(parsed) || 0,
+                                      parsePriceInput(e.target.value),
                                     )
                                   }}
                                 />
@@ -1658,11 +1657,10 @@ export default function SalesForm({
                                   inputMode="decimal"
                                   value={formatPriceDisplay(entry.credit ?? '')}
                                   onChange={(e) => {
-                                    const parsed = parsePriceInput(e.target.value)
                                     form.updateJournalEntry(
                                       entry.id,
                                       'credit',
-                                      parsed === '' ? '' : parseFloat(parsed) || 0,
+                                      parsePriceInput(e.target.value),
                                     )
                                   }}
                                 />

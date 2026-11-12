@@ -23,7 +23,7 @@ import ReactDOM from 'react-dom'
 import { DynamicToast, RightSideModal } from '../../components/ui'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDefaults'
-import { computeTotals, findMissingAutoAccounts } from '../../utils/taxCalculations'
+import { computeTotals, findMissingAutoAccounts, round2 } from '../../utils/taxCalculations'
 import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 import { API } from '../../api/endpoints'
 
@@ -1489,8 +1489,11 @@ export default function PurchaseForm({
     // - AP settles at the discounted total, so the standalone Purchase
     //   Discounts credit keeps the entry balanced:
     //   grossEx + vat = settled + discountBook + wht
-    const totalSettled =
-      totals.grossEx + totals.vat - totals.discountBook - totals.wht
+    // round2 keeps the derived total centava-clean (raw float math on the
+    // already-rounded totals produces values like 13800.560000000001)
+    const totalSettled = round2(
+      totals.grossEx + totals.vat - totals.discountBook - totals.wht,
+    )
 
     // 1. Expense Accounts (DEBIT) - per item at pre-discount tax-exclusive amount
     lines.forEach(({ item, f }) => {
@@ -3013,11 +3016,10 @@ export default function PurchaseForm({
                                   inputMode="decimal"
                                   value={formatPriceDisplay(entry.debit ?? '')}
                                   onChange={(e) => {
-                                    const parsed = parsePriceInput(e.target.value)
                                     updateJournalEntry(
                                       entry.id,
                                       'debit',
-                                      parsed === '' ? '' : parseFloat(parsed) || 0,
+                                      parsePriceInput(e.target.value),
                                     )
                                   }}
                                   readOnly={isViewMode || !entry.isManual}
@@ -3032,11 +3034,10 @@ export default function PurchaseForm({
                                   inputMode="decimal"
                                   value={formatPriceDisplay(entry.credit ?? '')}
                                   onChange={(e) => {
-                                    const parsed = parsePriceInput(e.target.value)
                                     updateJournalEntry(
                                       entry.id,
                                       'credit',
-                                      parsed === '' ? '' : parseFloat(parsed) || 0,
+                                      parsePriceInput(e.target.value),
                                     )
                                   }}
                                   readOnly={isViewMode || !entry.isManual}
