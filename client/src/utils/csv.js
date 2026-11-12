@@ -56,7 +56,6 @@ export const parseCsv = (csvText) => {
   if (lines.length < 2) return []
 
   const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
-  const validHeaders = headers.filter((h) => !CSV_EXCLUDE_COLUMNS.has(h))
 
   const rows = []
   for (let i = 1; i < lines.length; i++) {
@@ -64,7 +63,11 @@ export const parseCsv = (csvText) => {
     if (values.length !== headers.length) continue
 
     const row = {}
-    validHeaders.forEach((header, index) => {
+    // Index by the header's ORIGINAL position in the CSV, not its position in
+    // the filtered list: skipping an excluded column (like a leading `id`)
+    // must not shift every later value one column to the left.
+    headers.forEach((header, index) => {
+      if (CSV_EXCLUDE_COLUMNS.has(header)) return
       row[header] = values[index]
     })
     rows.push(row)

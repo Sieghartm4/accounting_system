@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken')
 
 let _currentTenantDb = null
 
+console.log("Decrypted",DecryptString("ab8b644188153dbd95b28ee410087359"))
+
 const setTenantDb = (db) => { 
   console.log('🔍 Config - Setting tenant DB to:', db, '(previous value:', _currentTenantDb, ')')
   _currentTenantDb = db 
