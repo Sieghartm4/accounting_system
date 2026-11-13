@@ -1665,7 +1665,9 @@ export default function useSalesForm({
           vatRate: parseFloat(item.vat_rate) || 0,
           vatType: inferVatTypeFromJournal(item, journalRows),
           wht: parseInt(item.witholding_tax_id) || 0,
-          whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
+          whtSearch: item.withholding_tax_name
+            ? `${item.withholding_tax_code || ''} - ${item.withholding_tax_name}`
+            : `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
           whtRate: parseFloat(item.withholding_tax_rate) || 0,
           responsibilityCenter: item.responsibility_center,
           isOther: false,

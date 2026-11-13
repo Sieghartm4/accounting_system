@@ -566,7 +566,9 @@ export function useReceiptsForm({
           vatRate: parseFloat(item.vat_rate) || 0,
           vatType: inferVatTypeFromJournal(item, journalRows),
           wht: parseFloat(item.withholding_tax_id) || 0,
-          whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
+          whtSearch: item.withholding_tax_name
+            ? `${item.withholding_tax_code || ''} - ${item.withholding_tax_name}`
+            : `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
           whtRate: parseFloat(item.withholding_tax_rate) || 0,
           responsibilityCenter: item.responsibility_center || '',
           isOther: false,

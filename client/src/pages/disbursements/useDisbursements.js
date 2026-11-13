@@ -583,7 +583,9 @@ export function useDisbursementForm({
           vat_code: item.vat_code,
           vat_name: item.vat_name,
           wht: parseFloat(item.withholding_tax_id) || 0,
-          whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
+          whtSearch: item.withholding_tax_name
+            ? `${item.withholding_tax_code || ''} - ${item.withholding_tax_name}`
+            : `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
           whtRate: parseFloat(item.withholding_tax_rate) || 0,
           withholding_tax_code: item.withholding_tax_code,
           responsibilityCenter: item.responsibility_center,

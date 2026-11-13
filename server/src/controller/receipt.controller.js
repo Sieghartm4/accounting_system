@@ -329,6 +329,11 @@ const getAllReceipts = async (req, res, next) => {
         },
 
         {
+          col: Master.withholding_tax.selectOptionColumns.name,
+          as: 'withholding_tax_name',
+        },
+
+        {
           col: Master.withholding_tax.selectOptionColumns.rate,
           as: 'withholding_tax_rate',
         },
