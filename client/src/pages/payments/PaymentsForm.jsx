@@ -23,6 +23,36 @@ import { DynamicToast, RightSideModal } from '../../components/ui'
 import useResponsibilityCenter from '../responsibility_center/useResponsibilityCenter'
 import { API } from '../../api/endpoints'
 
+// Signature of everything that feeds the auto-generated journal entries. It is
+// used to tell a real user edit apart from the initial form hydration so that
+// loading an existing document never regenerates (and therefore rewrites) the
+// stored journal rows.
+const buildPaymentJournalGenerationSignature = (
+  items,
+  modeOfPayment = '',
+  bankName = '',
+) =>
+  JSON.stringify({
+    mode: modeOfPayment,
+    bank: bankName,
+    items: (items || []).map((item) => [
+      item.id ?? null,
+      item.purchaseItemId ?? '',
+      item.invoiceRef ?? '',
+      item.description ?? '',
+      item.responsibilityCenter ?? '',
+      item.gross ?? '',
+      item.paidAmount ?? '',
+      item.pendingPayments ?? '',
+      item.discAmt ?? '',
+      item.vatAmt ?? '',
+      item.vatType ?? '',
+      item.whtAmount ?? '',
+      item.amount ?? '',
+      item.isOther ?? false,
+    ]),
+  })
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
 // ─────────────────────────────────────────────────────────────────────────────
@@ -386,6 +416,9 @@ export default function PaymentsForm({
   // }
   const [paymentItems, setPaymentItems] = useState([])
   const [journalEntries, setJournalEntries] = useState([])
+  const lastJournalGenerationRef = useRef(null)
+  const pendingJournalHydrationRef = useRef(null)
+  const journalHydrationSettledRef = useRef(true)
 
   // ── Remote data ──────────────────────────────────────────────────────────
   const [vendors, setVendors] = useState([])
@@ -795,8 +828,9 @@ export default function PaymentsForm({
       }
 
       // Populate payment items
+      let hydratedItems = []
       if (paymentData.items && paymentData.items.length > 0) {
-        const items = paymentData.items.map((item, index) => ({
+        hydratedItems = paymentData.items.map((item, index) => ({
           id: item.id,
           purchaseItemId: item.purchase_item_id,
           invoiceRef: item.invoice_ref || '',
@@ -812,9 +846,23 @@ export default function PaymentsForm({
           amount: parseFloat(item.amount) || 0,
           isOther: false,
         }))
-        setPaymentItems(items)
-      } else {
       }
+
+      setPaymentItems(hydratedItems)
+
+      lastJournalGenerationRef.current =
+        buildPaymentJournalGenerationSignature(
+          hydratedItems,
+          payment?.mode_of_payment || '',
+          payment?.bank_name || '',
+        )
+
+      pendingJournalHydrationRef.current = {
+        items: hydratedItems,
+        mode: payment?.mode_of_payment || '',
+        bank: payment?.bank_name || '',
+      }
+      journalHydrationSettledRef.current = false
 
       // Populate journal entries
       // Check if journal entries are in paymentData.journal or as a separate property
@@ -1167,13 +1215,39 @@ export default function PaymentsForm({
   const isLoadingData = useRef(false)
 
   useEffect(() => {
+    if (isViewMode) return
 
-
-    if (!isViewMode && !isLoadingData.current) {
-      generateJournalEntries()
-    } else {
-
+    // Hydration schedules state updates that have not been applied yet in
+    // this commit. Wait until items/mode/bank match the hydrated snapshot so
+    // a stale render cannot regenerate (and wipe) the stored journal entries.
+    const pendingHydration = pendingJournalHydrationRef.current
+    if (pendingHydration && !journalHydrationSettledRef.current) {
+      const settled =
+        paymentItems === pendingHydration.items &&
+        modeOfPayment === pendingHydration.mode &&
+        bankName === pendingHydration.bank
+      if (!settled) return
+      journalHydrationSettledRef.current = true
     }
+
+    const signature = buildPaymentJournalGenerationSignature(
+      paymentItems,
+      modeOfPayment,
+      bankName,
+    )
+
+    // First run only records the baseline (empty form or a document that is
+    // still hydrating). Hydration updates the ref itself before this effect
+    // runs, so loading an existing document never triggers regeneration.
+    if (lastJournalGenerationRef.current === null) {
+      lastJournalGenerationRef.current = signature
+      return
+    }
+
+    if (lastJournalGenerationRef.current === signature) return
+
+    lastJournalGenerationRef.current = signature
+    generateJournalEntries()
   }, [
     paymentItems,
     modeOfPayment,

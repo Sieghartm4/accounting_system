@@ -1430,7 +1430,7 @@ export default function CollectionsForm({
 
           id: entry.id,
 
-          account: entry.charts_of_accounts_name,
+          account: entry.coa_id,
 
           accountSearch: entry.charts_of_accounts_name,
 

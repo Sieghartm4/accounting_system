@@ -16,6 +16,37 @@ import connectRealtime from '../../utils/realtimeSocket'
 import { useNotificationsState } from '../../components/layout/NotificationContext'
 import { buildUnreadDocCounts } from '../../hooks/useNotifications'
 
+// Signature of everything that feeds the auto-generated journal entries. It is
+// used to tell a real user edit apart from the initial form hydration so that
+// loading an existing document never regenerates (and therefore rewrites) the
+// stored journal rows.
+const buildJournalGenerationSignature = (
+  items,
+  modeOfPayment = '',
+  bankName = '',
+) =>
+  JSON.stringify({
+    mode: modeOfPayment,
+    bank: bankName,
+    items: (items || []).map((item) => [
+      item.id ?? null,
+      item.productId ?? '',
+      item.coa ?? item.accountId ?? '',
+      item.description ?? '',
+      item.qty ?? '',
+      item.price ?? '',
+      item.discount ?? '',
+      item.discountType ?? '',
+      item.vat ?? '',
+      item.vatRate ?? '',
+      item.vatType ?? 'VAT-EX',
+      item.wht ?? '',
+      item.whtRate ?? '',
+      item.responsibilityCenter ?? '',
+      item.isOther ?? false,
+    ]),
+  })
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Drag to Scroll Hook
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,6 +159,29 @@ export function findDefaultVatOption(vatOptions) {
   )
 }
 
+// vatType (EX/INC) is not persisted, so it is inferred on hydration by
+// comparing the stored per-item income credit (grossEx) against both
+// formulas: EX -> qty*price, INC -> qty*price/(1+rate).
+const inferVatTypeFromJournal = (dbItem, journalRows) => {
+  const rate = parseFloat(dbItem.vat_rate) || 0
+  const gross = (parseFloat(dbItem.quantity) || 0) * (parseFloat(dbItem.sales_price) || 0)
+  if (rate <= 0 || gross <= 0) return 'VAT-EX'
+
+  const credits = (journalRows || []).filter(
+    (entry) =>
+      entry.type === 'CREDIT' &&
+      Number(entry.coa_id) === Number(dbItem.charts_of_accounts_id),
+  )
+  if (credits.length === 0) return 'VAT-EX'
+
+  const exAmount = gross
+  const incAmount = gross / (1 + rate / 100)
+  const minDiff = (target) =>
+    Math.min(...credits.map((e) => Math.abs((parseFloat(e.amount) || 0) - target)))
+
+  return minDiff(incAmount) < minDiff(exAmount) - 0.005 ? 'VAT-INC' : 'VAT-EX'
+}
+
 export function findDefaultWhtOption(whtOptions) {
   return whtOptions.find(
     (opt) =>
@@ -149,6 +203,9 @@ export function useReceiptsForm({
 }) {
   const [receiptItems, setReceiptItems] = useState([])
   const [journalEntries, setJournalEntries] = useState([])
+  const lastJournalGenerationRef = useRef(null)
+  const pendingJournalHydrationRef = useRef(null)
+  const journalHydrationSettledRef = useRef(true)
 
   const [customers, setCustomers] = useState([])
   const [customerLoading, setCustomerLoading] = useState(false)
@@ -489,34 +546,53 @@ export function useReceiptsForm({
         setRemarks(receipt.remarks || '')
       }
 
+      let hydratedItems = []
+      const journalRows = receiptData.journal || []
+
       if (receiptData.items && receiptData.items.length > 0) {
-        setReceiptItems(
-          receiptData.items.map((item) => ({
-            id: item.id,
-            productId: item.product_service_id,
-            productSearch: item.product_service_name,
-            coa: item.charts_of_accounts_id,
-            coaSearch: item.charts_of_accounts_name,
-            description: item.description || '',
-            qty: item.quantity || 1,
-            price: parseFloat(item.sales_price) || 0,
-            discount: parseFloat(item.discount) || 0,
-            discountType: item.discount_type || 'PERCENT',
-            vat: parseFloat(item.vat_id) || 0,
-            vatSearch: `${item.vat_code || ''} - ${item.vat_name || ''}`,
-            vatRate: parseFloat(item.vat_rate) || 0,
-            wht: parseFloat(item.withholding_tax_id) || 0,
-            whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
-            whtRate: parseFloat(item.withholding_tax_rate) || 0,
-            responsibilityCenter: item.responsibility_center || '',
-            isOther: false,
-          })),
-        )
+        hydratedItems = receiptData.items.map((item) => ({
+          id: item.id,
+          productId: item.product_service_id,
+          productSearch: item.product_service_name,
+          coa: item.charts_of_accounts_id,
+          coaSearch: item.charts_of_accounts_name,
+          description: item.description || '',
+          qty: item.quantity || 1,
+          price: parseFloat(item.sales_price) || 0,
+          discount: parseFloat(item.discount) || 0,
+          discountType: item.discount_type || 'PERCENT',
+          vat: parseFloat(item.vat_id) || 0,
+          vatSearch: `${item.vat_code || ''} - ${item.vat_name || ''}`,
+          vatRate: parseFloat(item.vat_rate) || 0,
+          vatType: inferVatTypeFromJournal(item, journalRows),
+          wht: parseFloat(item.withholding_tax_id) || 0,
+          whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
+          whtRate: parseFloat(item.withholding_tax_rate) || 0,
+          responsibilityCenter: item.responsibility_center || '',
+          isOther: false,
+        }))
       }
 
-      if (receiptData.journal && receiptData.journal.length > 0) {
+      setReceiptItems(hydratedItems)
+
+      const hydratedReceipt = receiptData.data?.[0]
+
+      lastJournalGenerationRef.current = buildJournalGenerationSignature(
+        hydratedItems,
+        hydratedReceipt?.mode || '',
+        hydratedReceipt?.bank_name || '',
+      )
+
+      pendingJournalHydrationRef.current = {
+        items: hydratedItems,
+        mode: hydratedReceipt?.mode || '',
+        bank: hydratedReceipt?.bank_name || '',
+      }
+      journalHydrationSettledRef.current = false
+
+      if (journalRows.length > 0) {
         setJournalEntries(
-          receiptData.journal.map((entry) => ({
+          journalRows.map((entry) => ({
             id: entry.id,
             account: entry.coa_id,
             accountSearch: entry.charts_of_accounts_name,
@@ -855,9 +931,40 @@ export function useReceiptsForm({
   )
 
   useEffect(() => {
-    if (!isDisabled && !isViewMode) {
-      generateJournalEntries()
+    if (isDisabled || isViewMode) return
+
+    // Hydration schedules state updates that have not been applied yet in
+    // this commit. Wait until receiptItems/mode/bank match the hydrated
+    // snapshot so a stale render cannot regenerate (and wipe) the stored
+    // journal entries.
+    const pendingHydration = pendingJournalHydrationRef.current
+    if (pendingHydration && !journalHydrationSettledRef.current) {
+      const settled =
+        receiptItems === pendingHydration.items &&
+        modeOfPayment === pendingHydration.mode &&
+        bankName === pendingHydration.bank
+      if (!settled) return
+      journalHydrationSettledRef.current = true
     }
+
+    const signature = buildJournalGenerationSignature(
+      receiptItems,
+      modeOfPayment,
+      bankName,
+    )
+
+    // First run only records the baseline (empty form or a document that is
+    // still hydrating). Hydration updates the ref itself before this effect
+    // runs, so loading an existing document never triggers regeneration.
+    if (lastJournalGenerationRef.current === null) {
+      lastJournalGenerationRef.current = signature
+      return
+    }
+
+    if (lastJournalGenerationRef.current === signature) return
+
+    lastJournalGenerationRef.current = signature
+    generateJournalEntries()
   }, [
     receiptItems,
     modeOfPayment,

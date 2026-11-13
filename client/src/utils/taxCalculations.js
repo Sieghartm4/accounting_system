@@ -78,17 +78,28 @@ export function computeLineFinancials(item) {
 // totals balance to the centava regardless of item count.
 export function computeRoundedLineFinancials(item) {
   const f = computeLineFinancials(item)
+  const grossEx = round2(f.grossEx)
+  const vatAmount = round2(f.vatAmount)
+  const discountBook = round2(f.discountBook)
+  const settledAmount = round2(f.settledAmount)
+
+  // Keep the line centavo-balanced: grossEx + vat - discountBook must equal
+  // the settled amount. Rounding each component independently can drift by
+  // a centavo (e.g. VAT-INCLUSIVE 321.86 @12% -> 287.38 + 34.49 = 321.87),
+  // so the residual is absorbed into the income/expense line.
+  const residual = round2(grossEx + vatAmount - discountBook - settledAmount)
+
   return {
     ...f,
     gross: round2(f.gross),
     discountAmount: round2(f.discountAmount),
     discounted: round2(f.discounted),
-    vatAmount: round2(f.vatAmount),
+    vatAmount,
     netBase: round2(f.netBase),
-    grossEx: round2(f.grossEx),
-    discountBook: round2(f.discountBook),
+    grossEx: round2(grossEx - residual),
+    discountBook,
     whtAmount: round2(f.whtAmount),
-    settledAmount: round2(f.settledAmount),
+    settledAmount,
   }
 }
 

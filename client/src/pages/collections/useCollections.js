@@ -774,6 +774,9 @@ const useCollections = () => {
   const handleEditFormSuccess = async (nextToast) => {
     if (nextToast) setToast(nextToast)
     await refetchCollections()
+    setIsEditing(false)
+    setEditingCollection(null)
+    setIsPostedEdit(false)
   }
 
   return {

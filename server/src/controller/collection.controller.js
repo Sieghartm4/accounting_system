@@ -36,6 +36,7 @@ const {
   assertPostedSafeEdit,
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
+const { moneyEqual, numericKey } = require('../util/documentDiff.util')
 
 const {
   findPeriodForDateKey,
@@ -724,6 +725,11 @@ const getAllCollections = async (req, res, next) => {
     const collection_journal_query = sql
       .select([
         { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+
+        {
+          col: Accounting.journal_entries.selectOptionColumns.coa_id,
+          as: 'coa_id',
+        },
 
         {
           col: Master.charts_of_accounts.selectOptionColumns.name,
@@ -2704,11 +2710,24 @@ const updateCollection = async (req, res, next) => {
         val === null || val === undefined ? '' : String(val).trim()
       const normalizeNumber = (val) =>
         val === null || val === undefined ? 0 : parseFloat(val)
+      const normalizeDateValue = (val) => {
+        if (val instanceof Date) return val.toISOString().slice(0, 10)
+        const s = normalizeValue(val)
+        const m = s.match(/^\d{4}-\d{2}-\d{2}/)
+        return m ? m[0] : s
+      }
+      const normalizeIdValue = (val) => {
+        const n = parseFloat(val)
+        return Number.isFinite(n) ? String(n) : normalizeValue(val)
+      }
 
       if (currentCollectionData.length > 0) {
         const current = currentCollectionData[0]
 
-        if (current.customer_id !== actualCustomerId) {
+        if (
+          normalizeIdValue(current.customer_id) !==
+          normalizeIdValue(actualCustomerId)
+        ) {
           auditChanges.push(
             `Customer ID: ${current.customer_id} → ${actualCustomerId}`,
           )
@@ -2748,8 +2767,8 @@ const updateCollection = async (req, res, next) => {
           )
         }
 
-        const currentCollectionDate = normalizeValue(current.collection_date)
-        const newCollectionDate = normalizeValue(collection_date)
+        const currentCollectionDate = normalizeDateValue(current.collection_date)
+        const newCollectionDate = normalizeDateValue(collection_date)
         if (currentCollectionDate !== newCollectionDate) {
           auditChanges.push(
             `Collection Date: ${currentCollectionDate || 'NULL'} → ${newCollectionDate || 'NULL'}`,
@@ -2767,22 +2786,53 @@ const updateCollection = async (req, res, next) => {
       }
 
       if (collection_items && collection_items.length > 0) {
+        const matchedItemIds = new Set()
+        const currentRows = currentItemsData[0] || []
         for (let i = 0; i < collection_items.length; i++) {
           const item = collection_items[i]
           let currentItem = null
 
           if (item.id) {
             // Find by ID if available
-            currentItem = currentItemsData[0]?.find((i) => i.id === item.id)
+            currentItem =
+              currentRows.find(
+                (row) => row.id === item.id && !matchedItemIds.has(row.id),
+              ) || null
           }
+
+          if (!currentItem && item.sales_id) {
+            // The client re-sends items without ids; pair each payload item
+            // with an unpaired stored row for the same sales invoice so
+            // unchanged items don't log as additions.
+            const unused = currentRows.filter(
+              (row) => !matchedItemIds.has(row.id),
+            )
+            const payloadAmount = item.amount ?? item.amount_applied
+            currentItem =
+              unused.find(
+                (existingItem) =>
+                  normalizeIdValue(existingItem.sales_id) ===
+                    normalizeIdValue(item.sales_id) &&
+                  moneyEqual(existingItem.amount, payloadAmount ?? 0),
+              ) ||
+              unused.find(
+                (existingItem) =>
+                  normalizeIdValue(existingItem.sales_id) ===
+                  normalizeIdValue(item.sales_id),
+              ) ||
+              null
+          }
+
+          if (currentItem) matchedItemIds.add(currentItem.id)
 
           if (currentItem) {
             // Only compare amount if it's provided in the request (not undefined/null)
-            if (item.amount !== undefined && item.amount !== null) {
+            const payloadAmount = item.amount ?? item.amount_applied
+            if (payloadAmount !== undefined && payloadAmount !== null) {
               const currentAmount = normalizeNumber(currentItem.amount)
-              const newAmount = normalizeNumber(item.amount)
+              const newAmount = normalizeNumber(payloadAmount)
 
-              if (currentAmount !== newAmount) {
+              if (!moneyEqual(currentAmount, newAmount)) {
                 auditChanges.push(
                   `Collection Item ${currentItem.id} Amount: ${currentAmount} → ${newAmount}`,
                 )
@@ -2799,6 +2849,8 @@ const updateCollection = async (req, res, next) => {
         }
       }
       if (journal_entries && journal_entries.length > 0) {
+        const matchedEntryIds = new Set()
+        const currentRows = currentJournalData[0] || []
         for (let i = 0; i < journal_entries.length; i++) {
           const entry = journal_entries[i]
           const type = entry.debit > 0 ? 'debit' : 'credit'
@@ -2807,35 +2859,36 @@ const updateCollection = async (req, res, next) => {
 
           if (entry.id) {
             // Find by ID if available
-            currentEntry = currentJournalData[0]?.find((j) => j.id === entry.id)
-          } else {
-            // If no ID, try to match by account_id, type, and position
-            currentEntry = currentJournalData[0]?.find(
-              (existingEntry, index) =>
-                existingEntry.account_id === entry.account_id &&
-                existingEntry.type.toLowerCase() === type &&
-                index === i,
-            )
-
-            // If still not found, try to match by account_id and type only
-            if (!currentEntry && entry.account_id) {
-              currentEntry = currentJournalData[0]?.find(
-                (existingEntry) =>
-                  existingEntry.account_id === entry.account_id &&
-                  existingEntry.type.toLowerCase() === type,
-              )
-            }
-
-            // If still not found, try to match by amount and type only
-            if (!currentEntry) {
-              currentEntry = currentJournalData[0]?.find(
-                (existingEntry) =>
-                  normalizeNumber(existingEntry.amount) ===
-                    normalizeNumber(amount) &&
-                  existingEntry.type.toLowerCase() === type,
-              )
-            }
+            currentEntry =
+              currentRows.find(
+                (row) => row.id === entry.id && !matchedEntryIds.has(row.id),
+              ) || null
           }
+
+          if (!currentEntry) {
+            // Match among rows not already paired with another payload entry.
+            const unused = currentRows.filter(
+              (row) => !matchedEntryIds.has(row.id),
+            )
+            const sameAccountAndType = (existingEntry) =>
+              numericKey(existingEntry.account_id) ===
+                numericKey(entry.account_id) &&
+              String(existingEntry.type || '').toLowerCase() === type
+            const sameAmountAndType = (existingEntry) =>
+              moneyEqual(existingEntry.amount, amount) &&
+              String(existingEntry.type || '').toLowerCase() === type
+
+            currentEntry =
+              unused.find(
+                (existingEntry, index) =>
+                  sameAccountAndType(existingEntry) && index === i,
+              ) ||
+              unused.find(sameAccountAndType) ||
+              unused.find(sameAmountAndType) ||
+              null
+          }
+
+          if (currentEntry) matchedEntryIds.add(currentEntry.id)
 
           if (currentEntry) {
             const currentRespCenter = normalizeValue(
@@ -2851,7 +2904,7 @@ const updateCollection = async (req, res, next) => {
 
             const currentAmount = normalizeNumber(currentEntry.amount)
             const newAmount = normalizeNumber(amount)
-            if (currentAmount !== newAmount) {
+            if (!moneyEqual(currentAmount, newAmount)) {
               auditChanges.push(
                 `Journal ${currentEntry.id} Amount: ${currentAmount} → ${newAmount}`,
               )
@@ -3014,14 +3067,14 @@ const updateCollection = async (req, res, next) => {
         type: 'DOCUMENT_UPDATED',
         module: 'collection',
         severity: 'info',
-        title: `Collection ${collectionId} updated`,
+        title: `Collection ${collection_id} updated`,
         body:
           auditChanges && auditChanges.length > 0
             ? auditChanges.join('; ')
-            : `Collection ${collectionId} was updated.`,
+            : `Collection ${collection_id} was updated.`,
         link: '/collections',
         entityType: 'collection',
-        entityId: collectionId,
+        entityId: collection_id,
         changes: auditChanges || [],
       })
 

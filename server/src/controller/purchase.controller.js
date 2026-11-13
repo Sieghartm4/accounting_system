@@ -67,6 +67,15 @@ const {
 } = require('../util/postedSafeEdit.util')
 
 const {
+  moneyEqual,
+  numericKey,
+  itemsEquivalentForModule,
+  journalsEquivalent,
+  itemsEquivalentFromDb,
+  journalsEquivalentFromDb,
+} = require('../util/documentDiff.util')
+
+const {
   findPeriodForDateKey,
   assertPeriodIsOpen,
   getPeriodKeyForDate,
@@ -3064,6 +3073,55 @@ const updatePurchase = async (req, res, next) => {
 
 
 
+      // Detect a metadata-only save. The client can re-send the same items and
+      // regenerated journal entries; when they match what is stored we leave
+      // the existing item/journal rows untouched so only the fields the user
+      // actually edited end up in the audit trail.
+      const itemsSame = await itemsEquivalentFromDb(
+        connection,
+        'purchase',
+        purchaseId,
+        Array.isArray(purchase_items)
+          ? purchase_items.map((item) => ({
+              product_id: item.product_service ?? item.product_id,
+              account_id: item.charts_of_accounts ?? item.account_id,
+              description: item.description,
+              qty: item.quantity ?? item.qty,
+              price: item.purchase_price ?? item.price,
+              discount: item.discount,
+              discount_type: item.discount_type,
+              vat: item.vat,
+              wtax: item.witholding_tax ?? item.withholding_tax ?? item.wtax,
+              responsibility_center: item.responsibility_center,
+            }))
+          : purchase_items,
+      )
+
+      // The purchase form submits journal entries with `charts_of_accounts`
+      // (DB column name) instead of `account_id`; normalize so equivalence
+      // checks and audit matching see a consistent shape.
+      const normalizedJournalEntries = Array.isArray(journal_entries)
+        ? journal_entries.map((entry) => ({
+            ...entry,
+            account_id: entry.account_id ?? entry.charts_of_accounts,
+          }))
+        : journal_entries
+
+      const journalsSame = await journalsEquivalentFromDb(
+        connection,
+        'purchase',
+        purchaseId,
+        normalizedJournalEntries,
+      )
+
+      const documentUnchanged = itemsSame && journalsSame
+
+      const effectiveTotalAmountDue = documentUnchanged
+        ? currentPurchaseData[0]?.total_amount_due ?? total_amount_due
+        : total_amount_due
+
+
+
       // Fetch current attachments BEFORE updates
 
       let currentAttachmentsData = []
@@ -3180,7 +3238,7 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-        total_amount_due || null,
+        effectiveTotalAmountDue || null,
 
 
 
@@ -3194,7 +3252,7 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-      if (purchase_items && purchase_items.length > 0) {
+      if (purchase_items && purchase_items.length > 0 && !itemsSame) {
 
         const existingItemsQuery = sql
 
@@ -3796,7 +3854,7 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-      if (journal_entries && journal_entries.length > 0) {
+      if (journal_entries && journal_entries.length > 0 && !journalsSame) {
 
         const existingEntriesQuery = sql
 
@@ -4492,17 +4550,11 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-        if (
-
-          normalizeNumber(current.total_amount_due) !==
-
-          normalizeNumber(total_amount_due)
-
-        ) {
+        if (!moneyEqual(current.total_amount_due, effectiveTotalAmountDue)) {
 
           auditChanges.push(
 
-            `Total Amount: ${current.total_amount_due} → ${total_amount_due}`,
+            `Total Amount: ${current.total_amount_due} → ${effectiveTotalAmountDue}`,
 
           )
 
@@ -4514,11 +4566,16 @@ const updatePurchase = async (req, res, next) => {
 
       // Track purchase items changes using data fetched earlier
 
-      if (purchase_items && purchase_items.length > 0) {
+      if (purchase_items && purchase_items.length > 0 && !itemsSame) {
 
         for (let i = 0; i < purchase_items.length; i++) {
 
           const item = purchase_items[i]
+
+          // The purchase form submits DB column names; accept both shapes.
+          const itemAccountId = item.account_id ?? item.charts_of_accounts
+          const itemQty = item.qty ?? item.quantity
+          const itemPrice = item.price ?? item.purchase_price
 
 
           let currentItem = null
@@ -4539,7 +4596,8 @@ const updatePurchase = async (req, res, next) => {
 
               (existingItem, index) =>
 
-                existingItem.account_id === item.account_id && index === i,
+                numericKey(existingItem.account_id) ===
+                  numericKey(itemAccountId) && index === i,
 
             )
 
@@ -4547,11 +4605,13 @@ const updatePurchase = async (req, res, next) => {
 
             // If still not found, try to match by account_id only
 
-            if (!currentItem && item.account_id) {
+            if (!currentItem && itemAccountId) {
 
               currentItem = currentItemsData[0]?.find(
 
-                (existingItem) => existingItem.account_id === item.account_id,
+                (existingItem) =>
+                  numericKey(existingItem.account_id) ===
+                  numericKey(itemAccountId),
 
               )
 
@@ -4566,15 +4626,15 @@ const updatePurchase = async (req, res, next) => {
 
             // Only compare qty if it's provided in the request (not undefined/null)
 
-            if (item.qty !== undefined && item.qty !== null) {
+            if (itemQty !== undefined && itemQty !== null) {
 
               const currentQty = normalizeNumber(currentItem.quantity)
 
-              const newQty = normalizeNumber(item.qty)
+              const newQty = normalizeNumber(itemQty)
 
 
 
-              if (currentQty !== newQty) {
+              if (numericKey(currentQty) !== numericKey(newQty)) {
 
                 auditChanges.push(
 
@@ -4590,15 +4650,15 @@ const updatePurchase = async (req, res, next) => {
 
             // Only compare price if it's provided in the request (not undefined/null)
 
-            if (item.price !== undefined && item.price !== null) {
+            if (itemPrice !== undefined && itemPrice !== null) {
 
               const currentPrice = normalizeNumber(currentItem.purchase_price)
 
-              const newPrice = normalizeNumber(item.price)
+              const newPrice = normalizeNumber(itemPrice)
 
 
 
-              if (currentPrice !== newPrice) {
+              if (!moneyEqual(currentPrice, newPrice)) {
 
                 auditChanges.push(
 
@@ -4678,11 +4738,17 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-      if (journal_entries && journal_entries.length > 0) {
+      if (journal_entries && journal_entries.length > 0 && !journalsSame) {
 
-        for (let i = 0; i < journal_entries.length; i++) {
+        const auditJournalEntries = normalizedJournalEntries || journal_entries
 
-          const entry = journal_entries[i]
+        const matchedEntryIds = new Set()
+
+        const currentRows = currentJournalData[0] || []
+
+        for (let i = 0; i < auditJournalEntries.length; i++) {
+
+          const entry = auditJournalEntries[i]
 
           const type = entry.debit > 0 ? 'debit' : 'credit'
 
@@ -4696,63 +4762,42 @@ const updatePurchase = async (req, res, next) => {
 
             // Find by ID if available
 
-            currentEntry = currentJournalData[0]?.find((j) => j.id === entry.id)
-
-          } else {
-
-            // If no ID, try to match by account_id, type, and position
-
-            currentEntry = currentJournalData[0]?.find(
-
-              (existingEntry, index) =>
-
-                existingEntry.account_id === entry.account_id &&
-
-                existingEntry.type.toLowerCase() === type &&
-
-                index === i,
-
-            )
-
-
-
-            // If still not found, try to match by account_id and type only
-
-            if (!currentEntry && entry.account_id) {
-
-              currentEntry = currentJournalData[0]?.find(
-
-                (existingEntry) =>
-
-                  existingEntry.account_id === entry.account_id &&
-
-                  existingEntry.type.toLowerCase() === type,
-
-              )
-
-            }
-
-
-
-            // If still not found, try to match by amount and type only
-
-            if (!currentEntry) {
-
-              currentEntry = currentJournalData[0]?.find(
-
-                (existingEntry) =>
-
-                  normalizeNumber(existingEntry.amount) ===
-
-                    normalizeNumber(amount) &&
-
-                  existingEntry.type.toLowerCase() === type,
-
-              )
-
-            }
+            currentEntry =
+              currentRows.find(
+                (row) => row.id === entry.id && !matchedEntryIds.has(row.id),
+              ) || null
 
           }
+
+          if (!currentEntry) {
+
+            // Match among rows not already paired with another payload entry.
+
+            const unused = currentRows.filter(
+              (row) => !matchedEntryIds.has(row.id),
+            )
+
+            const sameAccountAndType = (existingEntry) =>
+              numericKey(existingEntry.account_id) ===
+                numericKey(entry.account_id) &&
+              String(existingEntry.type || '').toLowerCase() === type
+
+            const sameAmountAndType = (existingEntry) =>
+              moneyEqual(existingEntry.amount, amount) &&
+              String(existingEntry.type || '').toLowerCase() === type
+
+            currentEntry =
+              unused.find(
+                (existingEntry, index) =>
+                  sameAccountAndType(existingEntry) && index === i,
+              ) ||
+              unused.find(sameAccountAndType) ||
+              unused.find(sameAmountAndType) ||
+              null
+
+          }
+
+          if (currentEntry) matchedEntryIds.add(currentEntry.id)
 
 
           if (currentEntry) {
@@ -4783,7 +4828,7 @@ const updatePurchase = async (req, res, next) => {
 
             const newAmount = normalizeNumber(amount)
 
-            if (currentAmount !== newAmount) {
+            if (!moneyEqual(currentAmount, newAmount)) {
 
               auditChanges.push(
 

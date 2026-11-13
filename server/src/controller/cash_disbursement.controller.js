@@ -36,6 +36,12 @@ const {
   assertPostedSafeEdit,
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
+const {
+  moneyEqual,
+  numericKey,
+  itemsEquivalentFromDb,
+  journalsEquivalentFromDb,
+} = require('../util/documentDiff.util')
 
 const {
   findPeriodForDateKey,
@@ -1160,6 +1166,30 @@ const updateCashDisbursement = async (req, res, next) => {
         disbursementId,
       ])
 
+      // Detect a metadata-only save. The client re-sends recomputed totals and
+      // regenerated journal entries; when items and journals match what is
+      // stored we keep the existing total so only fields the user actually
+      // edited end up changed (and in the audit trail).
+      const itemsSame = await itemsEquivalentFromDb(
+        connection,
+        'cash_disbursements',
+        disbursementId,
+        disbursement_items,
+      )
+
+      const journalsSame = await journalsEquivalentFromDb(
+        connection,
+        'cash_disbursements',
+        disbursementId,
+        journal_entries,
+      )
+
+      const documentUnchanged = itemsSame && journalsSame
+
+      const effectiveTotalAmountDue = documentUnchanged
+        ? currentDisbursementData[0]?.total_amount_due ?? total_amount_due
+        : total_amount_due
+
       const updateMainQuery = sql
         .update(Accounting.cash_disbursements.tablename)
         .set([
@@ -1183,7 +1213,7 @@ const updateCashDisbursement = async (req, res, next) => {
         bank_name || null,
         check_number || null,
         remarks || null,
-        total_amount_due || null,
+        effectiveTotalAmountDue || null,
         disbursementId,
       ]
 
@@ -1636,6 +1666,16 @@ const updateCashDisbursement = async (req, res, next) => {
         val === null || val === undefined
           ? 0
           : parseFloat(parseFloat(val).toFixed(2))
+      const normalizeDateValue = (val) => {
+        if (val instanceof Date) return val.toISOString().slice(0, 10)
+        const s = normalizeValue(val)
+        const m = s.match(/^\d{4}-\d{2}-\d{2}/)
+        return m ? m[0] : s
+      }
+      const normalizeIdValue = (val) => {
+        const n = parseFloat(val)
+        return Number.isFinite(n) ? String(n) : normalizeValue(val)
+      }
 
       if (currentDisbursementData.length > 0) {
         const current = currentDisbursementData[0]
@@ -1658,12 +1698,14 @@ const updateCashDisbursement = async (req, res, next) => {
           )
         }
 
-        if (current.vendor_id !== vendor_id) {
+        if (
+          normalizeIdValue(current.vendor_id) !== normalizeIdValue(vendor_id)
+        ) {
           auditChanges.push(`Vendor ID: ${current.vendor_id} → ${vendor_id}`)
         }
 
-        const currentPaymentDate = normalizeValue(current.payment_date)
-        const newPaymentDate = normalizeValue(payment_date)
+        const currentPaymentDate = normalizeDateValue(current.payment_date)
+        const newPaymentDate = normalizeDateValue(payment_date)
         if (currentPaymentDate !== newPaymentDate) {
           auditChanges.push(
             `Payment Date: ${currentPaymentDate || 'NULL'} → ${newPaymentDate || 'NULL'}`,
@@ -1694,38 +1736,57 @@ const updateCashDisbursement = async (req, res, next) => {
           )
         }
 
-        if (
-          normalizeNumber(current.total_amount_due) !==
-          normalizeNumber(total_amount_due)
-        ) {
+        if (!moneyEqual(current.total_amount_due, effectiveTotalAmountDue)) {
           auditChanges.push(
-            `Total Amount: ${current.total_amount_due} → ${total_amount_due}`,
+            `Total Amount: ${current.total_amount_due} → ${effectiveTotalAmountDue}`,
           )
         }
       }
 
       if (disbursement_items && disbursement_items.length > 0) {
+        const matchedItemIds = new Set()
+        const currentRows = currentItemsData[0] || []
         for (let i = 0; i < disbursement_items.length; i++) {
           const item = disbursement_items[i]
           let currentItem = null
 
           if (item.id) {
             // Find by ID if available
-            currentItem = currentItemsData[0]?.find((i) => i.id === item.id)
-          } else {
-            // If no ID, try to match by account_id and position
-            currentItem = currentItemsData[0]?.find(
-              (existingItem, index) =>
-                existingItem.account_id === item.account_id && index === i,
-            )
-
-            // If still not found, try to match by account_id only
-            if (!currentItem && item.account_id) {
-              currentItem = currentItemsData[0]?.find(
-                (existingItem) => existingItem.account_id === item.account_id,
-              )
-            }
+            currentItem =
+              currentRows.find(
+                (row) => row.id === item.id && !matchedItemIds.has(row.id),
+              ) || null
           }
+
+          if (!currentItem) {
+            // If no ID match, pair with an unused row by account, position,
+            // and price so unchanged items don't log phantom diffs.
+            const unused = currentRows.filter(
+              (row) => !matchedItemIds.has(row.id),
+            )
+            currentItem =
+              unused.find(
+                (existingItem, index) =>
+                  numericKey(existingItem.account_id) ===
+                    numericKey(item.account_id) &&
+                  index === i &&
+                  moneyEqual(existingItem.purchase_price, item.price ?? 0),
+              ) ||
+              unused.find(
+                (existingItem) =>
+                  numericKey(existingItem.account_id) ===
+                    numericKey(item.account_id) &&
+                  moneyEqual(existingItem.purchase_price, item.price ?? 0),
+              ) ||
+              unused.find(
+                (existingItem) =>
+                  numericKey(existingItem.account_id) ===
+                  numericKey(item.account_id),
+              ) ||
+              null
+          }
+
+          if (currentItem) matchedItemIds.add(currentItem.id)
 
           if (currentItem) {
             // Only compare qty if it's provided in the request (not undefined/null)
@@ -1733,7 +1794,7 @@ const updateCashDisbursement = async (req, res, next) => {
               const currentQty = normalizeNumber(currentItem.quantity)
               const newQty = normalizeNumber(item.qty)
 
-              if (currentQty !== newQty) {
+              if (numericKey(currentQty) !== numericKey(newQty)) {
                 auditChanges.push(
                   `Item ${currentItem.id} Qty: ${currentQty} → ${newQty}`,
                 )
@@ -1745,7 +1806,7 @@ const updateCashDisbursement = async (req, res, next) => {
               const currentPrice = normalizeNumber(currentItem.purchase_price)
               const newPrice = normalizeNumber(item.price)
 
-              if (currentPrice !== newPrice) {
+              if (!moneyEqual(currentPrice, newPrice)) {
                 auditChanges.push(
                   `Item ${currentItem.id} Price: ${currentPrice} → ${newPrice}`,
                 )
@@ -1786,6 +1847,8 @@ const updateCashDisbursement = async (req, res, next) => {
       }
 
       if (journal_entries && journal_entries.length > 0) {
+        const matchedEntryIds = new Set()
+        const currentRows = currentJournalData[0] || []
         for (let i = 0; i < journal_entries.length; i++) {
           const entry = journal_entries[i]
           const type = entry.debit > 0 ? 'debit' : 'credit'
@@ -1794,35 +1857,36 @@ const updateCashDisbursement = async (req, res, next) => {
 
           if (entry.id) {
             // Find by ID if available
-            currentEntry = currentJournalData[0]?.find((j) => j.id === entry.id)
-          } else {
-            // If no ID, try to match by account_id, type, and position
-            currentEntry = currentJournalData[0]?.find(
-              (existingEntry, index) =>
-                existingEntry.account_id === entry.account_id &&
-                existingEntry.type.toLowerCase() === type &&
-                index === i,
-            )
-
-            // If still not found, try to match by account_id and type only
-            if (!currentEntry && entry.account_id) {
-              currentEntry = currentJournalData[0]?.find(
-                (existingEntry) =>
-                  existingEntry.account_id === entry.account_id &&
-                  existingEntry.type.toLowerCase() === type,
-              )
-            }
-
-            // If still not found, try to match by amount and type only
-            if (!currentEntry) {
-              currentEntry = currentJournalData[0]?.find(
-                (existingEntry) =>
-                  normalizeNumber(existingEntry.amount) ===
-                    normalizeNumber(amount) &&
-                  existingEntry.type.toLowerCase() === type,
-              )
-            }
+            currentEntry =
+              currentRows.find(
+                (row) => row.id === entry.id && !matchedEntryIds.has(row.id),
+              ) || null
           }
+
+          if (!currentEntry) {
+            // Match among rows not already paired with another payload entry.
+            const unused = currentRows.filter(
+              (row) => !matchedEntryIds.has(row.id),
+            )
+            const sameAccountAndType = (existingEntry) =>
+              numericKey(existingEntry.account_id) ===
+                numericKey(entry.account_id) &&
+              String(existingEntry.type || '').toLowerCase() === type
+            const sameAmountAndType = (existingEntry) =>
+              moneyEqual(existingEntry.amount, amount) &&
+              String(existingEntry.type || '').toLowerCase() === type
+
+            currentEntry =
+              unused.find(
+                (existingEntry, index) =>
+                  sameAccountAndType(existingEntry) && index === i,
+              ) ||
+              unused.find(sameAccountAndType) ||
+              unused.find(sameAmountAndType) ||
+              null
+          }
+
+          if (currentEntry) matchedEntryIds.add(currentEntry.id)
 
           if (currentEntry) {
             const currentRespCenter = normalizeValue(
@@ -1838,7 +1902,7 @@ const updateCashDisbursement = async (req, res, next) => {
 
             const currentAmount = normalizeNumber(currentEntry.amount)
             const newAmount = normalizeNumber(amount)
-            if (currentAmount !== newAmount) {
+            if (!moneyEqual(currentAmount, newAmount)) {
               auditChanges.push(
                 `Journal ${currentEntry.id} Amount: ${currentAmount} → ${newAmount}`,
               )

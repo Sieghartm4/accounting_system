@@ -19,6 +19,62 @@ import {
 } from '../../utils/taxCalculations'
 import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 
+// Signature of everything that feeds the auto-generated journal entries. It is
+// used to tell a real user edit apart from the initial form hydration so that
+// loading an existing document never regenerates (and therefore rewrites) the
+// stored journal rows.
+const buildJournalGenerationSignature = (
+  items,
+  modeOfPayment = '',
+  bankName = '',
+) =>
+  JSON.stringify({
+    mode: modeOfPayment,
+    bank: bankName,
+    items: (items || []).map((item) => [
+      item.id ?? null,
+      item.productId ?? '',
+      item.coa ?? item.accountId ?? '',
+      item.description ?? '',
+      item.qty ?? '',
+      item.price ?? '',
+      item.discount ?? '',
+      item.discountType ?? '',
+      item.vat ?? '',
+      item.vatRate ?? '',
+      item.vatType ?? 'VAT-EX',
+      item.wht ?? '',
+      item.whtRate ?? '',
+      item.responsibilityCenter ?? '',
+      item.isOther ?? false,
+    ]),
+  })
+
+// vatType (EX/INC) is not persisted, so it is inferred on hydration by
+// comparing the stored per-item expense debit (grossEx) against both
+// formulas: EX -> qty*price, INC -> qty*price/(1+rate).
+const inferVatTypeFromJournal = (dbItem, journalRows) => {
+  const rate = parseFloat(dbItem.vat_rate) || 0
+  const gross =
+    (parseFloat(dbItem.quantity) || 0) * (parseFloat(dbItem.purchase_price) || 0)
+  if (rate <= 0 || gross <= 0) return 'VAT-EX'
+
+  const debits = (journalRows || []).filter(
+    (entry) =>
+      entry.type === 'DEBIT' &&
+      Number(entry.coa_id ?? entry.charts_of_accounts_id) ===
+        Number(dbItem.charts_of_accounts_id),
+  )
+  if (debits.length === 0) return 'VAT-EX'
+
+  const exAmount = gross
+  const incAmount = gross / (1 + rate / 100)
+  const minDiff = (target) =>
+    Math.min(...debits.map((e) => Math.abs((parseFloat(e.amount) || 0) - target)))
+
+  return minDiff(incAmount) < minDiff(exAmount) - 0.005 ? 'VAT-INC' : 'VAT-EX'
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Drag to Scroll Hook
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,6 +213,9 @@ export function useDisbursementForm({
       isManual: false,
     },
   ])
+  const lastJournalGenerationRef = useRef(null)
+  const pendingJournalHydrationRef = useRef(null)
+  const journalHydrationSettledRef = useRef(true)
 
   const [vendors, setVendors] = useState([])
   const [vendorLoading, setVendorLoading] = useState(false)
@@ -503,33 +562,49 @@ export function useDisbursementForm({
       setPaymentDate(mainData?.payment_date || '')
       setRemarks(mainData?.remarks || '')
 
+      let hydratedItems = []
+
       if (itemsData.length > 0) {
-        setDisbursementItems(
-          itemsData.map((item) => ({
-            id: item.id,
-            productId: item.product_service_id,
-            productSearch: item.product_service_name,
-            coa: item.charts_of_accounts_id,
-            coaSearch: item.charts_of_accounts_name,
-            description: item.description,
-            qty: item.quantity,
-            price: item.purchase_price,
-            discount: item.discount,
-            discountType: item.discount_type || 'PERCENT',
-            vat: parseFloat(item.vat_id) || 0,
-            vatSearch: `${item.vat_code || ''} - ${item.vat_name || ''}`,
-            vatRate: parseFloat(item.vat_rate) || 0,
-            vat_code: item.vat_code,
-            vat_name: item.vat_name,
-            wht: parseFloat(item.withholding_tax_id) || 0,
-            whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
-            whtRate: parseFloat(item.withholding_tax_rate) || 0,
-            withholding_tax_code: item.withholding_tax_code,
-            responsibilityCenter: item.responsibility_center,
-            isOther: false,
-          })),
-        )
+        hydratedItems = itemsData.map((item) => ({
+          id: item.id,
+          productId: item.product_service_id,
+          productSearch: item.product_service_name,
+          coa: item.charts_of_accounts_id,
+          coaSearch: item.charts_of_accounts_name,
+          description: item.description,
+          qty: item.quantity,
+          price: item.purchase_price,
+          discount: item.discount,
+          discountType: item.discount_type || 'PERCENT',
+          vat: parseFloat(item.vat_id) || 0,
+          vatSearch: `${item.vat_code || ''} - ${item.vat_name || ''}`,
+          vatRate: parseFloat(item.vat_rate) || 0,
+          vatType: inferVatTypeFromJournal(item, journalData),
+          vat_code: item.vat_code,
+          vat_name: item.vat_name,
+          wht: parseFloat(item.withholding_tax_id) || 0,
+          whtSearch: `${item.withholding_tax_code || ''} - ${item.withholding_tax_rate || ''} %`,
+          whtRate: parseFloat(item.withholding_tax_rate) || 0,
+          withholding_tax_code: item.withholding_tax_code,
+          responsibilityCenter: item.responsibility_center,
+          isOther: false,
+        }))
       }
+
+      setDisbursementItems(hydratedItems)
+
+      lastJournalGenerationRef.current = buildJournalGenerationSignature(
+        hydratedItems,
+        mainData?.mode || '',
+        mainData?.bank_name || '',
+      )
+
+      pendingJournalHydrationRef.current = {
+        items: hydratedItems,
+        mode: mainData?.mode || '',
+        bank: mainData?.bank_name || '',
+      }
+      journalHydrationSettledRef.current = false
 
       if (journalData.length > 0) {
         setJournalEntries(
@@ -973,9 +1048,39 @@ export function useDisbursementForm({
   )
 
   useEffect(() => {
-    if (!isViewMode) {
-      generateJournalEntries()
+    if (isViewMode) return
+
+    // Hydration schedules state updates that have not been applied yet in
+    // this commit. Wait until items/mode/bank match the hydrated snapshot so
+    // a stale render cannot regenerate (and wipe) the stored journal entries.
+    const pendingHydration = pendingJournalHydrationRef.current
+    if (pendingHydration && !journalHydrationSettledRef.current) {
+      const settled =
+        disbursementItems === pendingHydration.items &&
+        modeOfPayment === pendingHydration.mode &&
+        bankName === pendingHydration.bank
+      if (!settled) return
+      journalHydrationSettledRef.current = true
     }
+
+    const signature = buildJournalGenerationSignature(
+      disbursementItems,
+      modeOfPayment,
+      bankName,
+    )
+
+    // First run only records the baseline (empty form or a document that is
+    // still hydrating). Hydration updates the ref itself before this effect
+    // runs, so loading an existing document never triggers regeneration.
+    if (lastJournalGenerationRef.current === null) {
+      lastJournalGenerationRef.current = signature
+      return
+    }
+
+    if (lastJournalGenerationRef.current === signature) return
+
+    lastJournalGenerationRef.current = signature
+    generateJournalEntries()
   }, [
     disbursementItems,
     modeOfPayment,

@@ -3161,14 +3161,14 @@ const updatePayment = async (req, res, next) => {
         type: 'DOCUMENT_UPDATED',
         module: 'payments',
         severity: 'info',
-        title: `Payment ${paymentId} updated`,
+        title: `Payment ${payment_id} updated`,
         body:
           auditChanges && auditChanges.length > 0
             ? auditChanges.join('; ')
-            : `Payment ${paymentId} was updated.`,
+            : `Payment ${payment_id} was updated.`,
         link: '/payments',
         entityType: 'payment',
-        entityId: paymentId,
+        entityId: payment_id,
         changes: auditChanges || [],
       })
 

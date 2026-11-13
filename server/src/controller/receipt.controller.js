@@ -33,6 +33,7 @@ const {
   assertPostedSafeEdit,
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
+const { moneyEqual, numericKey } = require('../util/documentDiff.util')
 const { notifyFromController } = require('../services/notification/notifyFromController')
 
 const {
@@ -1525,6 +1526,11 @@ const updateReceipt = async (req, res, next) => {
             { col: Accounting.receipt_items.selectOptionColumns.id, as: 'id' },
 
             {
+              col: Accounting.receipt_items.selectOptionColumns.charts_of_accounts,
+              as: 'account_id',
+            },
+
+            {
               col: Accounting.receipt_items.selectOptionColumns.quantity,
               as: 'quantity',
             },
@@ -1563,6 +1569,11 @@ const updateReceipt = async (req, res, next) => {
         const currentJournalQuery = sql
           .select([
             { col: Accounting.journal_entries.selectOptionColumns.id, as: 'id' },
+
+            {
+              col: Accounting.journal_entries.selectOptionColumns.coa_id,
+              as: 'account_id',
+            },
 
             {
               col: Accounting.journal_entries.selectOptionColumns
@@ -1996,6 +2007,16 @@ const updateReceipt = async (req, res, next) => {
         val === null || val === undefined ? '' : String(val).trim()
       const normalizeNumber = (val) =>
         val === null || val === undefined ? 0 : parseFloat(val)
+      const normalizeDateValue = (val) => {
+        if (val instanceof Date) return val.toISOString().slice(0, 10)
+        const s = normalizeValue(val)
+        const m = s.match(/^\d{4}-\d{2}-\d{2}/)
+        return m ? m[0] : s
+      }
+      const normalizeIdValue = (val) => {
+        const n = parseFloat(val)
+        return Number.isFinite(n) ? String(n) : normalizeValue(val)
+      }
 
 
       if (currentReceiptData.length > 0) {
@@ -2019,12 +2040,15 @@ const updateReceipt = async (req, res, next) => {
           )
         }
 
-        if (current.customer_id !== customer_id) {
+        if (
+          normalizeIdValue(current.customer_id) !==
+          normalizeIdValue(customer_id)
+        ) {
           auditChanges.push(`Customer ID: ${current.customer_id} → ${customer_id}`)
         }
 
-        const currentCollectionDate = normalizeValue(current.collection_date)
-        const newCollectionDate = normalizeValue(payment_date)
+        const currentCollectionDate = normalizeDateValue(current.collection_date)
+        const newCollectionDate = normalizeDateValue(payment_date)
         if (currentCollectionDate !== newCollectionDate) {
           auditChanges.push(
             `Collection Date: ${currentCollectionDate || 'NULL'} → ${newCollectionDate || 'NULL'}`,
@@ -2055,56 +2079,88 @@ const updateReceipt = async (req, res, next) => {
           )
         }
 
-        if (
-          normalizeNumber(current.total_amount_due) !==
-          normalizeNumber(total_amount_due)
-        ) {
+        if (!moneyEqual(current.total_amount_due, total_amount_due)) {
           auditChanges.push(
             `Total Amount: ${current.total_amount_due} → ${total_amount_due}`,
           )
         }
       }
       if (receipt_items && receipt_items.length > 0) {
+        const matchedItemIds = new Set()
+        const currentRows = currentItemsData[0] || []
         for (const item of receipt_items) {
+          let currentItem = null
+
           if (item.id) {
-            const currentItem = currentItemsData[0]?.find((i) => i.id === item.id)
+            currentItem =
+              currentRows.find(
+                (row) => row.id === item.id && !matchedItemIds.has(row.id),
+              ) || null
+          }
 
-            if (currentItem) {
-              const currentQty = normalizeNumber(currentItem.quantity)
-              const newQty = normalizeNumber(item.qty)
+          if (!currentItem) {
+            const unused = currentRows.filter(
+              (row) => !matchedItemIds.has(row.id),
+            )
+            currentItem =
+              unused.find(
+                (existingItem) =>
+                  numericKey(existingItem.account_id) ===
+                    numericKey(item.account_id) &&
+                  numericKey(existingItem.quantity) === numericKey(item.qty) &&
+                  moneyEqual(existingItem.sales_price, item.price ?? 0),
+              ) ||
+              unused.find(
+                (existingItem) =>
+                  numericKey(existingItem.account_id) ===
+                    numericKey(item.account_id) &&
+                  moneyEqual(existingItem.sales_price, item.price ?? 0),
+              ) ||
+              unused.find(
+                (existingItem) =>
+                  numericKey(existingItem.account_id) ===
+                  numericKey(item.account_id),
+              ) ||
+              null
+          }
 
-              if (currentQty !== newQty) {
-                auditChanges.push(`Item ${item.id} Qty: ${currentQty} → ${newQty}`)
-              }
+          if (currentItem) matchedItemIds.add(currentItem.id)
 
-              const currentPrice = normalizeNumber(currentItem.sales_price)
-              const newPrice = normalizeNumber(item.price)
- 
-              if (currentPrice !== newPrice) {
-                auditChanges.push(
-                  `Item ${item.id} Price: ${currentPrice} → ${newPrice}`,
-                )
-              }
+          if (currentItem) {
+            const currentQty = normalizeNumber(currentItem.quantity)
+            const newQty = normalizeNumber(item.qty)
 
-              const currentDesc = normalizeValue(currentItem.description)
-              const newDesc = normalizeValue(item.description)
+            if (numericKey(currentQty) !== numericKey(newQty)) {
+              auditChanges.push(`Item ${currentItem.id} Qty: ${currentQty} → ${newQty}`)
+            }
 
-              if (currentDesc !== newDesc) {
-                auditChanges.push(
-                  `Item ${item.id} Desc: ${currentDesc || 'NULL'} → ${newDesc || 'NULL'}`,
-                )
-              }
+            const currentPrice = normalizeNumber(currentItem.sales_price)
+            const newPrice = normalizeNumber(item.price)
 
-              const currentRespCenter = normalizeValue(
-                currentItem.responsibility_center,
+            if (!moneyEqual(currentPrice, newPrice)) {
+              auditChanges.push(
+                `Item ${currentItem.id} Price: ${currentPrice} → ${newPrice}`,
               )
-              const newRespCenter = normalizeValue(item.responsibility_center)
+            }
 
-              if (currentRespCenter !== newRespCenter) {
-                auditChanges.push(
-                  `Item ${item.id} Resp Center: ${currentRespCenter || 'NULL'} → ${newRespCenter || 'NULL'}`,
-                )
-              }
+            const currentDesc = normalizeValue(currentItem.description)
+            const newDesc = normalizeValue(item.description)
+
+            if (currentDesc !== newDesc) {
+              auditChanges.push(
+                `Item ${currentItem.id} Desc: ${currentDesc || 'NULL'} → ${newDesc || 'NULL'}`,
+              )
+            }
+
+            const currentRespCenter = normalizeValue(
+              currentItem.responsibility_center,
+            )
+            const newRespCenter = normalizeValue(item.responsibility_center)
+
+            if (currentRespCenter !== newRespCenter) {
+              auditChanges.push(
+                `Item ${currentItem.id} Resp Center: ${currentRespCenter || 'NULL'} → ${newRespCenter || 'NULL'}`,
+              )
             }
           } else {
             auditChanges.push(
@@ -2115,40 +2171,65 @@ const updateReceipt = async (req, res, next) => {
       }
 
       if (journal_entries && journal_entries.length > 0) {
+        const matchedEntryIds = new Set()
+        const currentRows = currentJournalData[0] || []
         for (const entry of journal_entries) {
+          const type = entry.debit > 0 ? 'debit' : 'credit'
+          const amount = entry.debit > 0 ? entry.debit : entry.credit
+          let currentEntry = null
+
           if (entry.id) {
-            const currentEntry = currentJournalData[0]?.find(
-              (j) => j.id === entry.id,
+            currentEntry =
+              currentRows.find(
+                (row) => row.id === entry.id && !matchedEntryIds.has(row.id),
+              ) || null
+          }
+
+          if (!currentEntry) {
+            const unused = currentRows.filter(
+              (row) => !matchedEntryIds.has(row.id),
             )
-            if (currentEntry) {
-              const type = entry.debit > 0 ? 'debit' : 'credit'
-              const amount = entry.debit > 0 ? entry.debit : entry.credit
+            const sameAccountAndType = (existingEntry) =>
+              numericKey(existingEntry.account_id) ===
+                numericKey(entry.account_id) &&
+              String(existingEntry.type || '').toLowerCase() === type
+            const sameAmountAndType = (existingEntry) =>
+              moneyEqual(existingEntry.amount, amount) &&
+              String(existingEntry.type || '').toLowerCase() === type
 
-              const currentRespCenter = normalizeValue(
-                currentEntry.responsibility_center,
+            currentEntry =
+              unused.find(sameAccountAndType) ||
+              unused.find(sameAmountAndType) ||
+              null
+          }
+
+          if (currentEntry) matchedEntryIds.add(currentEntry.id)
+
+          if (currentEntry) {
+            const currentRespCenter = normalizeValue(
+              currentEntry.responsibility_center,
+            )
+            const newRespCenter = normalizeValue(entry.responsibility_center)
+
+            if (currentRespCenter !== newRespCenter) {
+              auditChanges.push(
+                `Journal ${currentEntry.id} Resp Center: ${currentRespCenter || 'NULL'} → ${newRespCenter || 'NULL'}`,
               )
-              const newRespCenter = normalizeValue(entry.responsibility_center)
+            }
 
-              if (currentRespCenter !== newRespCenter) {
-                auditChanges.push(
-                  `Journal ${entry.id} Resp Center: ${currentRespCenter || 'NULL'} → ${newRespCenter || 'NULL'}`,
-                )
-              }
+            const currentAmount = normalizeNumber(currentEntry.amount)
+            const newAmount = normalizeNumber(amount)
+            if (!moneyEqual(currentAmount, newAmount)) {
+              auditChanges.push(
+                `Journal ${currentEntry.id} Amount: ${currentAmount} → ${newAmount}`,
+              )
+            }
 
-              const currentAmount = normalizeNumber(currentEntry.amount)
-              const newAmount = normalizeNumber(amount)
-              if (currentAmount !== newAmount) {
-                auditChanges.push(
-                  `Journal ${entry.id} Amount: ${currentAmount} → ${newAmount}`,
-                )
-              }
-
-              const currentType = normalizeValue(currentEntry.type)
-              if (currentType.toLowerCase() !== type.toLowerCase()) {
-                auditChanges.push(
-                  `Journal ${entry.id} Type: ${currentType} → ${type}`,
-                )
-              }
+            const currentType = normalizeValue(currentEntry.type)
+            if (currentType.toLowerCase() !== type.toLowerCase()) {
+              auditChanges.push(
+                `Journal ${currentEntry.id} Type: ${currentType} → ${type}`,
+              )
             }
           } else {
             auditChanges.push(
