@@ -10,6 +10,8 @@ import {
   ClipboardList,
   Wallet,
   ListStart,
+  Check,
+  X
 } from 'lucide-react'
 import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
 import { SequenceSettingsModal } from '../../components/modals'
@@ -187,80 +189,80 @@ function AdjustmentsContent() {
           </div>
         </motion.div>
 
-{/* ── SUMMARY TILES ──────────────────────────────────────────────────── */}
-<div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-  <SummaryTile
-    label="Total Adjustments"
-    value={activeFilter ? filteredAdjustments?.length || 0 : adjustments?.length || 0}
-    subText="Fetched"
-    color="emerald"
-    onClick={() => setActiveFilter(null)}
-    isActive={activeFilter === null}
-    icon={Layers}
-  />
-  <SummaryTile
-    label="Prepared"
-    value={
-      activeFilter === 'PREPARED'
-        ? filteredAdjustments?.length || 0
-        : adjustments?.filter((a) => a.status === 'PREPARED').length || 0
-    }
-    subText="Transactions"
-    color="rose"
-    onClick={() => setActiveFilter('PREPARED')}
-    isActive={activeFilter === 'PREPARED'}
-    icon={ClipboardList}
-  />
-  <SummaryTile
-    label="Checked"
-    value={
-      activeFilter === 'CHECKED'
-        ? filteredAdjustments?.length || 0
-        : adjustments?.filter((a) => a.status === 'CHECKED').length || 0
-    }
-    subText="Transactions"
-    color="blue"
-    onClick={() => setActiveFilter('CHECKED')}
-    isActive={activeFilter === 'CHECKED'}
-    icon={CheckCircle}
-  />
-  <SummaryTile
-    label="Cancelled"
-    value={
-      activeFilter === 'CANCELLED'
-        ? filteredAdjustments?.length || 0
-        : adjustments?.filter((a) => a.status === 'CANCELLED').length || 0
-    }
-    subText="Transactions"
-    color="orange"
-    onClick={() => setActiveFilter('CANCELLED')}
-    isActive={activeFilter === 'CANCELLED'}
-    icon={XCircle}
-  />
-  <SummaryTile
-    label="Approved"
-    value={
-      activeFilter === 'APPROVED'
-        ? filteredAdjustments?.length || 0
-        : adjustments?.filter((a) => a.status === 'APPROVED').length || 0
-    }
-    subText="Transactions"
-    color="emerald"
-    onClick={() => setActiveFilter('APPROVED')}
-    isActive={activeFilter === 'APPROVED'}
-    icon={ShieldCheck}
-  />
-  <SummaryTile
-    label="Total Amount"
-    value={`₱ ${filteredTotalAmount.toLocaleString('en-PH', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }) || '0.00'}`}
-    subText="PHP"
-    color="dark"
-    icon={Wallet}
-  />
-</div>
+        {/* ── SUMMARY TILES ──────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+          <SummaryTile
+            label="Total Adjustments"
+            value={activeFilter ? filteredAdjustments?.length || 0 : adjustments?.length || 0}
+            subText="Fetched"
+            color="emerald"
+            onClick={() => setActiveFilter(null)}
+            isActive={activeFilter === null}
+            icon={Layers}
+          />
+          <SummaryTile
+            label="Prepared"
+            value={
+              activeFilter === 'PREPARED'
+                ? filteredAdjustments?.length || 0
+                : adjustments?.filter((a) => a.status === 'PREPARED').length || 0
+            }
+            subText="Transactions"
+            color="rose"
+            onClick={() => setActiveFilter('PREPARED')}
+            isActive={activeFilter === 'PREPARED'}
+            icon={ClipboardList}
+          />
+          <SummaryTile
+            label="Checked"
+            value={
+              activeFilter === 'CHECKED'
+                ? filteredAdjustments?.length || 0
+                : adjustments?.filter((a) => a.status === 'CHECKED').length || 0
+            }
+            subText="Transactions"
+            color="blue"
+            onClick={() => setActiveFilter('CHECKED')}
+            isActive={activeFilter === 'CHECKED'}
+            icon={CheckCircle}
+          />
+          <SummaryTile
+            label="Cancelled"
+            value={
+              activeFilter === 'CANCELLED'
+                ? filteredAdjustments?.length || 0
+                : adjustments?.filter((a) => a.status === 'CANCELLED').length || 0
+            }
+            subText="Transactions"
+            color="orange"
+            onClick={() => setActiveFilter('CANCELLED')}
+            isActive={activeFilter === 'CANCELLED'}
+            icon={XCircle}
+          />
+          <SummaryTile
+            label="Approved"
+            value={
+              activeFilter === 'APPROVED'
+                ? filteredAdjustments?.length || 0
+                : adjustments?.filter((a) => a.status === 'APPROVED').length || 0
+            }
+            subText="Transactions"
+            color="emerald"
+            onClick={() => setActiveFilter('APPROVED')}
+            isActive={activeFilter === 'APPROVED'}
+            icon={ShieldCheck}
+          />
+          <SummaryTile
+            label="Total Amount"
+            value={`₱ ${filteredTotalAmount.toLocaleString('en-PH', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }) || '0.00'}`}
+            subText="PHP"
+            color="dark"
+            icon={Wallet}
+          />
+        </div>
       </div>
 
       {/* --- TABLE SECTION --- */}
@@ -314,11 +316,13 @@ function AdjustmentsContent() {
           ]}
           checkboxActions={[
             {
-              label: 'Approve Selected',
+              label: 'Approve',
+              icon: <Check size={14} />,
               onClick: handleApproveSelected,
             },
             {
-              label: 'Cancel Selected',
+              label: 'Cancel',
+              icon: <X size={14} />,
               style: 'orange',
               onClick: handleCancelSelected,
             },

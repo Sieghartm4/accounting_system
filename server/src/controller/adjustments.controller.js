@@ -28,6 +28,12 @@ const {
 } = require('../util/postedSafeEdit.util')
 
 const {
+  moneyEqual,
+  numericKey,
+  journalsEquivalentFromDb,
+} = require('../util/documentDiff.util')
+
+const {
   findPeriodForDateKey,
   assertPeriodIsOpen,
   getPeriodKeyForDate,
@@ -992,6 +998,19 @@ const updateAdjustmentData = async (req, res, next) => {
         ])
       }
 
+      // Skip rewriting journal rows when the payload only re-sends the stored
+      // entries so only fields the user actually edited reach the audit trail.
+      const journalsSame = await journalsEquivalentFromDb(
+        connection,
+        'adjustments',
+        adjustment_id,
+        journal_entries,
+      )
+
+      const effectiveTotalAmount = journalsSame
+        ? currentAdjustmentData?.[0]?.total_amount ?? total_amount
+        : total_amount
+
       // Fetch current attachments BEFORE updates
       let currentAttachmentsData = []
       const currentAttachmentsQuery = sql
@@ -1033,46 +1052,48 @@ const updateAdjustmentData = async (req, res, next) => {
         document_reference || null,
         posting_date || null,
         remarks || null,
-        total_amount || null,
+        effectiveTotalAmount || null,
         adjustment_id,
       ]
 
       await connection.execute(updateHeaderQuery, headerValues)
 
-      // Delete existing journal entries for this adjustment
-      const deleteJournalQuery = sql
-        .delete(Accounting.journal_entries.tablename)
-        .where(Accounting.journal_entries.selectOptionColumns.db_name)
-        .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
-        .build()
+      if (!journalsSame) {
+        // Delete existing journal entries for this adjustment
+        const deleteJournalQuery = sql
+          .delete(Accounting.journal_entries.tablename)
+          .where(Accounting.journal_entries.selectOptionColumns.db_name)
+          .andWhere(Accounting.journal_entries.selectOptionColumns.db_id)
+          .build()
 
-      await connection.execute(deleteJournalQuery, ['adjustments', adjustment_id])
+        await connection.execute(deleteJournalQuery, ['adjustments', adjustment_id])
 
-      // Insert new journal entries
-      if (journal_entries && journal_entries.length > 0) {
-        for (const entry of journal_entries) {
-          const entryQuery = sql
-            .insert(Accounting.journal_entries.tablename, {
-              columns: Accounting.journal_entries.insertColumns,
-              prefix: Accounting.journal_entries.prefix,
-              isTransaction: true,
-            })
-            .build()
+        // Insert new journal entries
+        if (journal_entries && journal_entries.length > 0) {
+          for (const entry of journal_entries) {
+            const entryQuery = sql
+              .insert(Accounting.journal_entries.tablename, {
+                columns: Accounting.journal_entries.insertColumns,
+                prefix: Accounting.journal_entries.prefix,
+                isTransaction: true,
+              })
+              .build()
 
-          const type = entry.debit > 0 ? 'debit' : 'credit'
-          const amount = entry.debit > 0 ? entry.debit : entry.credit
+            const type = entry.debit > 0 ? 'debit' : 'credit'
+            const amount = entry.debit > 0 ? entry.debit : entry.credit
 
-          const entryValues = [
-            'adjustments',
-            adjustment_id,
-            entry.account_id || null,
-            entry.responsibility_center || '',
-            type,
-            amount,
-            new Date().toISOString().split('T')[0],
-          ]
+            const entryValues = [
+              'adjustments',
+              adjustment_id,
+              entry.account_id || null,
+              entry.responsibility_center || '',
+              type,
+              amount,
+              new Date().toISOString().split('T')[0],
+            ]
 
-          await connection.execute(entryQuery, entryValues)
+            await connection.execute(entryQuery, entryValues)
+          }
         }
       }
 
@@ -1152,17 +1173,15 @@ const updateAdjustmentData = async (req, res, next) => {
           )
         }
 
-        if (
-          normalizeNumber(current.total_amount) !== normalizeNumber(total_amount)
-        ) {
+        if (!moneyEqual(current.total_amount, effectiveTotalAmount)) {
           auditChanges.push(
-            `Total Amount: ${current.total_amount} → ${total_amount}`,
+            `Total Amount: ${current.total_amount} → ${effectiveTotalAmount}`,
           )
         }
       }
 
       // Track journal entries changes using data fetched earlier
-      if (journal_entries && journal_entries.length > 0) {
+      if (journal_entries && journal_entries.length > 0 && !journalsSame) {
         for (let i = 0; i < journal_entries.length; i++) {
           const entry = journal_entries[i]
           const type = entry.debit > 0 ? 'debit' : 'credit'
@@ -1176,7 +1195,8 @@ const updateAdjustmentData = async (req, res, next) => {
             // If no ID, try to match by account_id, type, and position
             currentEntry = currentJournalData[0]?.find(
               (existingEntry, index) =>
-                existingEntry.account_id === entry.account_id &&
+                numericKey(existingEntry.account_id) ===
+                  numericKey(entry.account_id) &&
                 existingEntry.type.toLowerCase() === type &&
                 index === i,
             )
@@ -1185,7 +1205,8 @@ const updateAdjustmentData = async (req, res, next) => {
             if (!currentEntry && entry.account_id) {
               currentEntry = currentJournalData[0]?.find(
                 (existingEntry) =>
-                  existingEntry.account_id === entry.account_id &&
+                  numericKey(existingEntry.account_id) ===
+                    numericKey(entry.account_id) &&
                   existingEntry.type.toLowerCase() === type,
               )
             }
@@ -1194,8 +1215,7 @@ const updateAdjustmentData = async (req, res, next) => {
             if (!currentEntry) {
               currentEntry = currentJournalData[0]?.find(
                 (existingEntry) =>
-                  normalizeNumber(existingEntry.amount) ===
-                    normalizeNumber(amount) &&
+                  moneyEqual(existingEntry.amount, amount) &&
                   existingEntry.type.toLowerCase() === type,
               )
             }
@@ -1215,7 +1235,7 @@ const updateAdjustmentData = async (req, res, next) => {
 
             const currentAmount = normalizeNumber(currentEntry.amount)
             const newAmount = normalizeNumber(amount)
-            if (currentAmount !== newAmount) {
+            if (!moneyEqual(currentAmount, newAmount)) {
               auditChanges.push(
                 `Journal ${currentEntry.id} Amount: ${currentAmount} → ${newAmount}`,
               )

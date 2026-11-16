@@ -13,6 +13,10 @@ import {
   XCircle,
   ClipboardList,
   ListStart,
+  X,
+  Printer,
+  ExternalLink
+
 } from 'lucide-react'
 import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen, SummaryTile } from '../../components/ui'
 import { SequenceSettingsModal } from '../../components/modals'
@@ -77,16 +81,16 @@ function ReceiptsContent() {
 
   const checkboxCondition = null // Always show checkboxes
 
-  // Function to filter checkbox actions based on selected rows' states
-  const getFilteredCheckboxActions = (selectedRows) => {
+const getFilteredCheckboxActions = (selectedRows) => {
     const allActions = [
       {
-        label: 'Approve Selected',
+        label: 'Approve',
         icon: <Check size={14} />,
         onClick: handleApproveSelected,
       },
       {
-        label: 'Cancel Selected',
+        label: 'Cancel',
+        icon: <X size={14} />,
         style: 'orange',
         onClick: handleCancelSelected,
       },
@@ -96,28 +100,29 @@ function ReceiptsContent() {
       {
         // ── Internal Copy → fetch data → generate + download PDF directly
         label: 'Internal Copy',
-        icon: <FileText size={14} />,
+        icon: <Printer size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
         style: 'blue', // Blue color for internal copy
       },
       {
         // ── Customer Copy → same but labelled differently in PDF
         label: 'Customer Copy',
-        icon: <Building size={14} />,
+        icon: <ExternalLink size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
         style: 'orange', // Orange color for customer copy
       },
     ]
 
-    // Filter Approve Selected button - show if at least one selected row is PREPARED or CHECKED
+    // Filter actions based on row states
     return allActions.filter((action) => {
-      if (action.label === 'Approve Selected') {
+      if (action.separator) return true // Keep separators
+      if (action.label === 'Approve') {
         // Show approve button if at least one selected row has state PREPARED or CHECKED
         return selectedRows.some(
           (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
         )
       }
-      if (action.label === 'Cancel Selected') {
+      if (action.label === 'Cancel') {
         return selectedRows.some(
           (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
         )
@@ -238,80 +243,80 @@ function ReceiptsContent() {
           </div>
         </motion.div>
 
-{/* ── SUMMARY TILES ──────────────────────────────────────────────────── */}
-<div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-  <SummaryTile
-    label="Total Receipts"
-    value={activeFilter ? filteredReceipts?.length || 0 : receipts?.length || 0}
-    subText="Fetched"
-    color="emerald"
-    onClick={() => setActiveFilter(null)}
-    isActive={activeFilter === null}
-    icon={Receipt}
-  />
-  <SummaryTile
-    label="Prepared"
-    value={
-      activeFilter === 'PREPARED'
-        ? filteredReceipts?.length || 0
-        : receipts?.filter((r) => r.state === 'PREPARED').length || 0
-    }
-    subText="Transactions"
-    color="rose"
-    onClick={() => setActiveFilter('PREPARED')}
-    isActive={activeFilter === 'PREPARED'}
-    icon={ClipboardList}
-  />
-  <SummaryTile
-    label="Checked"
-    value={
-      activeFilter === 'CHECKED'
-        ? filteredReceipts?.length || 0
-        : receipts?.filter((r) => r.state === 'CHECKED').length || 0
-    }
-    subText="Transactions"
-    color="blue"
-    onClick={() => setActiveFilter('CHECKED')}
-    isActive={activeFilter === 'CHECKED'}
-    icon={CheckCircle}
-  />
-  <SummaryTile
-    label="Cancelled"
-    value={
-      activeFilter === 'CANCELLED'
-        ? filteredReceipts?.length || 0
-        : receipts?.filter((r) => r.state === 'CANCELLED').length || 0
-    }
-    subText="Transactions"
-    color="orange"
-    onClick={() => setActiveFilter('CANCELLED')}
-    isActive={activeFilter === 'CANCELLED'}
-    icon={XCircle}
-  />
-  <SummaryTile
-    label="Approved"
-    value={
-      activeFilter === 'APPROVED'
-        ? filteredReceipts?.length || 0
-        : receipts?.filter((r) => r.state === 'APPROVED').length || 0
-    }
-    subText="Transactions"
-    color="emerald"
-    onClick={() => setActiveFilter('APPROVED')}
-    isActive={activeFilter === 'APPROVED'}
-    icon={ShieldCheck}
-  />
-  <SummaryTile
-    label="Total Amount Due"
-    value={`₱ ${filteredTotalAmount.toLocaleString('en-PH', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }) || '0.00'}`}
-    subText="PHP"
-    color="dark"
-    icon={Wallet}
-  />
-</div>
+        {/* ── SUMMARY TILES ──────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+          <SummaryTile
+            label="Total Receipts"
+            value={activeFilter ? filteredReceipts?.length || 0 : receipts?.length || 0}
+            subText="Fetched"
+            color="emerald"
+            onClick={() => setActiveFilter(null)}
+            isActive={activeFilter === null}
+            icon={Receipt}
+          />
+          <SummaryTile
+            label="Prepared"
+            value={
+              activeFilter === 'PREPARED'
+                ? filteredReceipts?.length || 0
+                : receipts?.filter((r) => r.state === 'PREPARED').length || 0
+            }
+            subText="Transactions"
+            color="rose"
+            onClick={() => setActiveFilter('PREPARED')}
+            isActive={activeFilter === 'PREPARED'}
+            icon={ClipboardList}
+          />
+          <SummaryTile
+            label="Checked"
+            value={
+              activeFilter === 'CHECKED'
+                ? filteredReceipts?.length || 0
+                : receipts?.filter((r) => r.state === 'CHECKED').length || 0
+            }
+            subText="Transactions"
+            color="blue"
+            onClick={() => setActiveFilter('CHECKED')}
+            isActive={activeFilter === 'CHECKED'}
+            icon={CheckCircle}
+          />
+          <SummaryTile
+            label="Cancelled"
+            value={
+              activeFilter === 'CANCELLED'
+                ? filteredReceipts?.length || 0
+                : receipts?.filter((r) => r.state === 'CANCELLED').length || 0
+            }
+            subText="Transactions"
+            color="orange"
+            onClick={() => setActiveFilter('CANCELLED')}
+            isActive={activeFilter === 'CANCELLED'}
+            icon={XCircle}
+          />
+          <SummaryTile
+            label="Approved"
+            value={
+              activeFilter === 'APPROVED'
+                ? filteredReceipts?.length || 0
+                : receipts?.filter((r) => r.state === 'APPROVED').length || 0
+            }
+            subText="Transactions"
+            color="emerald"
+            onClick={() => setActiveFilter('APPROVED')}
+            isActive={activeFilter === 'APPROVED'}
+            icon={ShieldCheck}
+          />
+          <SummaryTile
+            label="Total Amount Due"
+            value={`₱ ${filteredTotalAmount.toLocaleString('en-PH', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }) || '0.00'}`}
+            subText="PHP"
+            color="dark"
+            icon={Wallet}
+          />
+        </div>
       </div>
 
       {/* ── TABLE ──────────────────────────────────────────────────────────── */}

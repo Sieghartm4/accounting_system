@@ -13,6 +13,10 @@ import {
   ClipboardList,
   Clock3,
   ListStart,
+  X,
+  Check,
+  Printer,
+  ExternalLink
 } from 'lucide-react'
 import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
 import { SequenceSettingsModal } from '../../components/modals'
@@ -91,15 +95,16 @@ function PaymentsContent() {
 
   const checkboxCondition = null // Always show checkboxes (match other pages)
 
-  // Function to filter checkbox actions based on selected rows
   const getFilteredCheckboxActions = (selectedRows) => {
     const allActions = [
       {
-        label: 'Approve Selected',
+        label: 'Approve',
+        icon: <Check size={14} />,
         onClick: handleApproveSelected,
       },
       {
-        label: 'Cancel Selected',
+        label: 'Cancel',
+        icon: <X size={14} />,
         style: 'orange',
         onClick: handleCancelSelected,
       },
@@ -108,25 +113,26 @@ function PaymentsContent() {
       },
       {
         label: 'Internal Copy',
-        icon: <FileText size={14} />,
+        icon: <Printer size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
         style: 'blue',
       },
       {
         label: 'Vendor Copy',
-        icon: <Building size={14} />,
+        icon: <ExternalLink size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
         style: 'orange',
       },
     ]
 
     return allActions.filter((action) => {
-      if (action.label === 'Approve Selected') {
+      if (action.separator) return true
+      if (action.label === 'Approve') {
         return selectedRows.some(
           (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
         )
       }
-      if (action.label === 'Cancel Selected') {
+      if (action.label === 'Cancel') {
         return selectedRows.some(
           (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
         )
@@ -189,20 +195,18 @@ function PaymentsContent() {
     <div className="ml-4 flex items-center bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner">
       <button
         onClick={() => setActiveTab('payments')}
-        className={`transition-all duration-200 ease-in-out pl-5 pr-1 py-2.5 rounded-lg text-xs font-black tracking-wider uppercase flex items-center gap-2 focus:outline-none ${
-          activeTab === 'payments'
+        className={`transition-all duration-200 ease-in-out pl-5 pr-1 py-2.5 rounded-lg text-xs font-black tracking-wider uppercase flex items-center gap-2 focus:outline-none ${activeTab === 'payments'
             ? 'bg-red-600 text-white shadow'
             : 'text-slate-600 hover:text-black hover:bg-white/70'
-        }`}
+          }`}
       >
         <CheckCircle size={14} />
         <span>Paid</span>
         <span
-          className={`ml-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${
-            activeTab === 'payments'
+          className={`ml-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${activeTab === 'payments'
               ? 'bg-white/20 text-white'
               : 'bg-slate-200 text-slate-700'
-          }`}
+            }`}
         >
           {payments?.length || 0}
         </span>
@@ -210,20 +214,18 @@ function PaymentsContent() {
 
       <button
         onClick={() => setActiveTab('toBePaid')}
-        className={`transition-all duration-200 ease-in-out pl-5 pr-1 py-2.5 rounded-lg text-xs font-black tracking-wider uppercase flex items-center gap-2 focus:outline-none ${
-          activeTab === 'toBePaid'
+        className={`transition-all duration-200 ease-in-out pl-5 pr-1 py-2.5 rounded-lg text-xs font-black tracking-wider uppercase flex items-center gap-2 focus:outline-none ${activeTab === 'toBePaid'
             ? 'bg-red-600 text-white shadow'
             : 'text-slate-600 hover:text-black hover:bg-white/70'
-        }`}
+          }`}
       >
         <Clock3 size={14} />
         <span>To Be Paid</span>
         <span
-          className={`ml-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${
-            activeTab === 'toBePaid'
+          className={`ml-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${activeTab === 'toBePaid'
               ? 'bg-white/20 text-white'
               : 'bg-slate-200 text-slate-700'
-          }`}
+            }`}
         >
           {toBePaidData?.length || 0}
         </span>
@@ -368,9 +370,9 @@ function PaymentsContent() {
               <SummaryTile
                 label="Total Paid"
                 value={`₱ ${filteredTotalPaidAmount.toLocaleString('en-PH', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  }) || '0.00'}`}
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }) || '0.00'}`}
                 subText="PHP"
                 color="dark"
                 icon={Wallet}
@@ -446,9 +448,9 @@ function PaymentsContent() {
               <SummaryTile
                 label="Total Unpaid Amount"
                 value={`₱ ${toBePaidData?.reduce((sum, v) => sum + (parseFloat(v.totalUnpaid) || 0), 0).toLocaleString('en-PH', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  }) || '0.00'}`}
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }) || '0.00'}`}
                 subText="PHP"
                 color="dark"
                 icon={Wallet}

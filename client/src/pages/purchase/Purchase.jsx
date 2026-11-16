@@ -12,6 +12,10 @@ import {
   ClipboardList,
   Wallet,
   ListStart,
+  Check,
+  X,
+  Printer,
+  ExternalLink
 } from 'lucide-react'
 import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
 import { SequenceSettingsModal } from '../../components/modals'
@@ -82,15 +86,16 @@ function PurchaseContent() {
 
   const checkboxCondition = null // Always show checkboxes (match other pages)
 
-  // Function to filter checkbox actions based on selected rows
   const getFilteredCheckboxActions = (selectedRows) => {
     const allActions = [
       {
-        label: 'Approve Selected',
+        label: 'Approve',
+        icon: <Check size={14} />,
         onClick: handleApproveSelected,
       },
       {
-        label: 'Cancel Selected',
+        label: 'Cancel',
+        icon: <X size={14} />,
         style: 'orange',
         onClick: handleCancelSelected,
       },
@@ -99,25 +104,26 @@ function PurchaseContent() {
       },
       {
         label: 'Internal Copy',
-        icon: <FileText size={14} />,
+        icon: <Printer size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
         style: 'blue',
       },
       {
         label: 'Vendor Copy',
-        icon: <Building size={14} />,
+        icon: <ExternalLink size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
         style: 'orange',
       },
     ]
 
     return allActions.filter((action) => {
-      if (action.label === 'Approve Selected') {
+      if (action.separator) return true
+      if (action.label === 'Approve') {
         return selectedRows.some(
           (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
         )
       }
-      if (action.label === 'Cancel Selected') {
+      if (action.label === 'Cancel') {
         return selectedRows.some(
           (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
         )
@@ -326,9 +332,9 @@ function PurchaseContent() {
           <SummaryTile
             label="Total Amount Due"
             value={`₱ ${filteredTotalAmount.toLocaleString('en-PH', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              }) || '0.00'}`}
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }) || '0.00'}`}
             subText="PHP"
             color="dark"
             icon={Wallet}

@@ -504,9 +504,6 @@ export default function BankReconciliationDetail({
   const matchedItemsCount = matchedBankItems + matchedBookItems
   const reconcilePercentage = totalItemsCount > 0 ? Math.round((matchedItemsCount / totalItemsCount) * 100) : 100
 
-  // Note: unrecordedBankCredits and unrecordedBankDebits are now calculated in useBankReconciliation.js
-  // as bookAdditions and bookDeductions from unmatched bank statement items
-
   const [ocrLoading, setOcrLoading] = React.useState(false)
   const [ocrError, setOcrError] = React.useState('')
   const ocrFileInputRef = React.useRef(null)

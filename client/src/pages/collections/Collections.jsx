@@ -13,6 +13,10 @@ import {
   XCircle,
   Clock3,
   ListStart,
+  Check,
+  X,
+  Printer,
+  ExternalLink
 } from 'lucide-react'
 import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
 import { SequenceSettingsModal } from '../../components/modals'
@@ -93,15 +97,16 @@ function CollectionsContent() {
 
   const checkboxCondition = null // Always show checkboxes (match Receipts/Sales behavior)
 
-  // Function to filter checkbox actions based on selected rows
   const getFilteredCheckboxActions = (selectedRows) => {
     const allActions = [
       {
-        label: 'Approve Selected',
+        label: 'Approve',
+        icon: <Check size={14} />,
         onClick: handleApproveSelected,
       },
       {
-        label: 'Cancel Selected',
+        label: 'Cancel',
+        icon: <X size={14} />,
         style: 'orange',
         onClick: handleCancelSelected,
       },
@@ -110,25 +115,26 @@ function CollectionsContent() {
       },
       {
         label: 'Internal Copy',
-        icon: <FileText size={14} />,
+        icon: <Printer size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
         style: 'blue',
       },
       {
         label: 'Customer Copy',
-        icon: <Building size={14} />,
+        icon: <ExternalLink size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'customer'),
         style: 'orange',
       },
     ]
 
     return allActions.filter((action) => {
-      if (action.label === 'Approve Selected') {
+      if (action.separator) return true
+      if (action.label === 'Approve') {
         return selectedRows.some(
           (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
         )
       }
-      if (action.label === 'Cancel Selected') {
+      if (action.label === 'Cancel') {
         return selectedRows.some(
           (row) =>
             row.state !== 'CANCELLED' &&
@@ -203,20 +209,18 @@ function CollectionsContent() {
     <div className="ml-4 flex items-center bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner">
       <button
         onClick={() => setActiveTab('collections')}
-        className={`transition-all duration-200 ease-in-out pl-5 pr-1 py-2.5 rounded-lg text-xs font-black tracking-wider uppercase flex items-center gap-2 focus:outline-none ${
-          activeTab === 'collections'
+        className={`transition-all duration-200 ease-in-out pl-5 pr-1 py-2.5 rounded-lg text-xs font-black tracking-wider uppercase flex items-center gap-2 focus:outline-none ${activeTab === 'collections'
             ? 'bg-red-600 text-white shadow'
             : 'text-slate-600 hover:text-black hover:bg-white/70'
-        }`}
+          }`}
       >
         <CheckCircle size={14} />
         <span>Collected</span>
         <span
-          className={`ml-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${
-            activeTab === 'collections'
+          className={`ml-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${activeTab === 'collections'
               ? 'bg-white/20 text-white'
               : 'bg-slate-200 text-slate-700'
-          }`}
+            }`}
         >
           {collections?.length || 0}
         </span>
@@ -224,20 +228,18 @@ function CollectionsContent() {
 
       <button
         onClick={() => setActiveTab('toBeCollected')}
-        className={`transition-all duration-200 ease-in-out pl-5 pr-1 py-2.5 rounded-lg text-xs font-black tracking-wider uppercase flex items-center gap-2 focus:outline-none ${
-          activeTab === 'toBeCollected'
+        className={`transition-all duration-200 ease-in-out pl-5 pr-1 py-2.5 rounded-lg text-xs font-black tracking-wider uppercase flex items-center gap-2 focus:outline-none ${activeTab === 'toBeCollected'
             ? 'bg-red-600 text-white shadow'
             : 'text-slate-600 hover:text-black hover:bg-white/70'
-        }`}
+          }`}
       >
         <Clock3 size={14} />
         <span>To Be Collected</span>
         <span
-          className={`ml-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${
-            activeTab === 'toBeCollected'
+          className={`ml-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${activeTab === 'toBeCollected'
               ? 'bg-white/20 text-white'
               : 'bg-slate-200 text-slate-700'
-          }`}
+            }`}
         >
           {toBeCollectedData?.length || 0}
         </span>
@@ -384,9 +386,9 @@ function CollectionsContent() {
               <SummaryTile
                 label="Total Collected"
                 value={`₱ ${filteredTotalCollectedAmount.toLocaleString('en-PH', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  }) || '0.00'}`}
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }) || '0.00'}`}
                 subText="PHP"
                 color="dark"
                 icon={Wallet}
@@ -465,11 +467,11 @@ function CollectionsContent() {
               <SummaryTile
                 label="Total Unpaid Amount"
                 value={`₱ ${toBeCollectedData
-                    ?.reduce((sum, c) => sum + (parseFloat(c.totalUnpaid) || 0), 0)
-                    .toLocaleString('en-PH', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }) || '0.00'}`}
+                  ?.reduce((sum, c) => sum + (parseFloat(c.totalUnpaid) || 0), 0)
+                  .toLocaleString('en-PH', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }) || '0.00'}`}
                 subText="PHP"
                 color="dark"
                 icon={Wallet}
@@ -635,9 +637,9 @@ function CollectionsContent() {
                             {isNaN(value)
                               ? '0.00'
                               : parseFloat(value).toLocaleString('en-US', {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
                           </span>
                         </span>
                       ),
@@ -658,8 +660,8 @@ function CollectionsContent() {
                   data={
                     expandedCustomer
                       ? toBeCollectedData.find(
-                          (c) => c.customerId === expandedCustomer,
-                        )?.sales || []
+                        (c) => c.customerId === expandedCustomer,
+                      )?.sales || []
                       : []
                   }
                   title=""
@@ -694,9 +696,9 @@ function CollectionsContent() {
                             {isNaN(value)
                               ? '0.00'
                               : parseFloat(value).toLocaleString('en-US', {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
                           </span>
                         </span>
                       ),

@@ -36,7 +36,11 @@ const {
   assertPostedSafeEdit,
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
-const { moneyEqual, numericKey } = require('../util/documentDiff.util')
+const {
+  moneyEqual,
+  numericKey,
+  journalsEquivalentFromDb,
+} = require('../util/documentDiff.util')
 
 const {
   findPeriodForDateKey,
@@ -2356,6 +2360,16 @@ const updateCollection = async (req, res, next) => {
         ])
       }
 
+      // Skip rewriting journal rows when the payload only re-sends the stored
+      // entries (the client regenerates ids on hydration). This keeps the
+      // audit trail focused on the fields the user actually edited.
+      const journalsSame = await journalsEquivalentFromDb(
+        connection,
+        'collections',
+        collection_id,
+        journal_entries,
+      )
+
       // Fetch current attachments BEFORE updates
 
       let currentAttachmentsData = []
@@ -2433,8 +2447,9 @@ const updateCollection = async (req, res, next) => {
 
 
       if (journal_entries && journal_entries.length > 0) {
-        const existingEntriesQuery = sql
-          .select([Accounting.journal_entries.selectOptionColumns.id])
+        if (!journalsSame) {
+          const existingEntriesQuery = sql
+            .select([Accounting.journal_entries.selectOptionColumns.id])
 
           .from(Accounting.journal_entries.tablename)
 
@@ -2548,6 +2563,7 @@ const updateCollection = async (req, res, next) => {
 
             await connection.execute(entryQuery, entryValues)
           }
+        }
         }
       } else {
         const deleteAllEntriesQuery = sql
@@ -2848,7 +2864,7 @@ const updateCollection = async (req, res, next) => {
           }
         }
       }
-      if (journal_entries && journal_entries.length > 0) {
+      if (journal_entries && journal_entries.length > 0 && !journalsSame) {
         const matchedEntryIds = new Set()
         const currentRows = currentJournalData[0] || []
         for (let i = 0; i < journal_entries.length; i++) {

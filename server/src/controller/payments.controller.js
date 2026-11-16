@@ -38,6 +38,13 @@ const {
 } = require('../util/postedSafeEdit.util')
 
 const {
+  moneyEqual,
+  numericKey,
+  itemsEquivalentFromDb,
+  journalsEquivalentFromDb,
+} = require('../util/documentDiff.util')
+
+const {
   findPeriodForDateKey,
   assertPeriodIsOpen,
   getPeriodKeyForDate,
@@ -2370,6 +2377,26 @@ const updatePayment = async (req, res, next) => {
         )
       }
 
+      // Detect a metadata-only save: when the client re-sends the same items
+      // and regenerated journal rows we leave them untouched so only real
+      // edits reach the audit trail.
+      const itemsSame = await itemsEquivalentFromDb(
+        connection,
+        'payments',
+        payment_id,
+        (payment_items || []).map((item) => ({
+          ...item,
+          amount_applied: item.amount ?? item.amount_applied,
+        })),
+      )
+
+      const journalsSame = await journalsEquivalentFromDb(
+        connection,
+        'payments',
+        payment_id,
+        journal_entries,
+      )
+
       // Fetch current attachments BEFORE updates
 
       let currentAttachmentsData = []
@@ -2448,8 +2475,9 @@ const updatePayment = async (req, res, next) => {
 
 
       if (journal_entries && journal_entries.length > 0) {
-        const existingEntriesQuery = sql
-          .select([Accounting.journal_entries.selectOptionColumns.id])
+        if (!journalsSame) {
+          const existingEntriesQuery = sql
+            .select([Accounting.journal_entries.selectOptionColumns.id])
 
           .from(Accounting.journal_entries.tablename)
 
@@ -2569,6 +2597,7 @@ const updatePayment = async (req, res, next) => {
 
             await connection.execute(insertEntryQuery, insertEntryValues)
           }
+        }
         }
       } else {
         const deleteAllEntriesQuery = sql
@@ -2821,7 +2850,7 @@ const updatePayment = async (req, res, next) => {
             (item.amount !== undefined && item.amount !== null), // Existing items with amount changes
         )
 
-      if (hasPaymentItemsChanges) {
+      if (hasPaymentItemsChanges && !itemsSame) {
         for (let i = 0; i < payment_items.length; i++) {
           const item = payment_items[i]
 
@@ -2847,7 +2876,7 @@ const updatePayment = async (req, res, next) => {
 
 
 
-              if (currentAmount !== newAmount) {
+              if (!moneyEqual(currentAmount, newAmount)) {
                 auditChanges.push(
                   `Payment Item ${currentItem.id} Amount: ${currentAmount} → ${newAmount}`,
                 )
@@ -2884,7 +2913,7 @@ const updatePayment = async (req, res, next) => {
         )
 
 
-      if (hasJournalChanges) {
+      if (hasJournalChanges && !journalsSame) {
         for (let i = 0; i < journal_entries.length; i++) {
           const entry = journal_entries[i]
 
@@ -2924,8 +2953,7 @@ const updatePayment = async (req, res, next) => {
             if (!currentEntry) {
               currentEntry = currentJournalData?.find(
                 (existingEntry) =>
-                  normalizeNumber(existingEntry.amount) ===
-                    normalizeNumber(amount) &&
+                  moneyEqual(existingEntry.amount, amount) &&
                   existingEntry.type.toLowerCase() === type,
               )
             }
@@ -2949,7 +2977,7 @@ const updatePayment = async (req, res, next) => {
 
             const newAmount = normalizeNumber(amount)
 
-            if (currentAmount !== newAmount) {
+            if (!moneyEqual(currentAmount, newAmount)) {
               auditChanges.push(
                 `Journal ${currentEntry.id} Amount: ${currentAmount} → ${newAmount}`,
               )

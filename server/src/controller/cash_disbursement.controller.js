@@ -1227,8 +1227,9 @@ const updateCashDisbursement = async (req, res, next) => {
       // ... rest of the code remains the same ...
 
       if (disbursement_items && disbursement_items.length > 0) {
-        const existingItemsQuery = sql
-          .select([Accounting.cash_disbursement_items.selectOptionColumns.id])
+        if (!itemsSame) {
+          const existingItemsQuery = sql
+            .select([Accounting.cash_disbursement_items.selectOptionColumns.id])
 
           .from(Accounting.cash_disbursement_items.tablename)
 
@@ -1374,6 +1375,7 @@ const updateCashDisbursement = async (req, res, next) => {
             await connection.execute(itemQuery, itemValues)
           }
         }
+        }
       } else {
         const deleteAllItemsQuery = sql
           .delete()
@@ -1391,8 +1393,9 @@ const updateCashDisbursement = async (req, res, next) => {
       }
 
       if (journal_entries && journal_entries.length > 0) {
-        const existingEntriesQuery = sql
-          .select([Accounting.journal_entries.selectOptionColumns.id])
+        if (!journalsSame) {
+          const existingEntriesQuery = sql
+            .select([Accounting.journal_entries.selectOptionColumns.id])
 
           .from(Accounting.journal_entries.tablename)
 
@@ -1506,6 +1509,7 @@ const updateCashDisbursement = async (req, res, next) => {
 
             await connection.execute(entryQuery, entryValues)
           }
+        }
         }
       } else {
         const deleteAllEntriesQuery = sql
@@ -1748,7 +1752,7 @@ const updateCashDisbursement = async (req, res, next) => {
         }
       }
 
-      if (disbursement_items && disbursement_items.length > 0) {
+      if (disbursement_items && disbursement_items.length > 0 && !itemsSame) {
         const matchedItemIds = new Set()
         const currentRows = currentItemsData[0] || []
         for (let i = 0; i < disbursement_items.length; i++) {
@@ -1851,7 +1855,7 @@ const updateCashDisbursement = async (req, res, next) => {
         }
       }
 
-      if (journal_entries && journal_entries.length > 0) {
+      if (journal_entries && journal_entries.length > 0 && !journalsSame) {
         const matchedEntryIds = new Set()
         const currentRows = currentJournalData[0] || []
         for (let i = 0; i < journal_entries.length; i++) {

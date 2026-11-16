@@ -33,7 +33,12 @@ const {
   assertPostedSafeEdit,
   applyPostedSafeEdit,
 } = require('../util/postedSafeEdit.util')
-const { moneyEqual, numericKey } = require('../util/documentDiff.util')
+const {
+  moneyEqual,
+  numericKey,
+  itemsEquivalentFromDb,
+  journalsEquivalentFromDb,
+} = require('../util/documentDiff.util')
 const { notifyFromController } = require('../services/notification/notifyFromController')
 
 const {
@@ -1608,6 +1613,30 @@ const updateReceipt = async (req, res, next) => {
         ])
       }
 
+      // Detect a metadata-only save. The client can re-send the same items and
+      // regenerated journal entries; when they match what is stored we leave
+      // the existing item/journal rows untouched so only the fields the user
+      // actually edited end up in the audit trail.
+      const itemsSame = await itemsEquivalentFromDb(
+        connection,
+        'receipts',
+        receiptId,
+        receipt_items,
+      )
+
+      const journalsSame = await journalsEquivalentFromDb(
+        connection,
+        'receipts',
+        receiptId,
+        journal_entries,
+      )
+
+      const documentUnchanged = itemsSame && journalsSame
+
+      const effectiveTotalAmountDue = documentUnchanged
+        ? currentReceiptData?.[0]?.total_amount_due ?? total_amount_due
+        : total_amount_due
+
       const updateMainQuery = sql
         .update(Accounting.receipts.tablename)
 
@@ -1648,7 +1677,7 @@ const updateReceipt = async (req, res, next) => {
 
         remarks || null,
 
-        total_amount_due || null,
+        effectiveTotalAmountDue || null,
 
         receiptId,
       ]
@@ -1656,8 +1685,9 @@ const updateReceipt = async (req, res, next) => {
       await connection.execute(updateMainQuery, updateMainValues)
 
       if (receipt_items && receipt_items.length > 0) {
-        const existingItemsQuery = sql
-          .select([Accounting.receipt_items.selectOptionColumns.id])
+        if (!itemsSame) {
+          const existingItemsQuery = sql
+            .select([Accounting.receipt_items.selectOptionColumns.id])
 
           .from(Accounting.receipt_items.tablename)
 
@@ -1792,6 +1822,7 @@ const updateReceipt = async (req, res, next) => {
             await connection.execute(itemQuery, itemValues)
           }
         }
+        }
       } else {
         const deleteAllItemsQuery = sql
           .delete()
@@ -1806,7 +1837,8 @@ const updateReceipt = async (req, res, next) => {
       }
 
       if (journal_entries && journal_entries.length > 0) {
-        const existingEntriesQuery = sql
+        if (!journalsSame) {
+          const existingEntriesQuery = sql
           .select([Accounting.journal_entries.selectOptionColumns.id])
 
           .from(Accounting.journal_entries.tablename)
@@ -1921,6 +1953,7 @@ const updateReceipt = async (req, res, next) => {
 
             await connection.execute(entryQuery, entryValues)
           }
+        }
         }
       } else {
         const deleteAllEntriesQuery = sql
@@ -2084,13 +2117,13 @@ const updateReceipt = async (req, res, next) => {
           )
         }
 
-        if (!moneyEqual(current.total_amount_due, total_amount_due)) {
+        if (!moneyEqual(current.total_amount_due, effectiveTotalAmountDue)) {
           auditChanges.push(
-            `Total Amount: ${current.total_amount_due} → ${total_amount_due}`,
+            `Total Amount: ${current.total_amount_due} → ${effectiveTotalAmountDue}`,
           )
         }
       }
-      if (receipt_items && receipt_items.length > 0) {
+      if (receipt_items && receipt_items.length > 0 && !itemsSame) {
         const matchedItemIds = new Set()
         const currentRows = currentItemsData[0] || []
         for (const item of receipt_items) {
@@ -2175,7 +2208,7 @@ const updateReceipt = async (req, res, next) => {
         }
       }
 
-      if (journal_entries && journal_entries.length > 0) {
+      if (journal_entries && journal_entries.length > 0 && !journalsSame) {
         const matchedEntryIds = new Set()
         const currentRows = currentJournalData[0] || []
         for (const entry of journal_entries) {

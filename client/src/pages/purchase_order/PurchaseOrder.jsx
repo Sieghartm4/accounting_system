@@ -10,6 +10,7 @@ import {
   XCircle,
   ShieldCheck,
   Wallet,
+  X,
   ClipboardList,
 } from 'lucide-react'
 import { DynamicTable, DynamicToast, LoadingScreen, RightSideModal } from '../../components/ui'
@@ -380,9 +381,9 @@ function PurchaseOrderContent() {
         <SummaryTile
           label="Total Value"
           value={`₱ ${filteredTotalValue.toLocaleString('en-PH', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }) || '0.00'}`}
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }) || '0.00'}`}
           subText="PHP"
           color="dark"
           icon={Wallet}
@@ -418,12 +419,14 @@ function PurchaseOrderContent() {
           checkboxActionsFilter={checkboxActionsFilter}
           checkboxActions={[
             {
-              label: 'Approve Selected',
+              label: 'Approve',
+              icon: <Check size={14} />,
               onClick: handleBulkApprove,
               className: 'bg-green-600 hover:bg-green-700',
             },
             {
-              label: 'Reject Selected',
+              label: 'Reject',
+              icon: <X size={14} />,
               onClick: handleBulkReject,
               className: 'bg-red-600 hover:bg-red-700',
             },

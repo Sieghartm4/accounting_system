@@ -319,7 +319,12 @@ const DynamicTable = ({
     }
 
     // Make amount_due values stand out in red with proper accounting format
-    if (header.toLowerCase().includes('amount_due') && value !== null && value !== undefined) {
+    if (
+      (header.toLowerCase().includes('amount_due') ||
+        header.toLowerCase() === 'total_amount') &&
+      value !== null &&
+      value !== undefined
+    ) {
       const numValue = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^0-9.-]+/g, ''))
       const formattedValue = new Intl.NumberFormat('en-PH', {
         minimumFractionDigits: 2,

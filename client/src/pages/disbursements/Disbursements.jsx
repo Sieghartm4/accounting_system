@@ -13,6 +13,9 @@ import {
   CheckCircle,
   XCircle,
   ListStart,
+  X,
+  Printer,
+  ExternalLink
 } from 'lucide-react'
 import { DynamicConfirmModal, DynamicTable, DynamicToast, LoadingScreen } from '../../components/ui'
 import { SequenceSettingsModal } from '../../components/modals'
@@ -79,16 +82,16 @@ function DisbursementsContent() {
 
   const checkboxCondition = null // Always show checkboxes
 
-  // Function to filter checkbox actions based on selected rows' states
-  const getFilteredCheckboxActions = (selectedRows) => {
+const getFilteredCheckboxActions = (selectedRows) => {
     const allActions = [
       {
-        label: 'Approve Selected',
+        label: 'Approve',
         icon: <Check size={14} />,
         onClick: handleApproveSelected,
       },
       {
-        label: 'Cancel Selected',
+        label: 'Cancel',
+        icon: <X size={14} />,
         style: 'orange',
         onClick: handleCancelSelected,
       },
@@ -98,28 +101,29 @@ function DisbursementsContent() {
       {
         // ── Internal Copy → fetch data → generate + download PDF directly
         label: 'Internal Copy',
-        icon: <FileText size={14} />,
+        icon: <Printer size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'internal'),
         style: 'blue', // Blue color for internal copy
       },
       {
         // ── Vendor Copy → same but labelled differently in PDF
         label: 'Vendor Copy',
-        icon: <Building size={14} />,
+        icon: <ExternalLink size={14} />,
         onClick: (selectedRows) => fetchAndDownloadPDF(selectedRows, 'vendor'),
         style: 'orange', // Orange color for vendor copy
       },
     ]
 
-    // Filter Approve Selected button - show if at least one selected row is PREPARED or CHECKED
+    // Filter actions based on row states
     return allActions.filter((action) => {
-      if (action.label === 'Approve Selected') {
+      if (action.separator) return true // Keep separators
+      if (action.label === 'Approve') {
         // Show approve button if at least one selected row has state PREPARED or CHECKED
         return selectedRows.some(
           (row) => row.state === 'PREPARED' || row.state === 'CHECKED',
         )
       }
-      if (action.label === 'Cancel Selected') {
+      if (action.label === 'Cancel') {
         return selectedRows.some(
           (row) => row.state !== 'CANCELLED' && row.state !== 'REJECTED' && row.state !== 'APPROVED',
         )
