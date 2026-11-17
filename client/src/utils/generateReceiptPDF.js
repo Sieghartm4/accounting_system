@@ -534,20 +534,9 @@ export async function generateReceiptPDF(receiptData, copyType = 'internal') {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ── AUTHORIZATION / SIGNATURE SECTION — thin hairline columns, no fills.
+    // ── SIGNATURE SECTION — thin hairline columns, no fills.
     //    Order: Approved → Checked → Submitted. Line sits above the name.
     // ─────────────────────────────────────────────────────────────────────────
-    y += 16
-
-    doc.setDrawColor(...RED)
-    doc.setLineWidth(1)
-    doc.line(margin, y, margin + 90, y)
-    y += 12
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(6.5)
-    doc.setTextColor(...BLACK)
-    doc.text('AUTHORIZATION', margin, y)
     y += 16
 
     const colW = contentW / 3

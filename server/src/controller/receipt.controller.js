@@ -39,8 +39,14 @@ const {
   itemsEquivalentFromDb,
   journalsEquivalentFromDb,
 } = require('../util/documentDiff.util')
-const { notifyFromController } = require('../services/notification/notifyFromController')
 
+const {
+  getIdempotencyKey,
+  claimIdempotencyKey,
+  linkIdempotencyKey,
+} = require('../util/idempotency.util')
+
+const { notifyFromController } = require('../services/notification/notifyFromController')
 const {
   findPeriodForDateKey,
   assertPeriodIsOpen,
@@ -633,6 +639,20 @@ const getPrintReceipts = async (req, res, next) => {
       ],
     )
 
+    // Resolve signer usernames to full names for the PDF signature block
+    const signerConn = await getTenantPool().getConnection()
+    try {
+      await Promise.all(
+        receipts.map(async (r) => {
+          r.created_by = await getUserFullName(r.created_by, signerConn, Master)
+          r.checked_by = await getUserFullName(r.checked_by, signerConn, Master)
+          r.approved_by = await getUserFullName(r.approved_by, signerConn, Master)
+        }),
+      )
+    } finally {
+      signerConn.release()
+    }
+
     const receipts_items_query = sql
       .select([
         { col: Accounting.receipt_items.selectOptionColumns.id, as: 'id' },
@@ -866,7 +886,9 @@ const getPrintReceipts = async (req, res, next) => {
       const receiptJournal =
         copyType === 'customer'
           ? [] // No journal entries for customer copies
-          : receipts_journal.filter((entry) => entry.db_id === receipt.id)
+          : receipts_journal.filter(
+              (entry) => String(entry.db_id) === String(receipt.id),
+            )
 
       // Map items to PDF expected format
 
@@ -1044,12 +1066,36 @@ const createReceipts = async (req, res, next) => {
       })
     }
 
+    const idempotencyKey = getIdempotencyKey(req)
+    if (!idempotencyKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'Idempotency-Key is required',
+      })
+    }
+
     let connection
 
     try {
       connection = await getTenantPool().getConnection()
 
       await connection.beginTransaction()
+
+      const claim = await claimIdempotencyKey(
+        connection,
+        idempotencyKey,
+        'receipts',
+      )
+      if (claim.duplicate) {
+        await connection.rollback()
+        return res.status(200).json({
+          success: true,
+          message: 'Receipt already created',
+          data: { id: claim.documentId },
+          duplicate: true,
+          timestamp: new Date().toISOString(),
+        })
+      }
 
       // Get user full name from database
       const userFullName = await getUserFullName(created_by, connection, Master)
@@ -1213,6 +1259,8 @@ const createReceipts = async (req, res, next) => {
       }
 
       // Allow submission without attachments - attachments are optional
+
+      await linkIdempotencyKey(connection, idempotencyKey, 'receipts', newReceiptId)
 
       await connection.commit()
 

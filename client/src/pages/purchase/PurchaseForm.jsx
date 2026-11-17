@@ -27,6 +27,40 @@ import { computeTotals, findMissingAutoAccounts, round2 } from '../../utils/taxC
 import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 import { API } from '../../api/endpoints'
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper to open data URLs (browser blocks direct window.open on data:)
+// ─────────────────────────────────────────────────────────────────────────────
+const openDataUrl = (dataUrl, fileName = 'attachment') => {
+  try {
+    const parts = dataUrl.split(',')
+    if (parts.length < 2) return
+    const mimeMatch = parts[0].match(/:(.*?);/)
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream'
+    const bstr = atob(parts[1])
+    let n = bstr.length
+    const u8arr = new Uint8Array(n)
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n)
+    }
+    const blob = new Blob([u8arr], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.target = '_blank'
+    // For PDFs, let browser decide to view or download
+    // For other files, add download attribute with actual file name
+    if (!mime.startsWith('application/pdf')) {
+      a.download = fileName
+    }
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (e) {
+    console.error('Failed to open data URL:', e)
+  }
+}
+
 // Signature of everything that feeds the auto-generated journal entries. It is
 // used to tell a real user edit apart from the initial form hydration so that
 // loading an existing document never regenerates (and therefore rewrites) the
@@ -584,6 +618,13 @@ export default function PurchaseForm({
 }) {
   const postedLock = isPostedLocked && !isViewMode
   const [purchaseItems, setPurchaseItems] = useState([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const submittingRef = useRef(false)
+  const idempotencyKeyRef = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  )
 
   const {
     responsibilityCenters,
@@ -1669,6 +1710,9 @@ export default function PurchaseForm({
 
 
   const handlePostTransaction = async () => {
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setIsSubmitting(true)
     try {
       const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
@@ -1886,6 +1930,9 @@ export default function PurchaseForm({
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          ...(method === 'POST'
+            ? { 'Idempotency-Key': idempotencyKeyRef.current }
+            : {}),
         },
         body: JSON.stringify(purchaseDataPayload),
       })
@@ -1900,6 +1947,12 @@ export default function PurchaseForm({
       const result = await response.json()
 
       if (result.success) {
+        if (!isEditMode) {
+          idempotencyKeyRef.current =
+            typeof crypto !== 'undefined' && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+        }
         const action = isEditMode ? 'updated' : 'created'
         const nextToast = {
           type: 'success',
@@ -1917,6 +1970,9 @@ export default function PurchaseForm({
     } catch (error) {
       console.error('Error posting purchase:', error)
       setToast({ type: 'error', message: 'Error: ' + error.message })
+    } finally {
+      submittingRef.current = false
+      setIsSubmitting(false)
     }
   }
 
@@ -2372,9 +2428,10 @@ export default function PurchaseForm({
             </button>
             <button
               onClick={handlePostTransaction}
-              className="px-6 py-2 bg-green-600 text-white text-[12px] font-black rounded-lg hover:bg-green-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-green-200"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-green-600 text-white text-[12px] font-black rounded-lg hover:bg-green-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-green-200 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Save size={14} /> {isEditMode ? 'Update Receipt' : 'Post Transaction'}
+              <Save size={14} /> {isSubmitting ? 'Saving...' : isEditMode ? 'Update Receipt' : 'Post Transaction'}
             </button>
           </div>
         )}
@@ -3296,9 +3353,22 @@ export default function PurchaseForm({
                                         }
                                         title="Click to view full size"
                                       />
+                                    ) : file.file && typeof file.file === 'string' ? (
+                                      <div className="flex flex-col items-center">
+                                        <span
+                                          className="text-blue-600 text-[11px] font-bold cursor-pointer hover:underline break-all text-center leading-tight"
+                                          onClick={() => openDataUrl(file.file, file.fileName || 'attachment')}
+                                          title="Click to open file"
+                                        >
+                                          {file.fileName || 'Unnamed file'}
+                                        </span>
+                                        <span className="text-[8px] text-gray-500">
+                                          {Math.round(file.file.length / 1024)}KB
+                                        </span>
+                                      </div>
                                     ) : file.file ? (
-                                      <span className="text-gray-500 text-[11px] italic">
-                                        File attached
+                                      <span className="text-orange-600 text-[11px] font-bold">
+                                        Invalid file data
                                       </span>
                                     ) : (
                                       <span className="text-gray-400 text-[11px] italic">

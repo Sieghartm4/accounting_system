@@ -76,6 +76,12 @@ const {
 } = require('../util/documentDiff.util')
 
 const {
+  getIdempotencyKey,
+  claimIdempotencyKey,
+  linkIdempotencyKey,
+} = require('../util/idempotency.util')
+
+const {
   findPeriodForDateKey,
   assertPeriodIsOpen,
   getPeriodKeyForDate,
@@ -1537,6 +1543,22 @@ const createPurchase = async (req, res, next) => {
 
 
 
+    const idempotencyKey = getIdempotencyKey(req)
+
+    if (!idempotencyKey) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message: 'Idempotency-Key is required',
+
+      })
+
+    }
+
+
+
     let connection
 
 
@@ -1548,6 +1570,34 @@ const createPurchase = async (req, res, next) => {
 
 
       await connection.beginTransaction()
+
+
+
+      const claim = await claimIdempotencyKey(
+        connection,
+        idempotencyKey,
+        'purchase',
+      )
+
+      if (claim.duplicate) {
+
+        await connection.rollback()
+
+        return res.status(200).json({
+
+          success: true,
+
+          message: 'Purchase already created',
+
+          data: { id: claim.documentId },
+
+          duplicate: true,
+
+          timestamp: new Date().toISOString(),
+
+        })
+
+      }
 
 
 
@@ -1882,6 +1932,13 @@ const createPurchase = async (req, res, next) => {
       }
 
 
+
+      await linkIdempotencyKey(
+        connection,
+        idempotencyKey,
+        'purchase',
+        purchaseId,
+      )
 
       await connection.commit()
 
@@ -5553,6 +5610,34 @@ const getPrintPurchases = async (req, res, next) => {
       ],
 
     )
+
+
+
+    // Resolve signer usernames to full names for the PDF signature block
+
+    const signerConn = await getTenantPool().getConnection()
+
+    try {
+
+      await Promise.all(
+
+        purchases.map(async (p) => {
+
+          p.created_by = await getUserFullName(p.created_by, signerConn, Master)
+
+          p.checked_by = await getUserFullName(p.checked_by, signerConn, Master)
+
+          p.approved_by = await getUserFullName(p.approved_by, signerConn, Master)
+
+        }),
+
+      )
+
+    } finally {
+
+      signerConn.release()
+
+    }
 
 
 

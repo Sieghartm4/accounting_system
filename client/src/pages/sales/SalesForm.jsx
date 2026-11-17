@@ -27,6 +27,40 @@ import { getItemResponsibilityCenter } from '../../utils/responsibilityCenterDef
 import { filterActiveMasterRows } from '../../utils/activeMasterFilter'
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Helper to open data URLs (browser blocks direct window.open on data:)
+// ─────────────────────────────────────────────────────────────────────────────
+const openDataUrl = (dataUrl, fileName = 'attachment') => {
+  try {
+    const parts = dataUrl.split(',')
+    if (parts.length < 2) return
+    const mimeMatch = parts[0].match(/:(.*?);/)
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream'
+    const bstr = atob(parts[1])
+    let n = bstr.length
+    const u8arr = new Uint8Array(n)
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n)
+    }
+    const blob = new Blob([u8arr], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.target = '_blank'
+    // For PDFs, let browser decide to view or download
+    // For other files, add download attribute with actual file name
+    if (!mime.startsWith('application/pdf')) {
+      a.download = fileName
+    }
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (e) {
+    console.error('Failed to open data URL:', e)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
 // ─────────────────────────────────────────────────────────────────────────────
 const MIN_DROPDOWN_WIDTH = 260
@@ -256,6 +290,7 @@ export default function SalesForm({
   salesData = null,
 } = {}) {
   const form = useSalesForm({ isViewMode, isEditMode, salesData, onBack, onSuccess })
+  const isDisabled = isViewMode && !isEditMode
   const postedLock = isPostedLocked && !isViewMode
   const salesItemsScrollRef = useDragToScroll()
 
@@ -314,14 +349,14 @@ export default function SalesForm({
 
   const inputBase =
     'w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ' +
-    (isViewMode
+    (isDisabled
       ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
       : 'bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500 text-center')
 
   const tableInput =
     'w-full rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none ' +
-    (isViewMode
-      ? 'bg-gray-100 border border-gray-300 text-black! cursor-not-allowed'
+    (isDisabled
+      ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
       : 'bg-gray-50/50 focus:ring-1 focus:ring-red-400')
 
   const pctInput = tableInput + ' pr-1'
@@ -839,7 +874,7 @@ export default function SalesForm({
             Sales <span className="text-red-600 italic">Order</span>
           </h1>
         </div>
-        {!isViewMode && (
+        {!isDisabled && (
           <div className="flex items-center gap-2">
             {postedLock && (
               <span className="px-3 py-1.5 bg-amber-100 border border-amber-400 text-amber-800 text-[11px] font-black rounded-lg uppercase tracking-wide">
@@ -851,13 +886,14 @@ export default function SalesForm({
             </button>
             <button
               onClick={form.handlePostTransaction}
-              className="px-6 py-2 bg-green-600 text-white text-[12px] font-black rounded-lg hover:bg-green-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-green-200"
+              disabled={form.isSubmitting}
+              className="px-6 py-2 bg-green-600 text-white text-[12px] font-black rounded-lg hover:bg-green-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-green-200 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Save size={14} /> Post Transaction
+              <Save size={14} /> {form.isSubmitting ? 'Saving...' : 'Post Transaction'}
             </button>
           </div>
         )}
-        {isViewMode &&(
+        {isDisabled &&(
           <div>
           </div>
         )}
@@ -1017,7 +1053,7 @@ export default function SalesForm({
                         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                           Customer <span className="text-red-500">*</span>
                         </label>
-                        {isViewMode || postedLock ? (
+                        {isDisabled || postedLock ? (
                           <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
                             {form.customerSearch || 'No customer selected'}
                           </div>
@@ -1065,8 +1101,8 @@ export default function SalesForm({
                           placeholder="INV-000"
                           value={form.documentReference}
                           onChange={(e) => form.setDocumentReference(e.target.value)}
-                          disabled={isViewMode}
-                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!form.documentReference ? 'border-red-500' : 'border-zinc-300'}`}
+                          disabled={isDisabled}
+                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!form.documentReference ? 'border-red-500' : 'border-zinc-300'}`}
                         />
                       </div>
                       {/* Terms */}
@@ -1076,10 +1112,10 @@ export default function SalesForm({
                         </label>
                         <div className="grid grid-cols-2 gap-1">
                           <select
-                            disabled={isViewMode || postedLock}
+                            disabled={isDisabled || postedLock}
                             value={form.termsOption}
                             onChange={(e) => form.setTermsOption(e.target.value)}
-                            className={`w-full px-2 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed' : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'}`}
+                            className={`w-full px-2 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isDisabled ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed' : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'}`}
                           >
                             {termsOptions.map((option) => (
                               <option key={option} value={option}>
@@ -1088,12 +1124,12 @@ export default function SalesForm({
                             ))}
                           </select>
                           <input
-                            disabled={isViewMode || postedLock}
+                            disabled={isDisabled || postedLock}
                             type="number"
                             placeholder="Number"
                             value={form.termsNumber}
                             onChange={(e) => form.setTermsNumber(e.target.value)}
-                            className={`w-full px-2 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isViewMode ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed' : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'}`}
+                            className={`w-full px-2 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ${isDisabled ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed' : 'bg-white border border-gray-200 text-black focus:ring-1 focus:ring-red-500'}`}
                           />
                         </div>
                       </div>
@@ -1107,7 +1143,7 @@ export default function SalesForm({
                           disabled={isViewMode || postedLock}
                           value={form.dateDelivered}
                           onChange={(e) => form.setDateDelivered(e.target.value)}
-                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!form.dateDelivered ? 'border-red-500' : 'border-zinc-300'}`}
+                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!form.dateDelivered ? 'border-red-500' : 'border-zinc-300'}`}
                         />
                       </div>
                       {/* Date Due */}
@@ -1120,7 +1156,7 @@ export default function SalesForm({
                           disabled={isViewMode || postedLock}
                           value={form.dateDue}
                           onChange={(e) => form.setDateDue(e.target.value)}
-                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!form.dateDue ? 'border-red-500' : 'border-zinc-300'}`}
+                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!form.dateDue ? 'border-red-500' : 'border-zinc-300'}`}
                         />
                       </div>
                     </div>
@@ -1179,7 +1215,7 @@ export default function SalesForm({
                               responsibilityCentersError ||
                               'No responsibility centers found'
                             }
-                            disabled={isViewMode}
+                            disabled={isDisabled}
                           />
                         </div>
                       </div>
@@ -1238,7 +1274,7 @@ export default function SalesForm({
                               {/* Product */}
                               <td className="py-1 px-1">
                                 <SearchableDropdown
-                                  disabled={isViewMode || item.isOther}
+                                  disabled={isDisabled || item.isOther}
                                   placeholder={item.isOther ? '' : 'Search product...'}
                                   value={item.isOther ? '' : item.productSearch}
                                   onChange={(v) =>
@@ -1253,10 +1289,10 @@ export default function SalesForm({
                                     )
                                   }}
                                   options={form.productOptions}
-                                  inputClassName={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  inputClassName={`${tableInput} ${isDisabled || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   emptyText={form.productError || 'No products found'}
                                   dropdownFooter={
-                                    !isViewMode && !item.isOther ? (
+                                    !isDisabled && !item.isOther ? (
                                       <button
                                         onPointerDown={(e) => {
                                           e.preventDefault()
@@ -1277,7 +1313,7 @@ export default function SalesForm({
                               {/* COA */}
                               <td className="py-1 px-1">
                                 <SearchableDropdown
-                                  disabled={isViewMode}
+                                  disabled={isDisabled}
                                   placeholder="Search account..."
                                   value={item.coaSearch}
                                   onChange={(v) =>
@@ -1288,15 +1324,15 @@ export default function SalesForm({
                                     form.updateSalesItem(item.id, 'coaSearch', opt.label)
                                   }}
                                   options={form.coaOptions}
-                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   emptyText="No accounts found"
                                 />
                               </td>
                               {/* Description */}
                               <td className="py-1 px-1">
                                 <input
-                                  disabled={isViewMode}
-                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  disabled={isDisabled}
+                                  className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   placeholder="Details..."
                                   value={item.description}
                                   onChange={(e) =>
@@ -1311,10 +1347,10 @@ export default function SalesForm({
                               {/* Qty */}
                               <td className="py-1 px-1">
                                 <input
-                                  disabled={isViewMode || item.isOther}
+                                  disabled={isDisabled || item.isOther}
                                   type="number"
                                   min="0"
-                                  className={`${tableInput} ${isViewMode || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  className={`${tableInput} ${isDisabled || item.isOther ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   placeholder={item.isOther ? '' : '1'}
                                   value={item.isOther ? '' : item.qty || ''}
                                   onChange={(e) =>
@@ -1332,8 +1368,8 @@ export default function SalesForm({
                               <td className="py-1 px-1">
                                 <div className="flex items-center gap-1">
                                   <input
-                                    disabled={isViewMode}
-                                    className={`${tableInput + ' font-black w-28'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    disabled={isDisabled}
+                                    className={`${tableInput + ' font-black w-28'} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                     type="text"
                                     placeholder="0.00"
                                     inputMode="decimal"
@@ -1344,10 +1380,10 @@ export default function SalesForm({
                                     }}
                                   />
                                   <select
-                                    disabled={isViewMode}
+                                    disabled={isDisabled}
                                     value={item.vatType || 'VAT-EX'}
                                     onChange={(e) => form.updateSalesItem(item.id, 'vatType', e.target.value)}
-                                    className={`text-[10px] font-bold px-1 py-1 rounded border ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' : 'bg-white border-gray-200 text-black focus:ring-1 focus:ring-red-500'} outline-none`}
+                                    className={`text-[10px] font-bold px-1 py-1 rounded border ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' : 'bg-white border-gray-200 text-black focus:ring-1 focus:ring-red-500'} outline-none`}
                                   >
                                     <option value="VAT-EX">EX</option>
                                     <option value="VAT-INC">INC</option>
@@ -1358,8 +1394,8 @@ export default function SalesForm({
                               <td className="py-1 px-1">
                                 <div className="relative">
                                   <input
-                                    disabled={isViewMode}
-                                    className={`${pctInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    disabled={isDisabled}
+                                    className={`${pctInput + ' font-black'} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                     type="number"
                                     min="0"
                                     max={
@@ -1385,7 +1421,7 @@ export default function SalesForm({
                               </td>
                               {/* Discount Type */}
                               <td className="py-1 px-1">
-                                {isViewMode ? (
+                                {isDisabled ? (
                                   <div
                                     className={`${tableInput} text-black py-1.5 text-center`}
                                   >
@@ -1412,7 +1448,7 @@ export default function SalesForm({
                               </td>
                               {/* VAT */}
                               <td className="py-1 px-1">
-                                {isViewMode ? (
+                                {isDisabled ? (
                                   <div
                                     className={`${tableInput} text-black py-1.5 text-center`}
                                   >
@@ -1444,7 +1480,7 @@ export default function SalesForm({
                               </td>
                               {/* WHT */}
                               <td className="py-1 px-1">
-                                {isViewMode ? (
+                                {isDisabled ? (
                                   <div
                                     className={`${tableInput} text-black py-1.5 text-center`}
                                   >
@@ -1477,7 +1513,7 @@ export default function SalesForm({
                               {/* Responsibility Center */}
                               <td className="py-1 px-1">
                                 <SearchableDropdown
-                                  disabled={isViewMode}
+                                  disabled={isDisabled}
                                   placeholder="Select"
                                   value={item.responsibilityCenter}
                                   onChange={(v) =>
@@ -1495,7 +1531,7 @@ export default function SalesForm({
                                     )
                                   }
                                   options={responsibilityCenterOptions}
-                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   emptyText={
                                     responsibilityCentersError ||
                                     'No responsibility centers found'
@@ -1504,7 +1540,7 @@ export default function SalesForm({
                               </td>
                               {/* Delete */}
                               <td className="py-1 px-1 text-center">
-                                {!isViewMode && (
+                                {!isDisabled && (
                                   <button
                                     onClick={() => form.removeSalesItem(item.id)}
                                     className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
@@ -1518,7 +1554,7 @@ export default function SalesForm({
                         </tbody>
                       </table>
                     </div>
-                    {!isViewMode && (
+                    {!isDisabled && (
                       <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
                         <div className="flex gap-2">
                           <button
@@ -1608,7 +1644,7 @@ export default function SalesForm({
                             <tr key={entry.id}>
                               <td className="py-2 px-3 text-center">
                                 <SearchableDropdown
-                                  disabled={isViewMode}
+                                  disabled={isDisabled}
                                   placeholder="Search account..."
                                   value={entry.accountSearch}
                                   onChange={(v) =>
@@ -1627,14 +1663,14 @@ export default function SalesForm({
                                     )
                                   }}
                                   options={form.coaOptions}
-                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   emptyText="No accounts found"
                                 />
                               </td>
                               <td className="py-2 px-3 text-center font-mono">
                                 <input
-                                  disabled={isViewMode}
-                                  className={`${tableInput + ' font-black text-center'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  disabled={isDisabled}
+                                  className={`${tableInput + ' font-black text-center'} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   placeholder="0.00"
                                   type="text"
                                   inputMode="decimal"
@@ -1650,8 +1686,8 @@ export default function SalesForm({
                               </td>
                               <td className="py-2 px-3 text-center font-mono">
                                 <input
-                                  disabled={isViewMode}
-                                  className={`${tableInput + ' font-black text-center text-red-600'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                                  disabled={isDisabled}
+                                  className={`${tableInput + ' font-black text-center text-red-600'} ${isDisabled ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
                                   placeholder="0.00"
                                   type="text"
                                   inputMode="decimal"
@@ -1667,7 +1703,7 @@ export default function SalesForm({
                               </td>
                               <td className="py-2 px-3 text-center">
                                 <SearchableDropdown
-                                  disabled={isViewMode}
+                                  disabled={isDisabled}
                                   placeholder="Select"
                                   value={entry.center}
                                   onChange={(v) =>
@@ -1684,7 +1720,7 @@ export default function SalesForm({
                                     form.responsibilityCenterOptions ||
                                     responsibilityCenterOptions
                                   }
-                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   emptyText={
                                     form.responsibilityCentersError ||
                                     responsibilityCentersError ||
@@ -1693,7 +1729,7 @@ export default function SalesForm({
                                 />
                               </td>
                               <td className="py-2 px-3 text-center">
-                                {!isViewMode && (
+                                {!isDisabled && (
                                   <button
                                     className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                                     onClick={() => form.removeJournalEntry(entry.id)}
@@ -1728,7 +1764,7 @@ export default function SalesForm({
                         </tfoot>
                       </table>
                     </div>
-                    {!isViewMode && (
+                    {!isDisabled && (
                       <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between">
                         <button
                           onClick={() => form.addJournalEntry(bulkResponsibilityCenter)}
@@ -1790,8 +1826,8 @@ export default function SalesForm({
                             <tr key={file.id}>
                               <td className="py-2 px-1">
                                 <input
-                                  disabled={isViewMode}
-                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  disabled={isDisabled}
+                                  className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   placeholder="e.g. Invoice_Scan"
                                   value={file.fileName}
                                   onChange={(e) =>
@@ -1804,7 +1840,7 @@ export default function SalesForm({
                                 />
                               </td>
                               <td className="py-2 px-1">
-                                {isViewMode ? (
+                                {isDisabled ? (
                                   <div
                                     className={`${tableInput} text-black cursor-not-allowed flex items-center justify-center`}
                                   >
@@ -1824,15 +1860,20 @@ export default function SalesForm({
                                           }
                                           title="Click to view full size"
                                         />
-                                        <span className="text-[8px] text-gray-500 ml-2">
-                                          {Math.round(file.file.length / 1024)}KB
-                                        </span>
                                       </>
                                     ) : file.file && typeof file.file === 'string' ? (
-                                      <span className="text-blue-600 text-[11px] font-bold">
-                                        Non-image file (
-                                        {Math.round(file.file.length / 1024)}KB)
-                                      </span>
+                                      <div className="flex flex-col items-center">
+                                        <span
+                                          className="text-blue-600 text-[11px] font-bold cursor-pointer hover:underline break-all text-center leading-tight"
+                                          onClick={() => openDataUrl(file.file, file.fileName || 'attachment')}
+                                          title="Click to open file"
+                                        >
+                                          {file.fileName || 'Unnamed file'}
+                                        </span>
+                                        <span className="text-[8px] text-gray-500">
+                                          {Math.round(file.file.length / 1024)}KB
+                                        </span>
+                                      </div>
                                     ) : file.file ? (
                                       <span className="text-orange-600 text-[11px] font-bold">
                                         Invalid file data
@@ -1855,8 +1896,8 @@ export default function SalesForm({
                               </td>
                               <td className="py-2 px-1">
                                 <input
-                                  disabled={isViewMode}
-                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  disabled={isDisabled}
+                                  className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   placeholder="Add note..."
                                   value={file.remarks}
                                   onChange={(e) =>
@@ -1872,7 +1913,7 @@ export default function SalesForm({
                                 {file.uploadedBy}
                               </td>
                               <td className="py-2 text-center">
-                                {!isViewMode && (
+                                {!isDisabled && (
                                   <button
                                     onClick={() => form.removeAttachment(file.id)}
                                     className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
@@ -1886,7 +1927,7 @@ export default function SalesForm({
                         </tbody>
                       </table>
                     </div>
-                    {!isViewMode && (
+                    {!isDisabled && (
                       <button
                         onClick={form.addAttachment}
                         className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
@@ -1907,12 +1948,12 @@ export default function SalesForm({
                   </div>
                   <div className="p-4">
                     <textarea
-                      disabled={isViewMode}
+                      disabled={isDisabled}
                       rows={4}
                       placeholder="Enter justification or internal notes here..."
                       value={form.remarks}
                       onChange={(e) => form.setRemarks(e.target.value)}
-                      className={`w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                      className={`w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                     />
                   </div>
                 </section>

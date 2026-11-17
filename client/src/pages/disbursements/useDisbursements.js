@@ -201,6 +201,14 @@ export function useDisbursementForm({
   onBack,
   onSuccess,
 }) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const submittingRef = useRef(false)
+  const idempotencyKeyRef = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  )
+
   const [disbursementItems, setDisbursementItems] = useState([])
   const [journalEntries, setJournalEntries] = useState([
     {
@@ -624,29 +632,14 @@ export function useDisbursementForm({
 
       if (attachmentsData.length > 0) {
         setAttachments(
-          attachmentsData.map((att) => {
-            const attFile = typeof att.file === 'string' ? att.file : ''
-            const attName = typeof att.name === 'string' ? att.name : ''
-            const base64 = attFile.startsWith('data:image/')
-              ? attFile
-              : attName.startsWith('data:image/')
-                ? attName
-                : null
-            const fileName =
-              !attFile.startsWith('data:') && attFile
-                ? attFile
-                : !attName.startsWith('data:') && attName
-                  ? attName
-                  : ''
-            return {
-              id: att.id,
-              fileName,
-              file: base64,
-              remarks: att.remarks || '',
-              uploadedBy: att.uploaded_by || 'Current User',
-              date: att.uploaded_date || new Date().toLocaleDateString(),
-            }
-          }),
+          attachmentsData.map((att) => ({
+            id: att.id,
+            fileName: att.name || '',
+            file: att.file || null,
+            remarks: att.remarks || '',
+            uploadedBy: att.uploaded_by || 'Current User',
+            date: att.uploaded_date || new Date().toLocaleDateString(),
+          })),
         )
       }
     }
@@ -1094,6 +1087,9 @@ export function useDisbursementForm({
   // ── Post / Submit ──
 
   const handlePostTransaction = async () => {
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setIsSubmitting(true)
     try {
       const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
@@ -1266,6 +1262,9 @@ export function useDisbursementForm({
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          ...(!(isEditMode && disbursementId)
+            ? { 'Idempotency-Key': idempotencyKeyRef.current }
+            : {}),
         },
         body: JSON.stringify(requestData),
       })
@@ -1279,6 +1278,12 @@ export function useDisbursementForm({
 
       const result = await response.json()
       if (result.success) {
+        if (!isEditMode) {
+          idempotencyKeyRef.current =
+            typeof crypto !== 'undefined' && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+        }
         const action = isEditMode ? 'updated' : 'created'
         const nextToast = {
           type: 'success',
@@ -1296,6 +1301,9 @@ export function useDisbursementForm({
     } catch (error) {
       console.error('Error posting cash disbursement:', error)
       setToast({ type: 'error', message: 'Error: ' + error.message })
+    } finally {
+      submittingRef.current = false
+      setIsSubmitting(false)
     }
   }
 
@@ -1361,6 +1369,7 @@ export function useDisbursementForm({
     createVendor,
     createProduct,
     handlePostTransaction,
+    isSubmitting,
     summary: computeSummary(disbursementItems),
   }
 }

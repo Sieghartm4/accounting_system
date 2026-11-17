@@ -224,34 +224,36 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
           })
         : ''
 
-    // ── ITEMS TABLE
+    const fmtDate = (v) => {
+      if (!v) return '—'
+      try {
+        return new Date(v).toLocaleDateString('en-US', {
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric',
+        })
+      } catch (_) {
+        return '—'
+      }
+    }
+
+    // ── ITEMS TABLE (invoice-application rows)
     const items = Array.isArray(payment.items) ? payment.items : []
 
     const itemRows = items.map((item, i) => {
-      const qty = parseFloat(item.quantity || 1)
-      const pp = parseFloat(item.purchase_price || 0)
-      const tp = parseFloat(item.total_price || pp * qty)
-      const disc = parseFloat(item.discount_amount || 0)
-      const vatP = item.vat_percentage != null ? item.vat_percentage + '%' : '0%'
-      const vatA = parseFloat(item.vat_amount || 0)
-      const whtP = item.wht_percentage != null ? item.wht_percentage + '%' : '0%'
-      const whtA = parseFloat(item.wht_amount || 0)
-      const due = parseFloat(item.amount_due || item.amount || tp)
+      const invoiceAmount = parseFloat(item.invoice_amount || 0)
+      const invoicePaid = parseFloat(item.invoice_paid || 0)
+      const amountApplied = parseFloat(item.amount_applied || 0)
       return [
-        i + 1,
+        String(i + 1),
         item.invoice_ref || '—',
-        item.product_name || '—',
-        item.description || '—',
-        item.unit || '—',
-        fmt2(qty),
-        fmt2(pp),
-        fmt2(tp),
-        fmt2(disc),
-        vatP,
-        fmt2(vatA),
-        whtP,
-        fmt2(whtA),
-        fmt2(due),
+        payment.vendor || '—',
+        item.terms || '—',
+        fmtDate(item.date_delivered),
+        fmtDate(item.date_due),
+        fmt2(invoiceAmount),
+        fmt2(invoicePaid),
+        fmt2(amountApplied),
       ]
     })
 
@@ -261,24 +263,19 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
       head: [
         [
           '#',
-          'Invoice\nRef',
-          'Product or\nService',
-          'Description',
-          'Unit',
-          'Quantity',
-          'Purchase\nPrice',
-          'Total\nPrice',
-          'Discount\nAmount',
-          'VAT',
-          'VAT\nAmount',
-          'WHT',
-          'WHT\nAmount',
-          'Amount\nDue',
+          'Invoice Ref',
+          'Vendor',
+          'Terms',
+          'Date\nDelivered',
+          'Date\nDue',
+          'Invoice\nAmount',
+          'Paid',
+          'Amount\nApplied',
         ],
       ],
-      body: itemRows.length > 0 ? itemRows : [Array(14).fill('')],
+      body: itemRows.length > 0 ? itemRows : [Array(9).fill('')],
       styles: {
-        fontSize: 6,
+        fontSize: 6.5,
         cellPadding: { top: 4, bottom: 4, left: 2, right: 2 },
         textColor: BLACK,
         lineColor: HAIRLINE,
@@ -297,19 +294,14 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
       },
       columnStyles: {
         0: { halign: 'center', cellWidth: 14 },
-        1: { halign: 'left', cellWidth: 38 },
+        1: { halign: 'left', cellWidth: 52 },
         2: { halign: 'left' },
-        3: { halign: 'left', cellWidth: 50 },
-        4: { halign: 'center', cellWidth: 20 },
-        5: { halign: 'right', cellWidth: 32 },
-        6: { halign: 'right', cellWidth: 42 },
-        7: { halign: 'right', cellWidth: 40 },
-        8: { halign: 'right', cellWidth: 38 },
-        9: { halign: 'center', cellWidth: 20 },
-        10: { halign: 'right', cellWidth: 38 },
-        11: { halign: 'center', cellWidth: 20 },
-        12: { halign: 'right', cellWidth: 38 },
-        13: { halign: 'right', cellWidth: 44 },
+        3: { halign: 'center', cellWidth: 36 },
+        4: { halign: 'center', cellWidth: 52 },
+        5: { halign: 'center', cellWidth: 52 },
+        6: { halign: 'right', cellWidth: 52 },
+        7: { halign: 'right', cellWidth: 52 },
+        8: { halign: 'right', cellWidth: 56 },
       },
       alternateRowStyles: { fillColor: [252, 240, 240] },
       tableLineColor: HAIRLINE,
@@ -338,31 +330,16 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
     // ── AMOUNT BREAKDOWN BOX
     const totals = items.reduce(
       (acc, item) => {
-        const qty = parseFloat(item.quantity || 1)
-        acc.purchasePrice += parseFloat(item.purchase_price || 0) * qty
-        acc.totalDiscount += parseFloat(item.discount_amount || 0)
-        acc.totalVAT += parseFloat(item.vat_amount || 0)
-        acc.vatableSales += parseFloat(item.vatable_sales || 0)
-        acc.vatExempt += parseFloat(item.vat_exempt_sales || 0)
-        acc.zeroRated += parseFloat(item.zero_rated_sales || 0)
-        acc.totalWHT += parseFloat(item.wht_amount || 0)
-        acc.amountDue += parseFloat(item.amount_due || item.amount || 0)
+        acc.totalInvoiceAmount += parseFloat(item.invoice_amount || 0)
+        acc.totalPaid += parseFloat(item.invoice_paid || 0)
+        acc.totalApplied += parseFloat(item.amount_applied || 0)
         return acc
       },
-      {
-        purchasePrice: 0,
-        totalDiscount: 0,
-        totalVAT: 0,
-        vatableSales: 0,
-        vatExempt: 0,
-        zeroRated: 0,
-        totalWHT: 0,
-        amountDue: 0,
-      },
+      { totalInvoiceAmount: 0, totalPaid: 0, totalApplied: 0 },
     )
 
-    const discountedAmount = totals.purchasePrice - totals.totalDiscount
-    const netOfVAT = discountedAmount - totals.totalVAT
+    const invoiceBalance = totals.totalInvoiceAmount - totals.totalPaid
+    const paymentTotal = payment.paid_amount || totals.totalApplied
 
     const BOX_X = margin
     const BOX_W = contentW
@@ -403,19 +380,19 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
     const bodyTopY = boxTopY + BOX_HEADER_H + BOX_BODY_PAD_TOP
 
     const leftRows = [
-      ['Total Purchase Price', fmt1(totals.purchasePrice)],
-      ['Total Discount', fmt1(totals.totalDiscount)],
-      ['Total Discounted Amount', fmt1(discountedAmount)],
-      ['Total VAT', fmt1(totals.totalVAT)],
-      ['Total NOV Discount', fmt1(0)],
+      ['Total Invoice Amount', fmt1(totals.totalInvoiceAmount)],
+      ['Paid on Invoices', fmt1(totals.totalPaid)],
+      ['Invoice Balance', fmt1(invoiceBalance)],
+      ['Total WHT', fmt1(0)],
+      ['No. of Invoices', String(items.length)],
     ]
 
     const rightRows = [
-      ['VATable Sales', fmt1(totals.vatableSales)],
-      ['VAT-Exempt Sales', fmt1(totals.vatExempt)],
-      ['Zero Rated Sales', fmt1(totals.zeroRated)],
-      ['Total Net of VAT', fmt1(netOfVAT)],
-      ['Total WHT', fmt1(totals.totalWHT)],
+      ['Amount Applied', fmt1(totals.totalApplied)],
+      ['Payment Total', fmt1(paymentTotal)],
+      ['Payment Date', fmtDate(payment.payment_date)],
+      ['Payment Mode', payment.mode_of_payment || '—'],
+      ['No. of Payments', '1'],
     ]
 
     doc.setFontSize(7.5)
@@ -461,7 +438,7 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
     doc.setTextColor(...BLACK)
     doc.text('TOTAL AMOUNT PAID', BOX_X + 10, dueY + BOX_DUE_H / 2 + 3)
     doc.setFontSize(11)
-    doc.text(fmt1(totals.amountDue), BOX_X + BOX_W - 10, dueY + BOX_DUE_H / 2 + 3, {
+    doc.text(fmt1(paymentTotal), BOX_X + BOX_W - 10, dueY + BOX_DUE_H / 2 + 3, {
       align: 'right',
     })
 
@@ -528,18 +505,7 @@ export async function generatePaymentPDF(paymentData, copyType = 'internal') {
       y = doc.lastAutoTable.finalY + 8
     }
 
-    // ── AUTHORIZATION / SIGNATURE SECTION
-    y += 16
-
-    doc.setDrawColor(...RED)
-    doc.setLineWidth(1)
-    doc.line(margin, y, margin + 90, y)
-    y += 12
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(6.5)
-    doc.setTextColor(...BLACK)
-    doc.text('AUTHORIZATION', margin, y)
+    // ── SIGNATURE SECTION
     y += 16
 
     const colW = contentW / 3

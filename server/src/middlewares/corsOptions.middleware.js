@@ -79,6 +79,7 @@ const corsOptions = {
   allowedHeaders: [
     'Content-Type',
     'Authorization',
+    'Idempotency-Key',
     'x-api-key',
     'x-requested-with',
     'x-tenant-db',

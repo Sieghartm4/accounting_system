@@ -31,6 +31,40 @@ import {
 } from './useDisbursements'
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Helper to open data URLs (browser blocks direct window.open on data:)
+// ─────────────────────────────────────────────────────────────────────────────
+const openDataUrl = (dataUrl, fileName = 'attachment') => {
+  try {
+    const parts = dataUrl.split(',')
+    if (parts.length < 2) return
+    const mimeMatch = parts[0].match(/:(.*?);/)
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream'
+    const bstr = atob(parts[1])
+    let n = bstr.length
+    const u8arr = new Uint8Array(n)
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n)
+    }
+    const blob = new Blob([u8arr], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.target = '_blank'
+    // For PDFs, let browser decide to view or download
+    // For other files, add download attribute with actual file name
+    if (!mime.startsWith('application/pdf')) {
+      a.download = fileName
+    }
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (e) {
+    console.error('Failed to open data URL:', e)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Portal Dropdown
 // ─────────────────────────────────────────────────────────────────────────────
 const MIN_DROPDOWN_WIDTH = 260
@@ -321,6 +355,7 @@ export default function CashDisbursementForm({
     loadVatOnDemand,
     loadWhtOnDemand,
     handlePostTransaction,
+  isSubmitting,
     summary,
   } = useDisbursementForm({
     isViewMode,
@@ -329,6 +364,7 @@ export default function CashDisbursementForm({
     onBack,
     onSuccess,
   })
+  const isDisabled = isViewMode && !isEditMode
   const postedLock = isPostedLocked && !isViewMode
 
   const {
@@ -550,12 +586,12 @@ export default function CashDisbursementForm({
 
   const inputBase =
     'w-full px-3 py-1.5 rounded-lg text-[12px] font-bold outline-none transition-all ' +
-    (isViewMode
+    (isDisabled
       ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
       : 'bg-gray-50 border border-gray-200 text-black focus:ring-1 focus:ring-red-500 text-center')
   const tableInput =
     'w-full rounded-md px-1 py-1 text-[13px] font-bold text-center outline-none ' +
-    (isViewMode
+    (isDisabled
       ? 'bg-gray-100 border border-gray-300 text-black cursor-not-allowed'
       : 'bg-gray-50/50 focus:ring-1 focus:ring-red-400')
   const pctInput = tableInput + ' pr-1'
@@ -611,7 +647,7 @@ export default function CashDisbursementForm({
             Cash <span className="text-red-600 italic">Disbursements</span>
           </h1>
         </div>
-        {!isViewMode && (
+        {!isDisabled && (
           <div className="flex gap-4 items-center">
             {postedLock && (
               <span className="px-3 py-1.5 bg-amber-100 border border-amber-400 text-amber-800 text-[11px] font-black rounded-lg uppercase tracking-wide">
@@ -623,13 +659,14 @@ export default function CashDisbursementForm({
             </button>
             <button
               onClick={handlePostTransaction}
-              className="px-6 py-2 bg-green-600 text-white text-[12px] font-black rounded-lg hover:bg-green-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-green-200"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-green-600 text-white text-[12px] font-black rounded-lg hover:bg-green-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-green-200 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Save size={14} /> Post Transaction
+              <Save size={14} /> {isSubmitting ? 'Saving...' : 'Post Transaction'}
             </button>
           </div>
         )}
-        {isViewMode && (
+        {isDisabled && (
           <div>
           </div>
         )}
@@ -790,7 +827,7 @@ export default function CashDisbursementForm({
                         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                           Vendor / Payee <span className="text-red-500">*</span>
                         </label>
-                        {isViewMode || postedLock ? (
+                        {isDisabled || postedLock ? (
                           <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
                             {vendorSearch || 'No vendor selected'}
                           </div>
@@ -842,8 +879,8 @@ export default function CashDisbursementForm({
                           placeholder="Reference"
                           value={documentReference}
                           onChange={(e) => setDocumentReference(e.target.value)}
-                          disabled={isViewMode}
-                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!documentReference ? 'border-red-500' : 'border-zinc-300'}`}
+                          disabled={isDisabled}
+                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!documentReference ? 'border-red-500' : 'border-zinc-300'}`}
                         />
                       </div>
 
@@ -852,7 +889,7 @@ export default function CashDisbursementForm({
                         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                           Mode of Payment <span className="text-red-500">*</span>
                         </label>
-                        {isViewMode || postedLock ? (
+                        {isDisabled || postedLock ? (
                           <div className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800">
                             {modeSearch || 'No mode selected'}
                           </div>
@@ -884,8 +921,8 @@ export default function CashDisbursementForm({
                           type="date"
                           value={paymentDate}
                           onChange={(e) => setPaymentDate(e.target.value)}
-                          disabled={isViewMode || postedLock}
-                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!paymentDate ? 'border-red-500' : 'border-zinc-300'}`}
+                          disabled={isDisabled || postedLock}
+                          className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''} ${!paymentDate ? 'border-red-500' : 'border-zinc-300'}`}
                         />
                       </div>
 
@@ -900,8 +937,8 @@ export default function CashDisbursementForm({
                             placeholder="Bank Name"
                             value={bankName}
                             onChange={(e) => setBankName(e.target.value)}
-                            disabled={isViewMode || postedLock}
-                            className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                            disabled={isDisabled || postedLock}
+                            className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                           />
                         </div>
                       )}
@@ -917,8 +954,8 @@ export default function CashDisbursementForm({
                             placeholder="Check #"
                             value={checkNumber}
                             onChange={(e) => setCheckNumber(e.target.value)}
-                            disabled={isViewMode || postedLock}
-                            className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                            disabled={isDisabled || postedLock}
+                            className={`w-full bg-white border rounded-lg px-3 py-2 text-sm text-zinc-800 focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none transition-all ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                           />
                         </div>
                       )}
@@ -978,7 +1015,7 @@ export default function CashDisbursementForm({
                               responsibilityCentersError ||
                               'No responsibility centers found'
                             }
-                            disabled={isViewMode}
+                            disabled={isDisabled}
                           />
                         </div>
                       </div>
@@ -1039,7 +1076,7 @@ export default function CashDisbursementForm({
                                   <div className="cursor-not-allowed text-center text-gray-400 text-[11px] italic py-2" />
                                 ) : (
                                   <SearchableDropdown
-                                    disabled={isViewMode}
+                                    disabled={isDisabled}
                                     placeholder="Search product..."
                                     value={item.productSearch}
                                     onChange={(v) => {
@@ -1062,10 +1099,10 @@ export default function CashDisbursementForm({
                                       )
                                     }}
                                     options={productOptions}
-                                    inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                     emptyText={productError || 'No products found'}
                                     dropdownFooter={
-                                      !isViewMode ? (
+                                      !isDisabled ? (
                                         <button
                                           onPointerDown={(e) => {
                                             e.preventDefault()
@@ -1086,7 +1123,7 @@ export default function CashDisbursementForm({
                               </td>
                               <td className="py-1 px-1">
                                 <SearchableDropdown
-                                  disabled={isViewMode}
+                                  disabled={isDisabled}
                                   placeholder="Search account..."
                                   value={item.coaSearch}
                                   onChange={(v) =>
@@ -1101,14 +1138,14 @@ export default function CashDisbursementForm({
                                     )
                                   }}
                                   options={coaOptions}
-                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   emptyText="No accounts found"
                                 />
                               </td>
                               <td className="py-1 px-1">
                                 <input
-                                  disabled={isViewMode}
-                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  disabled={isDisabled}
+                                  className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   placeholder="Details..."
                                   value={item.description}
                                   onChange={(e) =>
@@ -1142,8 +1179,8 @@ export default function CashDisbursementForm({
                               <td className="py-1 px-1">
                                 <div className="flex items-center gap-1">
                                   <input
-                                    disabled={isViewMode}
-                                    className={`${tableInput + ' font-black w-28'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    disabled={isDisabled}
+                                    className={`${tableInput + ' font-black w-28'} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                     type="text"
                                     placeholder="0.00"
                                     inputMode="decimal"
@@ -1154,10 +1191,10 @@ export default function CashDisbursementForm({
                                     }}
                                   />
                                   <select
-                                    disabled={isViewMode}
+                                    disabled={isDisabled}
                                     value={item.vatType || 'VAT-EX'}
                                     onChange={(e) => updateDisbursementItem(item.id, 'vatType', e.target.value)}
-                                    className={`text-[10px] font-bold px-1 py-1 rounded border ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' : 'bg-white border-gray-200 text-black focus:ring-1 focus:ring-red-500'} outline-none`}
+                                    className={`text-[10px] font-bold px-1 py-1 rounded border ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300' : 'bg-white border-gray-200 text-black focus:ring-1 focus:ring-red-500'} outline-none`}
                                   >
                                     <option value="VAT-EX">EX</option>
                                     <option value="VAT-INC">INC</option>
@@ -1167,8 +1204,8 @@ export default function CashDisbursementForm({
                               <td className="py-1 px-1">
                                 <div className="relative">
                                   <input
-                                    disabled={isViewMode}
-                                    className={`${tableInput + ' font-black'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    disabled={isDisabled}
+                                    className={`${tableInput + ' font-black'} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                     type="number"
                                     min="0"
                                     max={
@@ -1200,7 +1237,7 @@ export default function CashDisbursementForm({
                                 </div>
                               </td>
                               <td className="py-1 px-1">
-                                {isViewMode ? (
+                                {isDisabled ? (
                                   <div
                                     className={`${tableInput} text-black py-1.5 text-center`}
                                   >
@@ -1226,7 +1263,7 @@ export default function CashDisbursementForm({
                                 )}
                               </td>
                               <td className="py-1 px-1">
-                                {isViewMode ? (
+                                {isDisabled ? (
                                   <div
                                     className={`${tableInput} text-black py-1.5 text-center`}
                                   >
@@ -1261,7 +1298,7 @@ export default function CashDisbursementForm({
                                 )}
                               </td>
                               <td className="py-1 px-1">
-                                {isViewMode ? (
+                                {isDisabled ? (
                                   <div
                                     className={`${tableInput} text-black py-1.5 text-center`}
                                   >
@@ -1297,7 +1334,7 @@ export default function CashDisbursementForm({
                               </td>
                               <td className="py-1 px-1">
                                 <SearchableDropdown
-                                  disabled={isViewMode}
+                                  disabled={isDisabled}
                                   placeholder="Select"
                                   value={item.responsibilityCenter}
                                   onChange={(v) =>
@@ -1315,7 +1352,7 @@ export default function CashDisbursementForm({
                                     )
                                   }
                                   options={responsibilityCenterOptions}
-                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   emptyText={
                                     responsibilityCentersError ||
                                     'No responsibility centers found'
@@ -1434,7 +1471,7 @@ export default function CashDisbursementForm({
                             <tr key={entry.id}>
                               <td className="py-2 px-3 text-center">
                                 <SearchableDropdown
-                                  disabled={isViewMode}
+                                  disabled={isDisabled}
                                   placeholder="Search account..."
                                   value={entry.accountSearch}
                                   onChange={(v) =>
@@ -1449,14 +1486,14 @@ export default function CashDisbursementForm({
                                     )
                                   }}
                                   options={coaOptions}
-                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   emptyText="No accounts found"
                                 />
                               </td>
                               <td className="py-2 px-3 text-center font-mono">
                                 <input
-                                  disabled={isViewMode}
-                                  className={`${tableInput + ' font-black text-center'} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  disabled={isDisabled}
+                                  className={`${tableInput + ' font-black text-center'} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   placeholder="0.00"
                                   type="text"
                                   inputMode="decimal"
@@ -1472,8 +1509,8 @@ export default function CashDisbursementForm({
                               </td>
                               <td className="py-2 px-3 text-center font-mono">
                                 <input
-                                  disabled={isViewMode}
-                                  className={`${tableInput + ' font-black text-center text-red-600'} ${isViewMode ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
+                                  disabled={isDisabled}
+                                  className={`${tableInput + ' font-black text-center text-red-600'} ${isDisabled ? 'bg-transparent text-gray-200 cursor-not-allowed' : ''}`}
                                   placeholder="0.00"
                                   type="text"
                                   inputMode="decimal"
@@ -1489,7 +1526,7 @@ export default function CashDisbursementForm({
                               </td>
                               <td className="py-2 px-3 text-center">
                                 <SearchableDropdown
-                                  disabled={isViewMode}
+                                  disabled={isDisabled}
                                   placeholder="Select"
                                   value={entry.center}
                                   onChange={(v) =>
@@ -1499,7 +1536,7 @@ export default function CashDisbursementForm({
                                     updateJournalEntry(entry.id, 'center', opt.value)
                                   }
                                   options={responsibilityCenterOptions}
-                                  inputClassName={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  inputClassName={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   emptyText={
                                     responsibilityCentersError ||
                                     'No responsibility centers found'
@@ -1597,8 +1634,8 @@ export default function CashDisbursementForm({
                             <tr key={file.id}>
                               <td className="py-2 px-1">
                                 <input
-                                  disabled={isViewMode}
-                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  disabled={isDisabled}
+                                  className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   placeholder="e.g. Invoice_Scan"
                                   value={file.fileName}
                                   onChange={(e) =>
@@ -1611,7 +1648,7 @@ export default function CashDisbursementForm({
                                 />
                               </td>
                               <td className="py-2 px-1">
-                                {isViewMode ? (
+                                {isDisabled ? (
                                   <div
                                     className={`${tableInput} text-black cursor-not-allowed flex items-center justify-center`}
                                   >
@@ -1631,15 +1668,20 @@ export default function CashDisbursementForm({
                                           }
                                           title="Click to view full size"
                                         />
-                                        <span className="text-[8px] text-gray-500 ml-2">
-                                          {Math.round(file.file.length / 1024)}KB
-                                        </span>
                                       </>
                                     ) : file.file && typeof file.file === 'string' ? (
-                                      <span className="text-blue-600 text-[11px] font-bold">
-                                        Non-image file (
-                                        {Math.round(file.file.length / 1024)}KB)
-                                      </span>
+                                      <div className="flex flex-col items-center">
+                                        <span
+                                          className="text-blue-600 text-[11px] font-bold cursor-pointer hover:underline break-all text-center leading-tight"
+                                          onClick={() => openDataUrl(file.file, file.fileName || 'attachment')}
+                                          title="Click to open file"
+                                        >
+                                          {file.fileName || 'Unnamed file'}
+                                        </span>
+                                        <span className="text-[8px] text-gray-500">
+                                          {Math.round(file.file.length / 1024)}KB
+                                        </span>
+                                      </div>
                                     ) : file.file ? (
                                       <span className="text-orange-600 text-[11px] font-bold">
                                         Invalid file data
@@ -1662,8 +1704,8 @@ export default function CashDisbursementForm({
                               </td>
                               <td className="py-2 px-1">
                                 <input
-                                  disabled={isViewMode}
-                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  disabled={isDisabled}
+                                  className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
                                   placeholder="Add note..."
                                   value={file.remarks}
                                   onChange={(e) =>
@@ -1679,7 +1721,7 @@ export default function CashDisbursementForm({
                                 {file.uploadedBy}
                               </td>
                               <td className="py-2 text-center">
-                                {!isViewMode && (
+                                {!isDisabled && (
                                   <button
                                     onClick={() => removeAttachment(file.id)}
                                     className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
@@ -1693,7 +1735,7 @@ export default function CashDisbursementForm({
                         </tbody>
                       </table>
                     </div>
-                    {!isViewMode && (
+                    {!isDisabled && (
                       <button
                         onClick={addAttachment}
                         className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
@@ -1714,12 +1756,12 @@ export default function CashDisbursementForm({
                   </div>
                   <div className="p-4">
                     <textarea
-                      disabled={isViewMode}
+                      disabled={isDisabled}
                       rows={4}
                       placeholder="Enter justification, payment reference notes, or internal instructions here..."
                       value={remarks}
                       onChange={(e) => setRemarks(e.target.value)}
-                      className={`w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none ${isViewMode ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                      className={`w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none ${isDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                     />
                   </div>
                 </section>
@@ -1729,7 +1771,7 @@ export default function CashDisbursementForm({
         </div>
 
         {/* IMAGE MODAL */}
-        {!isViewMode && (
+        {!isDisabled && (
           <RightSideModal
             isOpen={isVendorModalOpen}
             onClose={closeVendorModal}
@@ -1889,7 +1931,7 @@ export default function CashDisbursementForm({
           </RightSideModal>
         )}
 
-        {!isViewMode && (
+        {!isDisabled && (
           <RightSideModal
             isOpen={isProductModalOpen}
             onClose={closeProductModal}

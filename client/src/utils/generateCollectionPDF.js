@@ -243,36 +243,34 @@ export async function generateCollectionPDF(collectionData, copyType = 'internal
           })
         : ''
 
-    // ── ITEMS TABLE
+    // ── ITEMS TABLE — collection items are invoice-level applications:
+    //    each row is a sales invoice with the amount applied in this collection.
     const items = Array.isArray(collection.items) ? collection.items : []
 
-    const itemRows = items.map((item, i) => {
-      const qty = parseFloat(item.quantity || 1)
-      const pp = parseFloat(item.purchase_price || 0)
-      const tp = parseFloat(item.total_price || pp * qty)
-      const disc = parseFloat(item.discount_amount || 0)
-      const vatP = item.vat_percentage != null ? item.vat_percentage + '%' : '0%'
-      const vatA = parseFloat(item.vat_amount || 0)
-      const whtP = item.wht_percentage != null ? item.wht_percentage + '%' : '0%'
-      const whtA = parseFloat(item.wht_amount || 0)
-      const due = parseFloat(item.amount_due || tp)
-      return [
-        i + 1,
-        item.invoice_ref || '—',
-        item.product_name || '—',
-        item.description || '—',
-        item.unit || '—',
-        fmt2(qty),
-        fmt2(pp),
-        fmt2(tp),
-        fmt2(disc),
-        vatP,
-        fmt2(vatA),
-        whtP,
-        fmt2(whtA),
-        fmt2(due),
-      ]
-    })
+    const fmtDate = (v) => {
+      if (!v) return '—'
+      try {
+        return new Date(v).toLocaleDateString('en-US', {
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric',
+        })
+      } catch (_) {
+        return String(v)
+      }
+    }
+
+    const itemRows = items.map((item, i) => [
+      i + 1,
+      item.invoice_ref || '—',
+      item.customer || '—',
+      item.terms || '—',
+      fmtDate(item.date_delivered),
+      fmtDate(item.date_due),
+      fmt2(item.invoice_amount),
+      fmt2(item.collected_amount),
+      fmt2(item.amount),
+    ])
 
     autoTable(doc, {
       startY: y,
@@ -281,23 +279,18 @@ export async function generateCollectionPDF(collectionData, copyType = 'internal
         [
           '#',
           'Invoice Ref',
-          'Product or\nService',
-          'Description',
-          'Unit',
-          'Qty',
-          'Sales\nPrice',
-          'Total\nPrice',
-          'Discount',
-          'VAT',
-          'VAT\nAmount',
-          'WHT',
-          'WHT\nAmount',
-          'Amount\nDue',
+          'Customer',
+          'Terms',
+          'Date\nDelivered',
+          'Date\nDue',
+          'Invoice\nAmount',
+          'Collected',
+          'Amount\nApplied',
         ],
       ],
-      body: itemRows.length > 0 ? itemRows : [Array(14).fill('')],
+      body: itemRows.length > 0 ? itemRows : [Array(9).fill('')],
       styles: {
-        fontSize: 6,
+        fontSize: 6.5,
         cellPadding: { top: 4, bottom: 4, left: 2, right: 2 },
         textColor: BLACK,
         lineColor: HAIRLINE,
@@ -316,19 +309,14 @@ export async function generateCollectionPDF(collectionData, copyType = 'internal
       },
       columnStyles: {
         0: { halign: 'center', cellWidth: 14 },
-        1: { halign: 'left' },
+        1: { halign: 'left', cellWidth: 52 },
         2: { halign: 'left' },
-        3: { halign: 'left', cellWidth: 46 },
-        4: { halign: 'center', cellWidth: 18 },
-        5: { halign: 'right', cellWidth: 28 },
-        6: { halign: 'right', cellWidth: 38 },
-        7: { halign: 'right', cellWidth: 36 },
-        8: { halign: 'right', cellWidth: 36 },
-        9: { halign: 'center', cellWidth: 18 },
-        10: { halign: 'right', cellWidth: 36 },
-        11: { halign: 'center', cellWidth: 18 },
-        12: { halign: 'right', cellWidth: 36 },
-        13: { halign: 'right', cellWidth: 40 },
+        3: { halign: 'center', cellWidth: 36 },
+        4: { halign: 'center', cellWidth: 52 },
+        5: { halign: 'center', cellWidth: 52 },
+        6: { halign: 'right', cellWidth: 52 },
+        7: { halign: 'right', cellWidth: 52 },
+        8: { halign: 'right', cellWidth: 56 },
       },
       alternateRowStyles: { fillColor: [252, 240, 240] },
       tableLineColor: HAIRLINE,
@@ -354,33 +342,23 @@ export async function generateCollectionPDF(collectionData, copyType = 'internal
       y += 6
     }
 
-    // ── AMOUNT BREAKDOWN BOX
+    // ── AMOUNT BREAKDOWN BOX — collection items carry invoice-level amounts,
+    //    so the box summarizes invoice totals vs. what was applied here.
     const totals = items.reduce(
       (acc, item) => {
-        const qty = parseFloat(item.quantity || 1)
-        acc.purchasePrice += parseFloat(item.purchase_price || 0) * qty
-        acc.totalDiscount += parseFloat(item.discount_amount || 0)
-        acc.totalVAT += parseFloat(item.vat_amount || 0)
-        acc.vatableSales += parseFloat(item.vatable_sales || 0)
-        acc.vatExempt += parseFloat(item.vat_exempt_sales || 0)
-        acc.zeroRated += parseFloat(item.zero_rated_sales || 0)
-        acc.totalWHT += parseFloat(item.wht_amount || 0)
+        acc.invoiceAmount += parseFloat(item.invoice_amount || 0)
+        acc.collectedOnInvoices += parseFloat(item.collected_amount || 0)
+        acc.applied += parseFloat(item.amount || 0)
+        acc.totalWHT += parseFloat(item.witholding_tax || 0)
         return acc
       },
-      {
-        purchasePrice: 0,
-        totalDiscount: 0,
-        totalVAT: 0,
-        vatableSales: 0,
-        vatExempt: 0,
-        zeroRated: 0,
-        totalWHT: 0,
-      },
+      { invoiceAmount: 0, collectedOnInvoices: 0, applied: 0, totalWHT: 0 },
     )
 
-    const amtDueTotal = parseFloat(collection.amount_due || 0)
-    const discountedAmount = totals.purchasePrice - totals.totalDiscount
-    const netOfVAT = discountedAmount - totals.totalVAT
+    const collectionTotal =
+      parseFloat(collection.collected_amount || 0) || totals.applied
+    const invoiceBalance = totals.invoiceAmount - totals.collectedOnInvoices
+    const netCollection = collectionTotal - totals.totalWHT
 
     const BOX_X = margin
     const BOX_W = contentW
@@ -421,19 +399,19 @@ export async function generateCollectionPDF(collectionData, copyType = 'internal
     const bodyTopY = boxTopY + BOX_HEADER_H + BOX_BODY_PAD_TOP
 
     const leftRows = [
-      ['Total Sales Price', fmt1(totals.purchasePrice)],
-      ['Total Discount', fmt1(totals.totalDiscount)],
-      ['Total Discounted Amount', fmt1(discountedAmount)],
-      ['Total VAT', fmt1(totals.totalVAT)],
-      ['Total NOV Discount', fmt1(0)],
+      ['Total Invoice Amount', fmt1(totals.invoiceAmount)],
+      ['Collected on Invoices', fmt1(totals.collectedOnInvoices)],
+      ['Invoice Balance', fmt1(invoiceBalance)],
+      ['Total WHT', fmt1(totals.totalWHT)],
+      ['No. of Invoices', String(items.length)],
     ]
 
     const rightRows = [
-      ['VATable Sales', fmt1(totals.vatableSales)],
-      ['VAT-Exempt Sales', fmt1(totals.vatExempt)],
-      ['Zero Rated Sales', fmt1(totals.zeroRated)],
-      ['Total Net of VAT', fmt1(netOfVAT)],
-      ['Total WHT', fmt1(totals.totalWHT)],
+      ['Amount Applied', fmt1(totals.applied)],
+      ['Net of WHT', fmt1(netCollection)],
+      ['Collection Total', fmt1(collectionTotal)],
+      ['Collection Date', collectionDate],
+      ['Payment Mode', modeDisplay],
     ]
 
     doc.setFontSize(7.5)
@@ -477,9 +455,9 @@ export async function generateCollectionPDF(collectionData, copyType = 'internal
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9.5)
     doc.setTextColor(...BLACK)
-    doc.text('TOTAL AMOUNT DUE', BOX_X + 10, dueY + BOX_DUE_H / 2 + 3)
+    doc.text('TOTAL AMOUNT COLLECTED', BOX_X + 10, dueY + BOX_DUE_H / 2 + 3)
     doc.setFontSize(11)
-    doc.text(fmt1(amtDueTotal), BOX_X + BOX_W - 10, dueY + BOX_DUE_H / 2 + 3, {
+    doc.text(fmt1(collectionTotal), BOX_X + BOX_W - 10, dueY + BOX_DUE_H / 2 + 3, {
       align: 'right',
     })
 
@@ -546,18 +524,7 @@ export async function generateCollectionPDF(collectionData, copyType = 'internal
       y = doc.lastAutoTable.finalY + 8
     }
 
-    // ── AUTHORIZATION / SIGNATURE SECTION
-    y += 16
-
-    doc.setDrawColor(...RED)
-    doc.setLineWidth(1)
-    doc.line(margin, y, margin + 90, y)
-    y += 12
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(6.5)
-    doc.setTextColor(...BLACK)
-    doc.text('AUTHORIZATION', margin, y)
+    // ── SIGNATURE SECTION
     y += 16
 
     const colW = contentW / 3

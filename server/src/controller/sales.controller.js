@@ -42,6 +42,12 @@ const {
   journalsEquivalentFromDb,
 } = require('../util/documentDiff.util')
 
+const {
+  getIdempotencyKey,
+  claimIdempotencyKey,
+  linkIdempotencyKey,
+} = require('../util/idempotency.util')
+
 const { notifyFromController } = require('../services/notification/notifyFromController')
 
 const {
@@ -861,12 +867,32 @@ const createSales = async (req, res, next) => {
       })
     }
 
+    const idempotencyKey = getIdempotencyKey(req)
+    if (!idempotencyKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'Idempotency-Key is required',
+      })
+    }
+
     let connection
 
     try {
       connection = await getTenantPool().getConnection()
 
       await connection.beginTransaction()
+
+      const claim = await claimIdempotencyKey(connection, idempotencyKey, 'sales')
+      if (claim.duplicate) {
+        await connection.rollback()
+        return res.status(200).json({
+          success: true,
+          message: 'Sales already created',
+          data: { id: claim.documentId },
+          duplicate: true,
+          timestamp: new Date().toISOString(),
+        })
+      }
 
       // Get user full name from database
       const userFullName = await getUserFullName(created_by, connection, Master)
@@ -1041,6 +1067,8 @@ const createSales = async (req, res, next) => {
           await connection.execute(attachmentQuery, attachmentValues)
         }
       }
+
+      await linkIdempotencyKey(connection, idempotencyKey, 'sales', salesId)
 
       await connection.commit()
 
@@ -3043,6 +3071,20 @@ const getPrintSales = async (req, res, next) => {
       ],
     )
 
+    // Resolve signer usernames to full names for the PDF signature block
+    const signerConn = await getTenantPool().getConnection()
+    try {
+      await Promise.all(
+        sales.map(async (s) => {
+          s.created_by = await getUserFullName(s.created_by, signerConn, Master)
+          s.checked_by = await getUserFullName(s.checked_by, signerConn, Master)
+          s.approved_by = await getUserFullName(s.approved_by, signerConn, Master)
+        }),
+      )
+    } finally {
+      signerConn.release()
+    }
+
     const sales_items_query = sql
       .select([
         { col: Accounting.sales_items.selectOptionColumns.id, as: 'id' },
@@ -3258,6 +3300,40 @@ const getPrintSales = async (req, res, next) => {
           ? []
           : sales_journal.filter((entry) => entry.db_id === sale.id)
 
+      // vatType (EX/INC) is not persisted on sales_items, so infer it the same
+      // way the form does on hydration: compare the item's income-account
+      // credit in the journal against both VAT formulas. Uses the unfiltered
+      // journal so customer copies get correct amounts too.
+      const saleJournalAll = sales_journal.filter(
+        (entry) => entry.db_id === sale.id,
+      )
+
+      const inferVatInclusive = (item) => {
+        const rate = parseFloat(item.vat_rate || 0) || 0
+        const gross =
+          (parseFloat(item.quantity || 0) || 0) *
+          (parseFloat(item.sales_price || 0) || 0)
+        if (rate <= 0 || gross <= 0) return false
+
+        const credits = saleJournalAll.filter(
+          (entry) =>
+            String(entry.type).toLowerCase() === 'credit' &&
+            Number(entry.coa_id) === Number(item.charts_of_accounts_id),
+        )
+        if (credits.length === 0) return false
+
+        const exAmount = gross
+        const incAmount = gross / (1 + rate / 100)
+        const minDiff = (target) =>
+          Math.min(
+            ...credits.map((e) =>
+              Math.abs((parseFloat(e.amount || 0) || 0) - target),
+            ),
+          )
+
+        return minDiff(incAmount) < minDiff(exAmount) - 0.005
+      }
+
       const mappedItems = saleItems.map((item) => {
         const quantity = parseFloat(item.quantity || 1)
 
@@ -3278,11 +3354,17 @@ const getPrintSales = async (req, res, next) => {
 
         const discountedPrice = totalPrice - discountAmount
 
-        const vatAmount = discountedPrice * (vatRate / 100)
+        const isVatInc = inferVatInclusive(item)
+        const vatDivisor = isVatInc && vatRate > 0 ? 1 + vatRate / 100 : 1
+        const vatAmount = isVatInc
+          ? discountedPrice - discountedPrice / vatDivisor
+          : discountedPrice * (vatRate / 100)
+        const netBase = isVatInc ? discountedPrice / vatDivisor : discountedPrice
+        const whtAmount = netBase * (whtRate / 100)
+        const amountDue =
+          (isVatInc ? discountedPrice : discountedPrice + vatAmount) - whtAmount
 
-        const whtAmount = discountedPrice * (whtRate / 100)
-
-        const amountDue = discountedPrice + vatAmount - whtAmount
+        const r2 = (v) => Math.round((Number(v) + Number.EPSILON) * 100) / 100
 
         return {
           id: item.id,
@@ -3303,19 +3385,21 @@ const getPrintSales = async (req, res, next) => {
 
           vat_percentage: vatRate,
 
-          vat_amount: vatAmount,
+          vat_amount: r2(vatAmount),
 
           wht_percentage: whtRate,
 
-          wht_amount: whtAmount,
+          wht_amount: r2(whtAmount),
 
-          amount_due: amountDue,
+          amount_due: r2(amountDue),
 
-          vatable_sales: vatRate > 0 ? discountedPrice : 0,
+          vatable_sales: vatRate > 0 ? r2(netBase) : 0,
 
-          vat_exempt_sales: vatRate === 0 ? discountedPrice : 0,
+          vat_exempt_sales:
+            vatRate === 0 && whtRate === 0 ? r2(discountedPrice) : 0,
 
-          zero_rated_sales: 0,
+          zero_rated_sales:
+            vatRate === 0 && whtRate > 0 ? r2(discountedPrice) : 0,
         }
       })
 

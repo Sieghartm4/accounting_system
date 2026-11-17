@@ -34,6 +34,12 @@ const {
 } = require('../util/documentDiff.util')
 
 const {
+  getIdempotencyKey,
+  claimIdempotencyKey,
+  linkIdempotencyKey,
+} = require('../util/idempotency.util')
+
+const {
   findPeriodForDateKey,
   assertPeriodIsOpen,
   getPeriodKeyForDate,
@@ -348,10 +354,34 @@ const createAdjustment = async (req, res, next) => {
       })
     }
 
+    const idempotencyKey = getIdempotencyKey(req)
+    if (!idempotencyKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'Idempotency-Key is required',
+      })
+    }
+
     let connection
     try {
       connection = await getTenantPool().getConnection()
       await connection.beginTransaction()
+
+      const claim = await claimIdempotencyKey(
+        connection,
+        idempotencyKey,
+        'adjustments',
+      )
+      if (claim.duplicate) {
+        await connection.rollback()
+        return res.status(200).json({
+          success: true,
+          message: 'Adjustment already created',
+          data: { id: claim.documentId },
+          duplicate: true,
+          timestamp: new Date().toISOString(),
+        })
+      }
 
       // generate adjustment id via the company's sequence settings
       // (defaults to the legacy JV-MMDDYY-0001 format)
@@ -456,6 +486,12 @@ const createAdjustment = async (req, res, next) => {
       }
 
       // Commit transaction
+      await linkIdempotencyKey(
+        connection,
+        idempotencyKey,
+        'adjustments',
+        adjustmentId,
+      )
       await connection.commit()
 
       // Audit trail for create

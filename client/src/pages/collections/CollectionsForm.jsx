@@ -47,14 +47,43 @@ import useResponsibilityCenter from '../responsibility_center/useResponsibilityC
 
 import { API } from '../../api/endpoints'
 
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper to open data URLs (browser blocks direct window.open on data:)
+// ─────────────────────────────────────────────────────────────────────────────
+const openDataUrl = (dataUrl, fileName = 'attachment') => {
+  try {
+    const parts = dataUrl.split(',')
+    if (parts.length < 2) return
+    const mimeMatch = parts[0].match(/:(.*?);/)
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream'
+    const bstr = atob(parts[1])
+    let n = bstr.length
+    const u8arr = new Uint8Array(n)
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n)
+    }
+    const blob = new Blob([u8arr], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.target = '_blank'
+    // For PDFs, let browser decide to view or download
+    // For other files, add download attribute with actual file name
+    if (!mime.startsWith('application/pdf')) {
+      a.download = fileName
+    }
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (e) {
+    console.error('Failed to open data URL:', e)
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
-
 // Portal Dropdown
-
 // ─────────────────────────────────────────────────────────────────────────────
-
 const MIN_DROPDOWN_WIDTH = 260
 
 
@@ -645,6 +674,16 @@ export default function CollectionsForm({
   const [collectionItems, setCollectionItems] = useState([])
 
   const [journalEntries, setJournalEntries] = useState([])
+
+  const idempotencyKeyRef = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  )
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const submittingRef = useRef(false)
 
 
 
@@ -2036,6 +2075,12 @@ export default function CollectionsForm({
 
   const handlePostTransaction = async () => {
 
+    if (submittingRef.current) return
+
+    submittingRef.current = true
+
+    setIsSubmitting(true)
+
     try {
 
       if (!selectedCustomer) {
@@ -2358,6 +2403,10 @@ export default function CollectionsForm({
 
           Authorization: `Bearer ${token}`,
 
+          ...(method === 'POST'
+            ? { 'Idempotency-Key': idempotencyKeyRef.current }
+            : {}),
+
         },
 
         body: JSON.stringify(requestPayload),
@@ -2383,6 +2432,13 @@ export default function CollectionsForm({
       const result = await response.json()
 
       if (result.success) {
+
+        if (method === 'POST') {
+          idempotencyKeyRef.current =
+            typeof crypto !== 'undefined' && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+        }
 
         const action = isEditMode ? 'updated' : 'posted'
 
@@ -2417,6 +2473,12 @@ export default function CollectionsForm({
       console.error('Error posting collection:', error)
 
       setToast({ type: 'error', message: 'Error: ' + error.message })
+
+    } finally {
+
+      submittingRef.current = false
+
+      setIsSubmitting(false)
 
     }
 
@@ -2911,11 +2973,13 @@ export default function CollectionsForm({
 
               onClick={handlePostTransaction}
 
-              className="px-6 py-2 bg-green-600 text-white text-[12px] font-black rounded-lg hover:bg-green-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-green-200"
+              disabled={isSubmitting}
+
+              className="px-6 py-2 bg-green-600 text-white text-[12px] font-black rounded-lg hover:bg-green-700 transition-all uppercase tracking-[2px] flex items-center gap-2 shadow-md shadow-green-200 disabled:opacity-60 disabled:cursor-not-allowed"
 
             >
 
-              <Save size={14} /> {isEditMode ? 'Update Receipt' : 'Post Transaction'}
+              <Save size={14} /> {isSubmitting ? 'Saving...' : isEditMode ? 'Update Receipt' : 'Post Transaction'}
 
             </button>
 
@@ -4409,53 +4473,23 @@ export default function CollectionsForm({
                                         }
 
                                         title="Click to view full size"
-
-
-                                        onError={(e) => {
-
-                                          console.error(
-
-                                            'Image failed to load:',
-
-                                            file.fileName,
-
-                                            e,
-
-                                          )
-
-                                          e.target.style.display = 'none'
-
-                                          const fallback =
-
-                                            document.createElement('span')
-
-                                          fallback.className =
-
-                                            'text-red-600 text-[10px] font-bold'
-
-                                          fallback.textContent = 'Image error'
-
-                                          e.target.parentNode.appendChild(fallback)
-
-                                        }}
-
                                       />
-
                                     ) : file.file &&
 
                                       typeof file.file === 'string' ? (
 
-                                      <span
-
-                                        className="text-blue-600 text-[11px] font-bold"
-
-                                        title={file.file.substring(0, 50) + '...'}
-
-                                      >
-
-                                        Non-image file
-
-                                      </span>
+                                      <div className="flex flex-col items-center">
+                                        <span
+                                          className="text-blue-600 text-[11px] font-bold cursor-pointer hover:underline break-all text-center leading-tight"
+                                          onClick={() => openDataUrl(file.file, file.fileName || 'attachment')}
+                                          title="Click to open file"
+                                        >
+                                          {file.fileName || 'Unnamed file'}
+                                        </span>
+                                        <span className="text-[8px] text-gray-500">
+                                          {Math.round(file.file.length / 1024)}KB
+                                        </span>
+                                      </div>
 
                                     ) : file.file ? (
 

@@ -201,6 +201,14 @@ export function useReceiptsForm({
   onBack,
   onSuccess,
 }) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const submittingRef = useRef(false)
+  const idempotencyKeyRef = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  )
+
   const [receiptItems, setReceiptItems] = useState([])
   const [journalEntries, setJournalEntries] = useState([])
   const lastJournalGenerationRef = useRef(null)
@@ -979,6 +987,9 @@ export function useReceiptsForm({
   // ── Post / Submit ──
 
   const handlePostTransaction = async () => {
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setIsSubmitting(true)
     const receiptId = isEditMode && receiptData?.data?.[0]?.id
     try {
       const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
@@ -1164,6 +1175,9 @@ export function useReceiptsForm({
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          ...(!isEditMode
+            ? { 'Idempotency-Key': idempotencyKeyRef.current }
+            : {}),
         },
         body: JSON.stringify(requestData),
       })
@@ -1177,6 +1191,12 @@ export function useReceiptsForm({
 
       const result = await response.json()
       if (result.success) {
+        if (!isEditMode) {
+          idempotencyKeyRef.current =
+            typeof crypto !== 'undefined' && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+        }
         const nextToast = {
           type: 'success',
           message: isEditMode
@@ -1196,6 +1216,9 @@ export function useReceiptsForm({
     } catch (error) {
       console.error('Error posting receipt:', error)
       setToast({ type: 'error', message: 'Error: ' + error.message })
+    } finally {
+      submittingRef.current = false
+      setIsSubmitting(false)
     }
   }
 
@@ -1266,6 +1289,7 @@ export function useReceiptsForm({
     loadVatOnDemand,
     loadWhtOnDemand,
     handlePostTransaction,
+    isSubmitting,
     summary: computeSummary(receiptItems),
   }
 }

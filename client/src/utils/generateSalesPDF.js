@@ -537,18 +537,7 @@ export async function generateSalesPDF(salesData, copyType = 'internal') {
       y = doc.lastAutoTable.finalY + 8
     }
 
-    // ── AUTHORIZATION / SIGNATURE SECTION
-    y += 16
-
-    doc.setDrawColor(...RED)
-    doc.setLineWidth(1)
-    doc.line(margin, y, margin + 90, y)
-    y += 12
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(6.5)
-    doc.setTextColor(...BLACK)
-    doc.text('AUTHORIZATION', margin, y)
+    // ── SIGNATURE SECTION
     y += 16
 
     const colW = contentW / 3

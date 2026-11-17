@@ -43,6 +43,12 @@ const {
 } = require('../util/documentDiff.util')
 
 const {
+  getIdempotencyKey,
+  claimIdempotencyKey,
+  linkIdempotencyKey,
+} = require('../util/idempotency.util')
+
+const {
   findPeriodForDateKey,
   assertPeriodIsOpen,
   getPeriodKeyForDate,
@@ -902,12 +908,36 @@ const createCollection = async (req, res, next) => {
       })
     }
 
+    const idempotencyKey = getIdempotencyKey(req)
+    if (!idempotencyKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'Idempotency-Key is required',
+      })
+    }
+
     let connection
 
     try {
       connection = await getTenantPool().getConnection()
 
       await connection.beginTransaction()
+
+      const claim = await claimIdempotencyKey(
+        connection,
+        idempotencyKey,
+        'collections',
+      )
+      if (claim.duplicate) {
+        await connection.rollback()
+        return res.status(200).json({
+          success: true,
+          message: 'Collection already created',
+          data: { id: claim.documentId },
+          duplicate: true,
+          timestamp: new Date().toISOString(),
+        })
+      }
 
       // Get user full name from database
       const userFullName = await getUserFullName(created_by, connection, Master)
@@ -1080,6 +1110,13 @@ const createCollection = async (req, res, next) => {
           await connection.execute(attachmentQuery, attachmentValues)
         }
       }
+
+      await linkIdempotencyKey(
+        connection,
+        idempotencyKey,
+        'collections',
+        newCollectionId,
+      )
 
       await connection.commit()
 
@@ -1732,6 +1769,11 @@ const getPrintCollections = async (req, res, next) => {
         },
 
         {
+          col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.collected_amount}`,
+          as: 'collected_amount',
+        },
+
+        {
           col: `${Accounting.collections.tablename}.${Accounting.collections.selectOptionColumns.mode_of_payment}`,
           as: 'mode',
         },
@@ -1802,6 +1844,20 @@ const getPrintCollections = async (req, res, next) => {
         Master.customers_information.prefix_,
       ],
     )
+
+    // Resolve signer usernames to full names for the PDF signature block
+    const signerConn = await getTenantPool().getConnection()
+    try {
+      await Promise.all(
+        collections.map(async (c) => {
+          c.created_by = await getUserFullName(c.created_by, signerConn, Master)
+          c.checked_by = await getUserFullName(c.checked_by, signerConn, Master)
+          c.approved_by = await getUserFullName(c.approved_by, signerConn, Master)
+        }),
+      )
+    } finally {
+      signerConn.release()
+    }
 
     // Fetch collection items with sales info
 
@@ -2017,7 +2073,7 @@ const getPrintCollections = async (req, res, next) => {
         copyType === 'customer'
           ? []
           : collection_journal.filter(
-              (entry) => Number(entry.db_id) === Number(collection.id),
+              (entry) => String(entry.db_id) === String(collection.id),
             )
 
       const mappedItems = items.map((item) => {
@@ -2661,7 +2717,7 @@ const updateCollection = async (req, res, next) => {
 
               attachment.name || attachment.fileName || null, // Filename
 
-              attachment.remarks || null,
+              attachment.remarks || '',
 
               attachment.uploadedBy || attachment.uploaded_by || 'Current User',
 
@@ -2691,7 +2747,7 @@ const updateCollection = async (req, res, next) => {
 
               attachment.name || attachment.fileName || null, // Filename
 
-              attachment.remarks || null,
+              attachment.remarks || '',
 
               attachment.uploadedBy || attachment.uploaded_by || 'Current User',
 

@@ -240,10 +240,10 @@ export function useSales() {
           API.salesById(id),
           {
             method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
           },
         )
 
@@ -794,6 +794,14 @@ export default function useSalesForm({
   onBack,
   onSuccess,
 } = {}) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const submittingRef = useRef(false)
+  const idempotencyKeyRef = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  )
+
   const [salesItems, setSalesItems] = useState([])
   const [journalEntries, setJournalEntries] = useState([
     { id: 1, account: '', accountSearch: '', center: '', debit: 0, credit: 0 },
@@ -1394,6 +1402,9 @@ export default function useSalesForm({
   }
 
   const handlePostTransaction = async () => {
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setIsSubmitting(true)
     try {
       const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
       const createdBy = userData.mu_username || userData.username || 'Unknown User'
@@ -1566,6 +1577,9 @@ export default function useSalesForm({
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          ...(method === 'POST'
+            ? { 'Idempotency-Key': idempotencyKeyRef.current }
+            : {}),
         },
         body: JSON.stringify(requestData),
       })
@@ -1580,6 +1594,12 @@ export default function useSalesForm({
       const result = await response.json()
 
       if (result.success) {
+        if (!isEditMode) {
+          idempotencyKeyRef.current =
+            typeof crypto !== 'undefined' && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+        }
         const action = isEditMode ? 'updated' : 'created'
         const nextToast = {
           type: 'success',
@@ -1597,6 +1617,9 @@ export default function useSalesForm({
     } catch (error) {
       console.error('Error posting sales:', error)
       setToast({ type: 'error', message: 'Error: ' + error.message })
+    } finally {
+      submittingRef.current = false
+      setIsSubmitting(false)
     }
   }
 
@@ -1705,29 +1728,14 @@ export default function useSalesForm({
 
       if (attachmentsData.length > 0) {
         setAttachments(
-          attachmentsData.map((att) => {
-            const attFile = typeof att.file === 'string' ? att.file : ''
-            const attName = typeof att.name === 'string' ? att.name : ''
-            const base64 = attFile.startsWith('data:image/')
-              ? attFile
-              : attName.startsWith('data:image/')
-                ? attName
-                : null
-            const fileName =
-              !attFile.startsWith('data:') && attFile
-                ? attFile
-                : !attName.startsWith('data:') && attName
-                  ? attName
-                  : ''
-            return {
-              id: att.id,
-              fileName,
-              file: base64,
-              remarks: att.remarks || '',
-              uploadedBy: att.uploaded_by || 'Current User',
-              date: att.uploaded_date || new Date().toLocaleDateString(),
-            }
-          }),
+          attachmentsData.map((att) => ({
+            id: att.id,
+            fileName: att.name || '',
+            file: att.file || null,
+            remarks: att.remarks || '',
+            uploadedBy: att.uploaded_by || 'Current User',
+            date: att.uploaded_date || new Date().toLocaleDateString(),
+          })),
         )
       }
     }
@@ -1871,5 +1879,6 @@ export default function useSalesForm({
     createCustomer,
     createProduct,
     handlePostTransaction,
+    isSubmitting,
   }
 }

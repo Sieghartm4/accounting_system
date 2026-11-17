@@ -45,6 +45,12 @@ const {
 } = require('../util/documentDiff.util')
 
 const {
+  getIdempotencyKey,
+  claimIdempotencyKey,
+  linkIdempotencyKey,
+} = require('../util/idempotency.util')
+
+const {
   findPeriodForDateKey,
   assertPeriodIsOpen,
   getPeriodKeyForDate,
@@ -885,12 +891,36 @@ const createPayment = async (req, res, next) => {
       })
     }
 
+    const idempotencyKey = getIdempotencyKey(req)
+    if (!idempotencyKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'Idempotency-Key is required',
+      })
+    }
+
     let connection
 
     try {
       connection = await getTenantPool().getConnection()
 
       await connection.beginTransaction()
+
+      const claim = await claimIdempotencyKey(
+        connection,
+        idempotencyKey,
+        'payments',
+      )
+      if (claim.duplicate) {
+        await connection.rollback()
+        return res.status(200).json({
+          success: true,
+          message: 'Payment already created',
+          data: { id: claim.documentId },
+          duplicate: true,
+          timestamp: new Date().toISOString(),
+        })
+      }
 
       // Get user full name from database
       const userFullName = await getUserFullName(created_by, connection, Master)
@@ -1036,6 +1066,13 @@ const createPayment = async (req, res, next) => {
           await connection.execute(attachmentQuery, attachmentValues)
         }
       }
+
+      await linkIdempotencyKey(
+        connection,
+        idempotencyKey,
+        'payments',
+        newPaymentId,
+      )
 
       await connection.commit()
 
@@ -1706,6 +1743,11 @@ const getPrintPayments = async (req, res, next) => {
         },
 
         {
+          col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.paid_amount}`,
+          as: 'paid_amount',
+        },
+
+        {
           col: `${Accounting.payments.tablename}.${Accounting.payments.selectOptionColumns.state}`,
           as: 'state',
         },
@@ -1747,6 +1789,20 @@ const getPrintPayments = async (req, res, next) => {
       [Accounting.payments.prefix_, Master.vendors.prefix_],
     )
 
+    // Resolve signer usernames to full names for the PDF signature block
+    const signerConn = await getTenantPool().getConnection()
+    try {
+      await Promise.all(
+        payments.map(async (p) => {
+          p.created_by = await getUserFullName(p.created_by, signerConn, Master)
+          p.checked_by = await getUserFullName(p.checked_by, signerConn, Master)
+          p.approved_by = await getUserFullName(p.approved_by, signerConn, Master)
+        }),
+      )
+    } finally {
+      signerConn.release()
+    }
+
     // Fetch payment items
 
     const payment_items_query = sql
@@ -1769,83 +1825,42 @@ const getPrintPayments = async (req, res, next) => {
         },
 
         {
-          col: Master.products_service.selectOptionColumns.name,
-          as: 'product_service_name',
+          col: Accounting.purchase.selectOptionColumns.terms,
+          as: 'terms',
         },
 
         {
-          col: Accounting.purchase_items.selectOptionColumns.description,
-          as: 'description',
+          col: Accounting.purchase.selectOptionColumns.date_delivered,
+          as: 'date_delivered',
         },
 
         {
-          col: Accounting.purchase_items.selectOptionColumns.quantity,
-          as: 'quantity',
+          col: Accounting.purchase.selectOptionColumns.date_due,
+          as: 'date_due',
         },
 
         {
-          col: Accounting.purchase_items.selectOptionColumns.purchase_price,
-          as: 'purchase_price',
+          col: Accounting.purchase.selectOptionColumns.total_amount_due,
+          as: 'invoice_amount',
         },
 
         {
-          col: Accounting.purchase_items.selectOptionColumns.discount,
-          as: 'discount',
+          col: Accounting.purchase.selectOptionColumns.paid_amount,
+          as: 'invoice_paid',
         },
-
-        {
-          col: Accounting.purchase_items.selectOptionColumns.discount_type,
-          as: 'discount_type',
-        },
-
-        { col: Master.vat.selectOptionColumns.rate, as: 'vat_rate' },
 
         {
           col: Accounting.payment_items.selectOptionColumns.amount_applied,
-          as: 'amount',
-        },
-
-        {
-          col: Master.withholding_tax.selectOptionColumns.rate,
-          as: 'withholding_tax_rate',
-        },
-
-        {
-          col: Accounting.purchase_items.selectOptionColumns.responsibility_center,
-          as: 'responsibility_center',
+          as: 'amount_applied',
         },
       ])
 
       .from(Accounting.payment_items.tablename)
 
       .innerJoin(
-        Accounting.purchase_items.tablename,
-        Accounting.purchase_items.selectOptionColumns.id,
-        Accounting.payment_items.selectOptionColumns.purchase_id,
-      )
-
-      .innerJoin(
         Accounting.purchase.tablename,
+        Accounting.payment_items.selectOptionColumns.purchase_id,
         Accounting.purchase.selectOptionColumns.id,
-        Accounting.purchase_items.selectOptionColumns.purchase_id,
-      )
-
-      .leftJoin(
-        Master.vat.tablename,
-        Accounting.purchase_items.selectOptionColumns.vat,
-        Master.vat.selectOptionColumns.id,
-      )
-
-      .leftJoin(
-        Master.withholding_tax.tablename,
-        Accounting.purchase_items.selectOptionColumns.withholding_tax,
-        Master.withholding_tax.selectOptionColumns.id,
-      )
-
-      .leftJoin(
-        Master.products_service.tablename,
-        Master.products_service.selectOptionColumns.id,
-        Accounting.purchase_items.selectOptionColumns.product_service,
       )
 
       .whereIn(Accounting.payment_items.selectOptionColumns.payment_id, paymentIds)
@@ -1989,69 +2004,23 @@ const getPrintPayments = async (req, res, next) => {
         copyType === 'customer'
           ? []
           : payment_journal.filter(
-              (entry) => Number(entry.db_id) === Number(payment.id),
+              (entry) => String(entry.db_id) === String(payment.id),
             )
 
       const mappedItems = paymentItems.map((item) => {
-        const quantity = parseFloat(item.quantity || 1)
-
-        const purchasePrice = parseFloat(item.purchase_price || 0)
-
-        const discount = parseFloat(item.discount || 0)
-
-        const vatRate = parseFloat(item.vat_rate || 0)
-
-        const whtRate = parseFloat(item.withholding_tax_rate || 0)
-
-        const amount = parseFloat(item.amount || 0)
-
-        const totalPrice = purchasePrice * quantity
-
-        const discountAmount =
-          String(item.discount_type || 'PERCENT').toUpperCase() === 'PERCENT'
-            ? totalPrice * (discount / 100)
-            : discount
-
-        const discountedPrice = totalPrice - discountAmount
-
-        const vatAmount = discountedPrice * (vatRate / 100)
-
-        const whtAmount = discountedPrice * (whtRate / 100)
-
-        const amountDue = amount || discountedPrice + vatAmount - whtAmount
+        const invoiceAmount = parseFloat(item.invoice_amount || 0)
+        const invoicePaid = parseFloat(item.invoice_paid || 0)
+        const amountApplied = parseFloat(item.amount_applied || 0)
 
         return {
           id: item.id,
-
-          product_name: item.product_service_name || '—',
-
-          description: item.description || '—',
-
-          unit: 'pcs',
-
-          quantity: quantity,
-
-          purchase_price: purchasePrice,
-
-          total_price: totalPrice,
-
-          discount_amount: discountAmount,
-
-          vat_percentage: vatRate,
-
-          vat_amount: vatAmount,
-
-          wht_percentage: whtRate,
-
-          wht_amount: whtAmount,
-
-          amount_due: amountDue,
-
-          vatable_sales: vatRate > 0 ? discountedPrice : 0,
-
-          vat_exempt_sales: vatRate === 0 ? discountedPrice : 0,
-
-          zero_rated_sales: 0,
+          invoice_ref: item.invoice_ref || '—',
+          terms: item.terms || '—',
+          date_delivered: item.date_delivered || '—',
+          date_due: item.date_due || '—',
+          invoice_amount: invoiceAmount,
+          invoice_paid: invoicePaid,
+          amount_applied: amountApplied,
         }
       })
 

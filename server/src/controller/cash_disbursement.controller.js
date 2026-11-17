@@ -44,6 +44,12 @@ const {
 } = require('../util/documentDiff.util')
 
 const {
+  getIdempotencyKey,
+  claimIdempotencyKey,
+  linkIdempotencyKey,
+} = require('../util/idempotency.util')
+
+const {
   findPeriodForDateKey,
   assertPeriodIsOpen,
   getPeriodKeyForDate,
@@ -585,12 +591,36 @@ const createCashDisbursement = async (req, res, next) => {
       })
     }
 
+    const idempotencyKey = getIdempotencyKey(req)
+    if (!idempotencyKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'Idempotency-Key is required',
+      })
+    }
+
     let connection
 
     try {
       connection = await getTenantPool().getConnection()
 
       await connection.beginTransaction()
+
+      const claim = await claimIdempotencyKey(
+        connection,
+        idempotencyKey,
+        'cash_disbursements',
+      )
+      if (claim.duplicate) {
+        await connection.rollback()
+        return res.status(200).json({
+          success: true,
+          message: 'Cash disbursement already created',
+          data: { id: claim.documentId },
+          duplicate: true,
+          timestamp: new Date().toISOString(),
+        })
+      }
 
       // Get user full name from database
       const userFullName = await getUserFullName(created_by, connection, Master)
@@ -757,6 +787,13 @@ const createCashDisbursement = async (req, res, next) => {
       }
 
       // Commit transaction
+
+      await linkIdempotencyKey(
+        connection,
+        idempotencyKey,
+        'cash_disbursements',
+        newCashDisbursementId,
+      )
 
       await connection.commit()
 
@@ -2586,6 +2623,20 @@ const getPrintDisbursements = async (req, res, next) => {
         Master.vendors_information.prefix_,
       ],
     )
+
+    // Resolve signer usernames to full names for the PDF signature block
+    const signerConn = await getTenantPool().getConnection()
+    try {
+      await Promise.all(
+        disbursements.map(async (d) => {
+          d.created_by = await getUserFullName(d.created_by, signerConn, Master)
+          d.checked_by = await getUserFullName(d.checked_by, signerConn, Master)
+          d.approved_by = await getUserFullName(d.approved_by, signerConn, Master)
+        }),
+      )
+    } finally {
+      signerConn.release()
+    }
 
     // Fetch vendors_information for involved vendors
     const disbVendorIds = Array.from(
