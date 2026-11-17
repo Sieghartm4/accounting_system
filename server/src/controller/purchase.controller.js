@@ -1911,7 +1911,7 @@ const createPurchase = async (req, res, next) => {
 
 
 
-            attachment.remarks || null,
+            attachment.remarks || '',
 
 
 
@@ -4388,7 +4388,7 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-              attachment.remarks || null,
+              attachment.remarks || '',
 
 
 
@@ -4446,7 +4446,7 @@ const updatePurchase = async (req, res, next) => {
 
 
 
-              attachment.remarks || null,
+              attachment.remarks || '',
 
 
 

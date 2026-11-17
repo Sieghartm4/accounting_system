@@ -1247,7 +1247,7 @@ const createReceipts = async (req, res, next) => {
 
             attachment.fileName || null,
 
-            attachment.remarks || null,
+            attachment.remarks || '',
 
             attachment.uploadedBy || null,
 
@@ -2045,7 +2045,7 @@ const updateReceipt = async (req, res, next) => {
 
               attachment.fileName || null,
 
-              attachment.remarks || null,
+              attachment.remarks || '',
 
               attachment.uploadedBy || null,
 
@@ -2073,7 +2073,7 @@ const updateReceipt = async (req, res, next) => {
 
               attachment.fileName || null,
 
-              attachment.remarks || null,
+              attachment.remarks || '',
 
               attachment.uploadedBy || null,
 

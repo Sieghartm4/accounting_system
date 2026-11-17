@@ -1056,7 +1056,7 @@ const createPayment = async (req, res, next) => {
 
             attachment.name || null,
 
-            attachment.remarks || null,
+            attachment.remarks || '',
 
             attachment.uploadedBy || null,
 
@@ -2659,7 +2659,7 @@ const updatePayment = async (req, res, next) => {
             const updateValues = [
               attachment.name || null,
 
-              attachment.remarks || null,
+              attachment.remarks || '',
             ]
 
             // Only update file if a new file is provided
@@ -2708,7 +2708,7 @@ const updatePayment = async (req, res, next) => {
 
               attachment.name || null,
 
-              attachment.remarks || null,
+              attachment.remarks || '',
 
               attachment.uploadedBy || null,
 

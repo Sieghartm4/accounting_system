@@ -430,7 +430,7 @@ const createAdjustment = async (req, res, next) => {
             adjustmentId,
             attachment.file || null,
             attachment.name || null,
-            attachment.remarks || null,
+            attachment.remarks || '',
             attachment.uploaded_by || null,
             attachment.uploaded_date || new Date().toLocaleDateString(),
           ]
@@ -1156,7 +1156,7 @@ const updateAdjustmentData = async (req, res, next) => {
             adjustment_id,
             attachment.file || null,
             attachment.name || null,
-            attachment.remarks || null,
+            attachment.remarks || '',
             attachment.uploaded_by || null,
             attachment.uploaded_date || new Date().toLocaleDateString(),
           ]

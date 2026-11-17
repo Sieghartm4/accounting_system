@@ -775,7 +775,7 @@ const createCashDisbursement = async (req, res, next) => {
 
             attachment.fileName || null,
 
-            attachment.remarks || null,
+            attachment.remarks || '',
 
             attachment.uploadedBy || null,
 

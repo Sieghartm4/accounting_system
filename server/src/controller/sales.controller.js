@@ -1057,7 +1057,7 @@ const createSales = async (req, res, next) => {
 
             attachment.fileName || null,
 
-            attachment.remarks || null,
+            attachment.remarks || '',
 
             attachment.uploadedBy || null,
 
@@ -2395,7 +2395,7 @@ const updateSale = async (req, res, next) => {
 
               attachment.fileName || null,
 
-              attachment.remarks || null,
+              attachment.remarks || '',
 
               attachment.uploadedBy || null,
 
@@ -2423,7 +2423,7 @@ const updateSale = async (req, res, next) => {
 
               attachment.fileName || null,
 
-              attachment.remarks || null,
+              attachment.remarks || '',
 
               attachment.uploadedBy || null,
 

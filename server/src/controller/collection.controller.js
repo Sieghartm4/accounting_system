@@ -1092,13 +1092,13 @@ const createCollection = async (req, res, next) => {
             .build()
 
           const attachmentValues = [
-            collection_id,
+            collectionId,
 
             attachment.file || null, // Base64 file data
 
             attachment.name || attachment.fileName || null, // Filename
 
-            attachment.remarks || null,
+            attachment.remarks || '',
 
             attachment.uploadedBy || attachment.uploaded_by || 'Current User',
 
