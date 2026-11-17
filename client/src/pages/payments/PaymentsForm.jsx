@@ -757,20 +757,20 @@ export default function PaymentsForm({
       const vendorName = firstPurchase.vendor_name || firstPurchase.vendor || ''
       const vendorId = firstPurchase.vendor_id || ''
 
-      vendors.forEach((v) => {
-
-      })
-
       const matchingVendor = vendors.find(
-        (v) => v.name === vendorName || v.id === vendorId,
+        (v) =>
+          v.name === vendorName ||
+          v.vendor_name === vendorName ||
+          v.code === vendorName ||
+          v.id === vendorId,
       )
-      if (matchingVendor) {
-      } else {
 
-        if (vendors.length > 0) {
-          setSelectedVendor(vendors[0].id)
-          setVendorSearch(vendors[0].name) // Also set the display value
-        }
+      if (matchingVendor) {
+        setSelectedVendor(matchingVendor.id)
+        setVendorSearch(matchingVendor.name || matchingVendor.vendor_name)
+      } else {
+        setSelectedVendor('')
+        setVendorSearch(vendorName)
       }
 
       // Use fetched purchase data if available, otherwise create placeholder items
