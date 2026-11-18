@@ -1151,11 +1151,13 @@
                         <thead>
                             <tr>
                                 <th>Username</th>
+                                <th>Full Name</th>
                                 <th>Email</th>
                                 <th>Database</th>
                                 <th>Role</th>
                                 <th>Subscription</th>
                                 <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1164,10 +1166,12 @@
                                     <div class="avatar">JD</div>
                                     <span>johndoe</span>
                                 </td>
+                                <td>John Doe</td>
                                 <td>john@example.com</td>
                                 <td class="font-mono">db_cluster_alpha</td>
                                 <td><span class="badge badge-admin">Master Admin</span></td>
                                 <td><span class="badge badge-active">Online</span></td>
+                                <td><button class="link-btn">Edit</button></td>
                             </tr>
                         </tbody>
                     </table>
@@ -1317,6 +1321,52 @@
         </div>
     </div>
 
+    <div id="user-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit User</h2>
+                <button type="button" id="close-user-modal" class="close-btn">&times;</button>
+            </div>
+            <form id="user-form" class="modal-body">
+                <input type="hidden" id="edit-user-id">
+                <div class="form-group">
+                    <label for="edit-username">Username</label>
+                    <input type="text" id="edit-username" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-fullname">Full Name</label>
+                    <input type="text" id="edit-fullname" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-email">Email</label>
+                    <input type="email" id="edit-email">
+                </div>
+                <div class="form-group">
+                    <label for="edit-role">Role</label>
+                    <select id="edit-role" required>
+                        <option value="USER">USER</option>
+                        <option value="ADMIN">ADMIN</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-password">Password</label>
+                    <input type="password" id="edit-password" placeholder="Leave blank to keep current password">
+                </div>
+                <div class="form-group">
+                    <label for="edit-status">Status</label>
+                    <select id="edit-status" required>
+                        <option value="active">active</option>
+                        <option value="inactive">inactive</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="cancel-user" class="btn-secondary">Cancel</button>
+                    <button type="submit" id="save-user" class="btn-submit">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="toast" class="toast">
         <span id="toast-icon">✨</span>
         <span id="toast-message">Action successful!</span>
@@ -1327,6 +1377,18 @@
         const API_BASE = window.location.origin;
         let currentUser = null;
         let pendingAction = null;
+        let currentUsers = [];
+        let isSavingUser = false;
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            })[char]);
+        }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -1462,7 +1524,8 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    renderUsersTable(data.data);
+                    currentUsers = data.data || [];
+                    renderUsersTable(currentUsers);
                 } else {
                     showToast('Failed to fetch master users', 'error');
                 }
@@ -1478,38 +1541,122 @@
             tbody.innerHTML = '';
 
             if (users.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="padding: 2rem; text-align: center; color: #71717a;">No master users found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="padding: 2rem; text-align: center; color: #71717a;">No master users found</td></tr>';
                 return;
             }
 
             users.forEach(user => {
-                const initials = (user.username || 'U').substring(0, 2).toUpperCase();
+                const initials = escapeHtml((user.username || 'U').substring(0, 2).toUpperCase());
+                const username = escapeHtml(user.username || '');
+                const fullname = escapeHtml(user.fullname || '-');
+                const email = escapeHtml(user.email || '-');
+                const dbName = escapeHtml(user.db_name || '-');
+                const role = escapeHtml(user.role || 'USER');
+                const planName = escapeHtml(user.subscription_plan_name || 'No Subscription');
+                const subscriptionId = escapeHtml(user.subscription_id || 'null');
+                const status = escapeHtml(user.status || 'inactive');
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="user-cell">
                         <div class="avatar">${initials}</div>
-                        <span>${user.username || ''}</span>
+                        <span>${username}</span>
                     </td>
-                    <td>${user.email || '-'}</td>
-                    <td class="font-mono">${user.db_name || '-'}</td>
+                    <td>${fullname}</td>
+                    <td>${email}</td>
+                    <td class="font-mono">${dbName}</td>
                     <td>
                         <span class="badge ${user.role === 'ADMIN' ? 'badge-admin' : 'badge-user'}">
-                            ${user.role || 'USER'}
+                            ${role}
                         </span>
                     </td>
                     <td>
-                        <button data-user-id="${user.id}" data-plan-name="${user.subscription_plan_name || 'No Subscription'}" data-subscription-id="${user.subscription_id || 'null'}" class="link-btn">
-                            ${user.subscription_plan_name || 'No Subscription'}
+                        <button data-user-id="${escapeHtml(user.id)}" data-plan-name="${planName}" data-subscription-id="${subscriptionId}" class="link-btn">
+                            ${planName}
                         </button>
                     </td>
                     <td>
                         <span class="badge ${user.status === 'active' ? 'badge-active' : 'badge-admin'}">
-                            ${user.status || 'inactive'}
+                            ${status}
                         </span>
+                    </td>
+                    <td>
+                        <button data-user-id="${escapeHtml(user.id)}" class="link-btn edit-user-btn">Edit</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        function openUserEditModal(userId) {
+            const user = currentUsers.find(entry => String(entry.id) === String(userId));
+            if (!user) {
+                showToast('User not found', 'error');
+                return;
+            }
+
+            document.getElementById('edit-user-id').value = user.id;
+            document.getElementById('edit-username').value = user.username || '';
+            document.getElementById('edit-fullname').value = user.fullname || user.username || '';
+            document.getElementById('edit-email').value = user.email || '';
+            document.getElementById('edit-role').value = user.role || 'USER';
+            document.getElementById('edit-password').value = '';
+            document.getElementById('edit-status').value = user.status || 'active';
+            document.getElementById('user-modal').classList.remove('hidden');
+        }
+
+        function closeUserEditModal() {
+            document.getElementById('user-modal').classList.add('hidden');
+            document.getElementById('edit-password').value = '';
+        }
+
+        async function saveUserEdit(event) {
+            event.preventDefault();
+            if (isSavingUser) return;
+
+            const id = document.getElementById('edit-user-id').value;
+            const payload = {
+                username: document.getElementById('edit-username').value.trim(),
+                fullname: document.getElementById('edit-fullname').value.trim(),
+                email: document.getElementById('edit-email').value.trim(),
+                role: document.getElementById('edit-role').value,
+                password: document.getElementById('edit-password').value,
+                status: document.getElementById('edit-status').value,
+            };
+
+            if (!payload.username || !payload.fullname) {
+                showToast('Username and full name are required', 'error');
+                return;
+            }
+
+            const saveButton = document.getElementById('save-user');
+            isSavingUser = true;
+            saveButton.disabled = true;
+            saveButton.textContent = 'Saving...';
+
+            try {
+                const response = await fetch(`${API_BASE}/users/${encodeURIComponent(id)}`, {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || 'Failed to update user');
+                }
+
+                showToast('User updated successfully', 'success');
+                closeUserEditModal();
+                await fetchMasterUsers();
+            } catch (error) {
+                console.error('Error updating user:', error);
+                showToast(error.message || 'Failed to update user', 'error');
+            } finally {
+                isSavingUser = false;
+                saveButton.disabled = false;
+                saveButton.textContent = 'Save Changes';
+            }
         }
 
         // Open subscription change dropdown
@@ -2137,6 +2284,11 @@
             document.getElementById('cancel-subscription').addEventListener('click', closeSubscriptionModal);
             document.getElementById('save-subscription').addEventListener('click', saveUserSubscription);
 
+            // User edit modal
+            document.getElementById('close-user-modal').addEventListener('click', closeUserEditModal);
+            document.getElementById('cancel-user').addEventListener('click', closeUserEditModal);
+            document.getElementById('user-form').addEventListener('submit', saveUserEdit);
+
             // Delegated event listeners for dynamically added buttons
             document.getElementById('plans-table').addEventListener('click', (e) => {
                 if (e.target.classList.contains('edit-plan-btn')) {
@@ -2150,10 +2302,18 @@
             });
 
             document.getElementById('users-table').addEventListener('click', (e) => {
-                if (e.target.classList.contains('link-btn')) {
-                    const userId = e.target.getAttribute('data-user-id');
-                    const planName = e.target.getAttribute('data-plan-name');
-                    const subscriptionId = e.target.getAttribute('data-subscription-id');
+                const button = e.target.closest('button');
+                if (!button) return;
+
+                if (button.classList.contains('edit-user-btn')) {
+                    openUserEditModal(button.getAttribute('data-user-id'));
+                    return;
+                }
+
+                if (button.classList.contains('link-btn')) {
+                    const userId = button.getAttribute('data-user-id');
+                    const planName = button.getAttribute('data-plan-name');
+                    const subscriptionId = button.getAttribute('data-subscription-id');
                     openSubscriptionDropdown(userId, planName, subscriptionId);
                 }
             });

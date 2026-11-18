@@ -6,6 +6,7 @@ const { SQLQueryBuilder } = require('../util/helper.util')
 const sql = new SQLQueryBuilder()
 const mysql = require('mysql2/promise')
 const CONFIG = require('../database/config/config')
+const { Encrypter } = require('../util/cryptography.util')
 
 const pool = mysql.createPool({
   host: CONFIG[process.env.NODE_ENV].host,
@@ -16,6 +17,70 @@ const pool = mysql.createPool({
 })
 
 require('dotenv').config()
+
+const fetchTenantFullnames = async (dbName, usernames) => {
+  const fullnames = new Map()
+  if (!dbName || !/^[A-Za-z0-9_]+$/.test(dbName) || usernames.length === 0) {
+    return fullnames
+  }
+
+  const cfg = CONFIG[process.env.NODE_ENV]
+  let connection
+  try {
+    connection = await mysql.createConnection({
+      host: cfg.host,
+      user: cfg.username,
+      password: cfg.password,
+      database: dbName,
+      multipleStatements: false,
+    })
+
+    const placeholders = usernames.map(() => '?').join(',')
+    const [rows] = await connection.execute(
+      `SELECT mu_username, mu_fullname FROM master_user WHERE mu_username IN (${placeholders})`,
+      usernames,
+    )
+
+    for (const row of rows) {
+      fullnames.set(String(row.mu_username || '').toLowerCase(), row.mu_fullname || '')
+    }
+  } catch (error) {
+    console.error(`Error fetching full names from ${dbName}:`, error.message)
+  } finally {
+    if (connection) await connection.end()
+  }
+  return fullnames
+}
+
+const getTenantConnection = async (dbName) => {
+  if (!dbName || !/^[A-Za-z0-9_]+$/.test(dbName)) return null
+  const cfg = CONFIG[process.env.NODE_ENV]
+  return mysql.createConnection({
+    host: cfg.host,
+    user: cfg.username,
+    password: cfg.password,
+    database: dbName,
+    multipleStatements: false,
+  })
+}
+
+const hasColumn = async (connection, schema, table, column) => {
+  const [rows] = await connection.execute(
+    `SELECT COUNT(*) AS column_exists
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [schema, table, column],
+  )
+  return Number(rows[0].column_exists) > 0
+}
+
+const encryptPassword = (password) =>
+  new Promise((resolve, reject) => {
+    Encrypter(password, (error, encrypted) => {
+      if (error) reject(error)
+      else resolve(encrypted)
+    })
+  })
 
 const getUsers = async (req, res, next) => {
   let connection
@@ -55,6 +120,24 @@ const getUsers = async (req, res, next) => {
 
     const [users] = await connection.execute(query)
 
+    // Full names live in each tenant's own master_user table, not in the
+    // subscription database. Resolve them per db_name so the admin sees the
+    // real name instead of just the username.
+    const usersByDb = new Map()
+    for (const user of users) {
+      if (!user.db_name || !user.username) continue
+      if (!usersByDb.has(user.db_name)) usersByDb.set(user.db_name, [])
+      usersByDb.get(user.db_name).push(user.username)
+    }
+
+    const fullnames = new Map()
+    for (const [dbName, usernames] of usersByDb) {
+      const dbFullnames = await fetchTenantFullnames(dbName, [...new Set(usernames)])
+      for (const [username, fullname] of dbFullnames) {
+        fullnames.set(`${dbName}:${username}`, fullname)
+      }
+    }
+
     // Modules per distinct plan, in one query, so the admin can see what each
     // company actually has rather than inferring it from the plan name.
     const planIds = [...new Set(users.map((u) => u.plan_id).filter((id) => id !== null && id !== undefined))]
@@ -74,6 +157,8 @@ const getUsers = async (req, res, next) => {
 
     const withModules = users.map((u) => ({
       ...u,
+      fullname:
+        fullnames.get(`${u.db_name}:${String(u.username || '').toLowerCase()}`) || '',
       // Kept for the existing UI which reads subscription_id.
       subscription_id: u.plan_id ?? null,
       modules: u.plan_id ? modulesByPlan.get(u.plan_id) || [] : [],
@@ -98,6 +183,264 @@ const getUsers = async (req, res, next) => {
     if (connection) {
       connection.release()
     }
+  }
+}
+
+const updateUser = async (req, res, next) => {
+  const { id } = req.params
+  const { username, fullname, email, role, password, status } = req.body
+
+  let subscriptionConnection
+  let tenantConnection
+  let subscriptionTransaction = false
+  let tenantTransaction = false
+  let tenantCommitted = false
+  let previousTenant = null
+  let tenantDbName = null
+  let tenantHasRole = false
+
+  const rollbackBoth = async () => {
+    if (tenantTransaction) {
+      await tenantConnection.rollback()
+      tenantTransaction = false
+    }
+    if (subscriptionTransaction) {
+      await subscriptionConnection.rollback()
+      subscriptionTransaction = false
+    }
+  }
+
+  try {
+    if (!/^\d+$/.test(String(id))) {
+      return res.status(400).json({ success: false, message: 'Invalid user id' })
+    }
+
+    const nextUsername = String(username || '').trim()
+    const nextFullname = String(fullname || '').trim() || nextUsername
+    const nextEmail = String(email || '').trim() || null
+    const nextRole = String(role || '').toUpperCase()
+    const nextStatus = String(status || '').toLowerCase()
+    const nextPassword = password ? await encryptPassword(String(password)) : null
+
+    if (!nextUsername) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username is required',
+      })
+    }
+    if (!['ADMIN', 'USER'].includes(nextRole)) {
+      return res.status(400).json({ success: false, message: 'Invalid role' })
+    }
+    if (!['active', 'inactive'].includes(nextStatus)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' })
+    }
+
+    subscriptionConnection = await pool.getConnection()
+    await subscriptionConnection.beginTransaction()
+    subscriptionTransaction = true
+
+    const [currentUsers] = await subscriptionConnection.execute(
+      `SELECT mu_id, mu_username, mu_email, mu_role, mu_status, mu_password, db_name
+       FROM master_user WHERE mu_id = ? FOR UPDATE`,
+      [id],
+    )
+
+    if (currentUsers.length === 0) {
+      await rollbackBoth()
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
+    const currentUser = currentUsers[0]
+
+    const [subscriptionDuplicates] = await subscriptionConnection.execute(
+      'SELECT mu_id FROM master_user WHERE mu_username = ? AND mu_id <> ?',
+      [nextUsername, id],
+    )
+
+    if (subscriptionDuplicates.length > 0) {
+      await rollbackBoth()
+      return res.status(409).json({ success: false, message: 'Username already exists' })
+    }
+
+    tenantDbName = currentUser.db_name
+    tenantConnection = await getTenantConnection(tenantDbName)
+
+    if (tenantConnection) {
+      tenantHasRole = await hasColumn(
+        tenantConnection,
+        tenantDbName,
+        'master_user',
+        'mu_role',
+      )
+      await tenantConnection.beginTransaction()
+      tenantTransaction = true
+
+      const [tenantUsers] = await tenantConnection.execute(
+        'SELECT * FROM master_user WHERE mu_username = ? LIMIT 2',
+        [currentUser.mu_username],
+      )
+
+      if (tenantUsers.length === 0) {
+        await rollbackBoth()
+        return res.status(404).json({
+          success: false,
+          message: `User not found in company database ${tenantDbName}`,
+        })
+      }
+      if (tenantUsers.length > 1) {
+        await rollbackBoth()
+        return res.status(409).json({
+          success: false,
+          message: `Multiple matching users found in company database ${tenantDbName}`,
+        })
+      }
+
+      previousTenant = tenantUsers[0]
+      const tenantId = previousTenant.mu_id
+
+      const [tenantDuplicates] = await tenantConnection.execute(
+        'SELECT mu_id FROM master_user WHERE mu_username = ? AND mu_id <> ?',
+        [nextUsername, tenantId],
+      )
+
+      if (tenantDuplicates.length > 0) {
+        await rollbackBoth()
+        return res.status(409).json({ success: false, message: 'Username already exists in company database' })
+      }
+
+      const tenantSets = [
+        'mu_username = ?',
+        'mu_fullname = ?',
+        'mu_email = ?',
+        'mu_status = ?',
+      ]
+      const tenantValues = [
+        nextUsername,
+        nextFullname,
+        nextEmail,
+        nextStatus,
+      ]
+
+      if (nextPassword) {
+        tenantSets.push('mu_password = ?')
+        tenantValues.push(nextPassword)
+      }
+      if (tenantHasRole) {
+        tenantSets.push('mu_role = ?')
+        tenantValues.push(nextRole)
+      }
+      tenantValues.push(tenantId)
+
+      await tenantConnection.execute(
+        `UPDATE master_user SET ${tenantSets.join(', ')} WHERE mu_id = ?`,
+        tenantValues,
+      )
+    }
+
+    const subscriptionSets = [
+      'mu_username = ?',
+      'mu_email = ?',
+      'mu_status = ?',
+      'mu_role = ?',
+    ]
+    const subscriptionValues = [
+      nextUsername,
+      nextEmail,
+      nextStatus,
+      nextRole,
+    ]
+
+    if (nextPassword) {
+      subscriptionSets.push('mu_password = ?')
+      subscriptionValues.push(nextPassword)
+    }
+    subscriptionValues.push(id)
+
+    await subscriptionConnection.execute(
+      `UPDATE master_user SET ${subscriptionSets.join(', ')} WHERE mu_id = ?`,
+      subscriptionValues,
+    )
+
+    if (tenantTransaction) {
+      await tenantConnection.commit()
+      tenantTransaction = false
+      tenantCommitted = true
+    }
+
+    try {
+      await subscriptionConnection.commit()
+      subscriptionTransaction = false
+    } catch (commitError) {
+      if (tenantCommitted && previousTenant && tenantDbName) {
+        try {
+          const restoreConnection = await getTenantConnection(tenantDbName)
+          if (restoreConnection) {
+            await restoreConnection.beginTransaction()
+            const restoreSets = [
+              'mu_username = ?',
+              'mu_fullname = ?',
+              'mu_email = ?',
+              'mu_status = ?',
+              'mu_password = ?',
+            ]
+            const restoreValues = [
+              previousTenant.mu_username,
+              previousTenant.mu_fullname,
+              previousTenant.mu_email,
+              previousTenant.mu_status,
+              previousTenant.mu_password,
+            ]
+            if (tenantHasRole) {
+              restoreSets.push('mu_role = ?')
+              restoreValues.push(previousTenant.mu_role)
+            }
+            restoreValues.push(previousTenant.mu_id)
+            await restoreConnection.execute(
+              `UPDATE master_user SET ${restoreSets.join(', ')} WHERE mu_id = ?`,
+              restoreValues,
+            )
+            await restoreConnection.commit()
+            await restoreConnection.end()
+          }
+        } catch (restoreError) {
+          console.error('Failed to roll back tenant user update:', restoreError)
+        }
+      }
+      throw commitError
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'User updated successfully',
+      data: {
+        id: Number(id),
+        username: nextUsername,
+        fullname: tenantCommitted ? nextFullname : '',
+        email: nextEmail,
+        role: nextRole,
+        status: nextStatus,
+        company_database_updated: tenantCommitted,
+      },
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    try {
+      await rollbackBoth()
+    } catch (rollbackError) {
+      console.error('Failed to roll back user update:', rollbackError)
+    }
+    console.error('Error updating user:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating user',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  } finally {
+    if (tenantConnection) await tenantConnection.end()
+    if (subscriptionConnection) subscriptionConnection.release()
   }
 }
 
@@ -227,5 +570,6 @@ const updateUserSubscription = async (req, res, next) => {
 
 module.exports = {
   getUsers,
+  updateUser,
   updateUserSubscription,
 }

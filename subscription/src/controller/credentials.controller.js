@@ -37,6 +37,18 @@ const pool = mysql.createPool({
 
 require('dotenv').config()
 
+const decryptPassword = (value) =>
+  new Promise((resolve) =>
+    Decrypter(value, (error, decrypted) => resolve({ error, decrypted })),
+  )
+
+const encryptPassword = (value) =>
+  new Promise((resolve, reject) =>
+    Encrypter(value, (error, encrypted) =>
+      error ? reject(error) : resolve(encrypted),
+    ),
+  )
+
 const getSessionCookieDomain = () => {
   if (process.env._COOKIE_DOMAIN) return process.env._COOKIE_DOMAIN
   const host = String(process.env._CLIENT_URL || process.env._SERVER_URL || '')
@@ -755,16 +767,59 @@ const login = async (req, res, next) => {
     }
 
     const user = users[0]
+    let mainServerPassword = user.password
 
-    Decrypter(user.password, async (error, decryptedPassword) => {
-      if (error) {
-        console.error('Password decryption error:', error)
+    let passwordCheck = await decryptPassword(user.password)
+    if (passwordCheck.error) {
+      const legacyMatched = await new Promise((resolve) =>
+        CheckPassword(password, user.password, (error, valid) =>
+          resolve(!error && valid),
+        ),
+      )
+
+      if (!legacyMatched) {
+        console.error('Password decryption error:', passwordCheck.error)
         return res.status(500).json({
           success: false,
           message: 'Server error during password verification',
         })
       }
 
+      const encryptedPassword = await encryptPassword(password)
+      await pool.execute(
+        'UPDATE master_user SET mu_password = ? WHERE mu_id = ?',
+        [encryptedPassword, user.id],
+      )
+
+      if (user.db_name && /^[A-Za-z0-9_]+$/.test(user.db_name)) {
+        try {
+          const cfg = CONFIG[process.env.NODE_ENV]
+          const tenantConnection = await mysql.createConnection({
+            host: cfg.host,
+            user: cfg.username,
+            password: cfg.password,
+            database: user.db_name,
+            multipleStatements: false,
+          })
+          await tenantConnection.execute(
+            'UPDATE master_user SET mu_password = ? WHERE mu_username = ?',
+            [encryptedPassword, user.username],
+          )
+          await tenantConnection.end()
+          mainServerPassword = encryptedPassword
+          user.password = encryptedPassword
+        } catch (tenantError) {
+          console.error('Failed to upgrade tenant password:', tenantError.message)
+        }
+      } else {
+        mainServerPassword = encryptedPassword
+        user.password = encryptedPassword
+      }
+
+      passwordCheck = { error: null, decrypted: password }
+    }
+
+    ;(async (decryptedPassword) => {
       if (password !== decryptedPassword) {
         return res.status(401).json({
           success: false,
@@ -815,7 +870,7 @@ const login = async (req, res, next) => {
         }
       }
 
-      const { password: userPassword, ...userWithoutPassword } = user
+      const { password: _unusedPassword, ...userWithoutPassword } = user
 
       try {
         const mongoClient = new MongoClient(process.env._SUBSCRIPTION_MONGODB_URL)
@@ -853,7 +908,7 @@ const login = async (req, res, next) => {
           `http://${mainServerUrl}:${mainServerPort}/credentials/login`,
           {
             username: username,
-            password: userPassword,
+            password: mainServerPassword,
           },
         )
 
@@ -965,7 +1020,7 @@ const login = async (req, res, next) => {
         data: responseData,
         timestamp: new Date().toISOString(),
       })
-    })
+    })(passwordCheck.decrypted)
   } catch (error) {
     console.error('Credentials login error:', error)
     return res.status(500).json({
