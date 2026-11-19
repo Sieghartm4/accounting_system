@@ -933,22 +933,32 @@ export function useDisbursementForm({
       )
 
       // 1. Expense (DEBIT) - per item at pre-discount tax-exclusive amount
+      // Consolidate entries with same COA and Responsibility Center
+      const expenseMap = new Map()
       lines.forEach(({ item, f }) => {
         if (item.coa && f.gross > 0) {
           const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
           if (selectedCoa) {
-            entries.push({
-              id: Date.now() + Math.random(),
-              account: selectedCoa.id,
-              accountSearch: selectedCoa.name,
-              center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
-              debit: f.grossEx,
-              credit: 0,
-              isManual: false,
-            })
+            const center = getItemResponsibilityCenter(item, defaultResponsibilityCenter)
+            const key = `${selectedCoa.id}-${center}`
+            if (expenseMap.has(key)) {
+              const existing = expenseMap.get(key)
+              existing.debit += f.grossEx
+            } else {
+              expenseMap.set(key, {
+                id: Date.now() + Math.random(),
+                account: selectedCoa.id,
+                accountSearch: selectedCoa.name,
+                center: center,
+                debit: f.grossEx,
+                credit: 0,
+                isManual: false,
+              })
+            }
           }
         }
       })
+      expenseMap.forEach((entry) => entries.push(entry))
 
       // 2. Input VAT (DEBIT) - on the discounted (net) base
       if (totals.vat > 0) {

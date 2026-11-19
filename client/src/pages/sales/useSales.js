@@ -1355,22 +1355,32 @@ export default function useSalesForm({
     }
 
     // 4. Income (CREDIT) - per item at pre-discount tax-exclusive amount
+    // Consolidate entries with same COA and Responsibility Center
+    const incomeMap = new Map()
     lines.forEach(({ item, f }) => {
       if (item.coa && f.grossEx > 0) {
         const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
         if (selectedCoa) {
-          entries.push({
-            id: Date.now() + Math.random(),
-            account: selectedCoa.id,
-            accountSearch: selectedCoa.name || selectedCoa.account_name || '',
-            center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
-            debit: 0,
-            credit: f.grossEx,
-            isManual: false,
-          })
+          const center = getItemResponsibilityCenter(item, defaultResponsibilityCenter)
+          const key = `${selectedCoa.id}-${center}`
+          if (incomeMap.has(key)) {
+            const existing = incomeMap.get(key)
+            existing.credit += f.grossEx
+          } else {
+            incomeMap.set(key, {
+              id: Date.now() + Math.random(),
+              account: selectedCoa.id,
+              accountSearch: selectedCoa.name || selectedCoa.account_name || '',
+              center: center,
+              debit: 0,
+              credit: f.grossEx,
+              isManual: false,
+            })
+          }
         }
       }
     })
+    incomeMap.forEach((entry) => entries.push(entry))
 
     // 5. Output VAT (CREDIT) - on the discounted (net) base
     if (totals.vat > 0) {

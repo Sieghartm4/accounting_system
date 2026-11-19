@@ -842,22 +842,32 @@ export function useReceiptsForm({
       )
 
       // 1. Income (CREDIT) - per item at pre-discount tax-exclusive amount
+      // Consolidate entries with same COA and Responsibility Center
+      const incomeMap = new Map()
       lines.forEach(({ item, f }) => {
         if (item.coa && f.gross > 0) {
           const selectedCoa = chartsOfAccounts.find((a) => a.id === item.coa)
           if (selectedCoa) {
-            entries.push({
-              id: Date.now() + Math.random(),
-              account: selectedCoa.id,
-              accountSearch: selectedCoa.name,
-              center: getItemResponsibilityCenter(item, defaultResponsibilityCenter),
-              debit: 0,
-              credit: f.grossEx,
-              isManual: false,
-            })
+            const center = getItemResponsibilityCenter(item, defaultResponsibilityCenter)
+            const key = `${selectedCoa.id}-${center}`
+            if (incomeMap.has(key)) {
+              const existing = incomeMap.get(key)
+              existing.credit += f.grossEx
+            } else {
+              incomeMap.set(key, {
+                id: Date.now() + Math.random(),
+                account: selectedCoa.id,
+                accountSearch: selectedCoa.name,
+                center: center,
+                debit: 0,
+                credit: f.grossEx,
+                isManual: false,
+              })
+            }
           }
         }
       })
+      incomeMap.forEach((entry) => entries.push(entry))
 
       // 2. Output VAT (CREDIT) - on the discounted (net) base
       if (totals.vat > 0) {
@@ -1092,7 +1102,6 @@ export function useReceiptsForm({
       const defaultWhtOpt = findDefaultWhtOption(whtOptions)
 
       const preparedReceiptItems = receiptItems.map((item) => ({
-        id: item.id && !item.isNew ? item.id : null,
         product_id: item.isOther ? null : item.productId || null,
         account_id: item.coa || item.accountId,
         description: item.description,
@@ -1118,7 +1127,6 @@ export function useReceiptsForm({
       const preparedJournalEntries = journalEntries
         .filter((entry) => !entry.isOther)
         .map((entry) => ({
-          id: entry.id && !entry.isNew ? entry.id : null,
           account_id: entry.account || entry.accountId,
           responsibility_center: entry.center || '',
           debit: parseFloat(entry.debit) || 0,
@@ -1136,7 +1144,6 @@ export function useReceiptsForm({
             }
           }
           return {
-            id: att.id && !att.isNew ? att.id : null,
             fileName: att.fileName,
             file: fileData,
             remarks: att.remarks,
