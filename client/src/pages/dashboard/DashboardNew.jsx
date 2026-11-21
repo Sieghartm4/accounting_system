@@ -48,6 +48,20 @@ const getNextEwtDeadline = (now = new Date()) => {
   return { deadline, days }
 }
 
+// Format number with K, M, B suffixes
+const formatCompactNumber = (num) => {
+  if (num === 0 || num === null || num === undefined) return '0'
+  const absNum = Math.abs(num)
+  if (absNum >= 1000000000) {
+    return (num / 1000000000).toFixed(1) + 'B'
+  } else if (absNum >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M'
+  } else if (absNum >= 1000) {
+    return (num / 1000).toFixed(1) + 'K'
+  }
+  return num.toFixed(0)
+}
+
 function DashboardNewContent() {
   const navigate = useNavigate()
   const { responsibilityCenters, loading: responsibilityCentersLoading } =
@@ -310,7 +324,7 @@ function DashboardNewContent() {
             y: {
               ticks: {
                 callback: function (val) {
-                  return '₱' + val / 1000 + 'k'
+                  return '₱' + formatCompactNumber(val)
                 },
                 font: { size: 10 },
               },
@@ -607,7 +621,7 @@ function DashboardNewContent() {
               <span>
                 Gross Revenue:{' '}
                 <strong className="text-gray-100">
-                  ₱{(metrics.grossRevenue / 1000).toFixed(0)}k
+                  ₱{formatCompactNumber(metrics.grossRevenue)}
                 </strong>
               </span>
               <span>
@@ -649,7 +663,7 @@ function DashboardNewContent() {
                   <ArrowDownRight className="w-3.5 h-3.5 mr-0.5" />
                 )}
                 {metrics.netCashMovement >= 0 ? '+' : ''}₱
-                {(metrics.netCashMovement / 1000).toFixed(0)}k
+                {formatCompactNumber(metrics.netCashMovement)}
               </span>
             </div>
             <div className="mt-3 pt-3 border-t border-white/20 flex items-center justify-between text-xs text-red-100">
@@ -658,7 +672,7 @@ function DashboardNewContent() {
                 <strong
                   className={`font-bold ${metrics.cashBreakdown.bankAccounts >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}
                 >
-                  ₱{(metrics.cashBreakdown.bankAccounts / 1000).toFixed(0)}k
+                  ₱{formatCompactNumber(metrics.cashBreakdown.bankAccounts)}
                 </strong>
               </span>
               <span>
@@ -666,7 +680,7 @@ function DashboardNewContent() {
                 <strong
                   className={`font-bold ${metrics.cashBreakdown.cashOnHand >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}
                 >
-                  ₱{(metrics.cashBreakdown.cashOnHand / 1000).toFixed(0)}k
+                  ₱{formatCompactNumber(metrics.cashBreakdown.cashOnHand)}
                 </strong>
               </span>
               <span>
@@ -674,7 +688,7 @@ function DashboardNewContent() {
                 <strong
                   className={`font-bold ${metrics.cashBreakdown.pettyCash >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}
                 >
-                  ₱{(metrics.cashBreakdown.pettyCash / 1000).toFixed(0)}k
+                  ₱{formatCompactNumber(metrics.cashBreakdown.pettyCash)}
                 </strong>
               </span>
               <span>
@@ -682,7 +696,7 @@ function DashboardNewContent() {
                 <strong
                   className={`font-bold ${metrics.cashBreakdown.checks >= 0 ? 'text-emerald-300' : 'text-rose-200'}`}
                 >
-                  ₱{(metrics.cashBreakdown.checks / 1000).toFixed(0)}k
+                  ₱{formatCompactNumber(metrics.cashBreakdown.checks)}
                 </strong>
               </span>
             </div>
@@ -704,10 +718,7 @@ function DashboardNewContent() {
               </div>
               <span className="text-xs font-medium text-rose-600 flex items-center">
                 <AlertTriangle className="w-3.5 h-3.5 mr-1" />₱
-                {(apiData?.alerts?.overdueReceivables?.amount / 1000 || 0).toFixed(
-                  0,
-                )}
-                k Overdue
+                {formatCompactNumber(apiData?.alerts?.overdueReceivables?.amount || 0)} Overdue
               </span>
             </div>
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
@@ -746,8 +757,7 @@ function DashboardNewContent() {
               </div>
               <span className="text-xs font-medium text-rose-600 flex items-center">
                 <AlertTriangle className="w-3.5 h-3.5 mr-1" />₱
-                {(apiData?.alerts?.overduePayables?.amount / 1000 || 0).toFixed(0)}k
-                Overdue
+                {formatCompactNumber(apiData?.alerts?.overduePayables?.amount || 0)} Overdue
               </span>
             </div>
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
@@ -928,25 +938,25 @@ function DashboardNewContent() {
               <div className="bg-emerald-50 p-1.5 rounded">
                 <div className="text-slate-500">Current</div>
                 <div className="font-bold text-emerald-700">
-                  ₱{((apiData?.arAging?.current || 0) / 1000).toFixed(0)}K
+                  ₱{formatCompactNumber(apiData?.arAging?.current || 0)}
                 </div>
               </div>
               <div className="bg-blue-50 p-1.5 rounded">
                 <div className="text-slate-500">1-30 Days</div>
                 <div className="font-bold text-blue-700">
-                  ₱{((apiData?.arAging?.overdue_1_30 || 0) / 1000).toFixed(0)}K
+                  ₱{formatCompactNumber(apiData?.arAging?.overdue_1_30 || 0)}
                 </div>
               </div>
               <div className="bg-amber-50 p-1.5 rounded">
                 <div className="text-slate-500">31-60 Days</div>
                 <div className="font-bold text-amber-700">
-                  ₱{((apiData?.arAging?.overdue_31_60 || 0) / 1000).toFixed(0)}K
+                  ₱{formatCompactNumber(apiData?.arAging?.overdue_31_60 || 0)}
                 </div>
               </div>
               <div className="bg-rose-50 p-1.5 rounded">
                 <div className="text-slate-500">61+ Days</div>
                 <div className="font-bold text-rose-700">
-                  ₱{((apiData?.arAging?.overdue_61_plus || 0) / 1000).toFixed(0)}K
+                  ₱{formatCompactNumber(apiData?.arAging?.overdue_61_plus || 0)}
                 </div>
               </div>
             </div>

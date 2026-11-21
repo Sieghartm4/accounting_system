@@ -867,7 +867,12 @@ export function useReceiptsForm({
           }
         }
       })
-      incomeMap.forEach((entry) => entries.push(entry))
+      incomeMap.forEach((entry) => {
+        entries.push({
+          ...entry,
+          credit: round2(entry.credit),
+        })
+      })
 
       // 2. Output VAT (CREDIT) - on the discounted (net) base
       if (totals.vat > 0) {

@@ -1637,7 +1637,12 @@ export default function PurchaseForm({
         }
       }
     })
-    expenseMap.forEach((entry) => entries.push(entry))
+    expenseMap.forEach((entry) => {
+      entries.push({
+        ...entry,
+        debit: round2(entry.debit),
+      })
+    })
 
     // 2. Input VAT (DEBIT) - on the discounted (net) base
     if (totals.vat > 0) {

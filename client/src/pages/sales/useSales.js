@@ -1380,7 +1380,12 @@ export default function useSalesForm({
         }
       }
     })
-    incomeMap.forEach((entry) => entries.push(entry))
+    incomeMap.forEach((entry) => {
+      entries.push({
+        ...entry,
+        credit: round2(entry.credit),
+      })
+    })
 
     // 5. Output VAT (CREDIT) - on the discounted (net) base
     if (totals.vat > 0) {
