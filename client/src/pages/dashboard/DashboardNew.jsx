@@ -50,16 +50,19 @@ const getNextEwtDeadline = (now = new Date()) => {
 
 // Format number with K, M, B suffixes
 const formatCompactNumber = (num) => {
-  if (num === 0 || num === null || num === undefined) return '0'
-  const absNum = Math.abs(num)
+  if (num === null || num === undefined || num === '') return '0'
+  const parsedNum = parseFloat(num)
+  if (isNaN(parsedNum)) return '0'
+  if (parsedNum === 0) return '0'
+  const absNum = Math.abs(parsedNum)
   if (absNum >= 1000000000) {
-    return (num / 1000000000).toFixed(1) + 'B'
+    return (parsedNum / 1000000000).toFixed(1) + 'B'
   } else if (absNum >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
+    return (parsedNum / 1000000).toFixed(1) + 'M'
   } else if (absNum >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
+    return (parsedNum / 1000).toFixed(1) + 'K'
   }
-  return num.toFixed(0)
+  return parsedNum.toFixed(0)
 }
 
 function DashboardNewContent() {
