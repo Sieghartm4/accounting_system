@@ -5,9 +5,8 @@ const useAgeingReceivables = () => {
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [asOf, setAsOf] = useState(null)
 
-  // filters: { as_of: 'YYYY-MM-DD' }
+  // filters: { date_from: 'YYYY-MM-DD', date_to: 'YYYY-MM-DD' }
   const refetchSales = useCallback(async (filters = {}) => {
     try {
       setLoading(true)
@@ -19,7 +18,8 @@ const useAgeingReceivables = () => {
       }
 
       const qs = []
-      if (filters.as_of) qs.push(`as_of=${encodeURIComponent(filters.as_of)}`)
+      if (filters.date_from) qs.push(`date_from=${encodeURIComponent(filters.date_from)}`)
+      if (filters.date_to) qs.push(`date_to=${encodeURIComponent(filters.date_to)}`)
       const url = `${API.salesAging()}${qs.length ? `?${qs.join('&')}` : ''}`
 
       const response = await fetch(url, {
@@ -40,7 +40,6 @@ const useAgeingReceivables = () => {
       }
 
       setSales(Array.isArray(result.data) ? result.data : [])
-      if (result.as_of) setAsOf(result.as_of)
     } catch (err) {
       setError(err.message || 'Failed to load aging receivables')
       setSales([])
@@ -49,11 +48,7 @@ const useAgeingReceivables = () => {
     }
   }, [])
 
-  useEffect(() => {
-    refetchSales()
-  }, [refetchSales])
-
-  return { sales, asOf, loading, error, refetchSales }
+  return { sales, loading, error, refetchSales }
 }
 
 export default useAgeingReceivables

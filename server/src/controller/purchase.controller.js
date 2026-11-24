@@ -6375,6 +6375,104 @@ const getPrintPurchases = async (req, res, next) => {
 
 
 
+const getAgingPayables = async (req, res, next) => {
+  try {
+    const asOf = req.query.as_of || req.query.asOf || new Date().toISOString().split('T')[0]
+    const { dateFrom, dateTo, date_from, date_to } = req.query
+    const purchaseDateFrom = dateFrom || date_from
+    const purchaseDateTo = dateTo || date_to
+
+    let whereClause = `WHERE p.${Accounting.purchase.selectOptionColumns.state} = 'APPROVED'
+        AND (p.${Accounting.purchase.selectOptionColumns.total_amount_due} - COALESCE(paid.amount, 0)) > 0`
+    const queryParams = [asOf, asOf]
+
+    const purchaseDateColumn = `DATE(p.${Accounting.purchase.selectOptionColumns.date_delivered})`
+
+    if (purchaseDateFrom) {
+      whereClause += ` AND ${purchaseDateColumn} >= ?`
+      queryParams.push(purchaseDateFrom)
+    }
+
+    if (purchaseDateTo) {
+      whereClause += ` AND ${purchaseDateColumn} <= ?`
+      queryParams.push(purchaseDateTo)
+    }
+
+    const aging_query = `
+      SELECT
+        p.${Accounting.purchase.selectOptionColumns.id} AS id,
+        v.${Master.vendors.selectOptionColumns.name} AS vendor,
+        p.${Accounting.purchase.selectOptionColumns.document_reference} AS doc_ref,
+        p.${Accounting.purchase.selectOptionColumns.terms} AS terms,
+        p.${Accounting.purchase.selectOptionColumns.date_delivered} AS date_delivered,
+        p.${Accounting.purchase.selectOptionColumns.date_due} AS date_due,
+        p.${Accounting.purchase.selectOptionColumns.total_amount_due} AS total_amount_due,
+        COALESCE(paid.amount, 0) AS paid_amount,
+        p.${Accounting.purchase.selectOptionColumns.total_amount_due} - COALESCE(paid.amount, 0) AS open_amount,
+        COALESCE(
+          DATEDIFF(?, COALESCE(
+            STR_TO_DATE(p.${Accounting.purchase.selectOptionColumns.date_due}, '%Y-%m-%d'),
+            STR_TO_DATE(p.${Accounting.purchase.selectOptionColumns.date_due}, '%m/%d/%Y'),
+            STR_TO_DATE(p.${Accounting.purchase.selectOptionColumns.date_due}, '%m-%d-%Y')
+          )),
+          0
+        ) AS days_overdue
+      FROM ${Accounting.purchase.tablename} p
+      INNER JOIN ${Master.vendors.tablename} v
+        ON v.${Master.vendors.selectOptionColumns.id} = p.${Accounting.purchase.selectOptionColumns.vendor_id}
+      LEFT JOIN (
+        SELECT
+          pi.${Accounting.payment_items.selectOptionColumns.purchase_id} AS purchase_id,
+          SUM(pi.${Accounting.payment_items.selectOptionColumns.amount_applied}) AS amount
+        FROM ${Accounting.payment_items.tablename} pi
+        INNER JOIN ${Accounting.payments.tablename} pay
+          ON pay.${Accounting.payments.selectOptionColumns.id} = pi.${Accounting.payment_items.selectOptionColumns.payment_id}
+        WHERE pay.${Accounting.payments.selectOptionColumns.state} = 'APPROVED'
+          AND pay.${Accounting.payments.selectOptionColumns.payment_date} <= ?
+        GROUP BY pi.${Accounting.payment_items.selectOptionColumns.purchase_id}
+      ) paid ON paid.purchase_id = p.${Accounting.purchase.selectOptionColumns.id}
+      ${whereClause}
+      ORDER BY days_overdue DESC, p.${Accounting.purchase.selectOptionColumns.id} DESC
+    `
+
+    const rows = await Query(aging_query, queryParams)
+
+    const data = rows.map((row) => {
+      const days = Math.max(Number(row.days_overdue) || 0, 0)
+      let agingBucket = 'Current'
+      if (days > 0 && days <= 30) agingBucket = '1-30'
+      else if (days > 30 && days <= 60) agingBucket = '31-60'
+      else if (days > 60 && days <= 90) agingBucket = '61-90'
+      else if (days > 90) agingBucket = '90+'
+
+      return {
+        ...row,
+        days_overdue: days,
+        aging_bucket: agingBucket,
+      }
+    })
+
+    res.status(200).json({
+      success: true,
+      message: 'Aging payables retrieved successfully',
+      data,
+      as_of: asOf,
+    })
+  } catch (error) {
+    console.error('Error fetching aging payables:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching aging payables',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+
+
 module.exports = {
 
   getPurchase,
@@ -6402,6 +6500,8 @@ module.exports = {
 
 
   getPrintPurchases,
+
+  getAgingPayables,
 
 }
 

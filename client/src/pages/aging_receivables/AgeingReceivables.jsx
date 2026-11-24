@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Clock3, TrendingUp, Download, RefreshCw, Printer, FileText, X, Eye, DollarSign, Filter, RotateCw } from 'lucide-react'
+import { Clock3, TrendingUp, Download, RefreshCw, Printer, FileText, X, Eye, DollarSign, Filter, RotateCw, Calendar } from 'lucide-react'
 import { RouteProtection } from '../../components/access'
 import useAgeingReceivables from './useAgeingReceivables'
 import { LoadingScreen } from '../../components/ui'
@@ -16,26 +16,31 @@ export default function AgeingReceivables() {
 }
 
 function AgeingReceivablesContent() {
-  const { sales, asOf, loading, error, refetchSales } = useAgeingReceivables()
+  const { sales, loading, error, refetchSales } = useAgeingReceivables()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [statusTab, setStatusTab] = useState('ALL')
   const [bucketFilter, setBucketFilter] = useState('ALL')
-  const [asOfDate, setAsOfDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState(0)
 
-  // Refetch when the As-Of date changes
+  // Initial fetch
   useEffect(() => {
-    refetchSales({ as_of: asOfDate })
-  }, [asOfDate, refetchSales])
+    const filters = {}
+    if (startDate) filters.date_from = startDate
+    if (endDate) filters.date_to = endDate
+    refetchSales(filters)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Calculate aging buckets for each sale
   const salesWithAging = useMemo(() => {
-    const now = new Date()
+    const now = new Date(endDate)
     return (sales || []).map((sale) => {
       const amountDue = Number(sale.open_amount ?? sale.amount_due ?? sale.total_amount_due ?? sale.total_amount) || 0
       const amountTotal = Number(sale.total_amount_due ?? sale.amount_total ?? sale.total_amount ?? sale.amount) || amountDue
@@ -169,10 +174,19 @@ function AgeingReceivablesContent() {
   }
 
   const handleRefresh = async () => {
+    await handleSubmitDates()
+  }
+
+  const handleSubmitDates = async () => {
     setIsRefreshing(true)
-    await refetchSales({ as_of: asOfDate })
+    const filters = {}
+    if (startDate) filters.date_from = startDate
+    if (endDate) filters.date_to = endDate
+    await refetchSales(filters)
     setTimeout(() => setIsRefreshing(false), 600)
   }
+
+
 
   const resetFilters = () => {
     setSearchQuery('')
@@ -195,9 +209,9 @@ function AgeingReceivablesContent() {
     navigate(`/sales?id=${item.id}`)
   }
 
-  const onPrint = () => handlePrint(filteredSales, stats, asOfDate)
+  const onPrint = () => handlePrint(filteredSales, stats, endDate)
 
-  const onExportCSV = () => handleExportCSV(filteredSales, stats, asOfDate)
+  const onExportCSV = () => handleExportCSV(filteredSales, stats, endDate)
 
   if (loading) return <LoadingScreen label="Loading Aging Receivables..." />
 
@@ -214,11 +228,31 @@ function AgeingReceivablesContent() {
 
   return (
     <div className="h-full flex flex-col bg-transparent overflow-hidden">
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .custom-table-scrollbar::-webkit-scrollbar {
+              width: 5px;
+              height: 5px;
+            }
+            .custom-table-scrollbar::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            .custom-table-scrollbar::-webkit-scrollbar-thumb {
+              background: #dc2626;
+              border-radius: 10px;
+            }
+            .custom-table-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: #b91c1c;
+            }
+          `,
+        }}
+      />
       {/* --- HEADER SECTION --- */}
-      <div className="shrink-0 mb-6">
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start space-x-4">
-            <div className="w-12 h-12 rounded-xl bg-black text-white flex items-center justify-center font-black text-xl shadow-md">
+      <div className="shrink-0 mb-3">
+        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center font-black text-lg shadow-md">
               5L
             </div>
             <div>
@@ -231,59 +265,84 @@ function AgeingReceivablesContent() {
                   Live AR Ledger
                 </span>
               </div>
-              <h1 className="text-2xl font-black text-black tracking-tight mt-0.5">
+              <h1 className="text-xl font-black text-black tracking-tight mt-0.5">
                 ACCOUNTS RECEIVABLE AGING DETAIL REPORT
               </h1>
-              <p className="text-xs text-gray-500 mt-1">
-                As of <span className="font-semibold text-gray-700">{formatDate(asOfDate)}</span>
-                {asOf ? ` (Server: ${formatDate(asOf)})` : ''} • Currency:{' '}
-                <span className="font-semibold text-gray-700">PHP (₱)</span> • Entity:{' '}
-                <span className="font-semibold text-gray-700">Main HQ Manila</span>
-              </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex flex-col">
               <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">
-                As Of Date
+                Start Date
               </label>
-              <input
-                type="date"
-                value={asOfDate}
-                onChange={(e) => setAsOfDate(e.target.value)}
-                className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-black"
-              />
+              <div className="relative">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-black"
+                />
+                <Calendar size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">
+                End Date
+              </label>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-black"
+                />
+                <Calendar size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              </div>
+            </div>
+            <div className="flex items-end gap-1.5 pb-0.5">
+              <button
+                onClick={handleSubmitDates}
+                disabled={isRefreshing}
+                className="px-3 py-2 bg-black hover:bg-gray-800 text-white text-xs font-semibold rounded-xl shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {isRefreshing ? <RotateCw size={12} className="animate-spin" /> : null}
+                Submit
+              </button>
+            </div>
+            <div className="w-px h-8 bg-gray-200 mx-1 self-center" />
+            <div className="flex items-end gap-1.5 pb-0.5">
+              <button
+                onClick={onPrint}
+                disabled={isRefreshing}
+                className="flex items-center space-x-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Printer size={14} />
+                <span>Print</span>
+              </button>
+              <button
+                onClick={onExportCSV}
+                disabled={isRefreshing}
+                className="flex items-center space-x-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-xl shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FileText size={14} />
+                <span>Export CSV</span>
+              </button>
             </div>
             <button
-              onClick={onPrint}
-              className="flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl shadow-sm transition"
-            >
-              <Printer size={14} />
-              <span>Print</span>
-            </button>
-            <button
-              onClick={onExportCSV}
-              className="flex items-center space-x-1.5 px-3 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl shadow-sm transition"
-            >
-              <FileText size={14} />
-              <span>Export CSV</span>
-            </button>
-            <button
               onClick={handleRefresh}
-              className={`p-2 bg-black hover:bg-red-600 text-white rounded-xl shadow-sm transition ${
-                isRefreshing ? 'animate-spin' : ''
-              }`}
+              disabled={isRefreshing}
+              className="p-2 bg-black hover:bg-red-600 text-white rounded-xl shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
               title="Refresh Receivables Data"
             >
-              <RotateCw size={14} />
+              <RotateCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
             </button>
           </div>
         </div>
       </div>
 
       {/* --- AGING SUMMARY KPI GRID --- */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-3">
         <SummaryTile
           label="Current (Not Due)"
           value={formatCurrency(stats.bucketCurrent)}
@@ -329,12 +388,13 @@ function AgeingReceivablesContent() {
       </div>
 
       {/* --- FILTER TOOLBAR & TABLE --- */}
-      <div className="flex-1 min-h-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden aging-table-container">
-        <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div className="flex-1 min-h-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden aging-table-container mb-0">
+        <div className="p-3 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-gray-600">
             <button
               onClick={() => setStatusTab('ALL')}
-              className={`px-3 py-1.5 rounded-lg transition ${
+              disabled={isRefreshing}
+              className={`px-3 py-1.5 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${
                 statusTab === 'ALL'
                   ? 'bg-black text-white'
                   : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'
@@ -344,7 +404,8 @@ function AgeingReceivablesContent() {
             </button>
             <button
               onClick={() => setStatusTab('OVERDUE')}
-              className={`px-3 py-1.5 rounded-lg transition ${
+              disabled={isRefreshing}
+              className={`px-3 py-1.5 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${
                 statusTab === 'OVERDUE'
                   ? 'bg-red-600 text-white'
                   : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'
@@ -354,7 +415,8 @@ function AgeingReceivablesContent() {
             </button>
             <button
               onClick={() => setStatusTab('PARTIALLY PAID')}
-              className={`px-3 py-1.5 rounded-lg transition ${
+              disabled={isRefreshing}
+              className={`px-3 py-1.5 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${
                 statusTab === 'PARTIALLY PAID'
                   ? 'bg-amber-500 text-white'
                   : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'
@@ -371,7 +433,8 @@ function AgeingReceivablesContent() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search Customer, Inv #, Doc Ref..."
-                className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-black focus:outline-none transition"
+                disabled={isRefreshing}
+                className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-black focus:outline-none transition disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <Filter size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             </div>
@@ -379,7 +442,8 @@ function AgeingReceivablesContent() {
             <select
               value={bucketFilter}
               onChange={(e) => setBucketFilter(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-black"
+              disabled={isRefreshing}
+              className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-black disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="ALL">All Aging Buckets</option>
               <option value="Current">Current (Not Due)</option>
@@ -391,7 +455,8 @@ function AgeingReceivablesContent() {
 
             <button
               onClick={resetFilters}
-              className="p-1.5 text-gray-400 hover:text-gray-700 bg-gray-100 rounded-xl transition"
+              disabled={isRefreshing}
+              className="p-1.5 text-gray-400 hover:text-gray-700 bg-gray-100 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
               title="Reset Filters"
             >
               <X size={14} />
@@ -400,9 +465,9 @@ function AgeingReceivablesContent() {
         </div>
 
         {/* --- AGING TABLE --- */}
-        <div className="overflow-x-auto">
+        <div className="overflow-auto h-[calc(100%-4rem)] custom-table-scrollbar">
           <table className="w-full text-left border-collapse">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="bg-black text-white text-[11px] font-bold uppercase tracking-wider">
                 <th className="py-3 px-3">Invoice # / Ref</th>
                 <th className="py-3 px-3">Customer Name</th>
@@ -486,14 +551,14 @@ function AgeingReceivablesContent() {
                     <div className="flex items-center justify-center space-x-1">
                       <button
                         onClick={() => openModal(item)}
-                        className="p-1.5 text-gray-600 hover:text-black bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                        className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
                         title="View Detail Ledger"
                       >
                         <Eye size={12} />
                       </button>
                       <button
                         onClick={() => handleView(item)}
-                        className="p-1.5 text-gray-600 hover:text-black bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                        className="p-1.5 text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 rounded-lg transition"
                         title="View Sales Order"
                       >
                         <FileText size={12} />
@@ -514,7 +579,7 @@ function AgeingReceivablesContent() {
             </tbody>
 
             {/* --- FOOTER TOTALS --- */}
-            <tfoot className="bg-black text-white text-xs font-bold font-mono">
+            <tfoot className="sticky bottom-0 bg-black text-white text-xs font-bold font-mono z-10">
               <tr>
                 <td colSpan={5} className="py-3 px-4 text-right uppercase tracking-wider font-sans font-extrabold text-gray-300">
                   GRAND TOTAL RECEIVABLES:
@@ -544,7 +609,7 @@ function AgeingReceivablesContent() {
         </div>
 
         {/* --- FOOTER METADATA --- */}
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 gap-2">
+        <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 gap-2">
           <div className="flex items-center space-x-4">
             <span>
               RECORD COUNT: <strong className="text-black">{filteredSales.length}</strong>
@@ -748,7 +813,7 @@ function SummaryTile({ label, value, count, percent, color }) {
   const bgClass = color === 'dark' ? 'bg-black text-white' : 'bg-white border border-gray-200'
 
   return (
-    <div className={`${bgClass} p-4 rounded-xl shadow-sm relative overflow-hidden`}>
+    <div className={`${bgClass} p-3 rounded-xl shadow-sm relative overflow-hidden`}>
       <span className="text-[10px] font-bold tracking-wider text-gray-400 uppercase block mb-1">
         {label}
       </span>

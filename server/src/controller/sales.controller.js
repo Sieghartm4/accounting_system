@@ -445,6 +445,25 @@ const getSales = async (req, res, next) => {
 const getAgingReceivables = async (req, res, next) => {
   try {
     const asOf = req.query.as_of || req.query.asOf || new Date().toISOString().split('T')[0]
+    const { dateFrom, dateTo, date_from, date_to } = req.query
+    const salesDateFrom = dateFrom || date_from
+    const salesDateTo = dateTo || date_to
+
+    let whereClause = `WHERE s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
+        AND (s.${Accounting.sales.selectOptionColumns.total_amount_due} - COALESCE(collected.amount, 0)) > 0`
+    const queryParams = [asOf, asOf]
+
+    const salesDateColumn = `DATE(s.${Accounting.sales.selectOptionColumns.date_delivered})`
+
+    if (salesDateFrom) {
+      whereClause += ` AND ${salesDateColumn} >= ?`
+      queryParams.push(salesDateFrom)
+    }
+
+    if (salesDateTo) {
+      whereClause += ` AND ${salesDateColumn} <= ?`
+      queryParams.push(salesDateTo)
+    }
 
     const aging_query = `
       SELECT
@@ -479,12 +498,11 @@ const getAgingReceivables = async (req, res, next) => {
           AND coll.${Accounting.collections.selectOptionColumns.collection_date} <= ?
         GROUP BY ci.${Accounting.collection_items.selectOptionColumns.sales_id}
       ) collected ON collected.sales_id = s.${Accounting.sales.selectOptionColumns.id}
-      WHERE s.${Accounting.sales.selectOptionColumns.state} = 'APPROVED'
-        AND (s.${Accounting.sales.selectOptionColumns.total_amount_due} - COALESCE(collected.amount, 0)) > 0
+      ${whereClause}
       ORDER BY days_overdue DESC, s.${Accounting.sales.selectOptionColumns.id} DESC
     `
 
-    const rows = await Query(aging_query, [asOf, asOf])
+    const rows = await Query(aging_query, queryParams)
 
     const data = rows.map((row) => {
       const days = Math.max(Number(row.days_overdue) || 0, 0)

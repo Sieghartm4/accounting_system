@@ -13,12 +13,12 @@ const useAgeingPayables = () => {
       const token = sessionStorage.getItem('authenticated')
       if (!token) throw new Error('No authorization token found')
 
-      const params = new URLSearchParams({ offset: '0', limit: '100' })
+      const params = new URLSearchParams()
       if (filters.date_from) params.set('date_from', filters.date_from)
       if (filters.date_to) params.set('date_to', filters.date_to)
 
       const response = await fetch(
-        `${API.purchase()}?${params.toString()}`,
+        `${API.purchaseAging()}${params.toString() ? `?${params.toString()}` : ''}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -32,17 +32,7 @@ const useAgeingPayables = () => {
       if (!result.success)
         throw new Error(result.message || 'Failed to load payables')
 
-      setPurchases(
-        (Array.isArray(result.data) ? result.data : []).filter((purchase) => {
-          const status = String(purchase.status || '')
-            .trim()
-            .toLowerCase()
-          const state = String(purchase.state || '')
-            .trim()
-            .toUpperCase()
-          return state === 'APPROVED' && status !== 'paid'
-        }),
-      )
+      setPurchases(Array.isArray(result.data) ? result.data : [])
     } catch (err) {
       setError(err.message || 'Failed to load aging payables')
       setPurchases([])
@@ -50,10 +40,6 @@ const useAgeingPayables = () => {
       setLoading(false)
     }
   }, [])
-
-  useEffect(() => {
-    refetchPurchases()
-  }, [refetchPurchases])
 
   return { purchases, loading, error, refetchPurchases }
 }

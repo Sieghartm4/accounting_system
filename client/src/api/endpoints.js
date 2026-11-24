@@ -208,6 +208,7 @@ export const API = {
   purchaseState: () => url('/purchase/purchase-state'),
   purchaseCancelState: () => url('/purchase/cancel-state'),
   purchasePrint: (ids) => url(`/purchase/print/${ids}`),
+  purchaseAging: () => url('/purchase/aging'),
 
   // --- Purchase orders (AP) ---
   purchaseOrder: () => url('/purchase_order'),
