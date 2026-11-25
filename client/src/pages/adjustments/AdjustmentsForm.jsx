@@ -415,6 +415,22 @@ export default function AdjustmentsForm({
 
   const [attachments, setAttachments] = useState([])
   const uploadInputRef = useRef(null)
+  const fileInputRef = useRef(null)
+
+  const handleAddAttachmentClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileInputChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      addAttachmentWithFile(file)
+    }
+    // Reset the input so the same file can be selected again if needed
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   const [toast, setToast] = useState(null)
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' })
@@ -522,6 +538,19 @@ export default function AdjustmentsForm({
         id: Date.now(),
         fileName: '',
         file: null,
+        remarks: '',
+        uploadedBy: 'Current User',
+        date: new Date().toLocaleDateString(),
+      },
+    ])
+
+  const addAttachmentWithFile = (file) =>
+    setAttachments((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        fileName: file.name,
+        file: file,
         remarks: '',
         uploadedBy: 'Current User',
         date: new Date().toLocaleDateString(),
@@ -1497,12 +1526,20 @@ export default function AdjustmentsForm({
                       </table>
                     </div>
                     {!isViewMode && (
-                      <button
-                        onClick={addAttachment}
-                        className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
-                      >
-                        <Plus size={15} /> Add File
-                      </button>
+                      <>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          className="hidden"
+                          onChange={handleFileInputChange}
+                        />
+                        <button
+                          onClick={handleAddAttachmentClick}
+                          className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
+                        >
+                          <Plus size={15} /> Add File
+                        </button>
+                      </>
                     )}
                   </div>
                 </section>

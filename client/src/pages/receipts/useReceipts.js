@@ -722,6 +722,20 @@ export function useReceiptsForm({
       },
     ])
 
+  const addAttachmentWithFile = (file) =>
+    setAttachments((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        fileName: file.name,
+        file: file,
+        remarks: '',
+        uploadedBy: 'Current User',
+        date: new Date().toLocaleDateString(),
+        isNew: true,
+      },
+    ])
+
   const removeAttachment = (id) =>
     setAttachments((prev) => prev.filter((a) => a.id !== id))
   const updateAttachment = (id, field, value) =>
@@ -1293,6 +1307,7 @@ export function useReceiptsForm({
     createCustomer,
     createProduct,
     addAttachment,
+    addAttachmentWithFile,
     removeAttachment,
     updateAttachment,
     handleFileChange,

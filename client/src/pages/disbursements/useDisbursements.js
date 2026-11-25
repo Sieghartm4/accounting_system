@@ -880,6 +880,19 @@ export function useDisbursementForm({
       },
     ])
 
+  const addAttachmentWithFile = (file) =>
+    setAttachments((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        fileName: file.name,
+        file: file,
+        remarks: '',
+        uploadedBy: 'Current User',
+        date: new Date().toLocaleDateString(),
+      },
+    ])
+
   const removeAttachment = (id) =>
     setAttachments((prev) => prev.filter((a) => a.id !== id))
   const updateAttachment = (id, field, value) =>
@@ -1376,6 +1389,7 @@ export function useDisbursementForm({
     removeJournalEntry,
     updateJournalEntry,
     addAttachment,
+    addAttachmentWithFile,
     removeAttachment,
     updateAttachment,
     handleFileChange,

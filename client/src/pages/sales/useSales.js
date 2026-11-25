@@ -1235,6 +1235,19 @@ export default function useSalesForm({
       },
     ])
 
+  const addAttachmentWithFile = (file) =>
+    setAttachments((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        fileName: file.name,
+        file: file,
+        remarks: '',
+        uploadedBy: 'Current User',
+        date: new Date().toLocaleDateString(),
+      },
+    ])
+
   const removeAttachment = (id) =>
     setAttachments((prev) => prev.filter((a) => a.id !== id))
 
@@ -1886,6 +1899,7 @@ export default function useSalesForm({
     updateSalesItem,
     updateJournalEntry,
     addAttachment,
+    addAttachmentWithFile,
     removeAttachment,
     updateAttachment,
     handleFileChange,

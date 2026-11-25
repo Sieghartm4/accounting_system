@@ -761,6 +761,22 @@ export default function CollectionsForm({
 
   const [attachments, setAttachments] = useState([])
 
+  const fileInputRef = useRef(null)
+
+  const handleAddAttachmentClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileInputChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      addAttachmentWithFile(file)
+    }
+    // Reset the input so the same file can be selected again if needed
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
 
   const [toast, setToast] = useState(null)
@@ -1764,6 +1780,30 @@ export default function CollectionsForm({
         fileName: '',
 
         file: null,
+
+        remarks: '',
+
+        uploadedBy: 'Current User',
+
+        date: new Date().toLocaleDateString(),
+
+      },
+
+    ])
+
+  const addAttachmentWithFile = (file) =>
+
+    setAttachments((prev) => [
+
+      ...prev,
+
+      {
+
+        id: Date.now(),
+
+        fileName: file.name,
+
+        file: file,
 
         remarks: '',
 
@@ -4599,17 +4639,33 @@ export default function CollectionsForm({
 
                     {!isViewMode && (
 
-                      <button
+                      <>
 
-                        onClick={addAttachment}
+                        <input
 
-                        className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
+                          ref={fileInputRef}
 
-                      >
+                          type="file"
 
-                        <Plus size={15} /> Add File
+                          className="hidden"
 
-                      </button>
+                          onChange={handleFileInputChange}
+
+                        />
+
+                        <button
+
+                          onClick={handleAddAttachmentClick}
+
+                          className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
+
+                        >
+
+                          <Plus size={15} /> Add File
+
+                        </button>
+
+                      </>
 
                     )}
 

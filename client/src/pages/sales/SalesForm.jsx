@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -293,6 +293,23 @@ export default function SalesForm({
   const isDisabled = isViewMode && !isEditMode
   const postedLock = isPostedLocked && !isViewMode
   const salesItemsScrollRef = useDragToScroll()
+
+  const fileInputRef = useRef(null)
+
+  const handleAddAttachmentClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileInputChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      form.addAttachmentWithFile(file)
+    }
+    // Reset the input so the same file can be selected again if needed
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   const {
     responsibilityCenters,
@@ -1928,12 +1945,20 @@ export default function SalesForm({
                       </table>
                     </div>
                     {!isDisabled && (
-                      <button
-                        onClick={form.addAttachment}
-                        className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
-                      >
-                        <Plus size={15} /> Add File
-                      </button>
+                      <>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          className="hidden"
+                          onChange={handleFileInputChange}
+                        />
+                        <button
+                          onClick={handleAddAttachmentClick}
+                          className="mt-2 py-1.5 border-2 border-dashed rounded-lg w-full text-[12px] font-black uppercase border-slate-300 text-slate-600 transition-all duration-300 hover:bg-slate-50 hover:border-slate-400 flex items-center justify-center gap-1"
+                        >
+                          <Plus size={15} /> Add File
+                        </button>
+                      </>
                     )}
                   </div>
                 </section>
