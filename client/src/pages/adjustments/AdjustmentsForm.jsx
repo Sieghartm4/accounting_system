@@ -772,13 +772,19 @@ export default function AdjustmentsForm({
   }
 
   // ── Post Transaction ──────────────────────────────────────────────────────
-  const fileToBase64 = (file) =>
-    new Promise((resolve, reject) => {
+  const fileToBase64 = (file) => {
+    // If file is already a base64 string (from database), return it directly
+    if (typeof file === 'string' && file.startsWith('data:')) {
+      return Promise.resolve(file)
+    }
+    // Otherwise, convert File/Blob to base64
+    return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.readAsDataURL(file)
       reader.onload = () => resolve(reader.result)
       reader.onerror = (err) => reject(err)
     })
+  }
 
   const handlePostTransaction = async () => {
     if (submittingRef.current) return
