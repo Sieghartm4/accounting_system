@@ -319,7 +319,7 @@ function SalesContent() {
           />
           <SummaryTile
             label="Total Amount Due"
-            value={`₱ ${filteredTotalAmount.toLocaleString('en-PH', {
+            value={`₱${filteredTotalAmount.toLocaleString('en-PH', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             }) || '0.00'}`}

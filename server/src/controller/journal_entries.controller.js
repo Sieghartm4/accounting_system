@@ -706,10 +706,11 @@ const reverseJournalEntries = async (req, res, next) => {
     }
     const reversalId = `${idPrefix}${String(seq).padStart(4, '0')}`
 
-    const totalAmount = journalRows.reduce(
-      (sum, r) => sum + (parseFloat(r.amount) || 0),
-      0,
-    )
+    // Only sum DEBIT amounts (or CREDIT amounts) since they should be equal in a balanced journal
+    // Summing both would double the total amount
+    const totalAmount = journalRows
+      .filter((r) => String(r.type).toLowerCase() === 'debit')
+      .reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0)
 
     const docRef = source.document_reference || `${db_name}:${db_id}`
 

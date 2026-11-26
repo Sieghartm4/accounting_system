@@ -318,9 +318,13 @@ const DynamicTable = ({
       )
     }
 
-    // Make amount_due values stand out in red with proper accounting format
+    // Make amount_due, collected_amount, pending_collections, paid_amount, pending_payments, and total_amount values stand out with proper accounting format
     if (
       (header.toLowerCase().includes('amount_due') ||
+        header.toLowerCase().includes('collected_amount') ||
+        header.toLowerCase().includes('pending_collections') ||
+        header.toLowerCase().includes('paid_amount') ||
+        header.toLowerCase().includes('pending_payments') ||
         header.toLowerCase() === 'total_amount') &&
       value !== null &&
       value !== undefined
@@ -332,7 +336,7 @@ const DynamicTable = ({
       }).format(isNaN(numValue) ? 0 : numValue)
       return (
   <span className="font-black">
-    <span className="text-green-600">₱ </span>
+    <span className="text-green-600">₱</span>
     <span className="text-gray-600">{formattedValue}</span>
   </span>
 );
