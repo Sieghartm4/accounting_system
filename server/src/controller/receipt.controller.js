@@ -436,7 +436,8 @@ const getAllReceipts = async (req, res, next) => {
       .select([
         { col: Accounting.receipt_attachments.selectOptionColumns.id, as: 'id' },
 
-        { col: Accounting.receipt_attachments.selectOptionColumns.file, as: 'file' },
+        // File column excluded for lazy loading - fetch separately via attachments endpoint
+        // { col: Accounting.receipt_attachments.selectOptionColumns.file, as: 'file' },
 
         { col: Accounting.receipt_attachments.selectOptionColumns.name, as: 'name' },
 
@@ -492,6 +493,75 @@ const getAllReceipts = async (req, res, next) => {
       success: false,
 
       message: 'Server error while fetching receipts',
+
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const getReceiptAttachments = async (req, res, next) => {
+  const { receipt_id } = req.params
+
+  const receiptId = receipt_id
+
+  try {
+    const receipts_attachments_query = sql
+      .select([
+        { col: Accounting.receipt_attachments.selectOptionColumns.id, as: 'id' },
+
+        { col: Accounting.receipt_attachments.selectOptionColumns.file, as: 'file' },
+
+        { col: Accounting.receipt_attachments.selectOptionColumns.name, as: 'name' },
+
+        {
+          col: Accounting.receipt_attachments.selectOptionColumns.remarks,
+          as: 'remarks',
+        },
+
+        {
+          col: Accounting.receipt_attachments.selectOptionColumns.uploaded_by,
+          as: 'uploaded_by',
+        },
+
+        {
+          col: Accounting.receipt_attachments.selectOptionColumns.uploaded_date,
+          as: 'uploaded_date',
+        },
+      ])
+
+      .from(Accounting.receipt_attachments.tablename)
+
+      .where(Accounting.receipt_attachments.selectOptionColumns.receipt_id)
+
+      .build()
+
+    let receipts_attachments = await Query(
+      receipts_attachments_query,
+      [receiptId],
+      [Accounting.receipt_attachments.prefix_],
+    )
+
+    res.status(200).json({
+      success: true,
+
+      message: 'Receipt attachments retrieved successfully',
+
+      attachments: receipts_attachments,
+
+      count: receipts_attachments.length,
+
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching receipt attachments:', error)
+
+    return res.status(500).json({
+      success: false,
+
+      message: 'Server error while fetching receipt attachments',
 
       error:
         process.env.NODE_ENV === 'development'
@@ -2988,6 +3058,8 @@ module.exports = {
   getReceipts,
 
   getAllReceipts,
+
+  getReceiptAttachments,
 
   getPrintReceipts,
 

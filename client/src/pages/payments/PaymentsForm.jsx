@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -499,6 +499,7 @@ export default function PaymentsForm({
   const [remarks, setRemarks] = useState('')
 
   const [attachments, setAttachments] = useState([])
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false)
 
   const fileInputRef = useRef(null)
 
@@ -759,6 +760,49 @@ export default function PaymentsForm({
     }
   }, [isModalOpen])
 
+  // Lazy-load attachments with file data
+  const fetchPaymentAttachments = useCallback(async (paymentId) => {
+    if (!paymentId) return
+
+    try {
+      setAttachmentsLoading(true)
+      const token = sessionStorage.getItem('authenticated')
+      if (!token) throw new Error('No authorization token found')
+
+      const response = await fetch(API.paymentsAttachmentsById(paymentId), {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+
+      const result = await response.json()
+      if (!result.success) throw new Error(result.message || 'Failed to fetch attachments')
+
+      const attachmentsWithFiles = result.data.map((att) => ({
+        id: att.id,
+        fileName: att.name || '',
+        file: att.file || null,
+        remarks: att.remarks || '',
+        uploadedBy: att.uploaded_by || 'Current User',
+        date: att.uploaded_date || new Date().toLocaleDateString(),
+      }))
+
+      setAttachments(attachmentsWithFiles)
+    } catch (err) {
+      console.error('Error fetching payment attachments:', err)
+      setToast({
+        type: 'error',
+        message: err.message || 'Failed to load attachments',
+      })
+    } finally {
+      setAttachmentsLoading(false)
+    }
+  }, [setToast])
+
   // Auto-fill form from preSelectedPurchases (To Be Paid feature)
   useEffect(() => {
     if (
@@ -774,19 +818,17 @@ export default function PaymentsForm({
       const vendorName = firstPurchase.vendor_name || firstPurchase.vendor || ''
       const vendorId = firstPurchase.vendor_id || ''
 
-      vendors.forEach((v) => {
-
-      })
-
       const matchingVendor = vendors.find(
         (v) => v.name === vendorName || v.id === vendorId,
       )
       if (matchingVendor) {
+        setSelectedVendor(matchingVendor.id)
+        setVendorSearch(matchingVendor.name)
       } else {
-
+        // If no matching vendor found, select the first available vendor
         if (vendors.length > 0) {
           setSelectedVendor(vendors[0].id)
-          setVendorSearch(vendors[0].name) // Also set the display value
+          setVendorSearch(vendors[0].name)
         }
       }
 
@@ -941,21 +983,24 @@ export default function PaymentsForm({
 
       }
 
-      // Populate attachments - handle both direct attachments property and nested structure
+      // Populate attachments (metadata only, lazy-load file data)
       const attachmentsData = paymentData.attachments || []
       if (attachmentsData && attachmentsData.length > 0) {
-        const attachments = attachmentsData.map((att) => {
-
-          return {
-            id: att.id,
-            fileName: att.name || '', // Server now correctly sends name as filename
-            file: att.file || null, // Server now correctly sends file as base64 string
-            remarks: att.remarks || '',
-            uploadedBy: att.uploaded_by || 'Current User',
-            date: att.uploaded_date || new Date().toLocaleDateString(),
-          }
-        })
+        const attachments = attachmentsData.map((att) => ({
+          id: att.id,
+          fileName: att.name || '',
+          file: null, // Lazy-load file data
+          remarks: att.remarks || '',
+          uploadedBy: att.uploaded_by || 'Current User',
+          date: att.uploaded_date || new Date().toLocaleDateString(),
+        }))
         setAttachments(attachments)
+
+        // Lazy-load file data after metadata is set
+        const paymentId = payment?.id || paymentData.id
+        if (paymentId && (isViewMode || isEditMode)) {
+          fetchPaymentAttachments(paymentId)
+        }
       } else {
         setAttachments([]) // Explicitly set to empty array to prevent empty rows
       }
@@ -1344,19 +1389,27 @@ export default function PaymentsForm({
   }, [journalEntries, isEditMode])
 
   // ── Post Transaction ──────────────────────────────────────────────────────
-  const fileToBase64 = (file) =>
-    new Promise((resolve, reject) => {
-      // Validate that file is a Blob/File object
-      if (!file || !(file instanceof Blob)) {
-        reject(new Error('Invalid file: parameter is not a Blob or File object'))
-        return
-      }
-
-      const reader = new FileReader()
-      reader.readAsDataURL(file)
-      reader.onload = () => resolve(reader.result)
-      reader.onerror = (err) => reject(err)
-    })
+  const fileToBase64 = (file) => {
+    // If already a base64 string, return as-is
+    if (typeof file === 'string' && file.startsWith('data:')) {
+      return Promise.resolve(file)
+    }
+    // If null or undefined, return null
+    if (!file) {
+      return Promise.resolve(null)
+    }
+    // If File or Blob object, convert to base64
+    if (file instanceof File || file instanceof Blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.readAsDataURL(file)
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = (error) => reject(error)
+      })
+    }
+    // Fallback for any other type
+    return Promise.resolve(null)
+  }
 
   const handlePostTransaction = async () => {
     if (submittingRef.current) return
@@ -2572,7 +2625,15 @@ export default function PaymentsForm({
                     </span>
                   </div>
                   <div className="p-4">
-                    <div className="overflow-x-auto custom-table-scroller">
+                    {attachmentsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-full animate-spin"></div>
+                          <span className="text-xs text-gray-500 font-medium">Loading attachments...</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto custom-table-scroller">
                       <table
                         className="w-full text-center"
                         style={{ tableLayout: 'fixed', minWidth: 600 }}
@@ -2727,6 +2788,7 @@ export default function PaymentsForm({
                         </tbody>
                       </table>
                     </div>
+                    )}
                     {!isViewMode && (
                       <>
                         <input

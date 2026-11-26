@@ -636,7 +636,7 @@ function PaymentsContent() {
                   checkboxActions={[
                     {
                       label: 'Pay Selected',
-                      onClick: startPayForPurchases,
+                      onClick: (selectedRows) => startPayForPurchases(selectedRows),
                       style: 'red',
                     },
                   ]}

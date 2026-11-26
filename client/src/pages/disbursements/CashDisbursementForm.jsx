@@ -300,6 +300,7 @@ export default function CashDisbursementForm({
     disbursementItems,
     journalEntries,
     attachments,
+    attachmentsLoading,
     toast,
     setToast,
     imageModal,
@@ -1648,7 +1649,23 @@ export default function CashDisbursementForm({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
-                          {attachments.map((file) => (
+                          {attachmentsLoading ? (
+                            <tr>
+                              <td colSpan="5" className="py-8">
+                                <div className="flex flex-col items-center justify-center gap-3">
+                                  <div className="w-8 h-8 border-4 border-gray-200 border-t-red-600 rounded-full animate-spin"></div>
+                                  <span className="text-xs text-gray-500 font-medium">Loading attachments...</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : attachments.length === 0 ? (
+                            <tr>
+                              <td colSpan="5" className="py-6">
+                                <span className="text-gray-400 text-xs italic">No attachments yet</span>
+                              </td>
+                            </tr>
+                          ) : (
+                            attachments.map((file) => (
                             <tr key={file.id}>
                               <td className="py-2 px-1">
                                 <input
@@ -1749,7 +1766,7 @@ export default function CashDisbursementForm({
                                 )}
                               </td>
                             </tr>
-                          ))}
+                          )))}
                         </tbody>
                       </table>
                     </div>

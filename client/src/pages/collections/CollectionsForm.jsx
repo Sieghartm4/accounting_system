@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 
 import { motion } from 'framer-motion'
 
@@ -761,7 +761,47 @@ export default function CollectionsForm({
 
   const [attachments, setAttachments] = useState([])
 
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false)
+
   const fileInputRef = useRef(null)
+
+  // ── Attachment helpers ────────────────────────────────────────────────────
+
+  const fetchCollectionAttachments = useCallback(async (collectionId) => {
+    try {
+      setAttachmentsLoading(true)
+      const token = sessionStorage.getItem('authenticated')
+      if (!token) throw new Error('No authorization token found')
+
+      const res = await fetch(API.collectionsAttachmentsById(collectionId), {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+      const result = await res.json()
+
+      if (result.success) {
+        const attachmentsWithFiles = result.data.map((att) => ({
+          id: att.id,
+          fileName: att.name || '',
+          file: att.file || null,
+          remarks: att.remarks || '',
+          uploadedBy: att.uploaded_by || 'Current User',
+          date: att.uploaded_date || new Date().toLocaleDateString(),
+        }))
+
+        setAttachments(attachmentsWithFiles)
+      }
+    } catch (err) {
+      console.error('Error fetching collection attachments:', err)
+      setToast({
+        type: 'error',
+        message: 'Failed to load attachments',
+      })
+    } finally {
+      setAttachmentsLoading(false)
+    }
+  }, [])
 
   const handleAddAttachmentClick = () => {
     fileInputRef.current?.click()
@@ -1507,7 +1547,7 @@ export default function CollectionsForm({
 
 
 
-      // Populate attachments
+      // Populate attachments (metadata only, lazy-load file data)
 
       if (collectionData.attachments && collectionData.attachments.length > 0) {
 
@@ -1520,7 +1560,7 @@ export default function CollectionsForm({
 
             fileName: att.name || '', // Server now correctly sends name as filename
 
-            file: att.file || null, // Server now correctly sends file as base64 string
+            file: null, // Lazy-load file data later
 
             remarks: att.remarks || '',
 
@@ -1534,6 +1574,12 @@ export default function CollectionsForm({
 
         setAttachments(attachments)
 
+        // Lazy-load attachment file data
+        const collectionId = collectionData.data?.[0]?.id || collectionData.id
+        if (collectionId) {
+          fetchCollectionAttachments(collectionId)
+        }
+
       } else {
 
       }
@@ -1543,7 +1589,7 @@ export default function CollectionsForm({
 
     }
 
-  }, [isViewMode, isEditMode, collectionData])
+  }, [isViewMode, isEditMode, collectionData, fetchCollectionAttachments])
 
 
 
@@ -2089,14 +2135,22 @@ export default function CollectionsForm({
 
     new Promise((resolve, reject) => {
 
-      // Validate that file is a Blob/File object
-
-      if (!file || !(file instanceof Blob)) {
-
-        reject(new Error('Invalid file: parameter is not a Blob or File object'))
-
+      // Handle already base64-encoded strings
+      if (typeof file === 'string' && file.startsWith('data:')) {
+        resolve(file)
         return
+      }
 
+      // Handle null or undefined
+      if (!file) {
+        resolve(null)
+        return
+      }
+
+      // Validate that file is a Blob/File object
+      if (!(file instanceof Blob)) {
+        reject(new Error('Invalid file: parameter is not a Blob or File object'))
+        return
       }
 
 
@@ -3642,27 +3696,7 @@ export default function CollectionsForm({
                         style={{ tableLayout: 'fixed', minWidth: 1200 }}
 
                       >
-
-                        <colgroup>
-
-                          <col style={{ width: '10%' }} /> {/* ID */}
-
-                          <col style={{ width: '15%' }} /> {/* Doc Ref */}
-
-                          <col style={{ width: '15%' }} /> {/* Remarks */}
-
-                          <col style={{ width: '12%' }} /> {/* Amount Due */}
-
-                          <col style={{ width: '12%' }} /> {/* Paid Amount */}
-
-                          <col style={{ width: '12%' }} /> {/* Pending Collections */}
-
-                          <col style={{ width: '12%' }} /> {/* To Pay */}
-
-                          <col style={{ width: '6%' }} /> {/* Delete */}
-
-                        </colgroup>
-
+                        <colgroup><col style={{ width: '10%' }} /><col style={{ width: '15%' }} /><col style={{ width: '15%' }} /><col style={{ width: '12%' }} /><col style={{ width: '12%' }} /><col style={{ width: '12%' }} /><col style={{ width: '12%' }} /><col style={{ width: '6%' }} /></colgroup>
                         <thead className="bg-zinc-100 border-b border-zinc-200 uppercase font-bold text-zinc-700 tracking-wider">
 
                           <tr>
@@ -3995,21 +4029,7 @@ export default function CollectionsForm({
                         style={{ tableLayout: 'fixed', minWidth: 600 }}
 
                       >
-
-                        <colgroup>
-
-                          <col style={{ width: '35%' }} />
-
-                          <col style={{ width: '18%' }} />
-
-                          <col style={{ width: '18%' }} />
-
-                          <col style={{ width: '22%' }} />
-
-                          <col style={{ width: '6%' }} />
-
-                        </colgroup>
-
+                        <colgroup><col style={{ width: '35%' }} /><col style={{ width: '18%' }} /><col style={{ width: '18%' }} /><col style={{ width: '22%' }} /><col style={{ width: '6%' }} /></colgroup>
                         <thead className="bg-zinc-100 border-b border-zinc-200 uppercase font-bold text-zinc-600 tracking-wider">
 
                           <tr>
@@ -4397,21 +4417,7 @@ export default function CollectionsForm({
                         style={{ tableLayout: 'fixed', minWidth: 600 }}
 
                       >
-
-                        <colgroup>
-
-                          <col style={{ width: '25%' }} />
-
-                          <col style={{ width: '25%' }} />
-
-                          <col style={{ width: '25%' }} />
-
-                          <col style={{ width: '15%' }} />
-
-                          <col style={{ width: '10%' }} />
-
-                        </colgroup>
-
+                        <colgroup><col style={{ width: '25%' }} /><col style={{ width: '25%' }} /><col style={{ width: '25%' }} /><col style={{ width: '15%' }} /><col style={{ width: '10%' }} /></colgroup>
                         <thead>
 
                           <tr className="border-b border-gray-100">
@@ -4441,8 +4447,17 @@ export default function CollectionsForm({
                         </thead>
 
                         <tbody className="divide-y divide-gray-50">
-
-                          {attachments.map((file) => (
+                          {attachmentsLoading ? (
+                            <tr>
+                              <td colSpan="5" className="py-8">
+                                <div className="flex flex-col items-center justify-center gap-2">
+                                  <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                                  <span className="text-xs text-gray-500 font-medium">Loading attachments...</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            attachments.map((file) => (
 
                             <tr key={file.id}>
 
@@ -4629,7 +4644,8 @@ export default function CollectionsForm({
 
                             </tr>
 
-                          ))}
+                          ))
+                          )}
 
                         </tbody>
 
@@ -4794,25 +4810,7 @@ export default function CollectionsForm({
               <div className="max-h-[440px] overflow-y-auto custom-table-scroller">
 
                 <table className="w-full" style={{ tableLayout: 'fixed' }}>
-
-                  <colgroup>
-
-                    <col style={{ width: '5%' }} />
-
-                    <col style={{ width: '40%' }} />
-
-                    <col style={{ width: '18%' }} />
-
-                    <col style={{ width: '13%' }} />
-
-                    <col style={{ width: '16%' }} />
-
-                    <col style={{ width: '14%' }} />
-
-                    <col style={{ width: '14%' }} />
-
-                  </colgroup>
-
+                  <colgroup><col style={{ width: '5%' }} /><col style={{ width: '40%' }} /><col style={{ width: '18%' }} /><col style={{ width: '13%' }} /><col style={{ width: '16%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} /></colgroup>
                   <thead className="bg-black sticky top-0 z-10">
 
                     <tr>

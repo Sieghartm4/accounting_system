@@ -3,6 +3,7 @@ const { auth } = require('../middlewares/auth.middleware')
 const {
   getCollections,
   getAllCollections,
+  getCollectionAttachments,
   getUncollectedSales,
   getSalesCollection,
   getSalesItemsCollection,
@@ -24,6 +25,7 @@ collectionRouter.post('/', createCollection)
 collectionRouter.put('/collection-state', updateCollectionState)
 collectionRouter.put('/cancel-state', cancelCollectionState)
 collectionRouter.put('/:collection_id', updateCollection)
+collectionRouter.get('/:collection_id/attachments', getCollectionAttachments)
 collectionRouter.get('/:collection_id', getAllCollections)
 
 module.exports = {

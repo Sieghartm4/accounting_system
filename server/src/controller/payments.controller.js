@@ -741,8 +741,6 @@ const getAllPayments = async (req, res, next) => {
 
         { col: Accounting.payment_attachments.selectOptionColumns.name, as: 'name' },
 
-        { col: Accounting.payment_attachments.selectOptionColumns.file, as: 'file' },
-
         {
           col: Accounting.payment_attachments.selectOptionColumns.remarks,
           as: 'remarks',
@@ -795,6 +793,73 @@ const getAllPayments = async (req, res, next) => {
       success: false,
 
       message: 'Server error while fetching payment',
+
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const getPaymentAttachments = async (req, res, next) => {
+  const { payment_id } = req.params
+
+  try {
+    const payment_attachments_query = sql
+      .select([
+        { col: Accounting.payment_attachments.selectOptionColumns.id, as: 'id' },
+
+        { col: Accounting.payment_attachments.selectOptionColumns.name, as: 'name' },
+
+        { col: Accounting.payment_attachments.selectOptionColumns.file, as: 'file' },
+
+        {
+          col: Accounting.payment_attachments.selectOptionColumns.remarks,
+          as: 'remarks',
+        },
+
+        {
+          col: Accounting.payment_attachments.selectOptionColumns.uploaded_by,
+          as: 'uploaded_by',
+        },
+
+        {
+          col: Accounting.payment_attachments.selectOptionColumns.uploaded_date,
+          as: 'uploaded_date',
+        },
+      ])
+
+      .from(Accounting.payment_attachments.tablename)
+
+      .where(Accounting.payment_attachments.selectOptionColumns.payment_id)
+
+      .build()
+
+    let payment_attachments = await Query(
+      payment_attachments_query,
+      [payment_id],
+      [Accounting.payment_attachments.prefix_],
+    )
+
+    res.status(200).json({
+      success: true,
+
+      message: 'Payment attachments retrieved successfully',
+
+      data: payment_attachments,
+
+      count: payment_attachments.length,
+
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching payment attachments:', error)
+
+    return res.status(500).json({
+      success: false,
+
+      message: 'Server error while fetching payment attachments',
 
       error:
         process.env.NODE_ENV === 'development'
@@ -3227,4 +3292,6 @@ module.exports = {
   cancelPaymentState,
 
   getPrintPayments,
+
+  getPaymentAttachments,
 }

@@ -241,7 +241,7 @@ const getAdjustmentById = async (req, res, next) => {
       [Accounting.adjustments.prefix_],
     )
 
-    // Attachments query
+    // Attachments query (without file data for lazy loading)
     const adjustment_attachments_query = sql
       .select([
         { col: Accounting.adjustment_attachments.selectOptionColumns.id, as: 'id' },
@@ -249,10 +249,11 @@ const getAdjustmentById = async (req, res, next) => {
           col: Accounting.adjustment_attachments.selectOptionColumns.name,
           as: 'name',
         },
-        {
-          col: Accounting.adjustment_attachments.selectOptionColumns.file,
-          as: 'file',
-        },
+        // File column excluded for lazy loading - fetch separately via attachments endpoint
+        // {
+        //   col: Accounting.adjustment_attachments.selectOptionColumns.file,
+        //   as: 'file',
+        // },
         {
           col: Accounting.adjustment_attachments.selectOptionColumns.remarks,
           as: 'remarks',
@@ -322,6 +323,66 @@ const getAdjustmentById = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching adjustment',
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const getAdjustmentAttachments = async (req, res, next) => {
+  const { adjustment_id } = req.params
+
+  const adjustmentId = adjustment_id
+
+  try {
+    const adjustment_attachments_query = sql
+      .select([
+        { col: Accounting.adjustment_attachments.selectOptionColumns.id, as: 'id' },
+        {
+          col: Accounting.adjustment_attachments.selectOptionColumns.name,
+          as: 'name',
+        },
+        {
+          col: Accounting.adjustment_attachments.selectOptionColumns.file,
+          as: 'file',
+        },
+        {
+          col: Accounting.adjustment_attachments.selectOptionColumns.remarks,
+          as: 'remarks',
+        },
+        {
+          col: Accounting.adjustment_attachments.selectOptionColumns.uploaded_by,
+          as: 'uploaded_by',
+        },
+        {
+          col: Accounting.adjustment_attachments.selectOptionColumns.uploaded_date,
+          as: 'uploaded_date',
+        },
+      ])
+      .from(Accounting.adjustment_attachments.tablename)
+      .where(Accounting.adjustment_attachments.selectOptionColumns.adjustment_id)
+      .build()
+
+    let adjustment_attachments = await Query(
+      adjustment_attachments_query,
+      [adjustmentId],
+      [Accounting.adjustment_attachments.prefix_],
+    )
+
+    res.status(200).json({
+      success: true,
+      message: 'Adjustment attachments retrieved successfully',
+      attachments: adjustment_attachments,
+      count: adjustment_attachments.length,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching adjustment attachments:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching adjustment attachments',
       error:
         process.env.NODE_ENV === 'development'
           ? error.message
@@ -1475,6 +1536,7 @@ const updateAdjustmentData = async (req, res, next) => {
 module.exports = {
   getAdjustments,
   getAdjustmentById,
+  getAdjustmentAttachments,
   createAdjustment,
   updateAdjustment,
   updateAdjustmentData,

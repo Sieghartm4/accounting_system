@@ -850,6 +850,7 @@ export default function useSalesForm({
   const [dateDue, setDateDue] = useState('')
   const [remarks, setRemarks] = useState('')
   const [attachments, setAttachments] = useState([])
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false)
   const [toast, setToast] = useState(null)
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' })
   const lastJournalGenerationRef = useRef(null)
@@ -1665,6 +1666,50 @@ export default function useSalesForm({
     // applied only when the user submits the transaction if the fields are blank.
   }, [salesItems, vatOptions, whtOptions])
 
+  const fetchSalesAttachments = async (salesId) => {
+    try {
+      setAttachmentsLoading(true)
+      const token = sessionStorage.getItem('authenticated')
+      if (!token) throw new Error('No authorization token found')
+
+      const response = await fetch(
+        API.salesAttachmentsById(salesId),
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
+        setAttachments(
+          result.attachments.map((att) => ({
+            id: att.id,
+            fileName: att.name || '',
+            file: att.file || null,
+            remarks: att.remarks || '',
+            uploadedBy: att.uploaded_by || 'Current User',
+            date: att.uploaded_date || new Date().toLocaleDateString(),
+          })),
+        )
+      } else {
+        console.error('Failed to fetch attachments:', result.message)
+      }
+    } catch (err) {
+      console.error('Error fetching sales attachments:', err)
+    } finally {
+      setAttachmentsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if ((isViewMode || isEditMode) && salesData) {
       const mainData = salesData.data ? salesData.data[0] : salesData
@@ -1754,20 +1799,26 @@ export default function useSalesForm({
         )
       }
 
-      if (attachmentsData.length > 0) {
+      if (attachmentsData && attachmentsData.length > 0) {
+        // Set attachments without file data first (metadata only)
         setAttachments(
           attachmentsData.map((att) => ({
             id: att.id,
             fileName: att.name || '',
-            file: att.file || null,
+            file: null, // File data will be loaded separately
             remarks: att.remarks || '',
             uploadedBy: att.uploaded_by || 'Current User',
             date: att.uploaded_date || new Date().toLocaleDateString(),
           })),
         )
+        // Lazy load attachment file data when in view/edit mode
+        if (mainData && mainData.id) {
+          fetchSalesAttachments(mainData.id)
+        }
       }
     }
-  }, [isViewMode, isEditMode, salesData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isViewMode, salesData])
 
   useEffect(() => {
     if (isViewMode) return
@@ -1881,6 +1932,7 @@ export default function useSalesForm({
     remarks,
     setRemarks,
     attachments,
+    attachmentsLoading,
     toast,
     setToast,
     imageModal,

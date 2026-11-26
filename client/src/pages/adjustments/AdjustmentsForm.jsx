@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -414,6 +414,7 @@ export default function AdjustmentsForm({
   const [isJournalEntriesCollapsed, setIsJournalEntriesCollapsed] = useState(false)
 
   const [attachments, setAttachments] = useState([])
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false)
   const uploadInputRef = useRef(null)
   const fileInputRef = useRef(null)
 
@@ -491,20 +492,25 @@ export default function AdjustmentsForm({
         setJournalEntries(journal)
       }
 
-      // Populate attachments
+      // Populate attachments (metadata only, file data loaded separately)
       if (adjustmentData.attachments && adjustmentData.attachments.length > 0) {
         const attachments = adjustmentData.attachments.map((att) => {
 
           return {
             id: att.id,
             fileName: att.name || '',
-            file: att.file || null,
+            file: null, // File data will be loaded separately
             remarks: att.remarks || '',
             uploadedBy: att.uploaded_by || 'Current User',
             date: att.uploaded_date || new Date().toLocaleDateString(),
           }
         })
         setAttachments(attachments)
+        // Lazy load attachment file data when in view/edit mode
+        if (adjustmentData.data && adjustmentData.data.length > 0) {
+          const adjustmentId = adjustmentData.data[0].id
+          fetchAdjustmentAttachments(adjustmentId)
+        }
       }
     }
   }, [isViewMode, isEditMode, adjustmentData])
@@ -773,6 +779,10 @@ export default function AdjustmentsForm({
 
   // ── Post Transaction ──────────────────────────────────────────────────────
   const fileToBase64 = (file) => {
+    // If file is null or undefined, return null
+    if (!file) {
+      return Promise.resolve(null)
+    }
     // If file is already a base64 string (from database), return it directly
     if (typeof file === 'string' && file.startsWith('data:')) {
       return Promise.resolve(file)
@@ -785,6 +795,50 @@ export default function AdjustmentsForm({
       reader.onerror = (err) => reject(err)
     })
   }
+
+  const fetchAdjustmentAttachments = useCallback(async (adjustmentId) => {
+    try {
+      setAttachmentsLoading(true)
+      const token = sessionStorage.getItem('authenticated')
+      if (!token) throw new Error('No authorization token found')
+
+      const response = await fetch(
+        API.adjustmentsAttachmentsById(adjustmentId),
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
+        setAttachments(
+          result.attachments.map((att) => ({
+            id: att.id,
+            fileName: att.name || '',
+            file: att.file || null,
+            remarks: att.remarks || '',
+            uploadedBy: att.uploaded_by || 'Current User',
+            date: att.uploaded_date || new Date().toLocaleDateString(),
+          })),
+        )
+      } else {
+        console.error('Failed to fetch attachments:', result.message)
+      }
+    } catch (err) {
+      console.error('Error fetching adjustment attachments:', err)
+    } finally {
+      setAttachmentsLoading(false)
+    }
+  }, [])
 
   const handlePostTransaction = async () => {
     if (submittingRef.current) return
@@ -805,44 +859,53 @@ export default function AdjustmentsForm({
         return
       }
 
-      // Check if journal entries are balanced
-      const totalDebit = journalEntries.reduce(
-        (sum, entry) => sum + (parseFloat(entry.debit) || 0),
-        0,
-      )
-      const totalCredit = journalEntries.reduce(
-        (sum, entry) => sum + (parseFloat(entry.credit) || 0),
-        0,
-      )
+      // When editing a posted/approved document, skip journal entry validation
+      const isPostedDocument = isEditMode && adjustmentData && isPostedLocked
 
-      if (Math.abs(totalDebit - totalCredit) > 0.01) {
-        // Allow for small floating point differences
-        setToast({
-          type: 'warning',
-          message:
-            'Journal entries must be balanced. Total debits must equal total credits.',
-        })
-        return
-      }
+      let totalDebit = 0
+      let preparedJournalEntries = []
+      let createdBy = ''
 
-      const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
-      const createdBy = userData.mu_username || userData.username || 'Unknown User'
+      if (!isPostedDocument) {
+        // Check if journal entries are balanced
+        totalDebit = journalEntries.reduce(
+          (sum, entry) => sum + (parseFloat(entry.debit) || 0),
+          0,
+        )
+        const totalCredit = journalEntries.reduce(
+          (sum, entry) => sum + (parseFloat(entry.credit) || 0),
+          0,
+        )
 
-      const preparedJournalEntries = journalEntries.map((entry) => {
-        const rawAccountValue = entry.account || entry.accountSearch || ''
-        const accountValue = String(rawAccountValue || '').trim()
-        const resolvedAccountId =
-          accountValue && !Number.isNaN(Number(accountValue))
-            ? Number(accountValue)
-            : findCoaIdByLabel(accountValue)
-
-        return {
-          account_id: resolvedAccountId || null,
-          responsibility_center: entry.center || '',
-          debit: parseFloat(entry.debit) || 0,
-          credit: parseFloat(entry.credit) || 0,
+        if (Math.abs(totalDebit - totalCredit) > 0.01) {
+          // Allow for small floating point differences
+          setToast({
+            type: 'warning',
+            message:
+              'Journal entries must be balanced. Total debits must equal total credits.',
+          })
+          return
         }
-      })
+
+        const userData = JSON.parse(sessionStorage.getItem('auth_user') || '{}')
+        createdBy = userData.mu_username || userData.username || 'Unknown User'
+
+        preparedJournalEntries = journalEntries.map((entry) => {
+          const rawAccountValue = entry.account || entry.accountSearch || ''
+          const accountValue = String(rawAccountValue || '').trim()
+          const resolvedAccountId =
+            accountValue && !Number.isNaN(Number(accountValue))
+              ? Number(accountValue)
+              : findCoaIdByLabel(accountValue)
+
+          return {
+            account_id: resolvedAccountId || null,
+            responsibility_center: entry.center || '',
+            debit: parseFloat(entry.debit) || 0,
+            credit: parseFloat(entry.credit) || 0,
+          }
+        })
+      }
 
       const preparedAttachments = await Promise.all(
         attachments.map(async (att) => ({
@@ -855,16 +918,28 @@ export default function AdjustmentsForm({
       )
 
       // ── adjustment header payload ──
-      const adjustmentPayload = {
-        document_reference: documentReference || null,
-        posting_date: postingDate || new Date().toISOString().split('T')[0],
-        remarks: remarks,
-        status: 'PREPARED BY',
-        total_amount: totalDebit, // Use total debit as the adjustment amount
-        created_by: createdBy,
-        adjustment_attachments: preparedAttachments,
-        journal_entries: preparedJournalEntries,
-      }
+      // When editing a posted/approved document, only allow editing remarks, attachments, and document_reference
+      // However, we must include posting_date and total_amount for backend validation (using original values)
+      const adjustmentPayload = isPostedDocument
+        ? {
+            // Include original posting_date and total_amount for backend validation
+            document_reference: documentReference || null,
+            posting_date: adjustmentData?.data?.[0]?.posting_date || postingDate || new Date().toISOString().split('T')[0],
+            remarks: remarks,
+            total_amount: adjustmentData?.data?.[0]?.total_amount || 0,
+            adjustment_attachments: preparedAttachments,
+          }
+        : {
+            // Full payload for non-posted documents
+            document_reference: documentReference || null,
+            posting_date: postingDate || new Date().toISOString().split('T')[0],
+            remarks: remarks,
+            status: 'PREPARED BY',
+            total_amount: totalDebit, // Use total debit as the adjustment amount
+            created_by: createdBy,
+            adjustment_attachments: preparedAttachments,
+            journal_entries: preparedJournalEntries,
+          }
 
       const url =
         isEditMode && adjustmentData
@@ -1426,7 +1501,23 @@ export default function AdjustmentsForm({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
-                          {attachments.map((file) => (
+                          {attachmentsLoading ? (
+                            <tr>
+                              <td colSpan="5" className="py-8">
+                                <div className="flex flex-col items-center justify-center gap-3">
+                                  <div className="w-8 h-8 border-4 border-gray-200 border-t-red-600 rounded-full animate-spin"></div>
+                                  <span className="text-xs text-gray-500 font-medium">Loading attachments...</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : attachments.length === 0 ? (
+                            <tr>
+                              <td colSpan="5" className="py-6">
+                                <span className="text-gray-400 text-xs italic">No attachments yet</span>
+                              </td>
+                            </tr>
+                          ) : (
+                            attachments.map((file) => (
                             <tr key={file.id}>
                               <td className="py-2 px-1">
                                 <input
@@ -1527,7 +1618,7 @@ export default function AdjustmentsForm({
                                 )}
                               </td>
                             </tr>
-                          ))}
+                          )))}
                         </tbody>
                       </table>
                     </div>

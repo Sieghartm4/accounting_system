@@ -4,6 +4,7 @@ const { requireAnyModule } = require('../middlewares/entitlement.middleware')
 const {
   getSales,
   getAllSales,
+  getSalesAttachments,
   createSales,
   updateSalesState,
   cancelSalesState,
@@ -36,8 +37,9 @@ const requireAgingModule = requireAnyModule([
 ])
 
 salesRouter.get('/aging', requireAgingModule, getAgingReceivables)
-salesRouter.get('/print/:sales_id', getPrintSales)
+salesRouter.get('/:sales_id/attachments', getSalesAttachments)
 salesRouter.get('/:id', getAllSales)
+salesRouter.get('/print/:sales_id', getPrintSales)
 salesRouter.post('/', createSales)
 salesRouter.put('/sales-state', updateSalesState)
 salesRouter.put('/cancel-state', cancelSalesState)

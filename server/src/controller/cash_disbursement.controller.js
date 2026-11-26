@@ -468,10 +468,11 @@ const getAllCashDisbursements = async (req, res, next) => {
           as: 'id',
         },
 
-        {
-          col: Accounting.cash_disbursement_attachments.selectOptionColumns.file,
-          as: 'file',
-        },
+        // File column excluded for lazy loading - fetch separately via attachments endpoint
+        // {
+        //   col: Accounting.cash_disbursement_attachments.selectOptionColumns.file,
+        //   as: 'file',
+        // },
 
         {
           col: Accounting.cash_disbursement_attachments.selectOptionColumns.name,
@@ -536,6 +537,80 @@ const getAllCashDisbursements = async (req, res, next) => {
       success: false,
 
       message: 'Server error while fetching receipts',
+
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const getCashDisbursementAttachments = async (req, res, next) => {
+  const { cash_disbursement_id } = req.params
+
+  const cashDisbursementId = cash_disbursement_id
+
+  try {
+    const cash_disbursement_attachments_query = sql
+      .select([
+        { col: Accounting.cash_disbursement_attachments.selectOptionColumns.id, as: 'id' },
+
+        { col: Accounting.cash_disbursement_attachments.selectOptionColumns.file, as: 'file' },
+
+        { col: Accounting.cash_disbursement_attachments.selectOptionColumns.name, as: 'name' },
+
+        {
+          col: Accounting.cash_disbursement_attachments.selectOptionColumns.remarks,
+          as: 'remarks',
+        },
+
+        {
+          col: Accounting.cash_disbursement_attachments.selectOptionColumns
+            .uploaded_by,
+          as: 'uploaded_by',
+        },
+
+        {
+          col: Accounting.cash_disbursement_attachments.selectOptionColumns
+            .uploaded_date,
+          as: 'uploaded_date',
+        },
+      ])
+
+      .from(Accounting.cash_disbursement_attachments.tablename)
+
+      .where(
+        Accounting.cash_disbursement_attachments.selectOptionColumns
+          .cash_disburssement_id,
+      )
+
+      .build()
+
+    let cash_disbursement_attachments = await Query(
+      cash_disbursement_attachments_query,
+      [cashDisbursementId],
+      [Accounting.cash_disbursement_attachments.prefix_],
+    )
+
+    res.status(200).json({
+      success: true,
+
+      message: 'Cash disbursement attachments retrieved successfully',
+
+      attachments: cash_disbursement_attachments,
+
+      count: cash_disbursement_attachments.length,
+
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching cash disbursement attachments:', error)
+
+    return res.status(500).json({
+      success: false,
+
+      message: 'Server error while fetching cash disbursement attachments',
 
       error:
         process.env.NODE_ENV === 'development'
@@ -2963,6 +3038,8 @@ module.exports = {
   getCashDisbursements,
 
   getAllCashDisbursements,
+
+  getCashDisbursementAttachments,
 
   createCashDisbursement,
 

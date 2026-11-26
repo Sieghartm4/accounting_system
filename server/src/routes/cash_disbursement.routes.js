@@ -1,9 +1,10 @@
 const express = require('express')
-const { getCashDisbursements, createCashDisbursement, updateCashDisbursement, updateDisbursementState, cancelDisbursementState, getAllCashDisbursements, getPrintDisbursements } = require('../controller/cash_disbursement.controller')
+const { getCashDisbursements, createCashDisbursement, updateCashDisbursement, updateDisbursementState, cancelDisbursementState, getAllCashDisbursements, getPrintDisbursements, getCashDisbursementAttachments } = require('../controller/cash_disbursement.controller')
 
 const cashDisbursementRouter = express.Router()
 
 cashDisbursementRouter.get('/', getCashDisbursements)
+cashDisbursementRouter.get('/:cash_disbursement_id/attachments', getCashDisbursementAttachments)
 cashDisbursementRouter.get('/:cash_disbursement_id', getAllCashDisbursements)
 cashDisbursementRouter.post('/', createCashDisbursement)
 cashDisbursementRouter.put('/disbursement-state', updateDisbursementState)

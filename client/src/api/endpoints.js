@@ -176,12 +176,14 @@ export const API = {
   // --- Adjustments ---
   adjustments: () => url('/adjustments'),
   adjustmentsById: (id) => url(`/adjustments/${id}`),
+  adjustmentsAttachmentsById: (id) => url(`/adjustments/${id}/attachments`),
   adjustmentsState: () => url('/adjustments/adjustment-state'),
   adjustmentsCancelState: () => url('/adjustments/cancel-state'),
 
   // --- Cash receipts (AR) ---
   receipt: () => url('/receipt'),
   receiptById: (id) => url(`/receipt/${id}`),
+  receiptAttachmentsById: (id) => url(`/receipt/${id}/attachments`),
   receiptState: () => url('/receipt/receipt-state'),
   receiptCancelState: () => url('/receipt/cancel-state'),
   receiptPrint: (ids) => url(`/receipt/print/${ids}`),
@@ -189,6 +191,7 @@ export const API = {
   // --- Sales (AR) ---
   sales: () => url('/sales'),
   salesById: (id) => url(`/sales/${id}`),
+  salesAttachmentsById: (id) => url(`/sales/${id}/attachments`),
   salesState: () => url('/sales/sales-state'),
   salesCancelState: () => url('/sales/cancel-state'),
   salesPrint: (ids) => url(`/sales/print/${ids}`),
@@ -196,6 +199,7 @@ export const API = {
   // --- Collections (AR) ---
   collections: () => url('/collections'),
   collectionsById: (id) => url(`/collections/${id}`),
+  collectionsAttachmentsById: (id) => url(`/collections/${id}/attachments`),
   collectionsState: () => url('/collections/collection-state'),
   collectionsCancelState: () => url('/collections/cancel-state'),
   collectionsPrint: (ids) => url(`/collections/print/${ids}`),
@@ -205,6 +209,7 @@ export const API = {
   // --- Purchase (AP) ---
   purchase: () => url('/purchase'),
   purchaseById: (id) => url(`/purchase/${id}`),
+  purchaseAttachmentsById: (id) => url(`/purchase/${id}/attachments`),
   purchaseState: () => url('/purchase/purchase-state'),
   purchaseCancelState: () => url('/purchase/cancel-state'),
   purchasePrint: (ids) => url(`/purchase/print/${ids}`),
@@ -217,6 +222,7 @@ export const API = {
   // --- Payments (AP) ---
   payments: () => url('/payments'),
   paymentsById: (id) => url(`/payments/${id}`),
+  paymentsAttachmentsById: (id) => url(`/payments/${id}/attachments`),
   paymentsState: () => url('/payments/payment-state'),
   paymentsCancelState: () => url('/payments/cancel-state'),
   paymentsPrint: (ids) => url(`/payments/print/${ids}`),
@@ -225,6 +231,7 @@ export const API = {
   // --- Cash disbursements (AP) ---
   cashDisbursements: () => url('/cash_disbursements'),
   cashDisbursementsById: (id) => url(`/cash_disbursements/${id}`),
+  cashDisbursementsAttachmentsById: (id) => url(`/cash_disbursements/${id}/attachments`),
   cashDisbursementsState: () => url('/cash_disbursements/disbursement-state'),
   cashDisbursementsCancelState: () => url('/cash_disbursements/cancel-state'),
   cashDisbursementsPrint: (ids) => url(`/cash_disbursements/print/${ids}`),

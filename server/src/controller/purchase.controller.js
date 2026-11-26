@@ -1311,16 +1311,6 @@ const getAllPurchase = async (req, res, next) => {
 
         {
 
-          col: Accounting.purchase_attachments.selectOptionColumns.file,
-
-          as: 'file',
-
-        },
-
-
-
-        {
-
           col: Accounting.purchase_attachments.selectOptionColumns.name,
 
           as: 'name',
@@ -1433,6 +1423,137 @@ const getAllPurchase = async (req, res, next) => {
 
 
       message: 'Server error while fetching purchase',
+
+
+
+      error:
+
+        process.env.NODE_ENV === 'development'
+
+          ? error.message
+
+          : 'Internal server error',
+
+    })
+
+  }
+
+}
+
+
+
+const getPurchaseAttachments = async (req, res, next) => {
+  const { purchase_id } = req.params
+
+  try {
+    const purchase_attachments_query = sql
+
+      .select([
+
+        { col: Accounting.purchase_attachments.selectOptionColumns.id, as: 'id' },
+
+        {
+
+          col: Accounting.purchase_attachments.selectOptionColumns.file,
+
+          as: 'file',
+
+        },
+
+        {
+
+          col: Accounting.purchase_attachments.selectOptionColumns.name,
+
+          as: 'name',
+
+        },
+
+        {
+
+          col: Accounting.purchase_attachments.selectOptionColumns.remarks,
+
+          as: 'remarks',
+
+        },
+
+        {
+
+          col: Accounting.purchase_attachments.selectOptionColumns.uploaded_by,
+
+          as: 'uploaded_by',
+
+        },
+
+        {
+
+          col: Accounting.purchase_attachments.selectOptionColumns.uploaded_date,
+
+          as: 'uploaded_date',
+
+        },
+      ])
+
+
+
+      .from(Accounting.purchase_attachments.tablename)
+
+
+
+      .where(Accounting.purchase_attachments.selectOptionColumns.purchase_id)
+
+
+
+      .build()
+
+
+
+    let purchase_attachments = await Query(
+
+      purchase_attachments_query,
+
+      [purchase_id],
+
+      [Accounting.purchase_attachments.prefix_],
+
+    )
+
+
+
+    res.status(200).json({
+
+      success: true,
+
+
+
+      message: 'Purchase attachments retrieved successfully',
+
+
+
+      data: purchase_attachments,
+
+
+
+      count: purchase_attachments.length,
+
+
+
+      timestamp: new Date().toISOString(),
+
+    })
+
+  } catch (error) {
+
+    console.error('Error fetching purchase attachments:', error)
+
+
+
+    return res.status(500).json({
+
+      success: false,
+
+
+
+      message: 'Server error while fetching purchase attachments',
 
 
 
@@ -6502,6 +6623,8 @@ module.exports = {
   getPrintPurchases,
 
   getAgingPayables,
+
+  getPurchaseAttachments,
 
 }
 

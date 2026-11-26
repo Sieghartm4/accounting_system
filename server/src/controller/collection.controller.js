@@ -786,11 +786,6 @@ const getAllCollections = async (req, res, next) => {
         },
 
         {
-          col: Accounting.collection_attachments.selectOptionColumns.file,
-          as: 'file',
-        },
-
-        {
           col: Accounting.collection_attachments.selectOptionColumns.remarks,
           as: 'remarks',
         },
@@ -843,6 +838,80 @@ const getAllCollections = async (req, res, next) => {
 
       message: 'Server error while fetching collection',
 
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const getCollectionAttachments = async (req, res, next) => {
+  const { collection_id } = req.params
+
+  if (!collection_id) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid collection ID provided',
+      timestamp: new Date().toISOString(),
+    })
+  }
+
+  try {
+    const collection_attachments_query = sql
+      .select([
+        { col: Accounting.collection_attachments.selectOptionColumns.id, as: 'id' },
+
+        {
+          col: Accounting.collection_attachments.selectOptionColumns.name,
+          as: 'name',
+        },
+
+        {
+          col: Accounting.collection_attachments.selectOptionColumns.file,
+          as: 'file',
+        },
+
+        {
+          col: Accounting.collection_attachments.selectOptionColumns.remarks,
+          as: 'remarks',
+        },
+
+        {
+          col: Accounting.collection_attachments.selectOptionColumns.uploaded_by,
+          as: 'uploaded_by',
+        },
+
+        {
+          col: Accounting.collection_attachments.selectOptionColumns.uploaded_date,
+          as: 'uploaded_date',
+        },
+      ])
+
+      .from(Accounting.collection_attachments.tablename)
+
+      .where(Accounting.collection_attachments.selectOptionColumns.collection_id)
+
+      .build()
+
+    let collection_attachments = await Query(
+      collection_attachments_query,
+      [collection_id],
+      [Accounting.collection_attachments.prefix_],
+    )
+
+    res.status(200).json({
+      success: true,
+      message: 'Collection attachments retrieved successfully',
+      data: collection_attachments,
+      count: collection_attachments.length,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching collection attachments:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching collection attachments',
       error:
         process.env.NODE_ENV === 'development'
           ? error.message
@@ -3194,6 +3263,8 @@ module.exports = {
   getCollections,
 
   getAllCollections,
+
+  getCollectionAttachments,
 
   getUncollectedSales,
 

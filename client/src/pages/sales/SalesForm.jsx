@@ -1839,108 +1839,125 @@ export default function SalesForm({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
-                          {form.attachments.map((file) => (
-                            <tr key={file.id}>
-                              <td className="py-2 px-1">
-                                <input
-                                  disabled={isDisabled}
-                                  className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                  placeholder="e.g. Invoice_Scan"
-                                  value={file.fileName}
-                                  onChange={(e) =>
-                                    form.updateAttachment(
-                                      file.id,
-                                      'fileName',
-                                      e.target.value,
-                                    )
-                                  }
-                                />
-                              </td>
-                              <td className="py-2 px-1">
-                                {isDisabled ? (
-                                  <div
-                                    className={`${tableInput} text-black cursor-not-allowed flex items-center justify-center`}
-                                  >
-                                    {file.file &&
-                                      typeof file.file === 'string' &&
-                                      file.file.startsWith('data:image/') ? (
-                                      <>
-                                        <img
-                                          src={file.file}
-                                          alt={file.fileName || 'Attachment'}
-                                          className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
-                                          onClick={() =>
-                                            form.setImageModal({
-                                              isOpen: true,
-                                              imageSrc: file.file,
-                                            })
-                                          }
-                                          title="Click to view full size"
-                                        />
-                                      </>
-                                    ) : file.file && typeof file.file === 'string' ? (
-                                      <div className="flex flex-col items-center">
-                                        <span
-                                          className="text-blue-600 text-[11px] font-bold cursor-pointer hover:underline break-all text-center leading-tight"
-                                          onClick={() => openDataUrl(file.file, file.fileName || 'attachment')}
-                                          title="Click to open file"
-                                        >
-                                          {file.fileName || 'Unnamed file'}
-                                        </span>
-                                        <span className="text-[8px] text-gray-500">
-                                          {Math.round(file.file.length / 1024)}KB
-                                        </span>
-                                      </div>
-                                    ) : file.file ? (
-                                      <span className="text-orange-600 text-[11px] font-bold">
-                                        Invalid file data
-                                      </span>
-                                    ) : (
-                                      <span className="text-gray-400 text-[11px] italic">
-                                        No file
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <input
-                                    type="file"
-                                    className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full"
-                                    onChange={(e) =>
-                                      form.handleFileChange(file.id, e.target.files[0])
-                                    }
-                                  />
-                                )}
-                              </td>
-                              <td className="py-2 px-1">
-                                <input
-                                  disabled={isDisabled}
-                                  className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
-                                  placeholder="Add note..."
-                                  value={file.remarks}
-                                  onChange={(e) =>
-                                    form.updateAttachment(
-                                      file.id,
-                                      'remarks',
-                                      e.target.value,
-                                    )
-                                  }
-                                />
-                              </td>
-                              <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">
-                                {file.uploadedBy}
-                              </td>
-                              <td className="py-2 text-center">
-                                {!isDisabled && (
-                                  <button
-                                    onClick={() => form.removeAttachment(file.id)}
-                                    className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                  >
-                                    <Trash2 size={15} />
-                                  </button>
-                                )}
+                          {form.attachmentsLoading ? (
+                            <tr>
+                              <td colSpan="5" className="py-8">
+                                <div className="flex flex-col items-center justify-center gap-3">
+                                  <div className="w-8 h-8 border-4 border-gray-200 border-t-red-600 rounded-full animate-spin"></div>
+                                  <span className="text-xs text-gray-500 font-medium">Loading attachments...</span>
+                                </div>
                               </td>
                             </tr>
-                          ))}
+                          ) : form.attachments.length === 0 ? (
+                            <tr>
+                              <td colSpan="5" className="py-6">
+                                <span className="text-gray-400 text-xs italic">No attachments yet</span>
+                              </td>
+                            </tr>
+                          ) : (
+                            form.attachments.map((file) => (
+                              <tr key={file.id}>
+                                <td className="py-2 px-1">
+                                  <input
+                                    disabled={isDisabled}
+                                    className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    placeholder="e.g. Invoice_Scan"
+                                    value={file.fileName}
+                                    onChange={(e) =>
+                                      form.updateAttachment(
+                                        file.id,
+                                        'fileName',
+                                        e.target.value,
+                                      )
+                                    }
+                                  />
+                                </td>
+                                <td className="py-2 px-1">
+                                  {isDisabled ? (
+                                    <div
+                                      className={`${tableInput} text-black cursor-not-allowed flex items-center justify-center`}
+                                    >
+                                      {file.file &&
+                                        typeof file.file === 'string' &&
+                                        file.file.startsWith('data:image/') ? (
+                                        <>
+                                          <img
+                                            src={file.file}
+                                            alt={file.fileName || 'Attachment'}
+                                            className="max-h-16 max-w-full object-contain cursor-pointer hover:scale-105 transition-transform"
+                                            onClick={() =>
+                                              form.setImageModal({
+                                                isOpen: true,
+                                                imageSrc: file.file,
+                                              })
+                                            }
+                                            title="Click to view full size"
+                                          />
+                                        </>
+                                      ) : file.file && typeof file.file === 'string' ? (
+                                        <div className="flex flex-col items-center">
+                                          <span
+                                            className="text-blue-600 text-[11px] font-bold cursor-pointer hover:underline break-all text-center leading-tight"
+                                            onClick={() => openDataUrl(file.file, file.fileName || 'attachment')}
+                                            title="Click to open file"
+                                          >
+                                            {file.fileName || 'Unnamed file'}
+                                          </span>
+                                          <span className="text-[8px] text-gray-500">
+                                            {Math.round(file.file.length / 1024)}KB
+                                          </span>
+                                        </div>
+                                      ) : file.file ? (
+                                        <span className="text-orange-600 text-[11px] font-bold">
+                                          Invalid file data
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-400 text-[11px] italic">
+                                          No file
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <input
+                                      type="file"
+                                      className="text-[11px] font-bold text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-black file:text-white cursor-pointer w-full"
+                                      onChange={(e) =>
+                                        form.handleFileChange(file.id, e.target.files[0])
+                                      }
+                                    />
+                                  )}
+                                </td>
+                                <td className="py-2 px-1">
+                                  <input
+                                    disabled={isDisabled}
+                                    className={`${tableInput} ${isDisabled ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                    placeholder="Add note..."
+                                    value={file.remarks}
+                                    onChange={(e) =>
+                                      form.updateAttachment(
+                                        file.id,
+                                        'remarks',
+                                        e.target.value,
+                                      )
+                                    }
+                                  />
+                                </td>
+                                <td className="py-2 px-1 text-[12px] font-bold text-gray-600 italic">
+                                  {file.uploadedBy}
+                                </td>
+                                <td className="py-2 text-center">
+                                  {!isDisabled && (
+                                    <button
+                                      onClick={() => form.removeAttachment(file.id)}
+                                      className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>

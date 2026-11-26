@@ -696,8 +696,11 @@ const useCollections = () => {
   }
 
   // To Be Collected tab: selection + collect flow.
-  const toggleCustomerExpansion = (customerId) =>
+  const toggleCustomerExpansion = (customerId) => {
+    // Clear selections when switching customers
+    setSelectedSales([])
     setExpandedCustomer(expandedCustomer === customerId ? null : customerId)
+  }
 
   const handleCustomerCheckboxChange = (selectedIds) => {
     const selectedCustomers = toBeCollectedData.filter((row) =>
@@ -725,7 +728,15 @@ const useCollections = () => {
   }
 
   const startCollectForSales = async (salesRows) => {
-    const salesIds = salesRows.map((s) => s.id)
+    // If no rows passed, use the currently selected sales from state
+    const salesToCollect = salesRows || selectedSales
+
+    if (!salesToCollect || salesToCollect.length === 0) {
+      showToast('error', 'No sales selected for collection')
+      return
+    }
+
+    const salesIds = salesToCollect.map((s) => s.id)
     const items = await fetchSalesItems(salesIds)
     if (items.length === 0) {
       showToast(
@@ -734,7 +745,7 @@ const useCollections = () => {
       )
       return
     }
-    setSelectedSales(salesRows)
+    setSelectedSales(salesToCollect)
     setSelectedSalesItems(items)
     setIsAdding(true)
   }

@@ -184,6 +184,24 @@ export function findDefaultWhtOption(whtOptions) {
 // ─────────────────────────────────────────────────────────────────────────────
 export function fileToBase64(file) {
   return new Promise((resolve, reject) => {
+    // If file is null or undefined, return null
+    if (!file) {
+      resolve(null)
+      return
+    }
+    // If file is already a base64 string (from database), return it directly
+    if (typeof file === 'string' && file.startsWith('data:')) {
+      resolve(file)
+      return
+    }
+    // Otherwise, convert File/Blob to base64
+    if (
+      typeof file !== 'object' ||
+      !(file instanceof File || file instanceof Blob)
+    ) {
+      resolve(null)
+      return
+    }
     const reader = new FileReader()
     reader.readAsDataURL(file)
     reader.onload = () => resolve(reader.result)
@@ -256,6 +274,7 @@ export function useDisbursementForm({
   const [remarks, setRemarks] = useState('')
 
   const [attachments, setAttachments] = useState([])
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false)
   const [toast, setToast] = useState(null)
   const [imageModal, setImageModal] = useState({ isOpen: false, imageSrc: '' })
 
@@ -539,6 +558,50 @@ export function useDisbursementForm({
     if (whtOptions.length === 0 && !whtLoading) await fetchWht()
   }
 
+  const fetchCashDisbursementAttachments = async (disbursementId) => {
+    try {
+      setAttachmentsLoading(true)
+      const token = sessionStorage.getItem('authenticated')
+      if (!token) throw new Error('No authorization token found')
+
+      const response = await fetch(
+        API.cashDisbursementsAttachmentsById(disbursementId),
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
+        setAttachments(
+          result.attachments.map((att) => ({
+            id: att.id,
+            fileName: att.name || '',
+            file: att.file || null,
+            remarks: att.remarks || '',
+            uploadedBy: att.uploaded_by || 'Current User',
+            date: att.uploaded_date || new Date().toLocaleDateString(),
+          })),
+        )
+      } else {
+        console.error('Failed to fetch attachments:', result.message)
+      }
+    } catch (err) {
+      console.error('Error fetching cash disbursement attachments:', err)
+    } finally {
+      setAttachmentsLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchVendors()
     fetchChartsOfAccounts()
@@ -630,20 +693,26 @@ export function useDisbursementForm({
         )
       }
 
-      if (attachmentsData.length > 0) {
+      if (attachmentsData && attachmentsData.length > 0) {
+        // Set attachments without file data first (metadata only)
         setAttachments(
           attachmentsData.map((att) => ({
             id: att.id,
             fileName: att.name || '',
-            file: att.file || null,
+            file: null, // File data will be loaded separately
             remarks: att.remarks || '',
             uploadedBy: att.uploaded_by || 'Current User',
             date: att.uploaded_date || new Date().toLocaleDateString(),
           })),
         )
+        // Lazy load attachment file data when in view/edit mode
+        if (mainData && mainData.id) {
+          fetchCashDisbursementAttachments(mainData.id)
+        }
       }
     }
-  }, [isViewMode, isEditMode, disbursementData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isViewMode, disbursementData])
 
   useEffect(() => {
     if (
@@ -1340,6 +1409,7 @@ export function useDisbursementForm({
     disbursementItems,
     journalEntries,
     attachments,
+    attachmentsLoading,
     toast,
     setToast,
     imageModal,

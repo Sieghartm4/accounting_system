@@ -10,6 +10,7 @@ const {
   updatePaymentState,
   cancelPaymentState,
   getPrintPayments,
+  getPaymentAttachments,
 } = require('../controller/payments.controller')
 
 const paymentRouter = express.Router()
@@ -23,6 +24,7 @@ paymentRouter.post('/', createPayment)
 paymentRouter.put('/payment-state', updatePaymentState)
 paymentRouter.put('/cancel-state', cancelPaymentState)
 paymentRouter.put('/:payment_id', updatePayment)
+paymentRouter.get('/:payment_id/attachments', getPaymentAttachments)
 paymentRouter.get('/:payment_id', getAllPayments)
 
 module.exports = {

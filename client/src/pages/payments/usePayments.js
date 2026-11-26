@@ -681,8 +681,11 @@ const usePayments = () => {
   }
 
   // To Be Paid tab: selection + pay flow.
-  const toggleVendorExpansion = (vendorId) =>
+  const toggleVendorExpansion = (vendorId) => {
+    // Clear selections when switching vendors
+    setSelectedPurchases([])
     setExpandedVendor(expandedVendor === vendorId ? null : vendorId)
+  }
 
   const handleVendorCheckboxChange = (selectedIds) => {
     const selectedVendors = toBePaidData.filter(row => selectedIds.includes(row.vendorId))
@@ -710,9 +713,24 @@ const usePayments = () => {
   }
 
   const startPayForPurchases = async (purchaseRows) => {
-    const purchaseIds = purchaseRows.map(p => p.id)
+    // If no rows passed, use the currently selected purchases from state
+    const purchasesToPay = purchaseRows || selectedPurchases
+
+    if (!purchasesToPay || purchasesToPay.length === 0) {
+      showToast('error', 'No purchases selected for payment')
+      return
+    }
+
+    const purchaseIds = purchasesToPay.map(p => p.id)
     const items = await fetchPurchaseItems(purchaseIds)
-    setSelectedPurchases(purchaseRows)
+    if (items.length === 0) {
+      showToast(
+        'error',
+        'This purchase order has no purchase items and cannot be paid.',
+      )
+      return
+    }
+    setSelectedPurchases(purchasesToPay)
     setSelectedPurchaseItems(items)
     setIsAdding(true)
   }

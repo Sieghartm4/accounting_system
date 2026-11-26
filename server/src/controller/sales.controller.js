@@ -772,7 +772,8 @@ const getAllSales = async (req, res, next) => {
       .select([
         { col: Accounting.sales_attachments.selectOptionColumns.id, as: 'id' },
 
-        { col: Accounting.sales_attachments.selectOptionColumns.file, as: 'file' },
+        // File column excluded for lazy loading - fetch separately via attachments endpoint
+        // { col: Accounting.sales_attachments.selectOptionColumns.file, as: 'file' },
 
         { col: Accounting.sales_attachments.selectOptionColumns.name, as: 'name' },
 
@@ -828,6 +829,75 @@ const getAllSales = async (req, res, next) => {
       success: false,
 
       message: 'Server error while fetching sales',
+
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error',
+    })
+  }
+}
+
+const getSalesAttachments = async (req, res, next) => {
+  const { sales_id } = req.params
+
+  const salesId = sales_id
+
+  try {
+    const sales_attachments_query = sql
+      .select([
+        { col: Accounting.sales_attachments.selectOptionColumns.id, as: 'id' },
+
+        { col: Accounting.sales_attachments.selectOptionColumns.file, as: 'file' },
+
+        { col: Accounting.sales_attachments.selectOptionColumns.name, as: 'name' },
+
+        {
+          col: Accounting.sales_attachments.selectOptionColumns.remarks,
+          as: 'remarks',
+        },
+
+        {
+          col: Accounting.sales_attachments.selectOptionColumns.uploaded_by,
+          as: 'uploaded_by',
+        },
+
+        {
+          col: Accounting.sales_attachments.selectOptionColumns.uploaded_date,
+          as: 'uploaded_date',
+        },
+      ])
+
+      .from(Accounting.sales_attachments.tablename)
+
+      .where(Accounting.sales_attachments.selectOptionColumns.sales_id)
+
+      .build()
+
+    let sales_attachments = await Query(
+      sales_attachments_query,
+      [salesId],
+      [Accounting.sales_attachments.prefix_],
+    )
+
+    res.status(200).json({
+      success: true,
+
+      message: 'Sales attachments retrieved successfully',
+
+      attachments: sales_attachments,
+
+      count: sales_attachments.length,
+
+      timestamp: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error fetching sales attachments:', error)
+
+    return res.status(500).json({
+      success: false,
+
+      message: 'Server error while fetching sales attachments',
 
       error:
         process.env.NODE_ENV === 'development'
@@ -3489,6 +3559,8 @@ module.exports = {
   getAgingReceivables,
 
   getAllSales,
+
+  getSalesAttachments,
 
   createSales,
 

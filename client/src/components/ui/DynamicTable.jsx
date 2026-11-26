@@ -418,9 +418,8 @@ const DynamicTable = ({
     }
   }, [headers])
 
-  // Clear selections and option data when data changes
+  // Clear option data when data changes (but NOT selections - allow persistence across searches)
   useEffect(() => {
-    setSelectedKeys(new Set())
     setOptionData(new Map())
   }, [data])
 
@@ -496,11 +495,12 @@ const DynamicTable = ({
   }
 
   // Build the array of selected full row objects for action callbacks
+  // Use full data (not filtered) to include hidden selections
   const selectedRows = useMemo(() => {
-    return filteredAndSortedData.filter((row, idx) =>
+    return (data || []).filter((row, idx) =>
       selectedKeys.has(getRowKey(row, idx)),
     )
-  }, [filteredAndSortedData, selectedKeys])
+  }, [data, selectedKeys])
 
   // Sum numeric values from selected rows (prefer `amount_raw`, fallback to `amount`)
   const selectedTotal = useMemo(() => {

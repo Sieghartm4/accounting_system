@@ -1,7 +1,7 @@
 const express = require('express')
 const { auth } = require('../middlewares/auth.middleware')
 const { requireAnyModule } = require('../middlewares/entitlement.middleware')
-const { getPurchase, getAllPurchase, createPurchase, updatePurchase, updatePurchaseState, cancelPurchaseState, getPrintPurchases, getAgingPayables } = require('../controller/purchase.controller')
+const { getPurchase, getAllPurchase, createPurchase, updatePurchase, updatePurchaseState, cancelPurchaseState, getPrintPurchases, getAgingPayables, getPurchaseAttachments } = require('../controller/purchase.controller')
 
 const purchaseRouter = express.Router()
 
@@ -19,6 +19,7 @@ const requireAgingModule = requireAnyModule([
 ])
 
 purchaseRouter.get('/aging', requireAgingModule, getAgingPayables)
+purchaseRouter.get('/:purchase_id/attachments', getPurchaseAttachments)
 purchaseRouter.get('/:id', getAllPurchase)
 purchaseRouter.post('/', createPurchase)
 purchaseRouter.put('/purchase-state', updatePurchaseState)

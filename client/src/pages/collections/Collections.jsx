@@ -675,7 +675,7 @@ function CollectionsContent() {
                   checkboxActions={[
                     {
                       label: 'Collect Selected',
-                      onClick: startCollectForSales,
+                      onClick: (selectedRows) => startCollectForSales(selectedRows),
                       style: 'red',
                     },
                   ]}
