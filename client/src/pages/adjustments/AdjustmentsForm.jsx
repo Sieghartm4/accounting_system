@@ -485,6 +485,7 @@ export default function AdjustmentsForm({
           account: entry.coa_id, // Use coa_id for the account field
           accountSearch: entry.account_name, // Use account_name for search display
           center: entry.responsibility_center || '',
+          description: entry.description || '',
           debit: entry.type === 'DEBIT' ? parseFloat(entry.amount) || 0 : 0,
           credit: entry.type === 'CREDIT' ? parseFloat(entry.amount) || 0 : 0,
           isManual: true, // In edit mode, all entries should be editable
@@ -524,6 +525,7 @@ export default function AdjustmentsForm({
         account: '',
         accountSearch: '',
         center: '',
+        description: '',
         debit: '',
         credit: '',
         isManual: true,
@@ -604,6 +606,7 @@ export default function AdjustmentsForm({
       accountSearch:
         entry.account_name || entry.coa_name || entry.account || entry.name || '',
       center: entry.responsibility_center ?? entry.center ?? '',
+      description: entry.description || '',
       debit: isDebit ? amount || 0 : 0,
       credit: isCredit ? amount || 0 : 0,
       isManual: true,
@@ -901,6 +904,7 @@ export default function AdjustmentsForm({
           return {
             account_id: resolvedAccountId || null,
             responsibility_center: entry.center || '',
+            description: entry.description || '',
             debit: parseFloat(entry.debit) || 0,
             credit: parseFloat(entry.credit) || 0,
           }
@@ -1321,10 +1325,11 @@ export default function AdjustmentsForm({
                         style={{ tableLayout: 'fixed', minWidth: 600 }}
                       >
                         <colgroup>
-                          <col style={{ width: '35%' }} />
+                          <col style={{ width: '25%' }} />
+                          <col style={{ width: '15%' }} />
+                          <col style={{ width: '15%' }} />
                           <col style={{ width: '18%' }} />
-                          <col style={{ width: '18%' }} />
-                          <col style={{ width: '22%' }} />
+                          <col style={{ width: '20%' }} />
                           <col style={{ width: '6%' }} />
                         </colgroup>
                         <thead className="bg-zinc-100 border-b border-zinc-200 uppercase font-bold text-zinc-600 tracking-wider">
@@ -1333,6 +1338,7 @@ export default function AdjustmentsForm({
                             <th className="py-2.5 px-3 text-center w-32">Debit (₱)</th>
                             <th className="py-2.5 px-3 text-center w-32">Credit (₱)</th>
                             <th className="py-2.5 px-3 text-center">Responsibility Center</th>
+                            <th className="py-2.5 px-3 text-center">Description</th>
                             <th className="py-2.5 px-3 w-10 text-center"></th>
                           </tr>
                         </thead>
@@ -1417,6 +1423,18 @@ export default function AdjustmentsForm({
                                   emptyText={
                                     responsibilityCentersError ||
                                     'No responsibility centers found'
+                                  }
+                                />
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <input
+                                  disabled={isViewMode}
+                                  className={`${tableInput} ${isViewMode ? 'bg-transparent text-black cursor-not-allowed' : ''}`}
+                                  placeholder="Description..."
+                                  type="text"
+                                  value={entry.description || ''}
+                                  onChange={(e) =>
+                                    updateJournalEntry(entry.id, 'description', e.target.value)
                                   }
                                 />
                               </td>

@@ -1128,6 +1128,7 @@ const Accounting = {
       'type',
       'amount',
       'date',
+      'description',
     ],
     selectColumns: [
       'je_id',
@@ -1140,6 +1141,7 @@ const Accounting = {
       'je_date',
       'je_reversal_of_db_name',
       'je_reversal_of_db_id',
+      'je_description',
     ],
     selectOptionColumns: {
       id: 'je_id',
@@ -1152,6 +1154,7 @@ const Accounting = {
       date: 'je_date',
       reversal_of_db_name: 'je_reversal_of_db_name',
       reversal_of_db_id: 'je_reversal_of_db_id',
+      description: 'je_description',
     },
     updateOptionColumns: {
       id: 'id',
@@ -1162,6 +1165,7 @@ const Accounting = {
       type: 'type',
       amount: 'amount',
       date: 'date',
+      description: 'description',
     },
     selectDateFormatColumns: {},
     selectMiscColumns: {},
@@ -1176,6 +1180,7 @@ const Accounting = {
       date: 'STRING',
       reversal_of_db_name: 'STRING',
       reversal_of_db_id: 'STRING',
+      description: 'TEXT',
     },
   },
   payments: {

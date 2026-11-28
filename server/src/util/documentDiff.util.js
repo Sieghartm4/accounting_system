@@ -80,7 +80,7 @@ const journalEntryAmount = (entry) => {
 }
 
 // Compares stored journal rows against submitted entries as an unordered set
-// using account + responsibility center + type + centavo amount. Row ids and
+// using account + responsibility center + type + centavo amount + description. Row ids and
 // ordering are intentionally ignored.
 const journalsEquivalent = (dbRows, payloadEntries) => {
   if (!Array.isArray(payloadEntries)) return true
@@ -92,6 +92,7 @@ const journalsEquivalent = (dbRows, payloadEntries) => {
       textValue(row.responsibility_center),
       String(row.type || '').toUpperCase(),
       String(cents(row.amount)),
+      textValue(row.description),
     ])
     .sort(compareTuples)
 
@@ -101,6 +102,7 @@ const journalsEquivalent = (dbRows, payloadEntries) => {
       textValue(entry.responsibility_center),
       journalEntryType(entry),
       String(cents(journalEntryAmount(entry))),
+      textValue(entry.description),
     ])
     .sort(compareTuples)
 
@@ -136,7 +138,7 @@ const loadItemRows = async (connection, moduleKey, dbId) => {
 const loadJournalRows = async (connection, dbName, dbId) => {
   const col = Accounting.journal_entries.selectOptionColumns
   const [rows] = await connection.execute(
-    `SELECT ${col.coa_id} AS account_id, ${col.responsibility_center} AS responsibility_center, ${col.type} AS type, ${col.amount} AS amount FROM ${Accounting.journal_entries.tablename} WHERE ${col.db_name} = ? AND ${col.db_id} = ?`,
+    `SELECT ${col.coa_id} AS account_id, ${col.responsibility_center} AS responsibility_center, ${col.type} AS type, ${col.amount} AS amount, ${col.description} AS description FROM ${Accounting.journal_entries.tablename} WHERE ${col.db_name} = ? AND ${col.db_id} = ?`,
     [dbName, String(dbId)],
   )
   return rows

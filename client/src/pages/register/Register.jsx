@@ -1,28 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Lock, 
-  User, 
-  Mail,
-  Building2, 
-  ArrowRight, 
-  Loader2, 
-  ShieldCheck, 
-  PieChart, 
-  Eye, 
-  EyeOff, 
-  Check, 
-  Star, 
-  Zap, 
-  Sparkles, 
-  ChevronRight, 
-  CheckCircle2, 
-  AlertCircle,
-  ArrowLeft,
-  Globe2,
-  CheckCircle
-} from 'lucide-react';
 import useRegister from './useRegister';
 import { REQUIRED_MODULES, moduleLabel } from '../../constants/modules';
 import { DynamicToast } from '../../components/ui';
@@ -46,10 +23,7 @@ export default function Register() {
   const [filteredPlans, setFilteredPlans] = useState([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [billingCycle, setBillingCycle] = useState('monthly');
-  const [step, setStep] = useState(1); // Step 1: Account Creation, Step 2: Plan Selection, Step 3: Payment
-    // Whose subscription is being chosen. Null unless the caller identified a
-    // user, so the plan step can name them instead of speaking generically.
-    const [pendingAccount, setPendingAccount] = useState(null);
+  const [seats, setSeats] = useState(1);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
   const [showToast, setShowToast] = useState(false);
@@ -57,18 +31,44 @@ export default function Register() {
   const [toastType, setToastType] = useState('warning');
   const [usedFreeTrials, setUsedFreeTrials] = useState([]);
   const [loadingUsedFreeTrials, setLoadingUsedFreeTrials] = useState(false);
+  const [pendingAccount, setPendingAccount] = useState(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showFeatureMatrix, setShowFeatureMatrix] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [paymentSuccessDetails, setPaymentSuccessDetails] = useState(null);
+  const [currentStep, setCurrentStep] = useState(1);
 
   const { register, loading, error, registerData, progress } = useRegister();
 
+  // Auto-hide toast after 5 seconds
   useEffect(() => {
-    // Restore selected plan from sessionStorage if it exists
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showToast]);
+
+  // Auto-select first plan when moving to step 2
+  useEffect(() => {
+    if (currentStep === 2 && !selectedPlan && filteredPlans.length > 0) {
+      setSelectedPlan(filteredPlans[0]);
+      setFormData(prev => ({
+        ...prev,
+        subscription_id: filteredPlans[0].sp_id,
+        subscription_price: filteredPlans[0].price,
+        subscription_billing_cycle: filteredPlans[0].billingCycle
+      }));
+    }
+  }, [currentStep, selectedPlan, filteredPlans]);
+
+  // Restore selected plan from sessionStorage
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedPlanId = sessionStorage.getItem('selectedPlanId');
-
       if (storedPlanId && plans.length > 0) {
-        // Convert stored ID to number for comparison with plan IDs
         const matchedPlan = plans.find(p => p.sp_id === parseInt(storedPlanId));
-
         if (matchedPlan) {
           setSelectedPlan(matchedPlan);
           setFormData(prev => ({
@@ -77,40 +77,30 @@ export default function Register() {
             subscription_price: matchedPlan.price,
             subscription_billing_cycle: matchedPlan.billingCycle
           }));
-          // Clear stored plan after successful restoration
           sessionStorage.removeItem('selectedPlanId');
-          // Set a flag to prevent default selection from overriding
           sessionStorage.setItem('planRestored', 'true');
         } else {
-          // Plan not found, clear sessionStorage to prevent infinite loop
           sessionStorage.removeItem('selectedPlanId');
         }
       }
     }
   }, [plans, selectedPlan]);
 
+  // Check if user is coming from login without subscription
   useEffect(() => {
-    // Check if user is coming from login without subscription
     if (typeof window !== 'undefined') {
       const queryParams = new URLSearchParams(window.location.search);
       const stepParam = queryParams.get('step');
       const pendingUser = sessionStorage.getItem('pendingUser');
       
       if (stepParam === 'plan' && pendingUser) {
-        // User is coming from login without subscription - skip to plan selection
         const userData = JSON.parse(pendingUser);
         setFormData(prev => ({
           ...prev,
           username: userData.username,
-          // No password is carried across. A blocked-login user has one in
-          // memory only; an upgrade has none because the account already
-          // exists. Leaving it undefined keeps the field genuinely empty rather
-          // than holding a stale value from a previous visit.
           password: userData.password || '',
         }));
 
-        // Whose plan this is. Set only when the caller supplied it, so a
-        // blocked login shows no company name rather than an empty label.
         setPendingAccount({
           username: userData.username,
           tenantDb: userData.tenantDb || null,
@@ -119,11 +109,6 @@ export default function Register() {
           existingAccount: userData.existingAccount === true,
         });
 
-        setStep(2); // Skip to plan selection
-
-        // Worded for who is actually here. An upgrade is not "completing
-        // registration" - the account already exists - and saying so made a
-        // signed-in user look like they were being asked to sign up again.
         setToastMessage(
           userData.existingAccount
             ? `Choose a plan for ${userData.username} to unlock the modules you don't have yet.`
@@ -131,141 +116,119 @@ export default function Register() {
         );
         setToastType('warning');
         setShowToast(true);
-
-        // Fetch user's used free trials
         fetchUsedFreeTrials(userData.username);
       }
     }
   }, []);
 
-  // Validate that user has an account before allowing step 2 or 3
+  // Handle payment status
   useEffect(() => {
-    if (step > 1) {
-      const pendingUser = sessionStorage.getItem('pendingUser');
-      const registeredUsername = sessionStorage.getItem('registeredUsername');
-      
-      if (!pendingUser && !registeredUsername && !formData.username) {
-        // User doesn't have an account, redirect to step 1
-        setToastMessage('Please create an account first.');
-        setToastType('error');
-        setShowToast(true);
-        // Drop the identified account too: the user is going back to register a
-        // different one, and leaving it would label the new signup with the old
-        // company on a later visit to this step.
-        setPendingAccount(null);
-        setStep(1);
-      }
-    }
-  }, [step]);
-
-  useEffect(() => {
-    // Handle payment status separately (always run this)
-    // Step 1: Account Creation, Step 2: Plan Selection, Step 3: Payment
     if (typeof window !== 'undefined') {
       const queryParams = new URLSearchParams(window.location.search);
       const paymentParam = queryParams.get('payment');
       
       if (paymentParam === 'success') {
-        // Check if we've already processed this payment
         const paymentProcessed = sessionStorage.getItem('paymentProcessed');
-        if (paymentProcessed) {
-          return;
-        }
+        if (paymentProcessed) return;
         
-        // Mark payment as processed
         sessionStorage.setItem('paymentProcessed', 'true');
         
-        // After successful payment, update user's subscription_id
-        const updateSubscription = async () => {
+        const processPaymentSuccess = async () => {
           try {
+            const pendingRegistration = sessionStorage.getItem('pendingRegistration');
             const pendingUser = sessionStorage.getItem('pendingUser');
+            const isUpgrade = sessionStorage.getItem('isUpgrade') === 'true';
             const storedPlanId = sessionStorage.getItem('selectedPlanId');
             const sessionId = sessionStorage.getItem('paymongoSessionId') || queryParams.get('session_id');
             const paymentReference = queryParams.get('payment_id') || queryParams.get('source_id') || queryParams.get('payment_intent');
 
+            console.log('Processing payment success', { pendingRegistration, pendingUser, isUpgrade, storedPlanId, sessionId });
+
             let username = null;
-            if (pendingUser) {
-              const userData = JSON.parse(pendingUser);
-              username = userData.username;
+            let registrationData = null;
+
+            // Check if this is a new registration (pendingRegistration) or existing user upgrade (pendingUser)
+            if (pendingRegistration) {
+              registrationData = JSON.parse(pendingRegistration);
+              username = registrationData.username;
+              console.log('This is a new registration for:', username);
+            } else if (pendingUser || isUpgrade) {
+              const userData = pendingUser ? JSON.parse(pendingUser) : null;
+              username = userData?.username || pendingAccount?.username;
+              console.log('This is an existing user upgrade for:', username);
             } else {
               username = sessionStorage.getItem('registeredUsername');
+              console.log('Using registeredUsername:', username);
             }
 
-            // Initialize variables for subscription history
             let paymentMethod = 'paymongo';
             let actualPaymentReference = paymentReference;
             let planPrice = 0;
             let billingCycleDays = null;
-            
-            // Fetch payment details from PayMongo if session_id is available
-            
+            let planName = 'Unknown Plan';
+
             if (sessionId && sessionId !== '{CHECKOUT_SESSION_ID}') {
               try {
                 const paymentDetailsResponse = await fetch(SUBSCRIPTION_API.subscriptionPlansPaymentDetails(sessionId));
                 const paymentDetailsData = await paymentDetailsResponse.json();
-                
+
                 if (paymentDetailsData.success && paymentDetailsData.data) {
                   paymentMethod = paymentDetailsData.data.payment_method || 'paymongo';
                   actualPaymentReference = paymentDetailsData.data.payment_reference || sessionId;
-                  // Use amount and billing cycle from payment details if available
                   if (paymentDetailsData.data.amount) {
                     planPrice = paymentDetailsData.data.amount;
                   }
                   if (paymentDetailsData.data.billing_cycle) {
                     billingCycleDays = paymentDetailsData.data.billing_cycle;
                   }
-                } else {
-                  console.error('Payment details fetch failed:', paymentDetailsData.message);
                 }
               } catch (error) {
                 console.error('Error fetching payment details:', error);
               }
-            } else {
             }
-            
-            if (username && storedPlanId) {
-              
-              let storedPlan = null;
-              
-              // Retry fetching plans if initial attempt fails
-              let retryCount = 0;
-              while (retryCount < 3 && !storedPlan) {
-                try {
-                  const plansResponse = await fetch(SUBSCRIPTION_API.subscriptionPlans());
-                  const plansData = await plansResponse.json();
-                  if (plansData.data && plansData.data.length > 0) {
-                  }
-                  storedPlan = plansData.data?.find(p => p.sp_id === parseInt(storedPlanId));
 
-                } catch (fetchError) {
-                  console.error(`Error fetching plans (attempt ${retryCount + 1}):`, fetchError);
-                  retryCount++;
-                  if (retryCount < 3) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                  }
-                }
-              }
-              
-              if (storedPlan) {
-                // Only use plan price if payment details didn't provide one
-                if (planPrice === 0 || planPrice === null) {
-                  planPrice = storedPlan.sp_price || 0;
-                } else {
-                }
-                
-                // Only use plan billing cycle if payment details didn't provide one
-                if (billingCycleDays === null) {
-                  if (storedPlan.items && storedPlan.items.length > 0) {
-                    const billingCycleItem = storedPlan.items.find(item => item.spi_type === 'BILLING_CYCLE');
-                    if (billingCycleItem) {
-                      billingCycleDays = parseInt(billingCycleItem.spi_details);
+            // Fetch plan details to get plan name
+            if (storedPlanId) {
+              try {
+                const plansResponse = await fetch(SUBSCRIPTION_API.subscriptionPlans());
+                const plansData = await plansResponse.json();
+                if (plansData.data && plansData.data.length > 0) {
+                  const plan = plansData.data?.find(p => p.sp_id === parseInt(storedPlanId));
+                  if (plan) {
+                    planName = plan.sp_name;
+                    if (planPrice === 0 || planPrice === null) {
+                      planPrice = plan.sp_price || 0;
+                    }
+                    if (billingCycleDays === null) {
+                      if (plan.items && plan.items.length > 0) {
+                        const billingCycleItem = plan.items.find(item => item.spi_type === 'BILLING_CYCLE');
+                        if (billingCycleItem) {
+                          billingCycleDays = parseInt(billingCycleItem.spi_details);
+                        }
+                      }
                     }
                   }
-                } else {
                 }
-              } else {
+              } catch (error) {
+                console.error('Error fetching plan details:', error);
               }
-              
+            }
+
+            // CRITICAL: If this is a new registration, register the user NOW (after payment success)
+            // This creates the account, database, and assigns the subscription
+            if (pendingRegistration && registrationData) {
+              console.log('Registering user after successful payment...', registrationData);
+              const success = await register(registrationData);
+              if (!success) {
+                console.error('Registration failed after payment');
+                setPaymentError('Registration failed after payment. Please contact support.');
+                return;
+              }
+              console.log('Registration successful after payment');
+            }
+
+            // For existing users (upgrades), update subscription
+            if ((pendingUser || isUpgrade) && username && storedPlanId) {
               await fetch(SUBSCRIPTION_API.credentialsSubscription(), {
                 method: 'PUT',
                 headers: {
@@ -280,13 +243,29 @@ export default function Register() {
                   payment_method: paymentMethod,
                 }),
               });
-              
-            } else {
             }
+
+            // Store payment success details and show confirmation
+            setPaymentSuccessDetails({
+              username: username,
+              email: registrationData?.email || pendingAccount?.email || '',
+              companyName: registrationData?.company_name || pendingAccount?.company_name || '',
+              planName: planName,
+              planPrice: planPrice,
+              billingCycle: billingCycleDays,
+              paymentMethod: paymentMethod,
+              paymentReference: actualPaymentReference,
+              isNewRegistration: !!pendingRegistration,
+              isUpgrade: isUpgrade || !!pendingUser
+            });
+            setShowConfirmation(true);
+
+            // Clear URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
           } catch (error) {
-            console.error('Error updating subscription:', error);
+            console.error('Error processing payment success:', error);
+            setPaymentError('Payment processing failed. Please contact support.');
           } finally {
-            // Clear all sessionStorage and redirect to login
             sessionStorage.removeItem('paymentStatus');
             sessionStorage.removeItem('selectedPlanId');
             sessionStorage.removeItem('planRestored');
@@ -294,28 +273,29 @@ export default function Register() {
             sessionStorage.removeItem('pendingUser');
             sessionStorage.removeItem('paymentProcessed');
             sessionStorage.removeItem('paymongoSessionId');
-            navigate('/login');
+            sessionStorage.removeItem('pendingRegistration');
+            sessionStorage.removeItem('isUpgrade');
           }
         };
         
-        updateSubscription();
+        processPaymentSuccess();
       } else if (paymentParam === 'failed') {
         setPaymentError('Payment failed or was canceled. Please try again.');
-        setStep(3); // Stay on payment step
-        // Store payment status in sessionStorage for page refresh handling
         sessionStorage.setItem('paymentStatus', 'failed');
         window.history.replaceState({}, document.title, window.location.pathname);
+        // Clear pending registration on failure
+        sessionStorage.removeItem('pendingRegistration');
+        sessionStorage.removeItem('isUpgrade');
       } else {
-        // Check for stored payment status (for page refresh scenario)
         const storedPaymentStatus = sessionStorage.getItem('paymentStatus');
         if (storedPaymentStatus === 'failed') {
           setPaymentError('Payment failed or was canceled. Please try again.');
-          setStep(3);
         }
       }
     }
-  }, []);
+  }, [navigate, register, setPaymentSuccessDetails, setShowConfirmation, setPaymentError]);
 
+  // Fetch subscription plans
   useEffect(() => {
     const fetchSubscriptionPlans = async () => {
       try {
@@ -328,9 +308,6 @@ export default function Register() {
             
             if (plan.items && Array.isArray(plan.items)) {
               plan.items.forEach((item) => {
-                // MODULES items are deliberately not read here. The table is
-                // never seeded and nothing writes to it; the plan's real module
-                // list is plan.modules, built from the operator's choices.
                 if (item.spi_type === 'FEATURES') {
                   features.push(item.spi_details);
                 } else if (item.spi_type === 'USERS') {
@@ -344,21 +321,13 @@ export default function Register() {
                   
                   if (!isNaN(parseInt(cycle))) {
                     const days = parseInt(cycle);
-                    if (days === 7) {
-                      formattedCycle = 'week';
-                    } else if (days === 30 || days === 31) {
-                      formattedCycle = 'month';
-                    } else if (days === 60 || days === 61) {
-                      formattedCycle = '2 months';
-                    } else if (days === 90 || days === 91) {
-                      formattedCycle = '3 months';
-                    } else if (days === 180 || days === 182) {
-                      formattedCycle = '6 months';
-                    } else if (days === 365 || days === 366) {
-                      formattedCycle = 'year';
-                    } else {
-                      formattedCycle = `${cycle} days`;
-                    }
+                    if (days === 7) formattedCycle = 'week';
+                    else if (days === 30 || days === 31) formattedCycle = 'month';
+                    else if (days === 60 || days === 61) formattedCycle = '2 months';
+                    else if (days === 90 || days === 91) formattedCycle = '3 months';
+                    else if (days === 180 || days === 182) formattedCycle = '6 months';
+                    else if (days === 365 || days === 366) formattedCycle = 'year';
+                    else formattedCycle = `${cycle} days`;
                   }
                   
                   plan.billingCycle = formattedCycle;
@@ -373,13 +342,6 @@ export default function Register() {
             return plan;
           });
 
-          // What the card advertises, built from the plan's real module grants.
-          //
-          // The legacy MODULES items in subscription_plan_items were never
-          // seeded, so reading the card's feature list from them showed only
-          // generic FEATURES strings ("All modules", "7 days free trial") and
-          // never the modules an operator had actually ticked. Modules now come
-          // from the plan itself.
           const CORE_NOTE = 'All core accounting, journal entry and financial reporting modules';
           plansWithItems.forEach((plan) => {
             const list = [];
@@ -391,16 +353,12 @@ export default function Register() {
             }
 
             const granted = plan.modules;
-            // The required set is always granted, so listing all 23 individually
-            // would bury the differences between plans. One line acknowledges
-            // them and the sellable modules are named.
             list.push(CORE_NOTE);
             if (Array.isArray(granted)) {
               const optional = granted.filter((m) => !REQUIRED_MODULES.includes(m));
               optional.forEach((m) => list.push(moduleLabel(m)));
             }
 
-            // Keep any operator-written FEATURES text after the real list.
             const extras = (plan.items || [])
               .filter((i) => i.spi_type === 'FEATURES')
               .map((i) => i.spi_details);
@@ -413,7 +371,6 @@ export default function Register() {
 
           setPlans(plansWithItems);
           
-          // Only set default plan if no plan was restored from sessionStorage
           const planRestored = sessionStorage.getItem('planRestored');
           if (plansWithItems.length > 0 && !planRestored) {
             setSelectedPlan(plansWithItems[0]);
@@ -440,7 +397,6 @@ export default function Register() {
     if (plans.length === 0) return;
 
     const filtered = plans.filter(plan => {
-      // If plan has price 0, check if it's in used free trials
       if (plan.price === 0 || plan.price === '0' || plan.price === '0.00') {
         return !usedFreeTrials.includes(plan.sp_id);
       }
@@ -449,7 +405,6 @@ export default function Register() {
 
     setFilteredPlans(filtered);
 
-    // Update selected plan if it was filtered out
     if (selectedPlan && !filtered.find(p => p.sp_id === selectedPlan.sp_id)) {
       if (filtered.length > 0) {
         setSelectedPlan(filtered[0]);
@@ -463,29 +418,16 @@ export default function Register() {
     }
   }, [plans, usedFreeTrials, selectedPlan]);
 
-
-
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handlePlanSelect = async (plan) => {
-    // Check if user has an account (either from registration or login redirect)
     const pendingUser = sessionStorage.getItem('pendingUser');
     const registeredUsername = sessionStorage.getItem('registeredUsername');
-    
-    if (!pendingUser && !registeredUsername && !formData.username) {
-      setToastMessage('Please create an account first before selecting a plan.');
-      setToastType('error');
-      setShowToast(true);
-      setStep(1); // Go back to account creation
-      return;
-    }
 
-    // Check if plan is free trial (price = 0)
     const planPrice = calculatePrice(plan);
     if (planPrice === 0) {
-      // Check if user has already used a free trial
       let username = null;
       if (pendingUser) {
         const userData = JSON.parse(pendingUser);
@@ -512,10 +454,10 @@ export default function Register() {
         }
       }
     }
-    
+
     setSelectedPlan(plan);
-    setFormData(prev => ({ 
-      ...prev, 
+    setFormData(prev => ({
+      ...prev,
       subscription_id: plan.sp_id,
       subscription_price: plan.price,
       subscription_billing_cycle: plan.billingCycle
@@ -525,24 +467,23 @@ export default function Register() {
   const calculatePrice = (plan) => {
     if (!plan) return 0;
     const numPrice = Number(plan.price) || 0;
-    // If the plan's billing cycle is annual and user selected annual, use the price as-is
-    // If the plan's billing cycle is monthly and user selected annual, apply discount
     if (billingCycle === 'annual' && plan.billingCycle === 'Monthly') {
       return Math.floor(numPrice * 0.85);
     }
     return numPrice;
   };
 
-  const handleBackToPlans = () => {
-    setStep(2);
-    setPaymentError(null);
-    // Clear payment status and pendingUser when going back to plans
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('paymentStatus');
-      sessionStorage.removeItem('pendingUser');
-      sessionStorage.removeItem('selectedPlanId');
-      sessionStorage.removeItem('planRestored');
-    }
+  const calculateTotal = () => {
+    if (!selectedPlan) return 0;
+    const planPrice = calculatePrice(selectedPlan);
+    const months = billingCycle === 'annual' ? 12 : 1;
+    const extraSeats = Math.max(0, seats - 1);
+    const seatPrice = 999; // ₱999 per extra seat per month
+    const baseCost = planPrice * months;
+    const seatsCost = extraSeats * seatPrice * months;
+    const subtotal = baseCost + seatsCost;
+    const discount = billingCycle === 'annual' ? Math.round(subtotal * 0.15) : 0;
+    return subtotal - discount;
   };
 
   const fetchUsedFreeTrials = async (username) => {
@@ -561,578 +502,965 @@ export default function Register() {
     }
   };
 
-  const handlePayment = async () => {
-    if (!selectedPlan) {
-      setPaymentError('Please select a plan');
-      return;
-    }
-
-    // Get username from sessionStorage (either from pendingUser or registeredUsername)
-    let username = null;
-    const pendingUser = sessionStorage.getItem('pendingUser');
-    const registeredUsername = sessionStorage.getItem('registeredUsername');
-
-    if (pendingUser) {
-      const userData = JSON.parse(pendingUser);
-      username = userData.username;
-    } else if (registeredUsername) {
-      username = registeredUsername;
-    }
-
-    if (!username) {
-      setPaymentError('User session expired. Please register again.');
-      navigate('/register');
-      return;
-    }
-
-    // Store selected plan ID in sessionStorage for restoration after payment redirect
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('selectedPlanId', selectedPlan.sp_id);
-    }
-
-    setPaymentLoading(true);
-    setPaymentError(null);
-
-    // Check if plan is free (â‚±0)
-    const planPrice = calculatePrice(selectedPlan);
-    
-    if (planPrice === 0 || planPrice === '0') {
-      // For free plans, skip PayMongo and directly update subscription
-      try {
-        // Update subscription with history details
-        // Convert billing cycle to days if it's in human-readable format
-        let billingCycleDays = selectedPlan.billingCycle;
-        if (typeof billingCycleDays === 'string') {
-          const cycleMap = { 'week': 7, 'month': 30, 'year': 365 };
-          billingCycleDays = cycleMap[billingCycleDays.toLowerCase()] || billingCycleDays;
-        }
-        
-        const planPrice = calculatePrice(selectedPlan);
-        
-        await fetch(SUBSCRIPTION_API.credentialsSubscription(), {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            username: username,
-            subscription_id: selectedPlan.sp_id,
-            subscription_price: planPrice,
-            subscription_billing_cycle: billingCycleDays,
-          }),
-        });
-
-        // The new plan is recorded but the accounting server caches entitlement
-        // for 60 seconds, so the newly bought modules would still be refused on
-        // the next login. Cleared here so the redirect lands on a working tenant.
-        // Not fatal if it fails: the cache expires on its own within the minute.
-        try {
-          sessionStorage.removeItem('auth_entitlement');
-        } catch {
-          // Storage unavailable; the server-side TTL still clears it.
-        }
-
-        // Clear sessionStorage and redirect to login
-        if (typeof window !== 'undefined') {
-          sessionStorage.removeItem('paymentStatus');
-          sessionStorage.removeItem('selectedPlanId');
-          sessionStorage.removeItem('planRestored');
-          sessionStorage.removeItem('registeredUsername');
-          sessionStorage.removeItem('pendingUser');
-        }
-
-        setPaymentLoading(false);
-        navigate('/login');
-        return;
-      } catch (error) {
-        console.error('Error updating subscription for free plan:', error);
-        setPaymentError('Failed to activate free plan. Please try again.');
-        setPaymentLoading(false);
+  const handleSubmit = async () => {
+    if (currentStep === 1) {
+      // Step 1: Validate and submit organization & admin login
+      if (!formData.username || !formData.password || !formData.company_name || !formData.email) {
+        setToastMessage('Please fill in all required fields.');
+        setToastType('error');
+        setShowToast(true);
         return;
       }
-    }
 
-    try {
-      const response = await fetch(SUBSCRIPTION_API.subscriptionPlansCheckout(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      if (formData.password.length < 8) {
+        setToastMessage('Password must be at least 8 characters.');
+        setToastType('error');
+        setShowToast(true);
+        return;
+      }
+
+      if (!formData.email.includes('@') || !formData.email.includes('.')) {
+        setToastMessage('Please enter a valid email address.');
+        setToastType('error');
+        setShowToast(true);
+        return;
+      }
+
+      if (formData.username.length < 3) {
+        setToastMessage('Username must be at least 3 characters.');
+        setToastType('error');
+        setShowToast(true);
+        return;
+      }
+
+      // Move to step 2
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      // Step 2: Validate subscription selection
+      if (!selectedPlan) {
+        setToastMessage('Please select a subscription plan.');
+        setToastType('error');
+        setShowToast(true);
+        return;
+      }
+
+      // Show review modal before proceeding
+      setShowReviewModal(true);
+    }
+  };
+
+  const handleConfirmAndProceed = async () => {
+    setShowReviewModal(false);
+    setPaymentLoading(true);
+
+    const planPrice = calculatePrice(selectedPlan);
+    const isTrial = planPrice === 0;
+    const isExistingUser = !!pendingAccount?.username;
+
+    console.log('handleConfirmAndProceed called', { planPrice, isTrial, isExistingUser, selectedPlan });
+
+    if (isTrial) {
+      // For free trials
+      if (isExistingUser) {
+        // Existing user - just update subscription directly
+        try {
+          let username = pendingAccount?.username;
+          if (!username) {
+            const pendingUser = sessionStorage.getItem('pendingUser');
+            if (pendingUser) {
+              const userData = JSON.parse(pendingUser);
+              username = userData.username;
+            }
+          }
+
+          let billingCycleDays = selectedPlan.billingCycle;
+          if (typeof billingCycleDays === 'string') {
+            const cycleMap = { 'week': 7, 'month': 30, 'year': 365 };
+            billingCycleDays = cycleMap[billingCycleDays.toLowerCase()] || billingCycleDays;
+          }
+          
+          await fetch(SUBSCRIPTION_API.credentialsSubscription(), {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              username: username,
+              subscription_id: selectedPlan.sp_id,
+              subscription_price: planPrice,
+              subscription_billing_cycle: billingCycleDays,
+            }),
+          });
+
+          setPaymentLoading(false);
+          setPaymentSuccessDetails({
+            username: username,
+            email: pendingAccount?.email || formData.email,
+            companyName: formData.company_name,
+            planName: selectedPlan?.sp_name,
+            planPrice: 0,
+            billingCycle: selectedPlan?.billingCycle,
+            paymentMethod: 'Free Trial',
+            paymentReference: 'N/A',
+            isNewRegistration: false,
+            isUpgrade: true
+          });
+          setShowConfirmation(true);
+          return;
+        } catch (error) {
+          console.error('Error updating subscription for free plan:', error);
+          setPaymentError('Failed to activate free plan. Please try again.');
+          setPaymentLoading(false);
+          return;
+        }
+      } else {
+        // New user - register directly without payment
+        const registrationData = {
+          ...formData,
+          subscription_id: selectedPlan?.sp_id || null,
+          subscription_price: selectedPlan ? calculatePrice(selectedPlan) : null,
+          subscription_billing_cycle: selectedPlan?.billingCycle || null,
+        };
+        
+        console.log('Starting free trial registration', registrationData);
+        const success = await register(registrationData);
+        setPaymentLoading(false);
+        if (success) {
+          setPaymentSuccessDetails({
+            username: formData.username,
+            email: formData.email,
+            companyName: formData.company_name,
+            planName: selectedPlan?.sp_name,
+            planPrice: 0,
+            billingCycle: selectedPlan?.billingCycle,
+            paymentMethod: 'Free Trial',
+            paymentReference: 'N/A',
+            isNewRegistration: true,
+            isUpgrade: false
+          });
+          setShowConfirmation(true);
+        }
+      }
+    } else {
+      // For paid plans: PayMongo checkout FIRST
+      try {
+        let username = formData.username;
+        let email = formData.email;
+        let companyName = formData.company_name;
+
+        // If existing user, get their info from pendingAccount
+        if (isExistingUser) {
+          username = pendingAccount?.username;
+          email = pendingAccount?.email || formData.email;
+          companyName = formData.company_name; // Company name from form
+          
+          // Store that this is an upgrade, not a new registration
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('isUpgrade', 'true');
+          }
+        }
+
+        const checkoutData = {
           amount: calculatePrice(selectedPlan),
           description: `${selectedPlan.sp_name} - ${selectedPlan.billingCycle}`,
           username: username,
-          email: formData.email,
-          company_name: formData.company_name,
+          email: email,
+          company_name: companyName,
           subscription_id: selectedPlan.sp_id,
           subscription_billing_cycle: selectedPlan.billingCycle,
-        }),
-      });
+        };
 
-      const data = await response.json();
+        console.log('Requesting PayMongo checkout', checkoutData);
+        console.log('Checkout URL:', SUBSCRIPTION_API.subscriptionPlansCheckout());
 
-      if (data.success) {
-        // Store session_id in sessionStorage for payment details retrieval
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('paymongoSessionId', data.data.session_id);
+        const response = await fetch(SUBSCRIPTION_API.subscriptionPlansCheckout(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(checkoutData),
+        });
+
+        console.log('PayMongo response status:', response.status);
+
+        const data = await response.json();
+        console.log('PayMongo response data:', data);
+
+        if (data.success) {
+          // Store data in sessionStorage for post-payment processing
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('paymongoSessionId', data.data.session_id);
+            sessionStorage.setItem('selectedPlanId', selectedPlan.sp_id.toString());
+            
+            if (!isExistingUser) {
+              // Only store pendingRegistration for NEW users
+              sessionStorage.setItem('pendingRegistration', JSON.stringify({
+                ...formData,
+                subscription_id: selectedPlan.sp_id,
+                subscription_price: calculatePrice(selectedPlan),
+                subscription_billing_cycle: selectedPlan.billingCycle,
+              }));
+            }
+          }
+          console.log('Redirecting to PayMongo checkout:', data.data.checkout_url);
+          // Redirect to PayMongo - user will come back after payment
+          window.location.href = data.data.checkout_url;
+        } else {
+          console.error('PayMongo checkout failed:', data);
+          setPaymentError(data.message || 'Failed to create payment session');
+          setPaymentLoading(false);
         }
-        // Redirect to PayMongo checkout
-        window.location.href = data.data.checkout_url;
-      } else {
-        setPaymentError(data.message || 'Failed to create payment session');
+      } catch (error) {
+        console.error('Payment error:', error);
+        setPaymentError(`Failed to process payment: ${error.message}`);
+        setPaymentLoading(false);
       }
-    } catch (error) {
-      console.error('Payment error:', error);
-      setPaymentError('Failed to process payment. Please try again.');
-    } finally {
-      setPaymentLoading(false);
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validate form fields
-    if (!formData.username || !formData.password || !formData.company_name || !formData.email) {
-      setToastMessage('Please fill in all required fields.');
-      setToastType('error');
-      setShowToast(true);
-      return;
-    }
-    
-    // Prepare registration data with subscription details if a plan is selected
-    const registrationData = {
-      ...formData,
-      subscription_id: selectedPlan?.sp_id || null,
-      subscription_price: selectedPlan ? calculatePrice(selectedPlan) : null,
-      subscription_billing_cycle: selectedPlan?.billingCycle || null,
-    };
-    
-    const success = await register(registrationData);
-    if (success) {
-      setStep(2); // Move to plan selection after successful registration
-    }
+  const formatPHP = (num) => {
+    return '₱' + num.toLocaleString('en-PH');
   };
+
+  const getWorkspaceSlug = (companyName) => {
+    const clean = companyName.trim();
+    return clean
+      ? clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      : 'your-company';
+  };
+
+  const planPrice = selectedPlan ? calculatePrice(selectedPlan) : 0;
+  const isTrial = planPrice === 0;
+  const total = calculateTotal();
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-red-600 selection:text-white">
-      <header className="w-full bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40 shadow-xs">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center font-black text-xl shadow-md border-b-2 border-red-600">
-              5L
-            </div>
-            <div>
-              <span className="font-extrabold text-lg tracking-tight text-black block leading-none">
-                5L SOLUTIONS
-              </span>
-              <span className="text-[11px] tracking-wider text-red-600 uppercase font-bold">
-                Enterprise SaaS Portal
-              </span>
-            </div>
-          </div>
+    <div className="min-h-screen bg-white text-slate-900 font-sans antialiased selection:bg-red-100 selection:text-red-700">
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .custom-sidebar-scrollbar::-webkit-scrollbar {
+              width: 5px;
+            }
+            .custom-sidebar-scrollbar::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            .custom-sidebar-scrollbar::-webkit-scrollbar-thumb {
+              background: #dc2626;
+              border-radius: 10px;
+            }
+            .custom-sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: #b91c1c;
+            }
+          `,
+        }}
+      />
+      <div className="min-h-screen flex flex-col lg:flex-row">
 
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 bg-slate-100 p-1.5 rounded-full border border-slate-200">
-              <button 
-                type="button"
-                onClick={() => setStep(1)}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  step === 1 ? 'bg-red-600 text-white shadow-md shadow-red-600/20' : 'text-slate-600 hover:text-black'
-                }`}
-              >
-                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${step === 1 ? 'bg-white text-red-600' : 'bg-slate-300 text-slate-800'}`}>1</span>
-                Account
-              </button>
-              <ChevronRight size={14} className="text-slate-400" />
-              <button 
-                type="button"
-                onClick={() => setStep(2)}
-                disabled={step < 1 || (!formData.username && !sessionStorage.getItem('pendingUser') && !sessionStorage.getItem('registeredUsername'))}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  step === 2 ? 'bg-red-600 text-white shadow-md shadow-red-600/20' : step >= 1 && (formData.username || sessionStorage.getItem('pendingUser') || sessionStorage.getItem('registeredUsername')) ? 'text-slate-600 hover:text-black' : 'text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${step === 2 ? 'bg-white text-red-600' : step >= 1 ? 'bg-slate-300 text-slate-800' : 'bg-slate-200 text-slate-600'}`}>2</span>
-                Plan
-              </button>
-              <ChevronRight size={14} className="text-slate-400" />
-              <button 
-                type="button"
-                disabled={step < 2}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  step === 3 ? 'bg-red-600 text-white shadow-md shadow-red-600/20' : step >= 2 ? 'text-slate-600 hover:text-black' : 'text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${step === 3 ? 'bg-white text-red-600' : step >= 2 ? 'bg-slate-300 text-slate-800' : 'bg-slate-200 text-slate-600'}`}>3</span>
-                Payment
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigate('/login')}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 border border-slate-200 text-slate-800 transition-all flex items-center gap-2 shadow-xs"
-            >
-              <ArrowLeft size={14} className="text-red-600" /> Back to Login
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6  flex flex-col justify-center">
-        <AnimatePresence mode="wait">
-          {step === 1 ? (
-            <motion.div 
-              key="step1"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="max-w-xl mx-auto w-full animate-fade-in py-6"
-            >
-              <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-2xl">
-                <div className="text-center mb-8">
-                  <h1 className="text-3xl font-black text-black">Create your account</h1>
-                  <p className="text-slate-600 mt-2">Start your 5L SOLUTIONS journey today</p>
+        {/* LEFT RAIL: WORKSPACE & LIVE RECEIPT SIDEBAR */}
+        <aside className="lg:w-[42%] xl:w-[38%] bg-zinc-950 text-white lg:fixed lg:inset-y-0 lg:left-0 flex flex-col justify-between p-6 sm:p-10 lg:p-12 overflow-y-auto custom-sidebar-scrollbar border-b lg:border-b-0 lg:border-r border-zinc-800">
+          
+          <div className="space-y-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-red-600 text-white flex items-center justify-center font-extrabold text-base tracking-tight">
+                  5L
                 </div>
-
-                {error && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-3 font-bold">
-                    <AlertCircle size={18} className="shrink-0 text-red-600" />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5" htmlFor="company_name">Company Name</label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Building2 size={16} />
-                      </span>
-                      <input 
-                        type="text" 
-                        id="company_name" 
-                        name="company_name"
-                        value={formData.company_name}
-                        onChange={handleChange}
-                        required 
-                        placeholder="Acme Corp" 
-                        className="w-full pl-10 pr-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-black placeholder-slate-400 text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 font-medium transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5" htmlFor="email">Work Email</label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Mail size={16} />
-                      </span>
-                      <input 
-                        type="email" 
-                        id="email" 
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required 
-                        placeholder="name@company.com" 
-                        className="w-full pl-10 pr-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-black placeholder-slate-400 text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 font-medium transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5" htmlFor="username">Username</label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <User size={16} />
-                      </span>
-                      <input 
-                        type="text" 
-                        id="username" 
-                        name="username"
-                        value={formData.username}
-                        onChange={handleChange}
-                        required 
-                        placeholder="johndoe" 
-                        className="w-full pl-10 pr-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-black placeholder-slate-400 text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 font-medium transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5" htmlFor="password">Password</label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Lock size={16} />
-                      </span>
-                      <input 
-                        type={showPassword ? 'text' : 'password'} 
-                        id="password" 
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        required 
-                        placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" 
-                        className="w-full pl-10 pr-10 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-black placeholder-slate-400 text-sm focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 font-medium transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
-                      >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1.5">Must be at least 8 characters long.</p>
-                  </div>
-
-                  <div className="pt-2">
-                    <button 
-                      type="submit"
-                      disabled={loading}
-                      className="w-full py-4 px-4 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/30 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest disabled:opacity-50"
-                    >
-                      {loading ? <Loader2 className="animate-spin" size={18} /> : <>Complete Registration <ArrowRight size={16} /></>}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-200 text-xs">
-                    <button type="button" onClick={() => navigate('/login')} className="text-red-600 hover:text-red-700 font-bold">
-                      Already have an account? Sign in
-                    </button>
-                  </div>
-                </form>
+                <div>
+                  <div className="font-bold tracking-tight text-sm text-white">5L SOLUTIONS</div>
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Cloud ERP & Accounting</div>
+                </div>
               </div>
-            </motion.div>
-          ) : step === 2 ? (
-            <motion.div 
-              key="step2"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full space-y-10"
-            >
-              <div className="text-center max-w-3xl mx-auto space-y-4">
-                <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-black">
-                  Choose Your Plan
-                </h1>
-                <p className="text-lg text-slate-600">
-                  Select the perfect operational workflow for your team. Switch billing options anytime.
-                </p>
 
-                {/* Who this plan is being bought for. Without it the page is
-                    indistinguishable from a first-time signup, and a signed-in
-                    user cannot tell the upgrade has been attributed to their
-                    account until they have already paid. */}
-                {pendingAccount?.username && (
-                  <div className="mx-auto mt-6 flex max-w-md items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3.5">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white">
-                      <User size={16} />
-                    </div>
-                    <div className="min-w-0 text-left">
-                      <p className="truncate text-sm font-black text-slate-900">
-                        {pendingAccount.fullname || pendingAccount.username}
-                        {pendingAccount.existingAccount && (
-                          <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 align-middle text-[10px] font-black uppercase tracking-wide text-emerald-700">
-                            Existing account
-                          </span>
-                        )}
-                      </p>
-                      <p className="truncate text-xs text-slate-500">
-                        {pendingAccount.email || `@${pendingAccount.username}`}
-                        {pendingAccount.tenantDb && (
-                          <span className="ml-2 text-slate-400">({pendingAccount.tenantDb})</span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                )}
+              <button
+                type="button"
+                onClick={() => navigate('/login')}
+                className="text-xs font-medium text-zinc-400 hover:text-white transition-colors flex items-center gap-1.5"
+              >
+                <i className="fa-solid fa-arrow-left text-[10px]"></i>
+                <span>Sign in</span>
+              </button>
+            </div>
 
-                <div className="pt-4 flex items-center justify-center gap-3">
-                  <span className={`text-sm font-bold ${billingCycle === 'monthly' ? 'text-black' : 'text-slate-500'}`}>Monthly</span>
-                  <button 
-                    type="button" 
-                    onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')}
-                    className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-300 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-600"
-                  >
-                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${billingCycle === 'annual' ? 'translate-x-5 bg-red-600' : 'translate-x-0'}`}></span>
-                  </button>
-                  <span className={`text-sm font-bold flex items-center gap-1.5 ${billingCycle === 'annual' ? 'text-black' : 'text-slate-500'}`}>
-                    Annual <span className="bg-red-50 text-red-600 text-xs px-2 py-0.5 rounded-full font-black border border-red-200">Save 15%</span>
+            {/* Live Dynamic Workspace Preview Card */}
+            <div className="rounded-2xl bg-white/10 border border-white/20 p-5 sm:p-6 space-y-5 shadow-2xl backdrop-blur-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-300">Workspace Provisioning</div>
+                  <h2 className="text-lg sm:text-xl font-bold text-white mt-0.5 truncate max-w-[240px]">
+                    {formData.company_name || 'Your Company Workspace'}
+                  </h2>
+                  <p className="text-xs font-mono text-zinc-400 mt-0.5">
+                    app.5lsolutions.com/{getWorkspaceSlug(formData.company_name)}
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 rounded-md bg-red-600/25 border border-red-500/50 text-red-300 text-[11px] font-semibold shrink-0">
+                  {selectedPlan?.sp_name || 'Professional'}
+                </span>
+              </div>
+
+              {/* Live Breakdown Line Items */}
+              <div className="pt-4 border-t border-white/10 space-y-2.5 text-xs sm:text-sm">
+                <div className="flex items-center justify-between text-zinc-200">
+                  <span>{selectedPlan?.sp_name || 'Professional Plan'} ({billingCycle === 'annual' ? 'Annual' : 'Monthly'})</span>
+                  <span className="font-mono font-semibold text-emerald-400">
+                    {isTrial ? '₱0' : formatPHP(planPrice * (billingCycle === 'annual' ? 12 : 1))}
                   </span>
                 </div>
+
+                <div className="flex items-center justify-between text-zinc-300">
+                  <span>
+                    {seats === 1
+                      ? '1 Admin User Included'
+                      : `1 Admin + ${seats - 1} Extra User${seats - 1 > 1 ? 's' : ''}`}
+                  </span>
+                  <span className="font-mono text-emerald-400">
+                    {isTrial ? '₱0' : formatPHP(Math.max(0, seats - 1) * 999 * (billingCycle === 'annual' ? 12 : 1))}
+                  </span>
+                </div>
+
+                {billingCycle === 'annual' && !isTrial && (
+                  <div className="flex items-center justify-between text-emerald-400">
+                    <span>Annual Savings (15% Off)</span>
+                    <span className="font-mono font-semibold">
+                      -{formatPHP(Math.round((planPrice * 12 + Math.max(0, seats - 1) * 999 * 12) * 0.15))}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-zinc-400 text-xs">
+                  <span>Philippine VAT (12% Inclusive)</span>
+                  <span>Included</span>
+                </div>
               </div>
 
-              {loadingPlans ? (
-                <div className="py-24 text-center flex flex-col items-center justify-center">
-                  <Loader2 className="animate-spin text-red-600 mb-3" size={36} />
-                  <p className="text-sm font-semibold text-slate-500">Loading plans...</p>
+              {/* Total Due Box */}
+              <div className="pt-4 border-t border-white/10 flex items-baseline justify-between">
+                <div>
+                  <div className="text-xs font-medium text-zinc-300">Due today</div>
+                  <div className="text-[11px] text-zinc-400">
+                    {isTrial ? 'No credit card required' : `Billed ${billingCycle === 'annual' ? 'annually' : 'monthly'} via PayMongo`}
+                  </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6">
-                  {filteredPlans.map((plan) => {
-                    const isSelected = selectedPlan?.sp_id === plan.sp_id;
-                    const price = calculatePrice(plan);
+                <div className="text-right">
+                  <div className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-400 tracking-tight">
+                    {isTrial ? '₱0' : formatPHP(total)}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-                    return (
-                      <motion.div 
-                        key={plan.sp_id}
-                        whileHover={{ y: -4 }}
-                        onClick={() => handlePlanSelect(plan)}
-                        className={`rounded-3xl p-10 flex flex-col justify-between cursor-pointer transition-all duration-300 relative bg-white min-h-[520px] ${
-                          isSelected 
-                            ? 'border-2 border-red-600 shadow-xl shadow-red-600/10 ring-2 ring-red-600/20' 
-                            : 'border border-slate-200 hover:border-slate-300 shadow-sm'
-                        }`}
-                      >
-                        {plan.popular && (
-                          <div className="absolute -top-3.5 left-1/2 transform -translate-x-1/2">
-                            <span className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-md border border-slate-800 flex items-center gap-1">
-                              <Star size={11} className="fill-red-500 text-red-500" /> {plan.badge || 'Most Popular'}
-                            </span>
-                          </div>
-                        )}
+            {/* Included Highlights for Selected Plan */}
+            <div className="hidden lg:block space-y-3">
+              <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-300">Included in selected tier</div>
+              <div className="rounded-2xl bg-white/10 border border-white/20 p-4 sm:p-5 backdrop-blur-sm">
+                <ul className="space-y-2.5 text-xs text-zinc-200">
+                  {(selectedPlan?.features || [
+                    'Automated BIR Tax Returns (VAT & Withholding)',
+                    'Bank Reconciliation, Aging AP/AR & Cash Flow',
+                    'Full Audit Trail & Accounting Period Locks'
+                  ]).map((feat, i) => (
+                    <li key={i} className="flex items-center gap-2.5">
+                      <i className="fa-solid fa-check text-red-400 text-xs"></i>
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
 
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-black text-black">{plan.sp_name}</h3>
-                            <span className={`p-2.5 rounded-xl ${isSelected ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
-                              <Zap size={24} />
-                            </span>
-                          </div>
-                          <p className="text-slate-500 text-base mt-3 leading-relaxed">{plan.sp_description}</p>
-                          
-                          <div className="mt-8 flex items-baseline">
-                            <span className="text-5xl font-black text-black">â‚±{price.toLocaleString()}</span>
-                            <span className="ml-2 text-base text-slate-500">/ {plan.billingCycle.toLowerCase()}</span>
-                          </div>
+          {/* Bottom Security Footer */}
+          <div className="hidden lg:flex items-center justify-between pt-8 mt-8 border-t border-zinc-800/80 text-[11px] text-zinc-500">
+            <span className="flex items-center gap-1.5">
+              <i className="fa-solid fa-shield-halved text-emerald-500"></i>
+              BIR-Ready & 256-Bit Encrypted
+            </span>
+            <span>PayMongo Verified</span>
+          </div>
+        </aside>
 
-                          <ul className="mt-10 space-y-5 text-base text-slate-700">
-                            {(plan.features || []).map((feat, i) => (
-                              <li key={i} className="flex items-center gap-3">
-                                <div className="p-0.5 rounded-full bg-red-100 text-red-600 shrink-0 border border-red-200">
-                                  <Check className="w-4 h-4" />
-                                </div>
-                                <span className="font-medium">{feat}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
+        {/* RIGHT CANVAS: UNIFIED SINGLE-PAGE INTERACTIVE SETUP FLOW */}
+        <main className="lg:ml-[42%] xl:ml-[38%] flex-1 bg-slate-50/70 min-h-screen py-10 sm:py-5 px-5 sm:px-10 lg:px-14 xl:px-20">
+          
+          {/* Confirmation View */}
+          {showConfirmation ? (
+            <div className="max-w-xl mx-auto py-12 text-center space-y-6">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-2xl">
+                <i className="fa-solid fa-check"></i>
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950">
+                  {paymentSuccessDetails?.isNewRegistration ? 'Registration Successful!' : 'Payment Successful!'}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {paymentSuccessDetails?.isNewRegistration
+                    ? 'Your account has been created and payment verified.'
+                    : paymentSuccessDetails?.isUpgrade
+                      ? 'Your subscription has been upgraded successfully.'
+                      : 'Payment verified! Your subscription is now active.'}
+                </p>
+              </div>
 
-                        <div className="mt-10">
-                          <button 
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handlePlanSelect(plan); setStep(3); }}
-                            className={`w-full py-4 px-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider ${
-                              isSelected 
-                                ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/30' 
-                                : 'bg-slate-100 hover:bg-black hover:text-white text-black'
-                            }`}
-                          >
-                            Select {plan.sp_name.split(' ')[0]} <ArrowRight size={16} />
-                          </button>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 text-left text-xs space-y-4">
+                <div className="space-y-3">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 pb-2 border-b border-slate-100">
+                    Account Details
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Username</span>
+                    <span className="font-bold text-slate-900">{paymentSuccessDetails?.username || formData.username}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Email</span>
+                    <span className="font-bold text-slate-900">{paymentSuccessDetails?.email || formData.email}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Organization</span>
+                    <span className="font-bold text-slate-900">{paymentSuccessDetails?.companyName || formData.company_name}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 pb-2 border-b border-slate-100">
+                    Subscription Details
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Plan</span>
+                    <span className="font-bold text-red-600">{paymentSuccessDetails?.planName || selectedPlan?.sp_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Amount Paid</span>
+                    <span className="font-bold text-slate-900">{formatPHP(paymentSuccessDetails?.planPrice || 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Billing Cycle</span>
+                    <span className="font-bold text-slate-900">
+                      {paymentSuccessDetails?.billingCycle
+                        ? `${paymentSuccessDetails.billingCycle} days`
+                        : selectedPlan?.billingCycle || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 pb-2 border-b border-slate-100">
+                    Payment Details
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Payment Method</span>
+                    <span className="font-bold text-slate-900 capitalize">
+                      {paymentSuccessDetails?.paymentMethod || 'PayMongo'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Reference ID</span>
+                    <span className="font-mono text-slate-700 text-[10px]">
+                      {paymentSuccessDetails?.paymentReference || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => navigate('/login')}
+                className="px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold uppercase tracking-wider transition-all"
+              >
+                Go to Login
+              </button>
+            </div>
+          ) : (
+            /* Main Setup Form Container */
+            <div className="max-w-2xl mx-auto space-y-10">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+                  {currentStep === 1
+                    ? 'Set up your 5L Solutions account'
+                    : 'Choose your subscription plan'}
+                </h1>
+                <p className="text-sm text-slate-500 mt-1.5">
+                  {currentStep === 1
+                    ? 'Complete your organization details and admin credentials below.'
+                    : 'Select a subscription tier that fits your business needs.'}
+                </p>
+              </div>
+
+              {pendingAccount?.username && (
+                <div className="mx-auto flex max-w-md items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3.5">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white">
+                    <i className="fa-solid fa-user text-sm"></i>
+                  </div>
+                  <div className="min-w-0 text-left">
+                    <p className="truncate text-sm font-black text-slate-900">
+                      {pendingAccount.fullname || pendingAccount.username}
+                      {pendingAccount.existingAccount && (
+                        <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 align-middle text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                          Existing account
+                        </span>
+                      )}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">
+                      {pendingAccount.email || `@${pendingAccount.username}`}
+                      {pendingAccount.tenantDb && (
+                        <span className="ml-2 text-slate-400">({pendingAccount.tenantDb})</span>
+                      )}
+                    </p>
+                  </div>
                 </div>
               )}
 
-              <div className="pt-8 flex justify-center">
-                <button
-                  type="button"
-                  disabled={!selectedPlan}
-                  onClick={() => selectedPlan && setStep(3)}
-                  className="px-12 py-4 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-2xl shadow-xl shadow-red-600/30 transition-all flex items-center gap-3 uppercase tracking-widest text-xs disabled:opacity-50"
-                >
-                  Proceed with {selectedPlan?.sp_name || 'Selected Plan'} <ArrowRight size={16} />
-                </button>
-              </div>
-            </motion.div>
-          ) : step === 3 ? (
-            <motion.div 
-              key="step3"
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0 }}
-              className="max-w-xl mx-auto w-full animate-fade-in py-6"
-            >
-              <button
-                type="button"
-                onClick={handleBackToPlans}
-                className="mb-6 inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-black transition-colors"
-              >
-                <ArrowLeft size={16} /> Back to Plans
-              </button>
+              <form className="space-y-10" novalidate>
 
-              <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-2xl">
-                
-                <div className="flex items-center justify-between pb-6 border-b border-slate-200 mb-6">
-                  <div>
-                    <span className="text-xs uppercase font-extrabold tracking-wider text-red-600">Payment Summary</span>
-                    <h2 className="text-2xl font-black text-black mt-0.5">{selectedPlan?.sp_name}</h2>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-black text-black">â‚±{calculatePrice(selectedPlan).toLocaleString()}</span>
-                    <span className="text-xs text-slate-500 block">per {selectedPlan?.billingCycle?.toLowerCase() || billingCycle}</span>
-                  </div>
-                </div>
+                {/* SECTION A: ORGANIZATION & ADMIN CREDENTIALS - STEP 1 */}
+                {currentStep === 1 && !pendingAccount?.username && (
+                  <div className="space-y-5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-6 h-6 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                      <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">Organization & Admin Login</h2>
+                      <span className="ml-auto text-xs text-slate-400">Step 1 of 2</span>
+                    </div>
 
-                <div className="space-y-4 mb-6">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Plan</span>
-                    <span className="font-bold text-black">{selectedPlan?.sp_name}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Billing Cycle</span>
-                    <span className="font-bold text-black">{selectedPlan?.billingCycle?.toLowerCase()}</span>
-                  </div>
-                </div>
+                    <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs space-y-4">
+                      {/* Company Name */}
+                      <div>
+                        <label htmlFor="company_name" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Registered Company Name
+                        </label>
+                        <input
+                          type="text"
+                          id="company_name"
+                          name="company_name"
+                          value={formData.company_name}
+                          onChange={handleChange}
+                          placeholder="e.g., Acme Trading Philippines Inc."
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/20 focus:border-red-600 transition-all"
+                        />
+                      </div>
 
-                {paymentError && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-3 font-bold">
-                    <AlertCircle size={18} className="shrink-0 text-red-600" />
-                    <span>{paymentError}</span>
+                      {/* Email & Username Row */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="email" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Work Email
+                          </label>
+                          <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            placeholder="finance@company.com"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/20 focus:border-red-600 transition-all"
+                          />
+                        </div>
+
+                        <div>
+                          <label htmlFor="username" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                            Admin Username
+                          </label>
+                          <input
+                            type="text"
+                            id="username"
+                            name="username"
+                            value={formData.username}
+                            onChange={handleChange}
+                            placeholder="johndoe"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/20 focus:border-red-600 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Password */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label htmlFor="password" className="block text-xs font-semibold text-slate-700">
+                            Password
+                          </label>
+                          <span className="text-[11px] text-slate-400">
+                            {formData.password.length < 8
+                              ? `${8 - formData.password.length} more characters needed`
+                              : 'Strong password ✓'}
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            id="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            placeholder="••••••••••••"
+                            className="w-full px-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600/20 focus:border-red-600 transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-700"
+                          >
+                            <i className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                <div className="pt-2">
-                  <button 
-                    type="button"
-                    onClick={handlePayment}
-                    disabled={paymentLoading}
-                    className="w-full py-4 px-4 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/30 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest disabled:opacity-50"
-                  >
-                    {paymentLoading ? <Loader2 className="animate-spin" size={18} /> : <>Pay with PayMongo <ArrowRight size={16} /></>}
-                  </button>
-                </div>
+                {/* SECTION B: PLAN SELECTOR - STEP 2 */}
+                {currentStep === 2 && (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentStep(1)}
+                          className="w-6 h-6 rounded-full bg-zinc-200 text-zinc-600 text-xs font-bold flex items-center justify-center hover:bg-zinc-300 transition-colors"
+                        >
+                          <i className="fa-solid fa-arrow-left text-[10px]"></i>
+                        </button>
+                        <span className="w-6 h-6 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">Select Subscription Tier</h2>
+                        <span className="ml-auto text-xs text-slate-400">Step 2 of 2</span>
+                      </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-slate-200 text-xs">
-                  <button type="button" onClick={() => setStep(2)} className="text-slate-600 hover:text-black font-bold flex items-center gap-1.5">
-                    <ArrowLeft size={14} /> Back to Plans
-                  </button>
-                  <button type="button" onClick={() => navigate('/login')} className="text-red-600 hover:text-red-700 font-bold">
-                    Already have an account? Sign in
-                  </button>
+                      {/* Billing Switch */}
+                      <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-xl text-xs font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => setBillingCycle('monthly')}
+                          className={`px-3 py-1.5 rounded-lg transition-all ${
+                            billingCycle === 'monthly'
+                              ? 'bg-white text-slate-900 shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Monthly
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBillingCycle('annual')}
+                          className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                            billingCycle === 'annual'
+                              ? 'bg-white text-slate-900 shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>Annual</span>
+                          <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">-15%</span>
+                        </button>
+                      </div>
+                    </div>
+
+                  {loadingPlans ? (
+                    <div className="py-12 text-center">
+                      <i className="fa-solid fa-circle-notch fa-spin text-red-600 text-3xl mb-3"></i>
+                      <p className="text-sm font-semibold text-slate-500">Loading plans...</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredPlans.map((plan) => {
+                        const isSelected = selectedPlan?.sp_id === plan.sp_id;
+                        const price = calculatePrice(plan);
+                        const isPlanTrial = price === 0;
+
+                        return (
+                          <div
+                            key={plan.sp_id}
+                            onClick={() => handlePlanSelect(plan)}
+                            className={`cursor-pointer rounded-2xl bg-white border-2 p-4 sm:p-5 transition-all flex items-center justify-between gap-4 ${
+                              isSelected 
+                                ? 'border-red-600 ring-4 ring-red-600/10' 
+                                : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3.5">
+                              <div className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                isSelected ? 'border-red-600' : 'border-slate-300'
+                              }`}>
+                                <div className={`w-2.5 h-2.5 rounded-full bg-red-600 ${isSelected ? '' : 'hidden'}`}></div>
+                              </div>
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-bold text-slate-950 text-sm sm:text-base">{plan.sp_name}</span>
+                                  {isPlanTrial && (
+                                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
+                                      7-Day Free Trial
+                                    </span>
+                                  )}
+                                  {plan.popular && !isPlanTrial && (
+                                    <span className="px-2 py-0.5 rounded-md bg-red-600 text-white text-[10px] font-extrabold uppercase tracking-wider">
+                                      Recommended
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {plan.sp_description || plan.features?.join(', ')}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-lg sm:text-xl font-extrabold font-mono text-slate-950">
+                                {isPlanTrial ? '₱0' : formatPHP(price)}
+                              </div>
+                              <div className="text-[11px] text-slate-400">
+                                {isPlanTrial ? 'for 7 days' : `/ ${plan.billingCycle?.toLowerCase()}`}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Feature Matrix Accordion */}
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowFeatureMatrix(!showFeatureMatrix)}
+                      className="text-xs font-semibold text-slate-600 hover:text-red-600 inline-flex items-center gap-1.5 transition-colors"
+                    >
+                      <i className={`fa-solid fa-chevron-right text-[10px] transition-transform ${showFeatureMatrix ? 'rotate-90' : ''}`}></i>
+                      <span>Compare all 17 accounting & tax modules</span>
+                    </button>
+
+                    {showFeatureMatrix && (
+                      <div className="mt-3 rounded-2xl bg-white border border-slate-200 p-5 text-xs space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-slate-600">
+                          <div className="flex items-center gap-2"><i className="fa-solid fa-check text-red-600"></i> Core Accounting & Journal Entries</div>
+                          <div className="flex items-center gap-2"><i className="fa-solid fa-check text-red-600"></i> Financial Reporting & Cash Flow</div>
+                          <div className="flex items-center gap-2"><i className="fa-solid fa-check text-red-600"></i> Tax Compliance (BIR Returns & VAT)</div>
+                          <div className="flex items-center gap-2"><i className="fa-solid fa-check text-red-600"></i> Withholding Tax Management</div>
+                          <div className="flex items-center gap-2"><i className="fa-solid fa-check text-red-600"></i> Aging Payables & Receivables</div>
+                          <div className="flex items-center gap-2"><i className="fa-solid fa-check text-red-600"></i> Bank Reconciliation & Advances</div>
+                          <div className="flex items-center gap-2"><i className="fa-solid fa-check text-red-600"></i> Purchase Orders & Products/Services</div>
+                          <div className="flex items-center gap-2"><i className="fa-solid fa-check text-red-600"></i> Audit Trail, Recurring Journals & Periods</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </main>
-      
+                )}
+
+                {/* SECTION C: TEAM SEATS & PAYMENT */}
+                {currentStep === 2 && !isTrial && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-6 h-6 rounded-full bg-zinc-900 text-white text-xs font-bold flex items-center justify-center">3</span>
+                      <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">Team Size & Checkout</h2>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 space-y-5">
+                      {/* Team Seats Stepper */}
+                      <div className="flex items-center justify-between gap-4 pb-5 border-b border-slate-100">
+                        <div>
+                          <div className="text-sm font-bold text-slate-900">Workspace User Seats</div>
+                          <div className="text-xs text-slate-500">1 Admin included • Additional users at ₱999/mo each</div>
+                        </div>
+                        <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => setSeats(Math.max(1, seats - 1))}
+                            className="w-8 h-8 rounded-lg bg-white hover:bg-slate-50 text-slate-800 font-bold shadow-2xs"
+                          >
+                            −
+                          </button>
+                          <span className="w-8 text-center font-mono text-sm font-bold text-slate-950">{seats}</span>
+                          <button
+                            type="button"
+                            onClick={() => setSeats(Math.min(50, seats + 1))}
+                            className="w-8 h-8 rounded-lg bg-white hover:bg-slate-50 text-slate-800 font-bold shadow-2xs"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* PayMongo Channels */}
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="text-xs text-slate-500">
+                          You will be redirected to <strong className="text-slate-800">PayMongo</strong> secure checkout:
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
+                          <span className="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200">GCash</span>
+                          <span className="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200">Maya</span>
+                          <span className="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200">Cards</span>
+                          <span className="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200">BPI / UnionBank</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Submit Action Area */}
+                <div className="pt-2 space-y-3">
+                  {error && (
+                    <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-3 font-bold">
+                      <i className="fa-solid fa-circle-exclamation text-red-600"></i>
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  {paymentError && (
+                    <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-3 font-bold">
+                      <i className="fa-solid fa-circle-exclamation text-red-600"></i>
+                      <span>{paymentError}</span>
+                    </div>
+                  )}
+
+                  {!pendingAccount?.username ? (
+                    <button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={paymentLoading}
+                      className="w-full py-4 px-6 rounded-2xl bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-bold text-sm tracking-wide shadow-lg shadow-red-600/20 transition-all flex items-center justify-center gap-2.5 disabled:opacity-50"
+                    >
+                      <i className={`fa-solid ${paymentLoading ? 'fa-circle-notch fa-spin' : 'fa-arrow-right'} text-xs`}></i>
+                      <span>
+                        {paymentLoading
+                          ? 'Processing...'
+                          : currentStep === 1
+                            ? 'Continue to Plan Selection'
+                            : isTrial
+                              ? 'START 7-DAY FREE TRIAL NOW'
+                              : `CREATE ACCOUNT & PAY ${formatPHP(total)} VIA PAYMONGO`}
+                      </span>
+                      <i className="fa-solid fa-arrow-right text-xs"></i>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleConfirmAndProceed}
+                      disabled={paymentLoading || !selectedPlan}
+                      className="w-full py-4 px-6 rounded-2xl bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-bold text-sm tracking-wide shadow-lg shadow-red-600/20 transition-all flex items-center justify-center gap-2.5 disabled:opacity-50"
+                    >
+                      <i className={`fa-solid ${paymentLoading ? 'fa-circle-notch fa-spin' : 'fa-lock'} text-xs`}></i>
+                      <span>
+                        {paymentLoading
+                          ? 'Processing Payment...'
+                          : isTrial
+                            ? 'START 7-DAY FREE TRIAL NOW'
+                            : `PAY ${formatPHP(total)} VIA PAYMONGO`}
+                      </span>
+                      <i className="fa-solid fa-arrow-right text-xs"></i>
+                    </button>
+                  )}
+
+                  <p className="text-center text-xs text-slate-400">
+                    By creating an account, you agree to 5L Solutions' Terms of Service & Privacy Policy.
+                  </p>
+                </div>
+              </form>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Toast Banner */}
       {showToast && (
-        <DynamicToast
-          type={toastType}
-          message={toastMessage}
-          onClose={() => setShowToast(false)}
-          duration={6000}
-        />
+        <div className="fixed bottom-5 right-5 z-50 transform transition-all duration-300">
+          <div className={`bg-zinc-900 text-white px-4 py-3 rounded-xl shadow-xl border border-zinc-700 flex items-center gap-2.5 text-xs font-medium ${
+            toastType === 'error' ? 'border-red-600' : ''
+          }`}>
+            <i className={`fa-solid ${toastType === 'error' ? 'fa-circle-exclamation text-red-400' : 'fa-circle-info text-sky-400'}`}></i>
+            <span>{toastMessage}</span>
+          </div>
+        </div>
       )}
 
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-lg w-full shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto text-2xl mb-4">
+                <i className="fa-solid fa-receipt"></i>
+              </div>
+              <h3 className="text-xl font-bold text-black mb-2">Review Your Order</h3>
+              <p className="text-sm text-slate-500">Please confirm your details before proceeding</p>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Company</span>
+                  <span className="font-bold text-slate-900">{formData.company_name}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Email</span>
+                  <span className="font-bold text-slate-900">{formData.email}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Username</span>
+                  <span className="font-bold text-slate-900">{formData.username}</span>
+                </div>
+                <div className="border-t border-slate-200 pt-3 mt-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Plan</span>
+                    <span className="font-bold text-slate-900">{selectedPlan?.sp_name}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Billing</span>
+                    <span className="font-bold text-slate-900 capitalize">{billingCycle}</span>
+                  </div>
+                  {!isTrial && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">User Seats</span>
+                      <span className="font-bold text-slate-900">{seats} user{seats > 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between py-3 border-t border-slate-200">
+                <div>
+                  <div className="text-sm font-bold text-slate-900">Total Due Today</div>
+                  <div className="text-xs text-slate-500">
+                    {isTrial ? 'No credit card required' : `Billed ${billingCycle === 'annual' ? 'annually' : 'monthly'}`}
+                  </div>
+                </div>
+                <div className="text-2xl font-extrabold font-mono text-slate-900">
+                  {isTrial ? '₱0' : formatPHP(total)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowReviewModal(false)}
+                className="flex-1 py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-sm transition-all"
+              >
+                <i className="fa-solid fa-arrow-left mr-2"></i>
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAndProceed}
+                disabled={paymentLoading}
+                className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {paymentLoading ? (
+                  <>
+                    <i className="fa-solid fa-circle-notch fa-spin"></i>
+                    Processing...
+                  </>
+                ) : isTrial ? (
+                  <>
+                    <i className="fa-solid fa-rocket"></i>
+                    Start Free Trial
+                  </>
+                ) : (
+                  <>
+                    <i className="fa-solid fa-lock"></i>
+                    Pay {formatPHP(total)}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Modal */}
       {loading && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
@@ -1159,27 +1487,27 @@ export default function Register() {
               
               <div className="mt-4 space-y-2">
                 <div className={`flex items-center gap-2 text-xs ${progress.progress >= 10 ? 'text-green-600' : 'text-gray-400'}`}>
-                  <CheckCircle size={14} className={progress.progress >= 10 ? 'fill-current' : ''} />
+                  <i className={`fa-solid fa-circle-check ${progress.progress >= 10 ? '' : 'fa-regular'}`}></i>
                   <span>Validating information</span>
                 </div>
                 <div className={`flex items-center gap-2 text-xs ${progress.progress >= 15 ? 'text-green-600' : 'text-gray-400'}`}>
-                  <CheckCircle size={14} className={progress.progress >= 15 ? 'fill-current' : ''} />
+                  <i className={`fa-solid fa-circle-check ${progress.progress >= 15 ? '' : 'fa-regular'}`}></i>
                   <span>Creating account</span>
                 </div>
                 <div className={`flex items-center gap-2 text-xs ${progress.progress >= 20 ? 'text-green-600' : 'text-gray-400'}`}>
-                  <CheckCircle size={14} className={progress.progress >= 20 ? 'fill-current' : ''} />
+                  <i className={`fa-solid fa-circle-check ${progress.progress >= 20 ? '' : 'fa-regular'}`}></i>
                   <span>Creating database</span>
                 </div>
                 <div className={`flex items-center gap-2 text-xs ${progress.progress >= 60 ? 'text-green-600' : 'text-gray-400'}`}>
-                  <CheckCircle size={14} className={progress.progress >= 60 ? 'fill-current' : ''} />
+                  <i className={`fa-solid fa-circle-check ${progress.progress >= 60 ? '' : 'fa-regular'}`}></i>
                   <span>Running migrations</span>
                 </div>
                 <div className={`flex items-center gap-2 text-xs ${progress.progress >= 85 ? 'text-green-600' : 'text-gray-400'}`}>
-                  <CheckCircle size={14} className={progress.progress >= 85 ? 'fill-current' : ''} />
+                  <i className={`fa-solid fa-circle-check ${progress.progress >= 85 ? '' : 'fa-regular'}`}></i>
                   <span>Running seeders</span>
                 </div>
                 <div className={`flex items-center gap-2 text-xs ${progress.progress >= 90 ? 'text-green-600' : 'text-gray-400'}`}>
-                  <CheckCircle size={14} className={progress.progress >= 90 ? 'fill-current' : ''} />
+                  <i className={`fa-solid fa-circle-check ${progress.progress >= 90 ? '' : 'fa-regular'}`}></i>
                   <span>Setting up user account</span>
                 </div>
               </div>

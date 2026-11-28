@@ -293,6 +293,7 @@ const getAdjustmentById = async (req, res, next) => {
         { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' },
         { col: Accounting.journal_entries.selectOptionColumns.amount, as: 'amount' },
         { col: Accounting.journal_entries.selectOptionColumns.date, as: 'date' },
+        { col: Accounting.journal_entries.selectOptionColumns.description, as: 'description' },
       ])
       .from(Accounting.journal_entries.tablename)
       .leftJoin(
@@ -540,6 +541,7 @@ const createAdjustment = async (req, res, next) => {
             type,
             amount,
             new Date().toISOString().split('T')[0],
+            entry.description || '',
           ]
 
           await connection.execute(entryQuery, entryValues)
@@ -1083,6 +1085,10 @@ const updateAdjustmentData = async (req, res, next) => {
               as: 'amount',
             },
             { col: Accounting.journal_entries.selectOptionColumns.type, as: 'type' },
+            {
+              col: Accounting.journal_entries.selectOptionColumns.description,
+              as: 'description',
+            },
           ])
           .from(Accounting.journal_entries.tablename)
           .where(Accounting.journal_entries.selectOptionColumns.db_name)
@@ -1187,6 +1193,7 @@ const updateAdjustmentData = async (req, res, next) => {
               type,
               amount,
               new Date().toISOString().split('T')[0],
+              entry.description || '',
             ]
 
             await connection.execute(entryQuery, entryValues)
@@ -1342,6 +1349,14 @@ const updateAdjustmentData = async (req, res, next) => {
             if (currentType.toLowerCase() !== type.toLowerCase()) {
               auditChanges.push(
                 `Journal ${currentEntry.id} Type: ${currentType} → ${type}`,
+              )
+            }
+
+            const currentDescription = normalizeValue(currentEntry.description)
+            const newDescription = normalizeValue(entry.description)
+            if (currentDescription !== newDescription) {
+              auditChanges.push(
+                `Journal ${currentEntry.id} Description: ${currentDescription || 'NULL'} → ${newDescription || 'NULL'}`,
               )
             }
           } else {
